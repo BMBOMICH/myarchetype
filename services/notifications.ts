@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 const storage = new MMKV({ id: 'notifications' });
 
 // ✅ Replace with your Render.com URL
-const SERVER_URL = 'https://myarchetype-server.onrender.com';
+const SERVER_URL = 'https://myarchetype-api.onrender.com';
 
 // ─── Expo Push (iOS + Android) ────────────────────────────────────────────────
 
