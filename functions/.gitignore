@@ -1,0 +1,16 @@
+node_modules/
+*.log
+.env# Dependencies
+node_modules/
+
+# Build output (if TypeScript is added later)
+lib/
+
+# Logs
+*.log
+
+# Environment & secrets
+.env
+.env.*
+*.local
+.secret.local

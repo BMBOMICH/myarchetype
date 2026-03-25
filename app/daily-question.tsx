@@ -1,0 +1,179 @@
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import {
+    getQuestionEmoji,
+    getTodaysQuestion,
+    hasAnsweredToday,
+    saveUserAnswer,
+} from '../utils/dailyQuestions';
+
+export default function DailyQuestionScreen() {
+  const router = useRouter();
+  const [question, setQuestion] = useState(getTodaysQuestion());
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [alreadyAnswered, setAlreadyAnswered] = useState(false);
+
+  useEffect(() => {
+    checkIfAnswered();
+  }, []);
+
+  const checkIfAnswered = async () => {
+    const answered = await hasAnsweredToday();
+    setAlreadyAnswered(answered);
+    setLoading(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!answer.trim()) {
+      alert('Please write an answer!');
+      return;
+    }
+
+    setSaving(true);
+
+    const success = await saveUserAnswer(question.id, answer.trim());
+
+    setSaving(false);
+
+    if (success) {
+      alert(
+        '✅ Answer saved!\n\n' +
+        'Your answer will appear on your profile for 24 hours.\n\n' +
+        'Come back tomorrow for a new question!'
+      );
+      router.back();
+    } else {
+      alert('Failed to save answer. Please try again.');
+    }
+  };
+
+  const handleSkip = () => {
+    router.back();
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#53a8b6" />
+      </View>
+    );
+  }
+
+  const emoji = getQuestionEmoji(question.category);
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Daily Question</Text>
+        <View style={{ width: 60 }} />
+      </View>
+
+      <View style={styles.questionCard}>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={styles.category}>{question.category.toUpperCase()}</Text>
+        <Text style={styles.questionText}>{question.question}</Text>
+      </View>
+
+      {alreadyAnswered && (
+        <View style={styles.alreadyAnsweredBanner}>
+          <Text style={styles.alreadyAnsweredIcon}>✓</Text>
+          <Text style={styles.alreadyAnsweredText}>
+            You already answered today's question!{'\n'}
+            Come back tomorrow for a new one.
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.label}>Your Answer</Text>
+      <Text style={styles.hint}>
+        Share your thoughts! Your answer will be visible on your profile for 24 hours.
+      </Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Type your answer here..."
+        placeholderTextColor="#666"
+        value={answer}
+        onChangeText={setAnswer}
+        multiline
+        maxLength={200}
+        editable={!saving}
+        autoFocus={!alreadyAnswered}
+      />
+
+      <Text style={styles.charCount}>{answer.length}/200</Text>
+
+      <TouchableOpacity
+        style={[styles.submitButton, (!answer.trim() || saving) && styles.submitButtonDisabled]}
+        onPress={handleSubmit}
+        disabled={!answer.trim() || saving}
+      >
+        <Text style={styles.submitButtonText}>
+          {saving ? 'Saving...' : alreadyAnswered ? '🔄 Update Answer' : '✓ Submit Answer'}
+        </Text>
+      </TouchableOpacity>
+
+      {!alreadyAnswered && (
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip} disabled={saving}>
+          <Text style={styles.skipButtonText}>Skip for Today</Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.infoCard}>
+        <Text style={styles.infoIcon}>ℹ️</Text>
+        <View style={styles.infoTextContainer}>
+          <Text style={styles.infoTitle}>How it works:</Text>
+          <Text style={styles.infoText}>
+            • A new question appears every day{'\n'}
+            • Your answer shows on your profile for 24 hours{'\n'}
+            • Great conversation starter for matches!{'\n'}
+            • Come back tomorrow for a new question
+          </Text>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  content: { padding: 20, paddingBottom: 40 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, marginBottom: 20 },
+  backButton: { color: '#53a8b6', fontSize: 16 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#eee' },
+  questionCard: { backgroundColor: '#16213e', borderRadius: 20, padding: 25, alignItems: 'center', marginBottom: 20, borderWidth: 2, borderColor: '#53a8b6' },
+  emoji: { fontSize: 50, marginBottom: 10 },
+  category: { color: '#53a8b6', fontSize: 12, fontWeight: '600', letterSpacing: 1, marginBottom: 15 },
+  questionText: { color: '#eee', fontSize: 20, fontWeight: 'bold', textAlign: 'center', lineHeight: 28 },
+  alreadyAnsweredBanner: { flexDirection: 'row', backgroundColor: '#1a5c3a', borderRadius: 15, padding: 15, marginBottom: 20, alignItems: 'center' },
+  alreadyAnsweredIcon: { fontSize: 24, marginRight: 12 },
+  alreadyAnsweredText: { color: '#5cb85c', fontSize: 13, flex: 1, lineHeight: 20 },
+  label: { fontSize: 16, fontWeight: '600', color: '#eee', marginBottom: 8 },
+  hint: { fontSize: 13, color: '#888', marginBottom: 12, lineHeight: 18 },
+  input: { backgroundColor: '#16213e', color: '#fff', padding: 15, borderRadius: 12, fontSize: 16, minHeight: 120, textAlignVertical: 'top', borderWidth: 1, borderColor: '#0f3460' },
+  charCount: { color: '#666', fontSize: 12, textAlign: 'right', marginTop: 5, marginBottom: 20 },
+  submitButton: { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginBottom: 10 },
+  submitButtonDisabled: { backgroundColor: '#555' },
+  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  skipButton: { paddingVertical: 12, alignItems: 'center', marginBottom: 30 },
+  skipButtonText: { color: '#888', fontSize: 16 },
+  infoCard: { flexDirection: 'row', backgroundColor: 'rgba(83, 168, 182, 0.1)', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: 'rgba(83, 168, 182, 0.3)' },
+  infoIcon: { fontSize: 24, marginRight: 12 },
+  infoTextContainer: { flex: 1 },
+  infoTitle: { color: '#53a8b6', fontSize: 14, fontWeight: '600', marginBottom: 6 },
+  infoText: { color: '#888', fontSize: 13, lineHeight: 20 },
+});

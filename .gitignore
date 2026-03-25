@@ -1,15 +1,24 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# ═══════════════════════════════════════════
+# Dependencies
+# ═══════════════════════════════════════════
 node_modules/
+.pnp
+.pnp.js
+.yarn/
 
+# ═══════════════════════════════════════════
 # Expo
+# ═══════════════════════════════════════════
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# ═══════════════════════════════════════════
+# Native (generated)
+# ═══════════════════════════════════════════
+/ios
+/android
 .kotlin/
 *.orig.*
 *.jks
@@ -18,28 +27,91 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# ═══════════════════════════════════════════
 # Metro
+# ═══════════════════════════════════════════
 .metro-health-check*
 
-# debug
+# ═══════════════════════════════════════════
+# Environment Variables
+# ═══════════════════════════════════════════
+.env
+.env.*
+!.env.example
+
+# ═══════════════════════════════════════════
+# Debug Logs
+# ═══════════════════════════════════════════
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# ═══════════════════════════════════════════
+# Firebase
+# ═══════════════════════════════════════════
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+database-debug.log
+
+# ═══════════════════════════════════════════
 # macOS
+# ═══════════════════════════════════════════
 .DS_Store
 *.pem
+.AppleDouble
+.LSOverride
 
-# local env files
-.env*.local
+# ═══════════════════════════════════════════
+# Windows
+# ═══════════════════════════════════════════
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# typescript
+# ═══════════════════════════════════════════
+# Linux
+# ═══════════════════════════════════════════
+*~
+
+# ═══════════════════════════════════════════
+# IDE & Editors
+# ═══════════════════════════════════════════
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# ═══════════════════════════════════════════
+# TypeScript
+# ═══════════════════════════════════════════
 *.tsbuildinfo
 
+# ═══════════════════════════════════════════
+# Testing
+# ═══════════════════════════════════════════
+coverage/
+.jest/
+jest-report/
+
+# ═══════════════════════════════════════════
+# Build & Cache
+# ═══════════════════════════════════════════
+.cache/
+tmp/
+temp/
+*.log
+
+# ═══════════════════════════════════════════
+# Misc
+# ═══════════════════════════════════════════
 app-example
-
-# generated native folders
-/ios
-/android
-
 .vercel
+.turbo
+storybook-static/
