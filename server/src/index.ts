@@ -1,4 +1,4 @@
-import * as express from 'express';
+import express, { Request, Response } from 'express';
 import * as webpush from 'web-push';
 
 const app = express();
@@ -10,7 +10,7 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY!
 );
 
-app.post('/send-notification', async (req, res) => {
+app.post('/send-notification', async (req: Request, res: Response) => {
   try {
     const { subscription, title, body, screen } = req.body as {
       subscription: webpush.PushSubscription;
@@ -36,7 +36,7 @@ app.post('/send-notification', async (req, res) => {
   }
 });
 
-app.post('/send-expo-notification', async (req, res) => {
+app.post('/send-expo-notification', async (req: Request, res: Response) => {
   try {
     const { expoPushToken, title, body, screen } = req.body as {
       expoPushToken: string;
@@ -70,7 +70,7 @@ app.post('/send-expo-notification', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
