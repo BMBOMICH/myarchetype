@@ -7,7 +7,6 @@ service cloud.firestore {
     // HELPER FUNCTIONS
     // ═══════════════════════════════════════════
 
-    // ── Authentication ────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -39,7 +38,6 @@ service cloud.firestore {
       return isNotBanned() && isEmailVerified();
     }
 
-    // ── Validation ────────────────────────────
     function isValidString(field, minLen, maxLen) {
       return field is string &&
         field.size() >= minLen &&
@@ -62,7 +60,10 @@ service cloud.firestore {
       return field == request.time;
     }
 
-    // ── Field guards ──────────────────────────
+    function isValidBool(field) {
+      return field is bool;
+    }
+
     function fieldsUnchanged(fields) {
       return !request.resource.data.diff(resource.data)
         .affectedKeys()
@@ -83,17 +84,16 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly(fields);
     }
 
-    // ── User-specific guards ──────────────────
-    // Fields that only the server / admin can modify
     function isProtectedUserUpdate() {
       return request.resource.data.diff(resource.data)
         .affectedKeys()
         .hasAny([
           'isAdmin', 'isBanned', 'bannedAt', 'bannedBy',
-          'createdAt', 'uid', 'email',
-          // Server-computed fields — users must NOT be able to inflate these
+          'createdAt', 'uid', 'email', 'termsAcceptedAt',
           'ratings', 'matchCount', 'profileViews', 'referralCount',
-          'achievements', 'achievementPoints', 'trustScore'
+          'achievements', 'achievementPoints', 'trustScore',
+          'loginStreak', 'lastLoginDate',
+          'selfieVerified', 'photoVerified', 'ageVerification'
         ]);
     }
 
@@ -101,69 +101,48 @@ service cloud.firestore {
     // USERS
     // ═══════════════════════════════════════════
     match /users/{userId} {
-
-      // Any authenticated user can read profiles for matching/discovery.
-      // Sensitive fields (email, location coords) should be excluded
-      // at the query level in your app code, or use a /publicProfiles
-      // subcollection in the future.
       allow read: if isAuthenticated();
 
-      // Profile creation — must match ALL fields your app actually sends
-      // from profile-setup.tsx doSave()
       allow create: if isOwner(userId) && isVerifiedUser() &&
         hasRequiredFields([
           'uid', 'email', 'name', 'age', 'gender',
           'interestedIn', 'photos', 'profileComplete', 'createdAt'
         ]) &&
         hasOnlyAllowedFields([
-          // Identity
           'uid', 'email', 'name', 'age', 'birthday',
           'zodiacSign', 'zodiacEmoji',
 
-          // Demographics
           'gender', 'interestedIn', 'pronouns',
           'height', 'bodyType', 'lookingFor',
 
-          // Lifestyle & values
           'religiousViews', 'lifestyle', 'relationshipGoal',
           'education', 'occupation', 'smoking', 'drinking',
           'children', 'pets', 'diet', 'politicalViews',
 
-          // Interests & personality
           'interests', 'loveLanguage', 'communicationStyle',
           'preferredFirstDate', 'vibes',
 
-          // Preferences (nested object)
           'preferences',
 
-          // Bio & prompts
           'bio', 'promptAnswers',
 
-          // Photos
           'photos', 'photoData', 'hasFullBodyPhoto',
 
-          // Privacy (nested object)
           'privacy',
 
-          // Location
           'location', 'locationCity',
 
-          // Verification
-          'ageVerification',
-
-          // System fields set on create
           'createdAt', 'updatedAt', 'profileComplete',
-          'photoVerified', 'selfieVerified', 'isVisible',
-          'termsAcceptedAt',
+          'isVisible', 'termsAcceptedAt',
 
-          // Defaults (initialised to zero/null/empty)
-          'ratings', 'personalityType', 'icebreakers',
-          'achievements', 'achievementPoints',
-          'loginStreak', 'lastLoginDate',
-          'matchCount', 'profileViews', 'referralCount',
+          'personalityType', 'icebreakers',
 
-          // Admin (set by server, but present at create with defaults)
-          'isAdmin', 'isBanned'
+          'pushToken', 'pushTokenUpdatedAt',
+          'webPushSubscription',
+
+          'encryptionPublicKey',
+          'encryptionKeyVersion',
+          'encryptionCreatedAt'
         ]) &&
         request.resource.data.uid == userId &&
         request.resource.data.email == request.auth.token.email &&
@@ -171,13 +150,12 @@ service cloud.firestore {
         isValidString(request.resource.data.name, 1, 30) &&
         isValidNumber(request.resource.data.age, 18, 99) &&
         isValidList(request.resource.data.photos, 1, 6) &&
-        request.resource.data.profileComplete == true;
+        request.resource.data.profileComplete == true &&
+        request.resource.data.isVisible is bool;
 
-      // Owner can update their own profile, but NOT protected fields
       allow update: if isAdmin() ||
         (isOwner(userId) && isVerifiedUser() &&
-         !isProtectedUserUpdate() &&
-         fieldsUnchanged(['createdAt', 'uid', 'email', 'termsAcceptedAt']));
+         !isProtectedUserUpdate());
 
       allow delete: if isAdmin();
     }
@@ -193,17 +171,21 @@ service cloud.firestore {
       allow create: if isVerifiedUser() &&
         hasRequiredFields(['fromUserId', 'toUserId', 'createdAt']) &&
         hasOnlyAllowedFields([
-          'fromUserId', 'toUserId', 'createdAt', 'type', 'message'
+          'fromUserId', 'toUserId', 'createdAt', 'type', 'message', 'status', 'matchedAt'
         ]) &&
         request.resource.data.fromUserId == request.auth.uid &&
         request.resource.data.toUserId != request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt) &&
-        isValidString(request.resource.data.toUserId, 1, 128);
+        isValidString(request.resource.data.toUserId, 1, 128) &&
+        likeId == (request.auth.uid + '_' + request.resource.data.toUserId);
 
       allow update: if false;
 
       allow delete: if isAuthenticated() &&
-        resource.data.fromUserId == request.auth.uid;
+        (
+          resource.data.fromUserId == request.auth.uid ||
+          resource.data.toUserId == request.auth.uid
+        );
     }
 
     // ═══════════════════════════════════════════
@@ -224,8 +206,13 @@ service cloud.firestore {
         isChatParticipantCreate() &&
         hasRequiredFields(['participants', 'createdAt']) &&
         hasOnlyAllowedFields([
-          'participants', 'createdAt',
-          'lastMessage', 'lastMessageAt', 'lastMessageSenderId'
+          'participants',
+          'createdAt',
+          'lastMessage',
+          'lastMessageAt',
+          'lastMessageSenderId',
+          'pinnedMessages',
+          'disappearingMessages'
         ]) &&
         request.resource.data.participants.size() == 2 &&
         isValidTimestamp(request.resource.data.createdAt);
@@ -243,40 +230,207 @@ service cloud.firestore {
             get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         }
 
+        function isTextMessage() {
+          return request.resource.data.messageType == 'text' ||
+                 request.resource.data.messageType == 'system';
+        }
+
+        function isImageMessage() {
+          return request.resource.data.messageType == 'image' ||
+                 request.resource.data.messageType == 'gif';
+        }
+
+        function isVoiceMessage() {
+          return request.resource.data.messageType == 'voice';
+        }
+
+        function validBaseFields() {
+          return request.resource.data.senderId == request.auth.uid &&
+            request.resource.data.timestamp == request.time &&
+            request.resource.data.version is number &&
+            request.resource.data.messageType in ['text', 'image', 'voice', 'gif', 'system'] &&
+            (!('read' in request.resource.data) || request.resource.data.read is bool) &&
+            (!('readAt' in request.resource.data) || request.resource.data.readAt == null) &&
+            (!('reactions' in request.resource.data) || request.resource.data.reactions is list);
+        }
+
+        function validEncryptedTextFields() {
+          return request.resource.data.ciphertext is string &&
+            request.resource.data.nonce is string &&
+            request.resource.data.senderPublicKey is string &&
+            request.resource.data.senderKeyVersion is number;
+        }
+
+        function validEncryptedMediaFields() {
+          return request.resource.data.mediaUrl is string &&
+            request.resource.data.mediaMimeType is string &&
+            request.resource.data.mediaSizeBytes is number &&
+            request.resource.data.encryptedMediaKey is string &&
+            request.resource.data.mediaKeyNonce is string &&
+            request.resource.data.mediaCipherNonce is string &&
+            request.resource.data.senderPublicKey is string &&
+            request.resource.data.senderKeyVersion is number;
+        }
+
         allow read: if isAuthenticated() && isParentChatParticipant();
 
         allow create: if isVerifiedUser() &&
           isParentChatParticipant() &&
-          hasRequiredFields(['senderId', 'text', 'createdAt']) &&
-          hasOnlyAllowedFields([
-            'senderId', 'text', 'createdAt',
-            'type', 'mediaUrl', 'readBy', 'edited'
+          hasRequiredFields([
+            'senderId',
+            'timestamp',
+            'version',
+            'messageType'
           ]) &&
-          request.resource.data.senderId == request.auth.uid &&
-          isValidTimestamp(request.resource.data.createdAt) &&
-          isValidString(request.resource.data.text, 1, 5000);
+          hasOnlyAllowedFields([
+            'senderId',
+            'timestamp',
+            'read',
+            'readAt',
 
-        // Allow marking as read or editing own message
+            'version',
+            'messageType',
+
+            'ciphertext',
+            'nonce',
+
+            'senderPublicKey',
+            'senderKeyVersion',
+
+            'mediaUrl',
+            'mediaMimeType',
+            'mediaSizeBytes',
+            'encryptedMediaKey',
+            'mediaKeyNonce',
+            'mediaCipherNonce',
+
+            'voiceDuration',
+            'isGif',
+
+            'reactions'
+          ]) &&
+          validBaseFields() &&
+          (
+            (
+              isTextMessage() &&
+              validEncryptedTextFields()
+            ) ||
+            (
+              isImageMessage() &&
+              validEncryptedMediaFields() &&
+              (!('isGif' in request.resource.data) || request.resource.data.isGif is bool)
+            ) ||
+            (
+              isVoiceMessage() &&
+              validEncryptedMediaFields() &&
+              request.resource.data.voiceDuration is number
+            )
+          );
+
         allow update: if isAuthenticated() &&
+          isNotBanned() &&
           isParentChatParticipant() &&
-          fieldsUnchanged(['senderId', 'createdAt']);
+          fieldsUnchanged([
+            'senderId',
+            'timestamp',
+            'version',
+            'messageType',
 
-        // Only sender can delete their own message
+            'ciphertext',
+            'nonce',
+
+            'senderPublicKey',
+            'senderKeyVersion',
+
+            'mediaUrl',
+            'mediaMimeType',
+            'mediaSizeBytes',
+            'encryptedMediaKey',
+            'mediaKeyNonce',
+            'mediaCipherNonce',
+
+            'voiceDuration',
+            'isGif'
+          ]);
+
         allow delete: if isAuthenticated() &&
           resource.data.senderId == request.auth.uid;
       }
 
       // ── Typing indicators ───────────────────
-      match /typing/{typingId} {
+      match /typing/{typingUserId} {
         allow read: if isAuthenticated() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
 
-        allow write: if isAuthenticated() &&
+        allow write: if isOwner(typingUserId) &&
           request.auth.uid in
             get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
-          isOwner(typingId);
+          hasOnlyAllowedFields(['isTyping', 'lastTyped']) &&
+          isValidBool(request.resource.data.isTyping);
       }
+    }
+
+    // ═══════════════════════════════════════════
+    // CHAT SETTINGS
+    // ═══════════════════════════════════════════
+    match /chatSettings/{settingsId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        hasRequiredFields(['userId', 'chatId']) &&
+        hasOnlyAllowedFields([
+          'userId',
+          'chatId',
+          'updatedAt',
+          'wallpaper',
+          'readReceiptsEnabled',
+          'typingIndicatorsEnabled',
+          'notificationsEnabled'
+        ]);
+
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        fieldsUnchanged(['userId', 'chatId']) &&
+        hasOnlyAllowedFields([
+          'userId',
+          'chatId',
+          'updatedAt',
+          'wallpaper',
+          'readReceiptsEnabled',
+          'typingIndicatorsEnabled',
+          'notificationsEnabled'
+        ]);
+
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ═══════════════════════════════════════════
+    // MATCH NOTES
+    // ═══════════════════════════════════════════
+    match /matchNotes/{noteId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        hasRequiredFields(['userId', 'matchId', 'note', 'lastUpdated']) &&
+        hasOnlyAllowedFields(['userId', 'matchId', 'note', 'lastUpdated']) &&
+        request.resource.data.note is string;
+
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        fieldsUnchanged(['userId', 'matchId']) &&
+        hasOnlyAllowedFields(['userId', 'matchId', 'note', 'lastUpdated']) &&
+        request.resource.data.note is string;
+
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
     }
 
     // ═══════════════════════════════════════════
@@ -293,11 +447,11 @@ service cloud.firestore {
         ]) &&
         hasOnlyAllowedFields([
           'reporterId', 'reportedUserId', 'reason',
-          'description', 'createdAt', 'status', 'evidence'
+          'description', 'createdAt', 'evidence'
         ]) &&
         request.resource.data.reporterId == request.auth.uid &&
         request.resource.data.reportedUserId != request.auth.uid &&
-        isValidTimestamp(request.resource.data.createdAt) &&
+        request.resource.data.createdAt == request.time &&
         isValidString(request.resource.data.reason, 1, 200);
 
       allow update: if isAdmin();
@@ -334,21 +488,23 @@ service cloud.firestore {
     // RATING STATUS
     // ═══════════════════════════════════════════
     match /ratingStatus/{statusId} {
-      // Only the owner can read their own rating status
       allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
 
       allow create: if isVerifiedUser() &&
         hasRequiredFields(['userId', 'createdAt']) &&
         hasOnlyAllowedFields([
-          'userId', 'createdAt', 'status', 'lastRatedAt'
+          'userId', 'createdAt', 'lastRatedAt'
         ]) &&
         request.resource.data.userId == request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt);
 
       allow update: if isVerifiedUser() &&
         resource.data.userId == request.auth.uid &&
-        fieldsUnchanged(['userId', 'createdAt']);
+        fieldsUnchanged(['userId', 'createdAt']) &&
+        hasOnlyAllowedFields([
+          'userId', 'createdAt', 'lastRatedAt'
+        ]);
 
       allow delete: if isAdmin();
     }
@@ -370,7 +526,7 @@ service cloud.firestore {
         ]) &&
         request.resource.data.blockerId == request.auth.uid &&
         request.resource.data.blockedUserId != request.auth.uid &&
-        isValidTimestamp(request.resource.data.createdAt);
+        request.resource.data.createdAt == request.time;
 
       allow update: if false;
 
@@ -379,10 +535,10 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // RATE LIMITS (server-side only)
+    // RATE LIMITS
     // ═══════════════════════════════════════════
     match /rateLimits/{limitId} {
-      allow read: if isOwner(limitId);
+      allow read: if isOwner(limitId) || isAdmin();
       allow write: if false;
     }
 
@@ -401,7 +557,7 @@ service cloud.firestore {
         hasOnlyAllowedFields([
           'reporterId', 'title', 'description', 'createdAt',
           'severity', 'screenshot', 'deviceInfo', 'appVersion',
-          'status', 'steps'
+          'steps'
         ]) &&
         request.resource.data.reporterId == request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt) &&
@@ -447,8 +603,7 @@ service cloud.firestore {
           'referrerId', 'referredUserId', 'createdAt'
         ]) &&
         hasOnlyAllowedFields([
-          'referrerId', 'referredUserId', 'createdAt',
-          'status', 'rewardClaimed'
+          'referrerId', 'referredUserId', 'createdAt'
         ]) &&
         request.resource.data.referrerId == request.auth.uid &&
         request.resource.data.referredUserId != request.auth.uid &&
@@ -459,7 +614,7 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // ADMIN STATS (server-only)
+    // ADMIN STATS
     // ═══════════════════════════════════════════
     match /adminStats/{statId} {
       allow read: if isAdmin();
@@ -490,10 +645,13 @@ service cloud.firestore {
         isValidTimestamp(request.resource.data.createdAt) &&
         isValidString(request.resource.data.answer, 1, 1000);
 
-      // Allow editing answer but not changing ownership
       allow update: if isVerifiedUser() &&
         resource.data.userId == request.auth.uid &&
-        fieldsUnchanged(['userId', 'questionId', 'createdAt']);
+        fieldsUnchanged(['userId', 'questionId', 'createdAt']) &&
+        hasOnlyAllowedFields([
+          'userId', 'questionId', 'answer', 'createdAt',
+          'questionDate'
+        ]);
 
       allow delete: if false;
     }
@@ -508,7 +666,8 @@ service cloud.firestore {
         hasOnlyAllowedFields([
           'online', 'lastSeen', 'platform'
         ]) &&
-        request.resource.data.lastSeen == request.time;
+        request.resource.data.lastSeen == request.time &&
+        isValidBool(request.resource.data.online);
 
       allow delete: if isOwner(userId);
     }
@@ -528,30 +687,36 @@ service cloud.firestore {
           'longestStreak'
         ]) &&
         isValidTimestamp(request.resource.data.createdAt) &&
-        isValidNumber(request.resource.data.currentStreak, 0, 9999);
+        isValidNumber(request.resource.data.currentStreak, 0, 9999) &&
+        (!('longestStreak' in request.resource.data) ||
+          isValidNumber(request.resource.data.longestStreak, 0, 9999));
 
       allow update: if isOwner(userId) && isNotBanned() &&
         fieldsUnchanged(['createdAt']) &&
-        isValidNumber(request.resource.data.currentStreak, 0, 9999);
+        hasOnlyAllowedFields([
+          'currentStreak', 'lastLoginDate', 'createdAt',
+          'longestStreak'
+        ]) &&
+        isValidNumber(request.resource.data.currentStreak, 0, 9999) &&
+        (!('longestStreak' in request.resource.data) ||
+          isValidNumber(request.resource.data.longestStreak, 0, 9999));
 
       allow delete: if false;
     }
 
     // ═══════════════════════════════════════════
-    // NOTIFICATIONS (server creates, user reads)
+    // NOTIFICATIONS
     // ═══════════════════════════════════════════
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
 
-      // Only server/Cloud Functions create notifications
       allow create: if false;
 
-      // Users can only mark as read — nothing else
       allow update: if isAuthenticated() &&
         resource.data.userId == request.auth.uid &&
         onlyChangedFields(['read', 'readAt']) &&
-        request.resource.data.read is bool;
+        isValidBool(request.resource.data.read);
 
       allow delete: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
@@ -593,13 +758,14 @@ service cloud.firestore {
         (request.resource.data.user1 == request.auth.uid ||
          request.resource.data.user2 == request.auth.uid) &&
         request.resource.data.user1 != request.resource.data.user2 &&
-        isValidTimestamp(request.resource.data.createdAt);
+        isValidTimestamp(request.resource.data.createdAt) &&
+        exists(/databases/$(database)/documents/likes/$(request.resource.data.user1 + '_' + request.resource.data.user2)) &&
+        exists(/databases/$(database)/documents/likes/$(request.resource.data.user2 + '_' + request.resource.data.user1));
 
       allow update: if isVerifiedUser() &&
         isMatchParticipant() &&
         fieldsUnchanged(['user1', 'user2', 'createdAt']);
 
-      // Either participant can unmatch
       allow delete: if isAuthenticated() && isMatchParticipant();
     }
 
@@ -631,7 +797,6 @@ service cloud.firestore {
     // STORIES
     // ═══════════════════════════════════════════
     match /stories/{storyId} {
-      // All authenticated users can discover stories
       allow read: if isAuthenticated();
 
       allow create: if isVerifiedUser() &&
@@ -644,15 +809,18 @@ service cloud.firestore {
         ]) &&
         request.resource.data.userId == request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt) &&
-        // Ensure viewCount starts at 0
         (!('viewCount' in request.resource.data) ||
           request.resource.data.viewCount == 0);
 
-      // Owner can update caption but not change media or ownership
-      allow update: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid &&
+      allow update: if isVerifiedUser() &&
+        (resource.data.userId == request.auth.uid || isAdmin()) &&
         fieldsUnchanged([
-          'userId', 'createdAt', 'mediaUrl', 'expiresAt'
+          'userId', 'createdAt', 'mediaUrl', 'expiresAt',
+          'viewCount'
+        ]) &&
+        hasOnlyAllowedFields([
+          'userId', 'mediaUrl', 'createdAt', 'expiresAt',
+          'caption', 'type', 'viewCount'
         ]);
 
       allow delete: if isAuthenticated() &&
@@ -671,12 +839,14 @@ service cloud.firestore {
         ]) &&
         hasOnlyAllowedFields([
           'name', 'location', 'createdBy', 'createdAt',
-          'description', 'category', 'rating', 'photos',
-          'address', 'reviewCount'
+          'description', 'category', 'photos', 'address',
+          'reviewCount'
         ]) &&
         request.resource.data.createdBy == request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt) &&
-        isValidString(request.resource.data.name, 1, 100);
+        isValidString(request.resource.data.name, 1, 100) &&
+        (!('reviewCount' in request.resource.data) ||
+          request.resource.data.reviewCount == 0);
 
       allow update: if isVerifiedUser() &&
         (resource.data.createdBy == request.auth.uid || isAdmin()) &&
@@ -703,9 +873,13 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid &&
         isValidTimestamp(request.resource.data.createdAt);
 
-      allow update: if isAuthenticated() &&
+      allow update: if isVerifiedUser() &&
         resource.data.userId == request.auth.uid &&
-        fieldsUnchanged(['userId', 'spotId', 'createdAt']);
+        fieldsUnchanged(['userId', 'spotId', 'createdAt']) &&
+        hasOnlyAllowedFields([
+          'userId', 'spotId', 'createdAt',
+          'partnerId', 'rating', 'notes', 'status'
+        ]);
 
       allow delete: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
@@ -733,11 +907,17 @@ service cloud.firestore {
         (request.resource.data.user1 == request.auth.uid ||
          request.resource.data.user2 == request.auth.uid) &&
         request.resource.data.user1 != request.resource.data.user2 &&
-        isValidTimestamp(request.resource.data.createdAt);
+        isValidTimestamp(request.resource.data.createdAt) &&
+        (exists(/databases/$(database)/documents/matches/$(request.resource.data.user1 + '_' + request.resource.data.user2)) ||
+         exists(/databases/$(database)/documents/matches/$(request.resource.data.user2 + '_' + request.resource.data.user1)));
 
       allow update: if isVerifiedUser() &&
         isRelParticipant() &&
-        fieldsUnchanged(['user1', 'user2', 'createdAt']);
+        fieldsUnchanged(['user1', 'user2', 'createdAt']) &&
+        hasOnlyAllowedFields([
+          'user1', 'user2', 'status', 'createdAt',
+          'updatedAt', 'startedAt'
+        ]);
 
       allow delete: if isAuthenticated() && isRelParticipant();
     }
@@ -746,8 +926,6 @@ service cloud.firestore {
     // PERSONALITY RESULTS
     // ═══════════════════════════════════════════
     match /personalityResults/{userId} {
-      // Owner and admin can read. Matches can see personality
-      // type via the user document instead.
       allow read: if isOwner(userId) || isAdmin();
 
       allow create: if isOwner(userId) && isNotBanned() &&
@@ -759,7 +937,11 @@ service cloud.firestore {
         isValidTimestamp(request.resource.data.createdAt);
 
       allow update: if isOwner(userId) && isNotBanned() &&
-        fieldsUnchanged(['createdAt']);
+        fieldsUnchanged(['createdAt']) &&
+        hasOnlyAllowedFields([
+          'personalityType', 'createdAt', 'scores', 'answers',
+          'updatedAt'
+        ]);
 
       allow delete: if isAdmin();
     }
@@ -772,10 +954,18 @@ service cloud.firestore {
 
       allow create: if isOwner(userId) && isNotBanned() &&
         hasRequiredFields(['createdAt']) &&
+        hasOnlyAllowedFields([
+          'createdAt', 'totalLikes', 'totalMatches',
+          'totalMessages', 'updatedAt'
+        ]) &&
         isValidTimestamp(request.resource.data.createdAt);
 
       allow update: if isOwner(userId) && isNotBanned() &&
-        fieldsUnchanged(['createdAt']);
+        fieldsUnchanged(['createdAt']) &&
+        hasOnlyAllowedFields([
+          'createdAt', 'totalLikes', 'totalMatches',
+          'totalMessages', 'updatedAt'
+        ]);
 
       allow delete: if false;
     }
@@ -797,7 +987,8 @@ service cloud.firestore {
         ]) &&
         request.resource.data.fromUserId == request.auth.uid &&
         request.resource.data.toUserId != request.auth.uid &&
-        isValidTimestamp(request.resource.data.createdAt);
+        isValidTimestamp(request.resource.data.createdAt) &&
+        likeId == (request.auth.uid + '_' + request.resource.data.toUserId);
 
       allow update: if false;
       allow delete: if false;
@@ -820,11 +1011,16 @@ service cloud.firestore {
         ]) &&
         request.auth.uid in request.resource.data.participants &&
         request.resource.data.participants.size() == 2 &&
-        isValidTimestamp(request.resource.data.createdAt);
+        isValidTimestamp(request.resource.data.createdAt) &&
+        isValidString(request.resource.data.name, 1, 100);
 
-      allow update: if isAuthenticated() &&
+      allow update: if isVerifiedUser() &&
         request.auth.uid in resource.data.participants &&
-        fieldsUnchanged(['participants', 'createdAt']);
+        fieldsUnchanged(['participants', 'createdAt']) &&
+        hasOnlyAllowedFields([
+          'participants', 'createdAt', 'name',
+          'songs', 'updatedAt'
+        ]);
 
       allow delete: if isAuthenticated() &&
         request.auth.uid in resource.data.participants;
@@ -839,7 +1035,7 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // ACHIEVEMENTS (definitions — server only)
+    // ACHIEVEMENTS
     // ═══════════════════════════════════════════
     match /achievementDefinitions/{achievementId} {
       allow read: if isAuthenticated();
@@ -852,7 +1048,14 @@ service cloud.firestore {
     match /userSettings/{userId} {
       allow read: if isOwner(userId);
 
-      allow create, update: if isOwner(userId) && isNotBanned() &&
+      allow create: if isOwner(userId) && isNotBanned() &&
+        hasRequiredFields(['updatedAt']) &&
+        hasOnlyAllowedFields([
+          'notifications', 'privacy', 'language',
+          'theme', 'updatedAt'
+        ]);
+
+      allow update: if isOwner(userId) && isNotBanned() &&
         hasOnlyAllowedFields([
           'notifications', 'privacy', 'language',
           'theme', 'updatedAt'
@@ -873,8 +1076,13 @@ service cloud.firestore {
         hasRequiredFields([
           'user1', 'user2', 'score', 'createdAt'
         ]) &&
+        hasOnlyAllowedFields([
+          'user1', 'user2', 'score', 'createdAt',
+          'breakdown', 'updatedAt'
+        ]) &&
         (request.resource.data.user1 == request.auth.uid ||
          request.resource.data.user2 == request.auth.uid) &&
+        request.resource.data.user1 != request.resource.data.user2 &&
         isValidTimestamp(request.resource.data.createdAt) &&
         isValidNumber(request.resource.data.score, 0, 100);
 
@@ -883,7 +1091,7 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // CATCH-ALL (deny everything not listed)
+    // CATCH-ALL
     // ═══════════════════════════════════════════
     match /{document=**} {
       allow read, write: if false;

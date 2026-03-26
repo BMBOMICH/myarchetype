@@ -1,8 +1,18 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { doc, updateDoc } from 'firebase/firestore';
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Platform } from 'react-native';
-import { auth, db } from '../firebaseConfig';
+import { app, auth, db } from '../firebaseConfig';
+
+// ─── Functions ─────────────────────────────────────────────
+
+const functions = getFunctions(app, 'europe-west1');
 
 // ─── Notification Handler (native only) ──────────────────
 if (Platform.OS !== 'web') {
@@ -24,17 +34,14 @@ const DUMMY_SUBSCRIPTION: Notifications.EventSubscription = {
 
 // ─── Register for push notifications ─────────────────────
 export async function registerForPushNotifications(): Promise<string | null> {
-  // Skip entirely on web
   if (Platform.OS === 'web') return null;
 
-  // Skip on emulator/simulator
   if (!Device.isDevice) {
     console.log('[Notifications] Push only works on physical devices');
     return null;
   }
 
   try {
-    // Check/request permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -48,21 +55,28 @@ export async function registerForPushNotifications(): Promise<string | null> {
       return null;
     }
 
-    // Get push token
     const tokenData = await Notifications.getExpoPushTokenAsync();
     const token = tokenData.data;
 
-    // Save token to Firestore
     const user = auth.currentUser;
     if (user && token) {
       await updateDoc(doc(db, 'users', user.uid), {
         pushToken: token,
-        pushTokenUpdatedAt: new Date().toISOString(),
+        pushTokenUpdatedAt: serverTimestamp(),
+      }).catch(async () => {
+        await setDoc(
+          doc(db, 'users', user.uid),
+          {
+            pushToken: token,
+            pushTokenUpdatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       });
-      console.log('[Notifications] Token saved to Firebase');
+
+      console.log('[Notifications] Token saved to Firestore');
     }
 
-    // Set up Android notification channels
     if (Platform.OS === 'android') {
       await Promise.all([
         Notifications.setNotificationChannelAsync('default', {
@@ -98,6 +112,28 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+// ─── Optional web push subscription persistence ───────────
+export async function saveWebPushSubscription(subscription: unknown): Promise<boolean> {
+  if (Platform.OS !== 'web') return false;
+
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  try {
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
+        webPushSubscription: JSON.stringify(subscription),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (error) {
+    console.error('[Notifications] Failed to save web push subscription:', error);
+    return false;
+  }
+}
+
 // ─── Local notification ───────────────────────────────────
 export async function sendLocalNotification(
   title: string,
@@ -117,33 +153,27 @@ export async function sendLocalNotification(
   });
 }
 
-// ─── Send push via Expo API ───────────────────────────────
+// ─── Secure server-side push via callable function ────────
 export async function sendPushNotification(
-  expoPushToken: string,
+  targetUserId: string,
   title: string,
   body: string,
-  data?: Record<string, unknown>
+  data?: Record<string, string>
 ): Promise<boolean> {
   try {
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: expoPushToken,
-        sound: 'default',
-        title,
-        body,
-        data: data ?? {},
-      }),
+    const callable = httpsCallable<
+      { targetUserId: string; title: string; body: string; data?: Record<string, string> },
+      { success: boolean; reason?: string }
+    >(functions, 'sendNotification');
+
+    const result = await callable({
+      targetUserId,
+      title,
+      body,
+      data,
     });
 
-    const result = await response.json();
-    console.log('[Notifications] Push sent:', result);
-    return true;
+    return !!result.data?.success;
   } catch (error) {
     console.error('[Notifications] Push send error:', error);
     return false;
@@ -154,11 +184,11 @@ export async function sendPushNotification(
 export type NotificationType = 'match' | 'message' | 'like' | 'rating_prompt';
 
 export async function notifyNewMatch(
-  recipientToken: string,
+  recipientUserId: string,
   matcherName: string
 ): Promise<void> {
   await sendPushNotification(
-    recipientToken,
+    recipientUserId,
     "It's a Match! 💕",
     `You and ${matcherName} liked each other!`,
     { type: 'match', screen: 'my-matches' }
@@ -166,7 +196,7 @@ export async function notifyNewMatch(
 }
 
 export async function notifyNewMessage(
-  recipientToken: string,
+  recipientUserId: string,
   senderName: string,
   messagePreview: string
 ): Promise<void> {
@@ -176,16 +206,16 @@ export async function notifyNewMessage(
       : messagePreview;
 
   await sendPushNotification(
-    recipientToken,
+    recipientUserId,
     senderName,
     preview,
     { type: 'message', screen: 'chat' }
   );
 }
 
-export async function notifyNewLike(recipientToken: string): Promise<void> {
+export async function notifyNewLike(recipientUserId: string): Promise<void> {
   await sendPushNotification(
-    recipientToken,
+    recipientUserId,
     'Someone likes you! 😍',
     'Open the app to see who it is',
     { type: 'like', screen: 'matches' }
@@ -193,11 +223,11 @@ export async function notifyNewLike(recipientToken: string): Promise<void> {
 }
 
 export async function notifyRatingPrompt(
-  recipientToken: string,
+  recipientUserId: string,
   matchName: string
 ): Promise<void> {
   await sendPushNotification(
-    recipientToken,
+    recipientUserId,
     'How was your date? 📝',
     `Rate your experience with ${matchName} to help the community`,
     { type: 'rating_prompt', screen: 'my-matches' }

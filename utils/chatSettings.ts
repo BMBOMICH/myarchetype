@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
 export interface ChatSettings {
@@ -22,18 +22,18 @@ export const CHAT_WALLPAPERS = [
   { id: 'gradient3', name: 'Forest Green', gradient: ['#1a3c34', '#0f2922'] },
   { id: 'gradient4', name: 'Sunset', gradient: ['#2d1f3d', '#1a1a2e'] },
   { id: 'gradient5', name: 'Midnight', gradient: ['#0a0a1a', '#1a1a2e'] },
-];
+] as const;
 
 export async function getChatSettings(chatId: string): Promise<ChatSettings> {
   const user = auth.currentUser;
-  if (!user) return DEFAULT_SETTINGS;
+  if (!user || !chatId) return DEFAULT_SETTINGS;
 
   try {
     const settingsRef = doc(db, 'chatSettings', `${user.uid}_${chatId}`);
     const settingsDoc = await getDoc(settingsRef);
-    
+
     if (!settingsDoc.exists()) return DEFAULT_SETTINGS;
-    
+
     return { ...DEFAULT_SETTINGS, ...settingsDoc.data() };
   } catch (error) {
     console.error('Error getting chat settings:', error);
@@ -47,50 +47,65 @@ export async function updateChatSettings(
 ): Promise<{ success: boolean; error?: string }> {
   const user = auth.currentUser;
   if (!user) return { success: false, error: 'Not logged in' };
+  if (!chatId) return { success: false, error: 'Missing chat ID' };
 
   try {
     const settingsRef = doc(db, 'chatSettings', `${user.uid}_${chatId}`);
-    
-    await setDoc(settingsRef, {
-      ...settings,
-      userId: user.uid,
-      chatId,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+
+    await setDoc(
+      settingsRef,
+      {
+        ...settings,
+        userId: user.uid,
+        chatId,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     return { success: true };
   } catch (error: any) {
     console.error('Error updating chat settings:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message ?? 'Unknown error' };
   }
 }
 
 export async function setWallpaper(
   chatId: string,
   wallpaperId: string
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; error?: string }> {
   return updateChatSettings(chatId, { wallpaper: wallpaperId });
 }
 
 export async function toggleReadReceipts(
   chatId: string,
   enabled: boolean
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; error?: string }> {
   return updateChatSettings(chatId, { readReceiptsEnabled: enabled });
 }
 
-export function getWallpaperStyle(wallpaperId: string | null): { backgroundColor?: string } {
+export function getWallpaperStyle(
+  wallpaperId: string | null
+): { backgroundColor?: string } {
   if (!wallpaperId || wallpaperId === 'none') {
     return { backgroundColor: '#1a1a2e' };
   }
 
-  const wallpaper = CHAT_WALLPAPERS.find(w => w.id === wallpaperId);
-  if (wallpaper && 'color' in wallpaper) {
+  const wallpaper = CHAT_WALLPAPERS.find((w) => w.id === wallpaperId);
+
+  if (!wallpaper) {
+    return { backgroundColor: '#1a1a2e' };
+  }
+
+  if ('color' in wallpaper) {
     return { backgroundColor: wallpaper.color };
   }
 
-  // For gradients, return the first color (React Native doesn't support gradients natively)
-  if (wallpaper && 'gradient' in wallpaper) {
+  if (
+    'gradient' in wallpaper &&
+    Array.isArray(wallpaper.gradient) &&
+    wallpaper.gradient.length > 0
+  ) {
     return { backgroundColor: wallpaper.gradient[0] };
   }
 
