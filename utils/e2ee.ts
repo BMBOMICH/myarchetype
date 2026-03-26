@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Platform } from 'react-native';
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { auth, db } from '../firebaseConfig';
@@ -43,14 +44,46 @@ function bytesToUtf8(bytes: Uint8Array): string {
   return naclUtil.encodeUTF8(bytes);
 }
 
+function canUseWebStorage(): boolean {
+  return Platform.OS === 'web' && typeof window !== 'undefined' && !!window.localStorage;
+}
+
+async function setStoredValue(key: string, value: string): Promise<void> {
+  if (canUseWebStorage()) {
+    window.localStorage.setItem(key, value);
+    return;
+  }
+
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function getStoredValue(key: string): Promise<string | null> {
+  if (canUseWebStorage()) {
+    return window.localStorage.getItem(key);
+  }
+
+  return await SecureStore.getItemAsync(key);
+}
+
+async function deleteStoredValue(key: string): Promise<void> {
+  if (canUseWebStorage()) {
+    window.localStorage.removeItem(key);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(key);
+}
+
 export async function generateAndStoreE2EEKeypair(): Promise<LocalE2EEKeypair> {
   const keyPair = nacl.box.keyPair();
 
   const publicKey = bytesToBase64(keyPair.publicKey);
   const secretKey = bytesToBase64(keyPair.secretKey);
 
-  await SecureStore.setItemAsync(E2EE_PUBLIC_KEY_KEY, publicKey);
-  await SecureStore.setItemAsync(E2EE_SECRET_KEY_KEY, secretKey);
+  await Promise.all([
+    setStoredValue(E2EE_PUBLIC_KEY_KEY, publicKey),
+    setStoredValue(E2EE_SECRET_KEY_KEY, secretKey),
+  ]);
 
   return {
     publicKey,
@@ -61,8 +94,8 @@ export async function generateAndStoreE2EEKeypair(): Promise<LocalE2EEKeypair> {
 
 export async function getLocalE2EEKeypair(): Promise<LocalE2EEKeypair | null> {
   const [publicKey, secretKey] = await Promise.all([
-    SecureStore.getItemAsync(E2EE_PUBLIC_KEY_KEY),
-    SecureStore.getItemAsync(E2EE_SECRET_KEY_KEY),
+    getStoredValue(E2EE_PUBLIC_KEY_KEY),
+    getStoredValue(E2EE_SECRET_KEY_KEY),
   ]);
 
   if (!publicKey || !secretKey) return null;
@@ -82,8 +115,8 @@ export async function ensureLocalE2EEKeypair(): Promise<LocalE2EEKeypair> {
 
 export async function clearLocalE2EEKeys(): Promise<void> {
   await Promise.all([
-    SecureStore.deleteItemAsync(E2EE_PUBLIC_KEY_KEY),
-    SecureStore.deleteItemAsync(E2EE_SECRET_KEY_KEY),
+    deleteStoredValue(E2EE_PUBLIC_KEY_KEY),
+    deleteStoredValue(E2EE_SECRET_KEY_KEY),
   ]);
 }
 
@@ -110,30 +143,63 @@ export async function getRemoteE2EEPublicKey(
   };
 }
 
+async function userDocExists(uid: string): Promise<boolean> {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    return snap.exists();
+  } catch (error) {
+    console.warn('Failed checking user doc existence for E2EE:', error);
+    return false;
+  }
+}
+
 export async function syncMyE2EEPublicKeyToFirestore(): Promise<{
   success: boolean;
   publicKey?: string;
   error?: string;
+  skipped?: boolean;
 }> {
   const user = auth.currentUser;
-  if (!user) return { success: false, error: 'Not authenticated' };
+  if (!user) {
+    return { success: false, error: 'Not authenticated' };
+  }
 
   try {
     const local = await ensureLocalE2EEKeypair();
 
-    await setDoc(
-      doc(db, 'users', user.uid),
-      {
-        encryptionPublicKey: local.publicKey,
-        encryptionKeyVersion: local.version,
-        encryptionCreatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const exists = await userDocExists(user.uid);
+    if (!exists) {
+      return {
+        success: true,
+        publicKey: local.publicKey,
+        skipped: true,
+        error: 'User profile document does not exist yet; skipped Firestore sync',
+      };
+    }
 
-    return { success: true, publicKey: local.publicKey };
+    try {
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          encryptionPublicKey: local.publicKey,
+          encryptionKeyVersion: local.version,
+          encryptionCreatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return { success: true, publicKey: local.publicKey };
+    } catch (error: any) {
+      console.error('Failed to sync E2EE public key:', error);
+      return {
+        success: true,
+        publicKey: local.publicKey,
+        skipped: true,
+        error: error?.message ?? 'Firestore sync skipped',
+      };
+    }
   } catch (error: any) {
-    console.error('Failed to sync E2EE public key:', error);
+    console.error('Failed to initialize local E2EE identity:', error);
     return {
       success: false,
       error: error?.message ?? 'Unknown error',
@@ -145,8 +211,9 @@ export async function ensureMyE2EEIdentity(): Promise<{
   success: boolean;
   publicKey?: string;
   error?: string;
+  skipped?: boolean;
 }> {
-  return syncMyE2EEPublicKeyToFirestore();
+  return await syncMyE2EEPublicKeyToFirestore();
 }
 
 export async function encryptTextForRecipient(

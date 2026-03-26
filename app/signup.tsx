@@ -39,7 +39,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../firebaseConfig';
-import { ensureLocalE2EEKeypair } from '../utils/e2ee';
 
 // ─── Platform ─────────────────────────────────────────────────────
 const IS_WEB = Platform.OS === 'web';
@@ -1295,7 +1294,6 @@ export default function SignupScreen() {
             const { user } = await createUserWithEmailAndPassword(auth, email, state.password);
 
             // Create local E2EE keys immediately after account creation
-            await ensureLocalE2EEKeypair();
 
             await sendEmailVerification(user);
             await auth.signOut();

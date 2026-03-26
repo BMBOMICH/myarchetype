@@ -1449,10 +1449,10 @@ export default function LoginScreen() {
         return;
       }
 
-      const e2eeResult = await ensureMyE2EEIdentity();
-      if (!e2eeResult.success) {
-        throw new Error(e2eeResult.error ?? 'Unable to initialize encrypted messaging');
-      }
+const e2eeResult = await ensureMyE2EEIdentity();
+if (!e2eeResult.success) {
+  console.warn('E2EE identity sync skipped during login:', e2eeResult.error);
+}
 
       const hasLocalKeysAfterLogin = !!(await getLocalE2EEKeypair());
 
