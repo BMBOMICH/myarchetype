@@ -50,7 +50,7 @@ import { profileStorage } from '../utils/storage';
 
 const IS_WEB = Platform.OS === 'web';
 const IS_IOS = Platform.OS === 'ios';
-const IS_ANDROID = Platform.OS === 'android';
+// const IS_ANDROID = Platform.OS === 'android'; // removed — unused
 
 // ─── Design Tokens ────────────────────────────────────────
 
@@ -118,7 +118,46 @@ const STEP_NAMES = [
 
 // ─── Theme tokens (matches login/signup) ──────────────────
 
-const darkTokens = {
+// ✅ FIX: Use an interface so both dark/light are assignable to Theme
+interface Theme {
+  bg: string;
+  bgGradientStart: string;
+  bgGradientMid: string;
+  bgGradientEnd: string;
+  card: string;
+  cardBorder: string;
+  input: string;
+  inputBorder: string;
+  accent: string;
+  accentSoft: string;
+  accentGlow: string;
+  error: string;
+  errorGlow: string;
+  warn: string;
+  success: string;
+  successGlow: string;
+  text: string;
+  sub: string;
+  muted: string;
+  dim: string;
+  white: string;
+  black: string;
+  overlay: string;
+  none: string;
+  guideStroke: string;
+  guideFill: string;
+  skeleton: string;
+  buttonGradStart: string;
+  buttonGradEnd: string;
+  disabledBg: string;
+  disabledText: string;
+  gold: string;
+  purple: string;
+  danger: string;
+  warning: string;
+}
+
+const darkTokens: Theme = {
   bg: '#07070f',
   bgGradientStart: '#0a0a18',
   bgGradientMid: '#0e0e24',
@@ -154,9 +193,9 @@ const darkTokens = {
   purple: '#9b59b6',
   danger: '#FF6B6B',
   warning: '#FFB347',
-} as const;
+};
 
-const lightTokens = {
+const lightTokens: Theme = {
   bg: '#F0F2F8',
   bgGradientStart: '#E8EAF4',
   bgGradientMid: '#E0E3F0',
@@ -192,9 +231,7 @@ const lightTokens = {
   purple: '#7b3fa0',
   danger: '#DC3545',
   warning: '#D4880F',
-} as const;
-
-type Theme = typeof darkTokens;
+};
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -747,7 +784,7 @@ function reducer(state: FormState, action: Action): FormState {
       return {
         ...state,
         photos: state.photos
-          .filter((_, i) => i !== action.index)
+          .filter((_p, i) => i !== action.index)
           .map((p, i) => ({ ...p, order: i })),
       };
     case 'MOVE_PHOTO': {
@@ -776,15 +813,13 @@ function reducer(state: FormState, action: Action): FormState {
       if (state.prompts.length >= 3) return state;
       return { ...state, prompts: [...state.prompts, { q: '', a: '' }] };
     case 'DEL_PROMPT':
-      return { ...state, prompts: state.prompts.filter((_, i) => i !== action.index) };
+      return { ...state, prompts: state.prompts.filter((_p, i) => i !== action.index) };
     case 'LOAD':
       return { ...state, ...action.state };
     case 'RESET':
       return INIT;
-    default: {
-      const _exhaustive: never = action;
+    default:
       return state;
-    }
   }
 }
 
@@ -990,18 +1025,14 @@ function makeGuideStyles(C: Theme) {
 }
 
 // ─── Web video component (isolates web-only JSX) ──────────
-// ✅ FIX: Separating the web video element into its own component
-// prevents TypeScript errors on native and ensures the ref
-// is properly attached after the stream is ready.
 
 const WebVideoPreview = React.memo(function WebVideoPreview({
-  streamReady,
   facing,
   onReady,
 }: {
-  streamReady: boolean;
+  streamReady?: boolean; // kept for API compat but not used
   facing: 'front' | 'back';
-  onReady: (el: HTMLVideoElement) => void;
+  onReady: (el: any) => void;
 }) {
   if (!IS_WEB) return null;
 
@@ -1009,7 +1040,7 @@ const WebVideoPreview = React.memo(function WebVideoPreview({
     <View style={{ flex: 1 }}>
       {/* @ts-ignore web only */}
       <video
-        ref={(node: HTMLVideoElement | null) => {
+        ref={(node: any) => {
           if (node) onReady(node);
         }}
         autoPlay
@@ -1036,7 +1067,6 @@ export default function ProfileSetupScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
 
-  // ✅ FIX: use useColorScheme for live theme switching
   const colorScheme = useColorScheme();
   const isDark = colorScheme !== 'light';
   const C: Theme = isDark ? darkTokens : lightTokens;
@@ -1083,13 +1113,11 @@ export default function ProfileSetupScreen() {
   const isMountedRef = useRef(true);
   const scrollRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // ✅ FIX: Use `any` for web-only refs so we don't need DOM lib
+  const streamRef = useRef<any>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isDirtyRef = useRef(false);
-  // ✅ FIX: store the actual HTMLVideoElement so we can attach stream to it
-  // directly when it becomes available, rather than relying on a callback
-  // that may fire before the stream exists
-  const webVideoElRef = useRef<HTMLVideoElement | null>(null);
+  const webVideoElRef = useRef<any>(null);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -1105,7 +1133,7 @@ export default function ProfileSetupScreen() {
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current.getTracks().forEach((t: any) => t.stop());
         streamRef.current = null;
       }
       if (countdownRef.current) {
@@ -1141,8 +1169,6 @@ export default function ProfileSetupScreen() {
     })();
   }, [draftKey, stepKey]);
 
-  // ✅ FIX: track dirty with a ref that only flips on actual form changes
-  // not on every render, so draft save doesn't run unnecessarily
   const prevFormRef = useRef(form);
   useEffect(() => {
     if (prevFormRef.current !== form) {
@@ -1357,187 +1383,172 @@ export default function ProfileSetupScreen() {
 
   const stopWebStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((t: any) => t.stop());
       streamRef.current = null;
     }
     if (isMountedRef.current) setCamReady(false);
   }, []);
 
-  // ✅ FIX: Attach stream to video element helper — called both when
-  // the stream arrives AND when the video element mounts, whichever
-  // happens second. This handles the race condition between
-  // getUserMedia resolving and the video element rendering.
-const attachStreamToVideo = useCallback(() => {
-  const video = webVideoElRef.current;
-  const stream = streamRef.current;
+  // ✅ FIX: All web DOM APIs use `any` casts to avoid needing "dom" in lib
+  const attachStreamToVideo = useCallback(() => {
+    const video = webVideoElRef.current;
+    const stream = streamRef.current;
 
-  // Need both video element and stream to proceed
-  if (!video || !stream) return;
+    if (!video || !stream) return;
 
-  // Already attached and playing — just ensure camReady is true
-  if (video.srcObject === stream) {
-    if (video.readyState >= 2 && isMountedRef.current) {
-      setCamReady(true);
-    }
-    return;
-  }
-
-  // Attach stream to video element
-  video.srcObject = stream;
-
-  // ✅ FIX: Check if metadata already loaded (race condition where
-  // getUserMedia resolved and video processed before this runs)
-  if (video.readyState >= 2) {
-    video.play().catch(() => {});
-    if (isMountedRef.current) setCamReady(true);
-    return;
-  }
-
-  // Normal case: wait for metadata to load
-  video.onloadedmetadata = () => {
-    video.play().catch(() => {});
-    if (isMountedRef.current) setCamReady(true);
-  };
-
-  // ✅ FIX: Fallback for browsers that skip onloadedmetadata
-  // for certain MediaStream types (observed in Firefox + Safari)
-  video.oncanplay = () => {
-    if (!video.paused) return; // already playing
-    video.play().catch(() => {});
-    if (isMountedRef.current) setCamReady(true);
-  };
-
-  // ✅ FIX: Handle stream errors after attachment
-  video.onerror = () => {
-    if (isMountedRef.current) {
-      setCamReady(false);
-      setCamErr('Camera stream error. Please try again.');
-    }
-  };
-
-  // ✅ FIX: Also detect if the stream tracks end unexpectedly
-  // (user revokes permission, hardware disconnect, etc.)
-  const tracks = stream.getTracks();
-  tracks.forEach((track) => {
-    track.onended = () => {
-      if (isMountedRef.current) {
-        setCamReady(false);
-        setCamErr('Camera disconnected. Please try again.');
+    // Already attached and playing
+    if (video.srcObject === stream) {
+      if (video.readyState >= 2 && isMountedRef.current) {
+        setCamReady(true);
       }
-    };
-  });
-}, []);
-
-  // ✅ FIX: Callback ref for the web video element.
-  // Called when the <video> DOM node mounts or unmounts.
-  // If the stream is already ready when this fires, attach immediately.
-const handleVideoRef = useCallback(
-  (el: HTMLVideoElement | null) => {
-    if (!el) {
-      // Element unmounting — clean up listeners
-      if (webVideoElRef.current) {
-        webVideoElRef.current.onloadedmetadata = null;
-        webVideoElRef.current.oncanplay = null;
-        webVideoElRef.current.onerror = null;
-        webVideoElRef.current.srcObject = null;
-      }
-      webVideoElRef.current = null;
       return;
     }
-    webVideoElRef.current = el;
-    // If stream already exists, attach now
-    attachStreamToVideo();
-  },
-  [attachStreamToVideo]
-);
 
-const startWebStream = useCallback(
-  async (facing: 'front' | 'back') => {
-    try {
-      // Stop any existing stream first
-      stopWebStream();
+    video.srcObject = stream;
 
-      if (!IS_WEB) return;
-
-      if (!navigator.mediaDevices?.getUserMedia) {
-        if (isMountedRef.current) setCamErr('Camera not supported in this browser.');
-        return;
-      }
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-      const facingMode = facing === 'front' ? 'user' : 'environment';
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: videoDevices.length > 1 ? facingMode : undefined,
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-        audio: false,
-      });
-
-      // ✅ FIX: If component unmounted or camera was closed while
-      // getUserMedia was resolving, stop the stream immediately
-      if (!isMountedRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-
-      streamRef.current = stream;
-
-      // Try to attach immediately — if the video element is already
-      // mounted this will work. If not, handleVideoRef will do it
-      // when the element mounts.
-      attachStreamToVideo();
-
-      // ✅ FIX: If attachment didn't work yet (video not mounted),
-      // retry after a short delay to handle slow renders
-      setTimeout(() => {
-        if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) {
-          attachStreamToVideo();
-        }
-      }, 300);
-    } catch (err: unknown) {
-      const name = err instanceof Error ? (err as any).name : '';
-      let msg: string;
-      switch (name) {
-        case 'NotAllowedError':
-          msg = 'Camera access blocked. Allow it in your browser settings.';
-          break;
-        case 'NotFoundError':
-          msg = 'No camera found on this device.';
-          break;
-        case 'NotReadableError':
-          msg = 'Camera is in use by another app. Close other tabs using the camera.';
-          break;
-        case 'OverconstrainedError':
-          msg = 'Camera does not support the requested settings. Trying again...';
-          // ✅ FIX: Retry with minimal constraints
-          try {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-              audio: false,
-            });
-            if (!isMountedRef.current) {
-              fallbackStream.getTracks().forEach((t) => t.stop());
-              return;
-            }
-            streamRef.current = fallbackStream;
-            attachStreamToVideo();
-            return; // Success on retry — don't show error
-          } catch {
-            msg = 'Could not start camera. Try a different browser.';
-          }
-          break;
-        default:
-          msg = 'Could not start camera. Try refreshing the page.';
-      }
-      if (isMountedRef.current) setCamErr(msg);
+    // Check if metadata already loaded
+    if (video.readyState >= 2) {
+      video.play().catch(() => {});
+      if (isMountedRef.current) setCamReady(true);
+      return;
     }
-  },
-  [stopWebStream, attachStreamToVideo]
-);
+
+video.onloadedmetadata = () => {
+  video.play().catch(() => {});
+  if (isMountedRef.current) setCamReady(true); // same, this one is fine
+};
+
+video.oncanplay = () => {
+  if (isMountedRef.current) setCamReady(true); // always set ready
+  if (video.paused) video.play().catch(() => {}); // only play if paused
+};
+
+    video.onerror = () => {
+      if (isMountedRef.current) {
+        setCamReady(false);
+        setCamErr('Camera stream error. Please try again.');
+      }
+    };
+
+    const tracks = stream.getTracks();
+    tracks.forEach((track: any) => {
+      track.onended = () => {
+        if (isMountedRef.current) {
+          setCamReady(false);
+          setCamErr('Camera disconnected. Please try again.');
+        }
+      };
+    });
+  }, []);
+
+  const handleVideoRef = useCallback(
+    (el: any) => {
+      if (!el) {
+        if (webVideoElRef.current) {
+          webVideoElRef.current.onloadedmetadata = null;
+          webVideoElRef.current.oncanplay = null;
+          webVideoElRef.current.onerror = null;
+          webVideoElRef.current.srcObject = null;
+        }
+        webVideoElRef.current = null;
+        return;
+      }
+      webVideoElRef.current = el;
+      attachStreamToVideo();
+    },
+    [attachStreamToVideo]
+  );
+
+  const startWebStream = useCallback(
+    async (facing: 'front' | 'back') => {
+      try {
+        stopWebStream();
+
+        if (!IS_WEB) return;
+
+        const nav = navigator as any;
+        if (!nav.mediaDevices?.getUserMedia) {
+          if (isMountedRef.current) setCamErr('Camera not supported in this browser.');
+          return;
+        }
+
+        const devices = await nav.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d: any) => d.kind === 'videoinput');
+        const facingMode = facing === 'front' ? 'user' : 'environment';
+
+        const stream = await nav.mediaDevices.getUserMedia({
+          video: {
+            facingMode: videoDevices.length > 1 ? facingMode : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+          },
+          audio: false,
+        });
+
+        if (!isMountedRef.current) {
+          stream.getTracks().forEach((t: any) => t.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        attachStreamToVideo();
+
+setTimeout(() => {
+  if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) {
+    attachStreamToVideo();
+  }
+}, 600);
+
+setTimeout(() => {
+  if (isMountedRef.current && streamRef.current) {
+    attachStreamToVideo();
+    // Force camReady if video is playing but state wasn't updated
+    const v = webVideoElRef.current;
+    if (v && v.readyState >= 2 && isMountedRef.current) {
+      setCamReady(true);
+    }
+  }
+}, 1200);
+      } catch (err: unknown) {
+        const name = err instanceof Error ? (err as any).name : '';
+        let msg: string;
+        switch (name) {
+          case 'NotAllowedError':
+            msg = 'Camera access blocked. Allow it in your browser settings.';
+            break;
+          case 'NotFoundError':
+            msg = 'No camera found on this device.';
+            break;
+          case 'NotReadableError':
+            msg = 'Camera is in use by another app. Close other tabs using the camera.';
+            break;
+          case 'OverconstrainedError':
+            msg = 'Camera does not support the requested settings. Trying again...';
+            try {
+              const nav2 = navigator as any;
+              const fallbackStream = await nav2.mediaDevices.getUserMedia({
+                video: true,
+                audio: false,
+              });
+              if (!isMountedRef.current) {
+                fallbackStream.getTracks().forEach((t: any) => t.stop());
+                return;
+              }
+              streamRef.current = fallbackStream;
+              attachStreamToVideo();
+              return;
+            } catch {
+              msg = 'Could not start camera. Try a different browser.';
+            }
+            break;
+          default:
+            msg = 'Could not start camera. Try refreshing the page.';
+        }
+        if (isMountedRef.current) setCamErr(msg);
+      }
+    },
+    [stopWebStream, attachStreamToVideo]
+  );
 
   const closeCam = useCallback(() => {
     stopWebStream();
@@ -1599,20 +1610,14 @@ const startWebStream = useCallback(
         setCountdown(null);
         setCamOpen(true);
         setCamErr(null);
-        // ✅ FIX: set camReady false so the loading state shows correctly
         setCamReady(false);
         setCapturing(false);
       }
 
-      // ✅ FIX: Start web stream after state is set. The video element will
-      // mount after setCamOpen(true) causes a re-render. We start the stream
-      // immediately — whichever happens first (stream ready or video mounted)
-      // will trigger attachStreamToVideo, and the second call is a no-op.
       if (IS_WEB) {
-        // Small delay to let the modal render and mount the video element
         setTimeout(() => {
           if (isMountedRef.current) startWebStream(targetSlot.cameraSide);
-        }, 100);
+        }, 500);
       }
     },
     [nextSlot, permission, requestPermission, form.photos, startWebStream]
@@ -1627,204 +1632,184 @@ const startWebStream = useCallback(
     }
   }, [camFacing, startWebStream]);
 
-const processPhoto = useCallback(
-  async (uri: string, type: PhotoType, currentPhotoCount: number) => {
-    if (isMountedRef.current) {
-      setUploading(true);
-      setUploadProgress(0);
-    }
-
-    try {
-      // ── Step 1: Upload to Cloudinary ──────────────────────
-      const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
-
-      if (isMountedRef.current) setUploadProgress(40);
-
-      if (!upload.success || !upload.url) {
-        Alert.alert(
-          'Upload Failed',
-          upload.error ?? 'Could not upload photo. Check your connection.'
-        );
-        return;
-      }
-
-      // ── Step 2: NSFW / moderation check ───────────────────
-      if (upload.moderationStatus === 'rejected') {
-        Alert.alert(
-          'Photo Rejected',
-          'This photo was flagged as inappropriate. Please use a different photo.'
-        );
-        return;
-      }
-
-      // If moderation returned pending, warn but allow
-      // (Cloudinary async moderation — will be reviewed later)
-      if (upload.moderationStatus === 'pending' && __DEV__) {
-        console.warn(
-          '[ProfileSetup] Photo moderation is pending — will be reviewed async.'
-        );
-      }
-
-      if (isMountedRef.current) setUploadProgress(60);
-
-      // ── Step 3: Type-specific validation ──────────────────
-
-      // FACE PHOTO: Must actually contain a human face
-      if (type === 'face') {
-        try {
-          const ageResult: AgeEstimationResult | null =
-            await estimateAgeFromPhoto(upload.url);
-
-          if (!ageResult || !ageResult.estimatedAge || ageResult.confidence < 0.1) {
-            // No face detected — reject the photo
-            Alert.alert(
-              'No Face Detected',
-              'We couldn\'t detect a clear human face in this photo.\n\n' +
-              'Tips:\n' +
-              '• Face the camera directly\n' +
-              '• Use good lighting\n' +
-              '• Remove sunglasses or masks\n' +
-              '• Only your face should be in frame'
-            );
-            return;
-          }
-
-          // Face found — save age estimate
-          if (isMountedRef.current) {
-            set('ageEstimate', ageResult.estimatedAge);
-          }
-        } catch (err) {
-          // If the detection service is completely down, log but allow
-          // the photo through — don't block the user for a service outage
-          if (__DEV__) {
-            console.warn('[ProfileSetup] Face detection failed, allowing photo:', err);
-          }
-        }
-      }
-
-      // UPPER BODY PHOTO: Use full body detection to verify at least
-      // an upper body is visible (the detector can detect partial bodies too)
-      if (type === 'upper_body') {
-        try {
-          const bodyResult = await detectFullBodyPhoto(upload.url);
-          // detectFullBodyPhoto checks for body presence —
-          // if it can't find ANY body, reject
-          if (bodyResult && !bodyResult.isFullBody && bodyResult.confidence !== undefined && bodyResult.confidence < 0.2) {
-            Alert.alert(
-              'No Person Detected',
-              'We couldn\'t detect a person in this photo.\n\n' +
-              'Please take a photo showing you from the waist up with your face visible.'
-            );
-            return;
-          }
-        } catch {
-          // Service down — allow through
-          if (__DEV__) {
-            console.warn('[ProfileSetup] Upper body detection failed, allowing photo.');
-          }
-        }
-      }
-
-      // FULL BODY PHOTO: Must show full body head to toe
-      if (type === 'full_body') {
-        try {
-          const body = await detectFullBodyPhoto(upload.url);
-          if (!body.isFullBody) {
-            // Show warning but still ask if they want to keep it
-            Alert.alert(
-              'Not Full Body',
-              'We could not detect a full body in this photo.\n\n' +
-              'Tips:\n' +
-              '• Stand further from the camera\n' +
-              '• Make sure head to toe is visible\n' +
-              '• Use the timer and prop your phone\n\n' +
-              'Would you like to keep this photo anyway?',
-              [
-                {
-                  text: 'Discard',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Keep Anyway',
-                  onPress: () => {
-                    // Add the photo despite failed detection
-                    const photo: ProfilePhoto = {
-                      uri,
-                      url: upload.url,
-                      type,
-                      order: currentPhotoCount,
-                      verified: false, // Mark as unverified since detection failed
-                      uploadedAt: new Date().toISOString(),
-                    };
-                    dispatch({ type: 'ADD_PHOTO', photo });
-                    successHaptic();
-                    Alert.alert('📸 Photo Added!', 'Consider retaking for better results.');
-                  },
-                },
-              ]
-            );
-            return; // Don't fall through to automatic add below
-          }
-        } catch {
-          if (__DEV__) {
-            console.warn('[ProfileSetup] Full body detection failed, allowing photo.');
-          }
-        }
-      }
-
-      // FREESTYLE: No body/face validation required
-      // but NSFW check from Step 2 still applies
-
-      if (isMountedRef.current) setUploadProgress(100);
-
-      // ── Step 4: All checks passed — add the photo ─────────
-
-      const photo: ProfilePhoto = {
-        uri,
-        url: upload.url,
-        type,
-        order: currentPhotoCount,
-        verified: true,
-        uploadedAt: new Date().toISOString(),
-      };
-
-      dispatch({ type: 'ADD_PHOTO', photo });
-      successHaptic();
-
-      // ── Step 5: Show helpful next-step hints ──────────────
-
-      const hints: string[] = [];
-      if (type === 'face' && !hasUpperBody) {
-        hints.push('upper body photo (required)');
-      }
-      if (type === 'upper_body' && !hasFullBody) {
-        hints.push('full body photo (+40% more matches)');
-      }
-      if (type === 'full_body' && currentPhotoCount < 3) {
-        hints.push('freestyle photo to show personality');
-      }
-
-      Alert.alert(
-        '📸 Photo Added!',
-        hints.length > 0
-          ? `Great shot! Next up: ${hints.join(', ')}`
-          : 'Looking good! 🎉'
-      );
-    } catch (err) {
-      logger.error('processPhoto failed:', err);
-      Alert.alert(
-        'Upload Error',
-        'Something went wrong uploading your photo. Check your connection and try again.'
-      );
-    } finally {
+  const processPhoto = useCallback(
+    async (uri: string, type: PhotoType, currentPhotoCount: number) => {
       if (isMountedRef.current) {
-        setUploading(false);
+        setUploading(true);
         setUploadProgress(0);
       }
-    }
-  },
-  [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
-);
+
+      try {
+        const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
+
+        if (isMountedRef.current) setUploadProgress(40);
+
+        if (!upload.success || !upload.url) {
+          Alert.alert(
+            'Upload Failed',
+            upload.error ?? 'Could not upload photo. Check your connection.'
+          );
+          return;
+        }
+
+        if (upload.moderationStatus === 'rejected') {
+          Alert.alert(
+            'Photo Rejected',
+            'This photo was flagged as inappropriate. Please use a different photo.'
+          );
+          return;
+        }
+
+        if (upload.moderationStatus === 'pending' && __DEV__) {
+          console.warn(
+            '[ProfileSetup] Photo moderation is pending — will be reviewed async.'
+          );
+        }
+
+        if (isMountedRef.current) setUploadProgress(60);
+
+        // ✅ FIX: Capture the URL here so TS knows it's defined
+        const photoUrl: string = upload.url;
+
+        // FACE PHOTO validation
+        if (type === 'face') {
+          try {
+            const ageResult: AgeEstimationResult | null =
+              await estimateAgeFromPhoto(photoUrl);
+
+            if (!ageResult || !ageResult.estimatedAge || ageResult.confidence < 0.1) {
+              Alert.alert(
+                'No Face Detected',
+                'We couldn\'t detect a clear human face in this photo.\n\n' +
+                'Tips:\n' +
+                '• Face the camera directly\n' +
+                '• Use good lighting\n' +
+                '• Remove sunglasses or masks\n' +
+                '• Only your face should be in frame'
+              );
+              return;
+            }
+
+            if (isMountedRef.current) {
+              set('ageEstimate', ageResult.estimatedAge);
+            }
+          } catch (err) {
+            if (__DEV__) {
+              console.warn('[ProfileSetup] Face detection failed, allowing photo:', err);
+            }
+          }
+        }
+
+        // UPPER BODY validation
+        if (type === 'upper_body') {
+          try {
+            const bodyResult = await detectFullBodyPhoto(photoUrl);
+            if (bodyResult && !bodyResult.isFullBody && bodyResult.confidence !== undefined && bodyResult.confidence < 0.2) {
+              Alert.alert(
+                'No Person Detected',
+                'We couldn\'t detect a person in this photo.\n\n' +
+                'Please take a photo showing you from the waist up with your face visible.'
+              );
+              return;
+            }
+          } catch {
+            if (__DEV__) {
+              console.warn('[ProfileSetup] Upper body detection failed, allowing photo.');
+            }
+          }
+        }
+
+        // FULL BODY validation
+        if (type === 'full_body') {
+          try {
+            const body = await detectFullBodyPhoto(photoUrl);
+            if (!body.isFullBody) {
+              Alert.alert(
+                'Not Full Body',
+                'We could not detect a full body in this photo.\n\n' +
+                'Tips:\n' +
+                '• Stand further from the camera\n' +
+                '• Make sure head to toe is visible\n' +
+                '• Use the timer and prop your phone\n\n' +
+                'Would you like to keep this photo anyway?',
+                [
+                  {
+                    text: 'Discard',
+                    style: 'cancel',
+                  },
+                  {
+                    text: 'Keep Anyway',
+                    onPress: () => {
+                      const photo: ProfilePhoto = {
+                        uri,
+                        url: photoUrl,
+                        type,
+                        order: currentPhotoCount,
+                        verified: false,
+                        uploadedAt: new Date().toISOString(),
+                      };
+                      dispatch({ type: 'ADD_PHOTO', photo });
+                      successHaptic();
+                      Alert.alert('📸 Photo Added!', 'Consider retaking for better results.');
+                    },
+                  },
+                ]
+              );
+              return;
+            }
+          } catch {
+            if (__DEV__) {
+              console.warn('[ProfileSetup] Full body detection failed, allowing photo.');
+            }
+          }
+        }
+
+        if (isMountedRef.current) setUploadProgress(100);
+
+        const photo: ProfilePhoto = {
+          uri,
+          url: photoUrl,
+          type,
+          order: currentPhotoCount,
+          verified: true,
+          uploadedAt: new Date().toISOString(),
+        };
+
+        dispatch({ type: 'ADD_PHOTO', photo });
+        successHaptic();
+
+        const hints: string[] = [];
+        if (type === 'face' && !hasUpperBody) {
+          hints.push('upper body photo (required)');
+        }
+        if (type === 'upper_body' && !hasFullBody) {
+          hints.push('full body photo (+40% more matches)');
+        }
+        if (type === 'full_body' && currentPhotoCount < 3) {
+          hints.push('freestyle photo to show personality');
+        }
+
+        Alert.alert(
+          '📸 Photo Added!',
+          hints.length > 0
+            ? `Great shot! Next up: ${hints.join(', ')}`
+            : 'Looking good! 🎉'
+        );
+      } catch (err) {
+        logger.error('processPhoto failed:', err);
+        Alert.alert(
+          'Upload Error',
+          'Something went wrong uploading your photo. Check your connection and try again.'
+        );
+      } finally {
+        if (isMountedRef.current) {
+          setUploading(false);
+          setUploadProgress(0);
+        }
+      }
+    },
+    [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
+  );
 
   const doCapture = useCallback(async () => {
     if (!camSlot || capturing) return;
@@ -1837,7 +1822,10 @@ const processPhoto = useCallback(
         const v = webVideoElRef.current;
         if (!v || v.readyState < 2) return;
 
-        const canvas = document.createElement('canvas');
+        // ✅ FIX: cast document to any for web-only usage
+        const doc2 = (globalThis as any).document;
+        if (!doc2) return;
+        const canvas = doc2.createElement('canvas');
         canvas.width = v.videoWidth || 1280;
         canvas.height = v.videoHeight || 960;
         const ctx = canvas.getContext('2d');
@@ -1872,8 +1860,6 @@ const processPhoto = useCallback(
         return;
       }
 
-      // ✅ FIX: capture current photo count before closing camera
-      // so processPhoto doesn't use a stale value
       const currentCount = form.photos.length;
       closeCam();
       await processPhoto(uri, camSlot.type, currentCount);
@@ -1910,6 +1896,7 @@ const processPhoto = useCallback(
   const removePhoto = useCallback(
     (index: number) => {
       const photo = form.photos[index];
+      if (!photo) return; // ✅ FIX: guard against undefined
       const isRequired = photo.type === 'face' || photo.type === 'upper_body';
       Alert.alert(
         'Remove Photo',
@@ -2837,17 +2824,17 @@ const processPhoto = useCallback(
             { key: 'incognito' as const, label: '👻 Incognito mode', desc: 'Only people you like first can see your profile.', val: form.incognito },
             { key: 'verifiedOnly' as const, label: '✅ Verified users only', desc: 'Only selfie-verified users can discover you.', val: form.verifiedOnly },
           ] as const
-        ).map((item) => (
-          <View key={item.key} style={[st.privRow, { borderBottomColor: C.inputBorder }]}>
+        ).map((privItem) => (
+          <View key={privItem.key} style={[st.privRow, { borderBottomColor: C.inputBorder }]}>
             <View style={st.privInfo}>
-              <Text style={[st.privLabel, { color: C.text }]}>{item.label}</Text>
-              <Text style={[st.privDesc, { color: C.muted }]}>{item.desc}</Text>
+              <Text style={[st.privLabel, { color: C.text }]}>{privItem.label}</Text>
+              <Text style={[st.privDesc, { color: C.muted }]}>{privItem.desc}</Text>
             </View>
             <Switch
-              value={item.val}
-              onValueChange={(v) => set(item.key, v)}
+              value={privItem.val}
+              onValueChange={(v) => set(privItem.key, v)}
               trackColor={{ false: C.inputBorder, true: C.accent }}
-              thumbColor={item.val ? C.success : C.dim}
+              thumbColor={privItem.val ? C.success : C.dim}
             />
           </View>
         ))}
@@ -2959,7 +2946,6 @@ const processPhoto = useCallback(
       style={[st.root, { backgroundColor: C.bg }]}
       behavior={IS_IOS ? 'padding' : 'height'}
     >
-      {/* Background gradient matching login/signup */}
       <LinearGradient
         colors={[C.bgGradientStart, C.bgGradientMid, C.bgGradientEnd]}
         style={StyleSheet.absoluteFill}
@@ -2967,7 +2953,6 @@ const processPhoto = useCallback(
         end={{ x: 0.5, y: 1 }}
       />
 
-      {/* Top bar */}
       <View style={[st.topBar, { backgroundColor: C.card, borderBottomColor: C.cardBorder }]}>
         <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={[st.backBtn, { color: C.accent }]}>
@@ -2980,7 +2965,6 @@ const processPhoto = useCallback(
         <Text style={[st.draftLabel, { color: C.muted }]}>💾 Draft</Text>
       </View>
 
-      {/* Step dots */}
       <View style={[st.stepDots, { backgroundColor: C.card }]}>
         {STEP_NAMES.map((name, i) => (
           <View
@@ -2995,7 +2979,6 @@ const processPhoto = useCallback(
         ))}
       </View>
 
-      {/* Progress bar */}
       <View style={[st.progBg, { backgroundColor: C.inputBorder }]}>
         <Animated.View
           style={[
@@ -3008,7 +2991,6 @@ const processPhoto = useCallback(
         />
       </View>
 
-      {/* Scrollable content */}
       <Pressable
         style={{ flex: 1 }}
         onPress={() => { if (!IS_WEB) Keyboard.dismiss(); }}
@@ -3027,11 +3009,9 @@ const processPhoto = useCallback(
         </ScrollView>
       </Pressable>
 
-      {/* Bottom bar with gradient button */}
       <View style={[st.botBar, { backgroundColor: C.card, borderTopColor: C.cardBorder }]}>
         {step < TOTAL_STEPS ? (
           stepOk ? (
-            // Active: gradient button matching login/signup style
             <TouchableOpacity
               style={st.nextBtnWrap}
               onPress={goNext}
@@ -3049,7 +3029,6 @@ const processPhoto = useCallback(
               </LinearGradient>
             </TouchableOpacity>
           ) : (
-            // Disabled state
             <View style={[st.nextBtnWrap, { opacity: 0.6 }]}>
               <View style={[st.nextBtn, { backgroundColor: C.disabledBg }]}>
                 <Text style={[st.nextBtnText, { color: C.disabledText }]}>
@@ -3135,12 +3114,6 @@ const processPhoto = useCallback(
                         <Text style={[st.camLoadText, { color: C.muted }]}>Starting camera…</Text>
                       </View>
                     )}
-                    {/*
-                     * ✅ FIX: WebVideoPreview is always rendered when camera is open
-                     * (not conditionally based on camReady). The video element needs
-                     * to be in the DOM so handleVideoRef can fire and attach the stream.
-                     * We hide it with opacity when not ready.
-                     */}
                     <View style={[StyleSheet.absoluteFillObject, !camReady && { opacity: 0 }]}>
                       <WebVideoPreview
                         streamReady={!!streamRef.current}
@@ -3235,25 +3208,25 @@ const processPhoto = useCallback(
             <Text style={[st.pickerTitle, { color: C.text }]}>Choose a Question</Text>
             <FlatList
               data={PROMPT_QUESTIONS}
-              keyExtractor={(item, index) => `pq_${index}`}
+              keyExtractor={(_q, index) => `pq_${index}`}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => {
+              renderItem={({ item: question }) => {
                 const used =
                   promptPicker !== null &&
                   promptPicker < form.prompts.length &&
-                  form.prompts.some((p, i) => p.q === item && i !== promptPicker);
+                  form.prompts.some((p, i) => p.q === question && i !== promptPicker);
                 return (
                   <TouchableOpacity
                     style={[st.pickerItem, { borderBottomColor: C.inputBorder }, used && st.pickerItemOff]}
                     onPress={() => {
                       if (used || promptPicker === null || promptPicker >= form.prompts.length) return;
-                      dispatch({ type: 'SET_PROMPT', index: promptPicker, q: item, a: form.prompts[promptPicker]?.a ?? '' });
+                      dispatch({ type: 'SET_PROMPT', index: promptPicker, q: question, a: form.prompts[promptPicker]?.a ?? '' });
                       setPromptPicker(null);
                     }}
                     disabled={used}
                     activeOpacity={0.7}
                   >
-                    <Text style={[st.pickerItemText, { color: used ? C.muted : C.text }]}>{item}</Text>
+                    <Text style={[st.pickerItemText, { color: used ? C.muted : C.text }]}>{question}</Text>
                     {used && <Text style={[st.pickerUsed, { color: C.muted }]}>Already used</Text>}
                   </TouchableOpacity>
                 );
