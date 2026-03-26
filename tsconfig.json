@@ -2,49 +2,32 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    // Strictness
     "strict": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
-    "useUnknownInCatchVariables": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
-
-    // Module Resolution
     "moduleResolution": "bundler",
-    "moduleDetection": "force",
-    "module": "ESNext",
-    "target": "ES2020",
-    "lib": ["ES2020"],
+    "module": "esnext",
+    "target": "esnext",
+    "lib": [
+      "esnext"
+    ],
     "resolveJsonModule": true,
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-
-    // Output
+    "allowImportingTsExtensions": true,
     "noEmit": true,
-    "composite": false,
-
-    // Interop
     "esModuleInterop": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
     "allowJs": true,
-
-    // Paths
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
-
-    // Types
-    "types": ["node"],
-
-    // Other
     "skipLibCheck": true,
-    "jsx": "react-native",
-    "noErrorTruncation": true
+    "jsx": "react-native"
   },
   "include": [
     "**/*.ts",
@@ -56,23 +39,28 @@
     "node_modules",
     "dist",
     "web-build",
-    ".expo",
+    ".expo/metro",
+    ".expo/web",
     "coverage",
     "android",
     "ios",
     "functions",
     "scripts",
     "e2e",
+    ".cache",
+    "tmp",
+    "temp",
     "**/__tests__/**",
     "**/__mocks__/**",
     "**/*.test.ts",
     "**/*.test.tsx",
+    "**/*.test.js",
+    "**/*.test.jsx",
     "**/*.spec.ts",
     "**/*.spec.tsx",
+    "**/*.spec.js",
+    "**/*.spec.jsx",
     "*.config.js",
-    "*.config.ts",
-    ".cache",
-    "tmp",
-    "temp"
+    "*.config.ts"
   ]
 }

@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { LanguageProvider } from '../utils/languageContext';
-import { logger } from '../utils/logger'; // Assumes you have a logger that respects __DEV__
+import { logger } from '../utils/logger';
 import { registerForPushNotifications } from '../utils/notifications';
 
 // ─── Keep splash visible until ready ─────────────────────
@@ -45,8 +45,10 @@ const COLORS = {
   },
 } as const;
 
-// ─── Auth screen routes ──────────────────────────────────
-const AUTH_SCREENS = new Set(['login', 'signup', 'index']);
+// ─── Public routes (no auth required) ────────────────────
+// ✅ CHANGED: renamed from AUTH_SCREENS, added 'terms' and 'privacy'
+const PUBLIC_SCREENS = new Set(['login', 'signup', 'index', 'terms', 'privacy']);
+
 const PROTECTED_SCREENS_ALLOW_UNVERIFIED = new Set(['login', 'signup', 'index']);
 
 // ─── Types ───────────────────────────────────────────────
@@ -68,7 +70,9 @@ type AppRoute =
   | '/chat'
   | '/matches'
   | '/profile-views'
-  | '/date-safety';
+  | '/date-safety'
+  | '/terms'
+  | '/privacy';
 
 interface NotificationData {
   screen?: string;
@@ -103,9 +107,6 @@ function isProfileComplete(data: UserProfile | null): boolean {
   );
 }
 
-/**
- * Wraps a promise with a timeout.
- */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     promise,
@@ -115,21 +116,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-/**
- * Fetches user profile from Firestore with cache fallback.
- */
 async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
   try {
-    // Try cache first for instant response
     const cachedDoc = await getDocFromCache(doc(db, 'users', uid)).catch(() => null);
     if (cachedDoc?.exists()) {
       return cachedDoc.data() as UserProfile;
     }
   } catch {
-    // Cache miss — proceed to network
+    // Cache miss
   }
 
-  // Network fetch with timeout
   const networkDoc = await withTimeout(
     getDoc(doc(db, 'users', uid)),
     FIRESTORE_TIMEOUT_MS,
@@ -154,7 +150,6 @@ class LayoutErrorBoundary extends React.Component<
     if (__DEV__) {
       console.error('[LayoutErrorBoundary]', error, info);
     }
-    // In production, send to crash reporting
   }
 
   render() {
@@ -211,29 +206,35 @@ function RootLayoutContent() {
   const segments = useSegments();
   const colorScheme = useColorScheme() ?? 'dark';
 
-  // ── State ──
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
-  // ── Refs ──
   const isMounted = useRef(true);
   const notificationListener = useRef<Notifications.EventSubscription>();
   const responseListener = useRef<Notifications.EventSubscription>();
   const pushRegistered = useRef(false);
   const authTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // ── Derived values (memoized) ──
+  // ── Derived values ──
   const currentSegment = useMemo(() => segments[0] ?? '', [segments]);
-  const isAuthScreen = useMemo(() => AUTH_SCREENS.has(currentSegment), [currentSegment]);
+
+  // ✅ CHANGED: uses PUBLIC_SCREENS instead of AUTH_SCREENS
+  const isPublicScreen = useMemo(() => PUBLIC_SCREENS.has(currentSegment), [currentSegment]);
+
   const isProfileSetupScreen = useMemo(() => currentSegment === 'profile-setup', [currentSegment]);
+
+  // ✅ ADDED: distinguish auth screens from all public screens
+  const isAuthScreen = useMemo(
+    () => currentSegment === 'login' || currentSegment === 'signup' || currentSegment === 'index',
+    [currentSegment]
+  );
 
   const screenOptions = useScreenOptions(colorScheme);
 
   // ── Process authenticated user ──
   const processAuthenticatedUser = useCallback(async (user: User) => {
-    // Check email verification first
     if (!user.emailVerified) {
       if (__DEV__) logger.info('[Layout] Email not verified');
       setIsLoggedIn(false);
@@ -243,7 +244,6 @@ function RootLayoutContent() {
 
     setIsLoggedIn(true);
 
-    // Fetch profile
     try {
       const profile = await fetchUserProfile(user.uid);
       if (!isMounted.current) return;
@@ -253,7 +253,6 @@ function RootLayoutContent() {
       if (isMounted.current) setProfileComplete(false);
     }
 
-    // Register push notifications (once per session)
     if (Platform.OS !== 'web' && !pushRegistered.current) {
       pushRegistered.current = true;
       registerForPushNotifications().catch((err) => {
@@ -266,7 +265,6 @@ function RootLayoutContent() {
   useEffect(() => {
     isMounted.current = true;
 
-    // Set auth timeout
     authTimeoutRef.current = setTimeout(() => {
       if (isMounted.current && !isReady) {
         if (__DEV__) logger.warn('[Layout] Auth timed out');
@@ -278,7 +276,6 @@ function RootLayoutContent() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!isMounted.current) return;
 
-      // Clear timeout on first auth response
       if (authTimeoutRef.current) {
         clearTimeout(authTimeoutRef.current);
         authTimeoutRef.current = undefined;
@@ -378,10 +375,10 @@ function RootLayoutContent() {
   }, [handleNotificationRoute]);
 
   // ── Auth redirect logic ──
+  // ✅ CHANGED: uses isPublicScreen so terms/privacy don't redirect to login
   useEffect(() => {
     if (!isReady) return;
 
-    // Use InteractionManager to avoid interrupting animations
     const task = InteractionManager.runAfterInteractions(() => {
       if (!isMounted.current) return;
 
@@ -394,13 +391,17 @@ function RootLayoutContent() {
       }
 
       if (isLoggedIn) {
+        // Logged-in user routing
         if (profileComplete === false && !isProfileSetupScreen) {
           router.replace('/profile-setup' as AppRoute);
         } else if (profileComplete === true && (isAuthScreen || isProfileSetupScreen)) {
+          // Only redirect away from auth screens, NOT from terms/privacy
           router.replace('/home' as AppRoute);
         }
       } else {
-        if (!isAuthScreen && currentSegment !== '') {
+        // Not logged in — only redirect if on a PROTECTED screen
+        // Public screens (login, signup, index, terms, privacy) stay accessible
+        if (!isPublicScreen && currentSegment !== '') {
           router.replace('/login' as AppRoute);
         }
       }
@@ -412,17 +413,16 @@ function RootLayoutContent() {
     isLoggedIn,
     profileComplete,
     currentSegment,
+    isPublicScreen,
     isAuthScreen,
     isProfileSetupScreen,
     router,
   ]);
 
-  // ── Loading state ──
   if (!isReady) {
     return <LoadingScreen colorScheme={colorScheme} />;
   }
 
-  // ── Auth timeout fallback ──
   if (authTimedOut && !isLoggedIn) {
     // Could show a retry button here
   }
@@ -433,7 +433,7 @@ function RootLayoutContent() {
         {/* Auth */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'Log In' }} />
-        <Stack.Screen name="signup" options={{ title: 'Sign Up' }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
 
         {/* Main */}
         <Stack.Screen
@@ -484,7 +484,7 @@ function RootLayoutContent() {
         <Stack.Screen name="social-verification" options={{ headerShown: false }} />
         <Stack.Screen name="date-spot-reviews" options={{ headerShown: false }} />
 
-        {/* Legal */}
+        {/* Legal — publicly accessible */}
         <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
         <Stack.Screen name="terms" options={{ title: 'Terms of Service' }} />
 
