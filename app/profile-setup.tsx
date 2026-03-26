@@ -1,10 +1,7 @@
-// ═══════════════════════════════════════
-// ProfileSetupScreen — Multi-step wizard (FIXED + E2EE)
-// ═══════════════════════════════════════
-
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -34,8 +31,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   useWindowDimensions,
-  View,
+  View
 } from 'react-native';
 import BodyTypeSelector from '../components/BodyTypeSelector';
 import { auth, db } from '../firebaseConfig';
@@ -118,49 +116,91 @@ const STEP_NAMES = [
   'Preview',
 ] as const;
 
-// ─── Colors ───────────────────────────────────────────────
+// ─── Theme tokens (matches login/signup) ──────────────────
 
-const DARK = {
-  bg: '#1a1a2e',
-  card: '#16213e',
-  input: '#0f3460',
-  border: '#0f3460',
-  accent: '#53a8b6',
-  success: '#5cb85c',
-  danger: '#d9534f',
-  warning: '#e67e22',
-  gold: '#f1c40f',
-  purple: '#9b59b6',
-  text: '#eeeeee',
-  sub: '#aaaaaa',
-  muted: '#888888',
-  dim: '#666666',
+const darkTokens = {
+  bg: '#07070f',
+  bgGradientStart: '#0a0a18',
+  bgGradientMid: '#0e0e24',
+  bgGradientEnd: '#07070f',
+  card: '#111128',
+  cardBorder: '#1e1e48',
+  input: '#0d0d24',
+  inputBorder: '#28285a',
+  accent: '#6C63FF',
+  accentSoft: '#8B83FF',
+  accentGlow: 'rgba(108,99,255,0.10)',
+  error: '#FF6B6B',
+  errorGlow: 'rgba(255,107,107,0.07)',
+  warn: '#FFB347',
+  success: '#51CF66',
+  successGlow: 'rgba(81,207,102,0.07)',
+  text: '#EDEDFF',
+  sub: '#9494B8',
+  muted: '#64648a',
+  dim: '#40406a',
   white: '#ffffff',
   black: '#000000',
-  overlay: 'rgba(0,0,0,0.85)',
+  overlay: 'rgba(4,4,12,0.92)',
   none: 'transparent',
-  guideStroke: 'rgba(83,168,182,0.6)',
-  guideFill: 'rgba(83,168,182,0.08)',
-  skeleton: '#253454',
+  guideStroke: 'rgba(108,99,255,0.7)',
+  guideFill: 'rgba(108,99,255,0.08)',
+  skeleton: '#1e1e48',
+  buttonGradStart: '#7B73FF',
+  buttonGradEnd: '#5A4FE6',
+  disabledBg: '#181834',
+  disabledText: '#40406a',
+  gold: '#f1c40f',
+  purple: '#9b59b6',
+  danger: '#FF6B6B',
+  warning: '#FFB347',
 } as const;
 
-type Theme = typeof DARK;
+const lightTokens = {
+  bg: '#F0F2F8',
+  bgGradientStart: '#E8EAF4',
+  bgGradientMid: '#E0E3F0',
+  bgGradientEnd: '#F0F2F8',
+  card: '#FFFFFF',
+  cardBorder: '#D4D8E8',
+  input: '#F4F5FC',
+  inputBorder: '#C8CCE0',
+  accent: '#5B52E0',
+  accentSoft: '#7A72F0',
+  accentGlow: 'rgba(91,82,224,0.08)',
+  error: '#DC3545',
+  errorGlow: 'rgba(220,53,69,0.05)',
+  warn: '#D4880F',
+  success: '#2F9E44',
+  successGlow: 'rgba(47,158,68,0.05)',
+  text: '#10102A',
+  sub: '#4E4E6E',
+  muted: '#8080A0',
+  dim: '#C0C0D0',
+  white: '#ffffff',
+  black: '#000000',
+  overlay: 'rgba(220,224,240,0.92)',
+  none: 'transparent',
+  guideStroke: 'rgba(91,82,224,0.7)',
+  guideFill: 'rgba(91,82,224,0.08)',
+  skeleton: '#D4D8E8',
+  buttonGradStart: '#6C63FF',
+  buttonGradEnd: '#4A42CC',
+  disabledBg: '#D0D4E4',
+  disabledText: '#9898B4',
+  gold: '#c4940a',
+  purple: '#7b3fa0',
+  danger: '#DC3545',
+  warning: '#D4880F',
+} as const;
+
+type Theme = typeof darkTokens;
 
 // ─── Types ────────────────────────────────────────────────
 
 type ZodiacSign =
-  | 'Capricorn'
-  | 'Aquarius'
-  | 'Pisces'
-  | 'Aries'
-  | 'Taurus'
-  | 'Gemini'
-  | 'Cancer'
-  | 'Leo'
-  | 'Virgo'
-  | 'Libra'
-  | 'Scorpio'
-  | 'Sagittarius';
+  | 'Capricorn' | 'Aquarius' | 'Pisces' | 'Aries' | 'Taurus'
+  | 'Gemini' | 'Cancer' | 'Leo' | 'Virgo' | 'Libra' | 'Scorpio' | 'Sagittarius';
 
 type PhotoType = 'face' | 'upper_body' | 'full_body' | 'freestyle';
 type BodyType = 'slim' | 'athletic' | 'average' | 'curvy' | 'heavyset' | '';
@@ -218,7 +258,6 @@ interface LocationData {
 
 interface FormState {
   photos: ProfilePhoto[];
-
   name: string;
   bdayMonth: string;
   bdayDay: string;
@@ -230,10 +269,8 @@ interface FormState {
   heightFt: string;
   heightIn: string;
   heightUnit: HeightUnit;
-
   bodyType: BodyType;
   lookingForBody: BodyType;
-
   religion: string;
   lifestyle: string;
   relationship: string;
@@ -245,13 +282,11 @@ interface FormState {
   pets: string;
   diet: string;
   politics: string;
-
   interests: string[];
   loveLang: string;
   commStyle: string;
   firstDate: string;
   vibes: string[];
-
   ageMin: string;
   ageMax: string;
   distKm: string;
@@ -259,19 +294,14 @@ interface FormState {
   heightPrefMaxCm: string;
   dealbreakers: string[];
   importantFields: string[];
-
   bio: string;
   prompts: { q: string; a: string }[];
-
   locCity: string;
   locData: LocationData | null;
-
   ageEstimate: number | null;
-
   blurUntilMatch: boolean;
   incognito: boolean;
   verifiedOnly: boolean;
-
   termsAccepted: boolean;
 }
 
@@ -318,8 +348,7 @@ const PHOTO_SLOTS: PhotoSlotConfig[] = [
     label: 'Full Body',
     required: false,
     icon: '🧍',
-    instruction:
-      'Head to toe, stand naturally\nProp your phone or use the timer',
+    instruction: 'Head to toe, stand naturally\nProp your phone or use the timer',
     cameraSide: 'back',
     timerAvailable: true,
   },
@@ -427,31 +456,11 @@ const DIET_OPTIONS: OptionItem[] = [
 ];
 
 const LOVE_LANGUAGE_OPTIONS: OptionItem[] = [
-  {
-    value: 'Words of Affirmation',
-    desc: 'Verbal compliments, encouragement',
-    icon: '💬',
-  },
-  {
-    value: 'Quality Time',
-    desc: 'Undivided attention together',
-    icon: '⏰',
-  },
-  {
-    value: 'Gifts',
-    desc: 'Thoughtful presents & surprises',
-    icon: '🎁',
-  },
-  {
-    value: 'Acts of Service',
-    desc: 'Helping out, doing things',
-    icon: '🤝',
-  },
-  {
-    value: 'Physical Touch',
-    desc: 'Hugs, holding hands',
-    icon: '🤗',
-  },
+  { value: 'Words of Affirmation', desc: 'Verbal compliments, encouragement', icon: '💬' },
+  { value: 'Quality Time', desc: 'Undivided attention together', icon: '⏰' },
+  { value: 'Gifts', desc: 'Thoughtful presents & surprises', icon: '🎁' },
+  { value: 'Acts of Service', desc: 'Helping out, doing things', icon: '🤝' },
+  { value: 'Physical Touch', desc: 'Hugs, holding hands', icon: '🤗' },
 ];
 
 const COMMUNICATION_OPTIONS: OptionItem[] = [
@@ -519,16 +528,8 @@ const VIBE_EMOJIS: string[] = [
 ];
 
 const IMPORTANT_FIELD_OPTIONS: string[] = [
-  'Religion',
-  'Lifestyle',
-  'Education',
-  'Height',
-  'Body Type',
-  'Children',
-  'Smoking',
-  'Drinking',
-  'Pets',
-  'Politics',
+  'Religion', 'Lifestyle', 'Education', 'Height', 'Body Type',
+  'Children', 'Smoking', 'Drinking', 'Pets', 'Politics',
 ];
 
 // ─── Pure Utilities ───────────────────────────────────────
@@ -567,9 +568,7 @@ function calcAge(bday: Date): number {
   const today = new Date();
   let age = today.getFullYear() - bday.getFullYear();
   const monthDiff = today.getMonth() - bday.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bday.getDate())) {
-    age--;
-  }
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bday.getDate())) age--;
   return age;
 }
 
@@ -622,16 +621,12 @@ function getPhotoLabel(type: PhotoType): string {
 
 function getNextPhotoSlot(photos: ProfilePhoto[]): PhotoSlotConfig | null {
   for (const slot of PHOTO_SLOTS) {
-    if (slot.required && !photos.some((p) => p.type === slot.type)) {
-      return slot;
-    }
+    if (slot.required && !photos.some((p) => p.type === slot.type)) return slot;
   }
   if (!photos.some((p) => p.type === 'full_body')) {
     return PHOTO_SLOTS.find((s) => s.type === 'full_body')!;
   }
-  if (photos.length < MAX_PHOTOS) {
-    return PHOTO_SLOTS.find((s) => s.type === 'freestyle')!;
-  }
+  if (photos.length < MAX_PHOTOS) return PHOTO_SLOTS.find((s) => s.type === 'freestyle')!;
   return null;
 }
 
@@ -648,8 +643,7 @@ function checkBlocked(text: string): string | null {
     if (r.test(text)) {
       if (r.source.includes('@') || r.source.includes('\\d'))
         return 'Contact information is not allowed.';
-      if (r.source.includes('snap'))
-        return 'Social media handles are not allowed.';
+      if (r.source.includes('snap')) return 'Social media handles are not allowed.';
       return 'This contains inappropriate language.';
     }
   }
@@ -684,16 +678,11 @@ function getMissingFieldsMessage(
       if (hCm < MIN_H || hCm > MAX_H) return 'Enter a valid height';
       return 'Complete required fields';
     }
-    case 3:
-      return 'Select your body type and preference';
-    case 4:
-      return 'Select religion, lifestyle and relationship goal';
-    case 5:
-      return 'Pick at least 3 interests';
-    case 8:
-      return 'Accept the Terms of Service to continue';
-    default:
-      return 'Complete required fields';
+    case 3: return 'Select your body type and preference';
+    case 4: return 'Select religion, lifestyle and relationship goal';
+    case 5: return 'Pick at least 3 interests';
+    case 8: return 'Accept the Terms of Service to continue';
+    default: return 'Complete required fields';
   }
 }
 
@@ -752,10 +741,8 @@ function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
     case 'SET':
       return { ...state, [action.field]: action.value };
-
     case 'ADD_PHOTO':
       return { ...state, photos: [...state.photos, action.photo] };
-
     case 'REMOVE_PHOTO':
       return {
         ...state,
@@ -763,14 +750,12 @@ function reducer(state: FormState, action: Action): FormState {
           .filter((_, i) => i !== action.index)
           .map((p, i) => ({ ...p, order: i })),
       };
-
     case 'MOVE_PHOTO': {
       const arr = [...state.photos];
       const [moved] = arr.splice(action.from, 1);
       arr.splice(action.to, 0, moved);
       return { ...state, photos: arr.map((p, i) => ({ ...p, order: i })) };
     }
-
     case 'TOGGLE_LIST': {
       const list = [...(state[action.field] as string[])];
       const idx = list.indexOf(action.value);
@@ -782,29 +767,20 @@ function reducer(state: FormState, action: Action): FormState {
       }
       return { ...state, [action.field]: list };
     }
-
     case 'SET_PROMPT': {
       const prompts = [...state.prompts];
       prompts[action.index] = { q: action.q, a: action.a };
       return { ...state, prompts };
     }
-
     case 'ADD_PROMPT':
       if (state.prompts.length >= 3) return state;
       return { ...state, prompts: [...state.prompts, { q: '', a: '' }] };
-
     case 'DEL_PROMPT':
-      return {
-        ...state,
-        prompts: state.prompts.filter((_, i) => i !== action.index),
-      };
-
+      return { ...state, prompts: state.prompts.filter((_, i) => i !== action.index) };
     case 'LOAD':
       return { ...state, ...action.state };
-
     case 'RESET':
       return INIT;
-
     default: {
       const _exhaustive: never = action;
       return state;
@@ -829,12 +805,9 @@ const CameraGuide = React.memo(function CameraGuide({
         <View style={guideS.container} pointerEvents="none">
           <View style={guideS.faceOval} />
           <View style={guideS.shoulderLine} />
-          <Text style={guideS.guideText}>
-            Position your face{'\n'}inside the oval
-          </Text>
+          <Text style={guideS.guideText}>Position your face{'\n'}inside the oval</Text>
         </View>
       );
-
     case 'upper_body':
       return (
         <View style={guideS.container} pointerEvents="none">
@@ -842,12 +815,9 @@ const CameraGuide = React.memo(function CameraGuide({
           <View style={guideS.ubNeck} />
           <View style={guideS.ubShoulders} />
           <View style={guideS.ubTorso} />
-          <Text style={guideS.guideTextBottom}>
-            Show from{'\n'}waist up
-          </Text>
+          <Text style={guideS.guideTextBottom}>Show from{'\n'}waist up</Text>
         </View>
       );
-
     case 'full_body':
       return (
         <View style={guideS.container} pointerEvents="none">
@@ -859,18 +829,13 @@ const CameraGuide = React.memo(function CameraGuide({
             <View style={guideS.fbLeg} />
             <View style={guideS.fbLeg} />
           </View>
-          <Text style={guideS.guideTextBottom}>
-            Stand naturally{'\n'}head to toe
-          </Text>
+          <Text style={guideS.guideTextBottom}>Stand naturally{'\n'}head to toe</Text>
         </View>
       );
-
     default:
       return (
         <View style={guideS.container} pointerEvents="none">
-          <Text style={guideS.freestyleText}>
-            📸{'\n'}Show your{'\n'}personality!
-          </Text>
+          <Text style={guideS.freestyleText}>📸{'\n'}Show your{'\n'}personality!</Text>
         </View>
       );
   }
@@ -1003,11 +968,7 @@ function makeGuideStyles(C: Theme) {
       borderStyle: 'dashed',
       marginTop: -2,
     },
-    fbLegs: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: -2,
-    },
+    fbLegs: { flexDirection: 'row', gap: 12, marginTop: -2 },
     fbLeg: {
       width: 28,
       height: 100,
@@ -1028,6 +989,44 @@ function makeGuideStyles(C: Theme) {
   });
 }
 
+// ─── Web video component (isolates web-only JSX) ──────────
+// ✅ FIX: Separating the web video element into its own component
+// prevents TypeScript errors on native and ensures the ref
+// is properly attached after the stream is ready.
+
+const WebVideoPreview = React.memo(function WebVideoPreview({
+  streamReady,
+  facing,
+  onReady,
+}: {
+  streamReady: boolean;
+  facing: 'front' | 'back';
+  onReady: (el: HTMLVideoElement) => void;
+}) {
+  if (!IS_WEB) return null;
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* @ts-ignore web only */}
+      <video
+        ref={(node: HTMLVideoElement | null) => {
+          if (node) onReady(node);
+        }}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+          transform: facing === 'front' ? 'scaleX(-1)' : 'none',
+        }}
+      />
+    </View>
+  );
+});
+
 // ═══════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════
@@ -1036,6 +1035,11 @@ export default function ProfileSetupScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
+
+  // ✅ FIX: use useColorScheme for live theme switching
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme !== 'light';
+  const C: Theme = isDark ? darkTokens : lightTokens;
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -1052,17 +1056,13 @@ export default function ProfileSetupScreen() {
     return unsub;
   }, [router]);
 
-  const C: Theme = DARK;
-
   const [form, dispatch] = useReducer(reducer, INIT);
   const set = useCallback(
-    (f: keyof FormState, v: any) =>
-      dispatch({ type: 'SET', field: f, value: v }),
+    (f: keyof FormState, v: any) => dispatch({ type: 'SET', field: f, value: v }),
     []
   );
 
   const [step, setStep] = useState(1);
-
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [capturing, setCapturing] = useState(false);
@@ -1083,11 +1083,13 @@ export default function ProfileSetupScreen() {
   const isMountedRef = useRef(true);
   const scrollRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
-  const streamRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const stepTitleRef = useRef<Text>(null);
   const isDirtyRef = useRef(false);
-  const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  // ✅ FIX: store the actual HTMLVideoElement so we can attach stream to it
+  // directly when it becomes available, rather than relying on a callback
+  // that may fire before the stream exists
+  const webVideoElRef = useRef<HTMLVideoElement | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -1103,7 +1105,7 @@ export default function ProfileSetupScreen() {
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks?.().forEach((t: any) => t.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
       if (countdownRef.current) {
@@ -1130,21 +1132,23 @@ export default function ProfileSetupScreen() {
         if (rawDraft) {
           const parsed = JSON.parse(rawDraft) as Partial<FormState>;
           delete parsed.photos;
-          if (isMountedRef.current) {
-            dispatch({ type: 'LOAD', state: parsed });
-          }
+          if (isMountedRef.current) dispatch({ type: 'LOAD', state: parsed });
         }
-        if (isMountedRef.current) {
-          setStep(1);
-        }
+        if (isMountedRef.current) setStep(1);
       } catch {
         // ignore
       }
     })();
   }, [draftKey, stepKey]);
 
+  // ✅ FIX: track dirty with a ref that only flips on actual form changes
+  // not on every render, so draft save doesn't run unnecessarily
+  const prevFormRef = useRef(form);
   useEffect(() => {
-    isDirtyRef.current = true;
+    if (prevFormRef.current !== form) {
+      isDirtyRef.current = true;
+      prevFormRef.current = form;
+    }
   }, [form]);
 
   useEffect(() => {
@@ -1153,12 +1157,8 @@ export default function ProfileSetupScreen() {
       if (!isDirtyRef.current) return;
       isDirtyRef.current = false;
       const { photos: _photos, ...rest } = form;
-      try {
-        profileStorage.set(draftKey, JSON.stringify(rest));
-      } catch {}
-      try {
-        profileStorage.set(stepKey, String(step));
-      } catch {}
+      try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch {}
+      try { profileStorage.set(stepKey, String(step)); } catch {}
     }, 2000);
     return () => clearTimeout(t);
   }, [form, step, draftKey, stepKey]);
@@ -1192,9 +1192,7 @@ export default function ProfileSetupScreen() {
 
   useEffect(() => {
     const name = STEP_NAMES[step - 1];
-    AccessibilityInfo.announceForAccessibility(
-      `Step ${step} of ${TOTAL_STEPS}: ${name}`
-    );
+    AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}: ${name}`);
   }, [step]);
 
   const birthday = useMemo<Date | null>(() => {
@@ -1212,7 +1210,7 @@ export default function ProfileSetupScreen() {
   );
 
   const zodiac = useMemo<ZodiacResult | null>(
-    () => (birthday ? getZodiac(birthday.getMonth() + 1, birthday.getDate()) : null),
+    () => birthday ? getZodiac(birthday.getMonth() + 1, birthday.getDate()) : null,
     [birthday]
   );
 
@@ -1228,78 +1226,42 @@ export default function ProfileSetupScreen() {
       : `${form.heightFt}'${form.heightIn || 0}" (${hCm} cm)`;
   }, [hCm, form.heightUnit, form.heightFt, form.heightIn]);
 
-  const hasFace = useMemo(
-    () => form.photos.some((p) => p.type === 'face'),
-    [form.photos]
-  );
-  const hasUpperBody = useMemo(
-    () => form.photos.some((p) => p.type === 'upper_body'),
-    [form.photos]
-  );
-  const hasFullBody = useMemo(
-    () => form.photos.some((p) => p.type === 'full_body'),
-    [form.photos]
-  );
+  const hasFace = useMemo(() => form.photos.some((p) => p.type === 'face'), [form.photos]);
+  const hasUpperBody = useMemo(() => form.photos.some((p) => p.type === 'upper_body'), [form.photos]);
+  const hasFullBody = useMemo(() => form.photos.some((p) => p.type === 'full_body'), [form.photos]);
   const nextSlot = useMemo(() => getNextPhotoSlot(form.photos), [form.photos]);
 
   const stepOk = useMemo<boolean>(() => {
     switch (step) {
-      case 1:
-        return hasFace && hasUpperBody;
+      case 1: return hasFace && hasUpperBody;
       case 2:
         return (
           validateName(form.name).valid &&
-          age !== null &&
-          age >= MIN_AGE &&
-          age <= MAX_AGE &&
-          form.gender !== '' &&
-          form.interestedIn !== '' &&
-          hCm >= MIN_H &&
-          hCm <= MAX_H
+          age !== null && age >= MIN_AGE && age <= MAX_AGE &&
+          form.gender !== '' && form.interestedIn !== '' &&
+          hCm >= MIN_H && hCm <= MAX_H
         );
-      case 3:
-        return form.bodyType !== '' && form.lookingForBody !== '';
-      case 4:
-        return form.religion !== '' && form.lifestyle !== '' && form.relationship !== '';
-      case 5:
-        return form.interests.length >= 3;
-      case 6:
-        return true;
-      case 7:
-        return true;
-      case 8:
-        return form.termsAccepted;
-      default:
-        return false;
+      case 3: return form.bodyType !== '' && form.lookingForBody !== '';
+      case 4: return form.religion !== '' && form.lifestyle !== '' && form.relationship !== '';
+      case 5: return form.interests.length >= 3;
+      case 6: return true;
+      case 7: return true;
+      case 8: return form.termsAccepted;
+      default: return false;
     }
   }, [step, form, hasFace, hasUpperBody, age, hCm]);
 
   const pct = useMemo<number>(() => {
     const checks = [
-      hasFace,
-      hasUpperBody,
-      hasFullBody,
-      form.photos.length >= 3,
-      validateName(form.name).valid,
-      age !== null && age >= MIN_AGE,
-      form.gender !== '',
-      form.interestedIn !== '',
-      hCm >= MIN_H,
-      form.bodyType !== '',
-      form.lookingForBody !== '',
-      form.religion !== '',
-      form.lifestyle !== '',
-      form.relationship !== '',
-      form.interests.length >= 3,
-      form.bio.trim().length > 0,
-      form.locCity !== '',
-      form.education !== '',
-      form.smoking !== '',
-      form.drinking !== '',
-      form.children !== '',
-      form.prompts.length >= 1,
-      form.vibes.length >= 1,
-      form.loveLang !== '',
+      hasFace, hasUpperBody, hasFullBody, form.photos.length >= 3,
+      validateName(form.name).valid, age !== null && age >= MIN_AGE,
+      form.gender !== '', form.interestedIn !== '', hCm >= MIN_H,
+      form.bodyType !== '', form.lookingForBody !== '',
+      form.religion !== '', form.lifestyle !== '', form.relationship !== '',
+      form.interests.length >= 3, form.bio.trim().length > 0,
+      form.locCity !== '', form.education !== '',
+      form.smoking !== '', form.drinking !== '', form.children !== '',
+      form.prompts.length >= 1, form.vibes.length >= 1, form.loveLang !== '',
     ];
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
   }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
@@ -1321,29 +1283,13 @@ export default function ProfileSetupScreen() {
     (dir: 'fwd' | 'back') => {
       const toVal = dir === 'fwd' ? -screenWidth : screenWidth;
       Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 140,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: toVal,
-          duration: 140,
-          useNativeDriver: true,
-        }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: toVal, duration: 140, useNativeDriver: true }),
       ]).start(() => {
         slideAnim.setValue(dir === 'fwd' ? screenWidth : -screenWidth);
         Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
+          Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
         ]).start();
       });
     },
@@ -1361,18 +1307,12 @@ export default function ProfileSetupScreen() {
     if (step === 7) {
       if (form.bio.trim()) {
         const bioBlock = checkBlocked(form.bio);
-        if (bioBlock) {
-          Alert.alert('Bio Issue', bioBlock);
-          return;
-        }
+        if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; }
       }
       for (const p of form.prompts) {
         if (p.a.trim()) {
           const promptBlock = checkBlocked(p.a);
-          if (promptBlock) {
-            Alert.alert('Prompt Issue', promptBlock);
-            return;
-          }
+          if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; }
         }
       }
     }
@@ -1396,9 +1336,7 @@ export default function ProfileSetupScreen() {
     successHaptic();
     animate('fwd');
     setStep((s) => s + 1);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    });
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); });
   }, [step, stepOk, form, hasFace, hasUpperBody, age, hCm, haptic, successHaptic, animate]);
 
   const goBack = useCallback(() => {
@@ -1412,22 +1350,101 @@ export default function ProfileSetupScreen() {
     haptic();
     animate('back');
     setStep((s) => s - 1);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    });
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); });
   }, [step, haptic, animate, router]);
 
-  const stopWebCam = useCallback(() => {
+  // ─── Camera: web stream management ────────────────────────
+
+  const stopWebStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks?.().forEach((t: any) => t.stop());
+      streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    webVideoRef.current = null;
     if (isMountedRef.current) setCamReady(false);
   }, []);
 
+  // ✅ FIX: Attach stream to video element helper — called both when
+  // the stream arrives AND when the video element mounts, whichever
+  // happens second. This handles the race condition between
+  // getUserMedia resolving and the video element rendering.
+  const attachStreamToVideo = useCallback(() => {
+    const video = webVideoElRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject === stream) return; // already attached
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      video.play().catch(() => {});
+      if (isMountedRef.current) setCamReady(true);
+    };
+  }, []);
+
+  // ✅ FIX: Callback ref for the web video element.
+  // Called when the <video> DOM node mounts or unmounts.
+  // If the stream is already ready when this fires, attach immediately.
+  const handleVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (!el) {
+        webVideoElRef.current = null;
+        return;
+      }
+      webVideoElRef.current = el;
+      // If stream already exists (getUserMedia resolved before render), attach now
+      attachStreamToVideo();
+    },
+    [attachStreamToVideo]
+  );
+
+  const startWebStream = useCallback(
+    async (facing: 'front' | 'back') => {
+      try {
+        stopWebStream();
+        if (!navigator.mediaDevices?.getUserMedia) {
+          if (isMountedRef.current) setCamErr('Camera not supported in this browser.');
+          return;
+        }
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+        const facingMode = facing === 'front' ? 'user' : 'environment';
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: videoDevices.length > 1 ? facingMode : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+          },
+          audio: false,
+        });
+
+        if (!isMountedRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        // ✅ FIX: Try to attach immediately. If the video element is already
+        // mounted this works. If not, handleVideoRef will attach when it mounts.
+        attachStreamToVideo();
+      } catch (err: unknown) {
+        const name = err instanceof Error ? (err as any).name : '';
+        const msg =
+          name === 'NotAllowedError'
+            ? 'Camera access blocked. Allow it in browser settings.'
+            : name === 'NotFoundError'
+              ? 'No camera found on this device.'
+              : name === 'NotReadableError'
+                ? 'Camera is in use by another app.'
+                : 'Could not start camera. Try refreshing.';
+        if (isMountedRef.current) setCamErr(msg);
+      }
+    },
+    [stopWebStream, attachStreamToVideo]
+  );
+
   const closeCam = useCallback(() => {
-    stopWebCam();
+    stopWebStream();
+    webVideoElRef.current = null;
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
@@ -1440,62 +1457,7 @@ export default function ProfileSetupScreen() {
       setTimerEnabled(false);
       setCapturing(false);
     }
-  }, [stopWebCam]);
-
-  const videoRefCallback = useCallback((node: any) => {
-    if (!node || !streamRef.current) return;
-    webVideoRef.current = node;
-    node.srcObject = streamRef.current;
-    node.onloadedmetadata = () => {
-      node.play().catch(() => {});
-      if (isMountedRef.current) setCamReady(true);
-    };
-  }, []);
-
-  const startWebStream = useCallback(async (facing: 'front' | 'back') => {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        if (isMountedRef.current) {
-          setCamErr('Camera not supported in this browser.');
-        }
-        return;
-      }
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-      const facingMode = facing === 'front' ? 'user' : 'environment';
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: videoDevices.length > 1 ? facingMode : undefined,
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      if (webVideoRef.current) {
-        webVideoRef.current.srcObject = stream;
-        webVideoRef.current.onloadedmetadata = () => {
-          webVideoRef.current?.play().catch(() => {});
-          if (isMountedRef.current) setCamReady(true);
-        };
-      }
-    } catch (err: unknown) {
-      const name = err instanceof Error ? (err as any).name : '';
-      const msg =
-        name === 'NotAllowedError'
-          ? 'Camera access blocked. Allow it in browser settings.'
-          : name === 'NotFoundError'
-          ? 'No camera found on this device.'
-          : name === 'NotReadableError'
-          ? 'Camera is in use by another app.'
-          : 'Could not start camera. Try refreshing.';
-      if (isMountedRef.current) setCamErr(msg);
-    }
-  }, []);
+  }, [stopWebStream]);
 
   const openCamera = useCallback(
     async (slot?: PhotoSlotConfig) => {
@@ -1540,12 +1502,20 @@ export default function ProfileSetupScreen() {
         setCountdown(null);
         setCamOpen(true);
         setCamErr(null);
+        // ✅ FIX: set camReady false so the loading state shows correctly
         setCamReady(false);
         setCapturing(false);
       }
 
+      // ✅ FIX: Start web stream after state is set. The video element will
+      // mount after setCamOpen(true) causes a re-render. We start the stream
+      // immediately — whichever happens first (stream ready or video mounted)
+      // will trigger attachStreamToVideo, and the second call is a no-op.
       if (IS_WEB) {
-        setTimeout(() => startWebStream(targetSlot.cameraSide), 200);
+        // Small delay to let the modal render and mount the video element
+        setTimeout(() => {
+          if (isMountedRef.current) startWebStream(targetSlot.cameraSide);
+        }, 100);
       }
     },
     [nextSlot, permission, requestPermission, form.photos, startWebStream]
@@ -1554,14 +1524,14 @@ export default function ProfileSetupScreen() {
   const flipCamera = useCallback(() => {
     const newFacing = camFacing === 'front' ? 'back' : 'front';
     setCamFacing(newFacing);
-    if (IS_WEB && streamRef.current) {
-      stopWebCam();
-      setTimeout(() => startWebStream(newFacing), 100);
+    if (IS_WEB) {
+      setCamReady(false);
+      startWebStream(newFacing);
     }
-  }, [camFacing, stopWebCam, startWebStream]);
+  }, [camFacing, startWebStream]);
 
   const processPhoto = useCallback(
-    async (uri: string, type: PhotoType) => {
+    async (uri: string, type: PhotoType, currentPhotoCount: number) => {
       if (isMountedRef.current) {
         setUploading(true);
         setUploadProgress(0);
@@ -1569,22 +1539,14 @@ export default function ProfileSetupScreen() {
 
       try {
         const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
-
         if (isMountedRef.current) setUploadProgress(50);
 
         if (!upload.success || !upload.url) {
-          Alert.alert(
-            'Upload Failed',
-            upload.error ?? 'Could not upload photo. Check your connection.'
-          );
+          Alert.alert('Upload Failed', upload.error ?? 'Could not upload photo. Check your connection.');
           return;
         }
-
         if (upload.moderationStatus === 'rejected') {
-          Alert.alert(
-            'Photo Rejected',
-            'This photo was flagged as inappropriate. Please use a different photo.'
-          );
+          Alert.alert('Photo Rejected', 'This photo was flagged as inappropriate. Please use a different photo.');
           return;
         }
 
@@ -1618,7 +1580,8 @@ export default function ProfileSetupScreen() {
           uri,
           url: upload.url,
           type,
-          order: form.photos.length,
+          // ✅ FIX: use passed-in count instead of stale closure value
+          order: currentPhotoCount,
           verified: true,
           uploadedAt: new Date().toISOString(),
         };
@@ -1644,7 +1607,7 @@ export default function ProfileSetupScreen() {
         }
       }
     },
-    [form.photos.length, hasFace, hasUpperBody, hasFullBody, set, successHaptic]
+    [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
   );
 
   const doCapture = useCallback(async () => {
@@ -1655,7 +1618,7 @@ export default function ProfileSetupScreen() {
     try {
       if (IS_WEB) {
         if (!camReady) return;
-        const v = webVideoRef.current;
+        const v = webVideoElRef.current;
         if (!v || v.readyState < 2) return;
 
         const canvas = document.createElement('canvas');
@@ -1674,10 +1637,7 @@ export default function ProfileSetupScreen() {
         }
 
         if (canvas.width < 400 || canvas.height < 400) {
-          Alert.alert(
-            'Photo Too Small',
-            'Please use a higher quality camera or move to better lighting.'
-          );
+          Alert.alert('Photo Too Small', 'Please use a higher quality camera or move to better lighting.');
           return;
         }
 
@@ -1696,15 +1656,18 @@ export default function ProfileSetupScreen() {
         return;
       }
 
+      // ✅ FIX: capture current photo count before closing camera
+      // so processPhoto doesn't use a stale value
+      const currentCount = form.photos.length;
       closeCam();
-      await processPhoto(uri, camSlot.type);
+      await processPhoto(uri, camSlot.type, currentCount);
     } catch (err) {
       logger.error('doCapture failed:', err);
       Alert.alert('Error', 'Something went wrong capturing the photo.');
     } finally {
       if (isMountedRef.current) setCapturing(false);
     }
-  }, [camSlot, capturing, camReady, camFacing, closeCam, processPhoto]);
+  }, [camSlot, capturing, camReady, camFacing, form.photos.length, closeCam, processPhoto]);
 
   const handleCapture = useCallback(() => {
     if (capturing || countdown !== null) return;
@@ -1732,7 +1695,6 @@ export default function ProfileSetupScreen() {
     (index: number) => {
       const photo = form.photos[index];
       const isRequired = photo.type === 'face' || photo.type === 'upper_body';
-
       Alert.alert(
         'Remove Photo',
         isRequired
@@ -1743,10 +1705,7 @@ export default function ProfileSetupScreen() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: () => {
-              dispatch({ type: 'REMOVE_PHOTO', index });
-              haptic();
-            },
+            onPress: () => { dispatch({ type: 'REMOVE_PHOTO', index }); haptic(); },
           },
         ]
       );
@@ -1784,10 +1743,7 @@ export default function ProfileSetupScreen() {
                 await saveUserLocation(loc);
                 Alert.alert('📍 Location Set', display);
               } else {
-                Alert.alert(
-                  'Location Error',
-                  'Enable location services in your settings and try again.'
-                );
+                Alert.alert('Location Error', 'Enable location services in your settings and try again.');
               }
             } catch {
               Alert.alert('Location Error', 'Something went wrong.');
@@ -1802,10 +1758,7 @@ export default function ProfileSetupScreen() {
 
   const switchHeightUnit = useCallback(() => {
     const { newFt, newIn, newCm } = convertHeightForUnitSwitch(
-      form.heightUnit,
-      form.heightCm,
-      form.heightFt,
-      form.heightIn
+      form.heightUnit, form.heightCm, form.heightFt, form.heightIn
     );
     const next: HeightUnit = form.heightUnit === 'cm' ? 'ft' : 'cm';
     dispatch({ type: 'SET', field: 'heightUnit', value: next });
@@ -1814,9 +1767,7 @@ export default function ProfileSetupScreen() {
     dispatch({ type: 'SET', field: 'heightCm', value: newCm });
   }, [form.heightUnit, form.heightCm, form.heightFt, form.heightIn]);
 
-  // ═══════════════════════════════════════
-  // SAVE (E2EE-INTEGRATED)
-  // ═══════════════════════════════════════
+  // ─── Save ─────────────────────────────────────────────────
 
   const doSave = useCallback(async () => {
     if (!userId || !birthday || !age) return;
@@ -1825,9 +1776,7 @@ export default function ProfileSetupScreen() {
     try {
       const e2eeIdentity = await ensureMyE2EEIdentity();
       if (!e2eeIdentity.success || !e2eeIdentity.publicKey) {
-        throw new Error(
-          e2eeIdentity.error ?? 'Unable to create encryption identity'
-        );
+        throw new Error(e2eeIdentity.error ?? 'Unable to create encryption identity');
       }
 
       const baseProfileData = {
@@ -1838,7 +1787,6 @@ export default function ProfileSetupScreen() {
         birthday: birthday.toISOString(),
         zodiacSign: zodiac?.sign ?? null,
         zodiacEmoji: zodiac?.emoji ?? null,
-
         gender: form.gender,
         interestedIn: form.interestedIn,
         pronouns: form.pronouns || null,
@@ -1849,10 +1797,8 @@ export default function ProfileSetupScreen() {
           verificationMethod: 'self-reported',
           verifiedAt: new Date().toISOString(),
         },
-
         bodyType: form.bodyType,
         lookingFor: form.lookingForBody,
-
         religiousViews: form.religion,
         lifestyle: form.lifestyle,
         relationshipGoal: form.relationship,
@@ -1864,18 +1810,13 @@ export default function ProfileSetupScreen() {
         pets: form.pets || null,
         diet: form.diet || null,
         politicalViews: form.politics || null,
-
         interests: form.interests,
         loveLanguage: form.loveLang || null,
         communicationStyle: form.commStyle || null,
         preferredFirstDate: form.firstDate || null,
         vibes: form.vibes,
-
         preferences: {
-          ageRange: {
-            min: parseInt(form.ageMin) || MIN_AGE,
-            max: parseInt(form.ageMax) || 50,
-          },
+          ageRange: { min: parseInt(form.ageMin) || MIN_AGE, max: parseInt(form.ageMax) || 50 },
           maxDistanceKm: parseInt(form.distKm) || 50,
           heightRangeCm: {
             min: parseInt(form.heightPrefMinCm) || null,
@@ -1884,37 +1825,27 @@ export default function ProfileSetupScreen() {
           dealbreakers: form.dealbreakers,
           importantFields: form.importantFields,
         },
-
         bio: form.bio.trim(),
         promptAnswers: form.prompts
           .filter((p) => p.a.trim())
           .map((p) => ({ question: p.q, answer: p.a.trim() })),
-
         photos: form.photos.map((p) => p.url),
         photoData: form.photos.map((p) => ({
-          url: p.url,
-          type: p.type,
-          order: p.order,
-          verified: p.verified,
-          uploadedAt: p.uploadedAt,
+          url: p.url, type: p.type, order: p.order,
+          verified: p.verified, uploadedAt: p.uploadedAt,
         })),
         hasFullBodyPhoto: hasFullBody,
-
         privacy: {
           blurUntilMatch: form.blurUntilMatch,
           incognitoMode: form.incognito,
           verifiedUsersOnly: form.verifiedOnly,
         },
-
         location: form.locData || null,
         locationCity: form.locCity || null,
-
         personalityType: null,
         icebreakers: [],
-
         profileComplete: true,
         isVisible: true,
-
         encryptionPublicKey: e2eeIdentity.publicKey,
         encryptionKeyVersion: 1,
       };
@@ -1923,20 +1854,8 @@ export default function ProfileSetupScreen() {
       const existingDoc = await getDoc(userDocRef);
 
       if (existingDoc.exists()) {
-        const {
-          uid: _uid,
-          email: _email,
-          ...updateData
-        } = baseProfileData;
-
-        await setDoc(
-          userDocRef,
-          {
-            ...updateData,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
+        const { uid: _uid, email: _email, ...updateData } = baseProfileData;
+        await setDoc(userDocRef, { ...updateData, updatedAt: serverTimestamp() }, { merge: true });
       } else {
         await setDoc(userDocRef, {
           ...baseProfileData,
@@ -1947,28 +1866,14 @@ export default function ProfileSetupScreen() {
         });
       }
 
-      if (draftKey) {
-        try {
-          profileStorage.delete(draftKey);
-        } catch {}
-      }
-      if (stepKey) {
-        try {
-          profileStorage.delete(stepKey);
-        } catch {}
-      }
+      if (draftKey) { try { profileStorage.delete(draftKey); } catch {} }
+      if (stepKey) { try { profileStorage.delete(stepKey); } catch {} }
 
       dispatch({ type: 'RESET' });
-
       Alert.alert(
         '🎉 Profile Created!',
         'Next up: discover your personality type to improve your matches!',
-        [
-          {
-            text: 'Continue',
-            onPress: () => router.replace('/personality-quiz' as any),
-          },
-        ]
+        [{ text: 'Continue', onPress: () => router.replace('/personality-quiz' as any) }]
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -1977,49 +1882,21 @@ export default function ProfileSetupScreen() {
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [
-    userId,
-    userEmail,
-    birthday,
-    age,
-    zodiac,
-    form,
-    hCm,
-    hDisplay,
-    hasFullBody,
-    draftKey,
-    stepKey,
-    router,
-  ]);
+  }, [userId, userEmail, birthday, age, zodiac, form, hCm, hDisplay, hasFullBody, draftKey, stepKey, router]);
 
   const handleSave = useCallback(async () => {
-    if (!userId) {
-      router.replace('/login' as any);
-      return;
-    }
-    if (!form.termsAccepted) {
-      Alert.alert('Terms Required', 'Please accept the Terms of Service.');
-      return;
-    }
-    if (!birthday || !age) {
-      Alert.alert('Invalid Birthday', 'Please enter a valid date of birth.');
-      return;
-    }
+    if (!userId) { router.replace('/login' as any); return; }
+    if (!form.termsAccepted) { Alert.alert('Terms Required', 'Please accept the Terms of Service.'); return; }
+    if (!birthday || !age) { Alert.alert('Invalid Birthday', 'Please enter a valid date of birth.'); return; }
 
     if (form.bio.trim()) {
       const bioBlock = checkBlocked(form.bio);
-      if (bioBlock) {
-        Alert.alert('Bio Issue', bioBlock);
-        return;
-      }
+      if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; }
     }
     for (const p of form.prompts) {
       if (p.a.trim()) {
         const promptBlock = checkBlocked(p.a);
-        if (promptBlock) {
-          Alert.alert('Prompt Issue', promptBlock);
-          return;
-        }
+        if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; }
       }
     }
 
@@ -2043,10 +1920,7 @@ export default function ProfileSetupScreen() {
           {
             text: 'Add Photo',
             style: 'cancel',
-            onPress: () => {
-              setStep(1);
-              void openCamera(PHOTO_SLOTS[2]);
-            },
+            onPress: () => { setStep(1); void openCamera(PHOTO_SLOTS[2]); },
           },
           { text: 'Continue Anyway', onPress: () => void doSave() },
         ]
@@ -2057,37 +1931,24 @@ export default function ProfileSetupScreen() {
     await doSave();
   }, [userId, form, birthday, age, hasFullBody, router, doSave, openCamera]);
 
-  // ── Shared render helpers ───────────────────────────────
+  // ─── Shared render helpers ─────────────────────────────────
 
   const renderChip = useCallback(
-    (
-      value: string,
-      selected: boolean,
-      onPress: () => void,
-      icon?: string,
-      disabled?: boolean
-    ) => (
+    (value: string, selected: boolean, onPress: () => void, icon?: string, disabled?: boolean) => (
       <TouchableOpacity
         key={value}
         style={[
           st.chip,
-          selected && st.chipOn,
+          { borderColor: selected ? C.accent : C.inputBorder, backgroundColor: selected ? C.accentGlow : C.input },
           disabled && st.chipOff,
-          { borderColor: selected ? C.accent : C.none },
         ]}
-        onPress={() => {
-          haptic();
-          onPress();
-        }}
+        onPress={() => { haptic(); onPress(); }}
         disabled={disabled || loading || uploading}
         activeOpacity={0.7}
       >
         {icon != null && <Text style={st.chipIcon}>{icon}</Text>}
         <Text
-          style={[
-            st.chipText,
-            selected && { color: C.accent, fontWeight: '600' },
-          ]}
+          style={[st.chipText, { color: selected ? C.accent : C.sub }, selected && { fontWeight: '600' }]}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
         >
           {value.replace(/^\S+\s/, '')}
@@ -2104,36 +1965,24 @@ export default function ProfileSetupScreen() {
         key={opt.value}
         style={[
           st.optRow,
-          { backgroundColor: C.input },
-          sel === opt.value && { borderColor: C.accent },
+          { backgroundColor: C.input, borderColor: sel === opt.value ? C.accent : C.inputBorder },
         ]}
-        onPress={() => {
-          haptic();
-          onSel(opt.value);
-        }}
+        onPress={() => { haptic(); onSel(opt.value); }}
         disabled={loading || uploading}
         activeOpacity={0.7}
       >
         <View style={st.optHead}>
           {opt.icon != null && <Text style={st.optIcon}>{opt.icon}</Text>}
           <Text
-            style={[
-              st.optText,
-              { color: sel === opt.value ? C.accent : C.text },
-            ]}
+            style={[st.optText, { color: sel === opt.value ? C.accent : C.text }]}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
           >
             {opt.value}
           </Text>
-          {sel === opt.value && (
-            <Text style={[st.optCheck, { color: C.accent }]}>✓</Text>
-          )}
+          {sel === opt.value && <Text style={[st.optCheck, { color: C.accent }]}>✓</Text>}
         </View>
         {opt.desc != null && opt.desc !== '' && (
-          <Text
-            style={[st.optDesc, { color: C.muted }]}
-            maxFontSizeMultiplier={MAX_FONT_SCALE}
-          >
+          <Text style={[st.optDesc, { color: C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {opt.desc}
           </Text>
         )}
@@ -2142,1457 +1991,811 @@ export default function ProfileSetupScreen() {
     [haptic, loading, uploading, C]
   );
 
-  // ── Step renderers ──────────────────────────────────────
+  // ─── Step renderers ────────────────────────────────────────
 
-  const renderStep1 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          📸 Your Photos
-        </Text>
-        <Text style={[st.sub, { color: C.muted }]}>
-          Camera only — real photos, real you. No filters, no imports.
-        </Text>
+  const renderStep1 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>📸 Your Photos</Text>
+      <Text style={[st.sub, { color: C.muted }]}>
+        Camera only — real photos, real you. No filters, no imports.
+      </Text>
 
-        <View style={st.slotStatus}>
-          {PHOTO_SLOTS.filter((s) => s.required).map((slot) => {
-            const done = form.photos.some((p) => p.type === slot.type);
-            return (
-              <View
-                key={slot.type}
-                style={[
-                  st.statusItem,
-                  { backgroundColor: C.input },
-                  done && { borderColor: C.success },
-                ]}
-              >
-                <Text style={st.statusIcon}>{done ? '✓' : slot.icon}</Text>
-                <Text
-                  style={[
-                    st.statusText,
-                    { color: done ? C.success : C.muted },
-                  ]}
-                >
-                  {slot.label} *
-                </Text>
-              </View>
-            );
-          })}
-          <View
-            style={[
-              st.statusItem,
-              { backgroundColor: C.input },
-              hasFullBody && { borderColor: C.success },
-            ]}
-          >
-            <Text style={st.statusIcon}>{hasFullBody ? '✓' : '🧍'}</Text>
-            <Text
+      <View style={st.slotStatus}>
+        {PHOTO_SLOTS.filter((s) => s.required).map((slot) => {
+          const done = form.photos.some((p) => p.type === slot.type);
+          return (
+            <View
+              key={slot.type}
               style={[
-                st.statusText,
-                { color: hasFullBody ? C.success : C.muted },
+                st.statusItem,
+                { backgroundColor: C.input, borderColor: done ? C.success : C.inputBorder },
               ]}
             >
-              Full Body
+              <Text style={st.statusIcon}>{done ? '✓' : slot.icon}</Text>
+              <Text style={[st.statusText, { color: done ? C.success : C.muted }]}>
+                {slot.label} *
+              </Text>
+            </View>
+          );
+        })}
+        <View style={[st.statusItem, { backgroundColor: C.input, borderColor: hasFullBody ? C.success : C.inputBorder }]}>
+          <Text style={st.statusIcon}>{hasFullBody ? '✓' : '🧍'}</Text>
+          <Text style={[st.statusText, { color: hasFullBody ? C.success : C.muted }]}>Full Body</Text>
+        </View>
+      </View>
+
+      {uploading && (
+        <View style={[st.loadRow, { backgroundColor: C.input }]}>
+          <ActivityIndicator size="small" color={C.accent} />
+          <View style={{ flex: 1, marginLeft: SPACING.md }}>
+            <Text style={[st.loadRowText, { color: C.accent }]}>
+              Uploading & verifying… {uploadProgress}%
             </Text>
+            <View style={[st.uploadBarBg, { backgroundColor: C.inputBorder }]}>
+              <View style={[st.uploadBarFill, { width: `${uploadProgress}%` as any, backgroundColor: C.accent }]} />
+            </View>
           </View>
         </View>
+      )}
 
-        {uploading && (
-          <View style={[st.loadRow, { backgroundColor: C.input }]}>
-            <ActivityIndicator size="small" color={C.accent} />
-            <View style={{ flex: 1, marginLeft: SPACING.md }}>
-              <Text style={[st.loadRowText, { color: C.accent }]}>
-                Uploading & verifying… {uploadProgress}%
-              </Text>
-              <View style={[st.uploadBarBg, { backgroundColor: C.border }]}>
-                <View
-                  style={[
-                    st.uploadBarFill,
-                    {
-                      width: `${uploadProgress}%`,
-                      backgroundColor: C.accent,
-                    },
-                  ]}
-                />
-              </View>
+      <View style={st.photoGrid}>
+        {form.photos.map((p, i) => (
+          <View key={`ph_${i}`} style={st.photoSlot}>
+            <Image
+              source={{ uri: p.uri }}
+              style={[st.photoImg, { borderColor: C.inputBorder }]}
+              contentFit="cover"
+              transition={150}
+            />
+            <View style={st.photoTypeTag}>
+              <Text style={st.photoTypeText}>{getPhotoLabel(p.type)}</Text>
             </View>
-          </View>
-        )}
-
-        <View style={st.photoGrid}>
-          {form.photos.map((p, i) => (
-            <View key={`ph_${i}`} style={st.photoSlot}>
-              <Image
-                source={{ uri: p.uri }}
-                style={[st.photoImg, { borderColor: C.input }]}
-                contentFit="cover"
-                transition={150}
-              />
-
-              <View style={st.photoTypeTag}>
-                <Text style={st.photoTypeText}>{getPhotoLabel(p.type)}</Text>
+            {i === 0 && (
+              <View style={[st.mainTag, { backgroundColor: C.accent }]}>
+                <Text style={[st.mainTagText, { color: C.white }]}>Main</Text>
               </View>
-
-              {i === 0 && (
-                <View style={[st.mainTag, { backgroundColor: C.accent }]}>
-                  <Text style={[st.mainTagText, { color: C.white }]}>Main</Text>
-                </View>
+            )}
+            <View style={[st.okDot, { backgroundColor: C.success }]}>
+              <Text style={[st.okDotText, { color: C.white }]}>✓</Text>
+            </View>
+            <View style={st.moveRow}>
+              {i > 0 && (
+                <TouchableOpacity
+                  style={[st.moveBtn, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
+                  onPress={() => movePhoto(i, i - 1)}
+                >
+                  <Text style={[st.moveBtnText, { color: C.white }]}>←</Text>
+                </TouchableOpacity>
               )}
-
-              <View style={[st.okDot, { backgroundColor: C.success }]}>
-                <Text style={[st.okDotText, { color: C.white }]}>✓</Text>
-              </View>
-
-              <View style={st.moveRow}>
-                {i > 0 && (
-                  <TouchableOpacity
-                    style={[st.moveBtn, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
-                    onPress={() => movePhoto(i, i - 1)}
-                  >
-                    <Text style={[st.moveBtnText, { color: C.white }]}>←</Text>
-                  </TouchableOpacity>
-                )}
-                {i < form.photos.length - 1 && (
-                  <TouchableOpacity
-                    style={[st.moveBtn, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
-                    onPress={() => movePhoto(i, i + 1)}
-                  >
-                    <Text style={[st.moveBtnText, { color: C.white }]}>→</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  st.rmBtn,
-                  { backgroundColor: C.danger, borderColor: C.card },
-                ]}
-                onPress={() => removePhoto(i)}
-                disabled={uploading || loading}
-              >
-                <Text style={[st.rmBtnText, { color: C.white }]}>×</Text>
-              </TouchableOpacity>
+              {i < form.photos.length - 1 && (
+                <TouchableOpacity
+                  style={[st.moveBtn, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
+                  onPress={() => movePhoto(i, i + 1)}
+                >
+                  <Text style={[st.moveBtnText, { color: C.white }]}>→</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          ))}
-
-          {nextSlot && (
             <TouchableOpacity
-              style={[
-                st.addBtn,
-                { borderColor: C.accent, backgroundColor: C.guideFill },
-                (uploading || loading) && st.addBtnOff,
-              ]}
-              onPress={() => void openCamera()}
+              style={[st.rmBtn, { backgroundColor: C.danger, borderColor: C.card }]}
+              onPress={() => removePhoto(i)}
               disabled={uploading || loading}
-              activeOpacity={0.7}
             >
-              <Text style={st.addBtnIcon}>{nextSlot.icon}</Text>
-              <Text style={[st.addBtnLabel, { color: C.accent }]}>
-                {nextSlot.label}
-              </Text>
-              {nextSlot.required && (
-                <Text style={[st.addBtnReq, { color: C.warning }]}>
-                  Required
-                </Text>
-              )}
+              <Text style={[st.rmBtnText, { color: C.white }]}>×</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ))}
 
-        {!hasFullBody && hasFace && hasUpperBody && (
+        {nextSlot && (
           <TouchableOpacity
             style={[
-              st.tipBox,
-              {
-                backgroundColor: 'rgba(230,126,34,0.15)',
-                borderColor: C.warning,
-              },
+              st.addBtn,
+              { borderColor: C.accent, backgroundColor: C.accentGlow },
+              (uploading || loading) && st.addBtnOff,
             ]}
-            onPress={() => void openCamera(PHOTO_SLOTS[2])}
+            onPress={() => void openCamera()}
+            disabled={uploading || loading}
             activeOpacity={0.7}
           >
-            <Text style={[st.tipText, { color: C.warning }]}>
-              💡 Add a full-body photo for 40% more matches! Tap here.
-            </Text>
+            <Text style={st.addBtnIcon}>{nextSlot.icon}</Text>
+            <Text style={[st.addBtnLabel, { color: C.accent }]}>{nextSlot.label}</Text>
+            {nextSlot.required && (
+              <Text style={[st.addBtnReq, { color: C.warning }]}>Required</Text>
+            )}
           </TouchableOpacity>
         )}
+      </View>
 
-        {form.photos.length === 0 && (
-          <View style={[st.socialProof, { backgroundColor: C.card, borderColor: C.border }]}>
-            <Text style={[st.socialProofText, { color: C.sub }]}>
-              📊 Profiles with 4+ photos receive 2× more matches on average.
+      {!hasFullBody && hasFace && hasUpperBody && (
+        <TouchableOpacity
+          style={[st.tipBox, { backgroundColor: C.accentGlow, borderColor: C.accent }]}
+          onPress={() => void openCamera(PHOTO_SLOTS[2])}
+          activeOpacity={0.7}
+        >
+          <Text style={[st.tipText, { color: C.accent }]}>
+            💡 Add a full-body photo for 40% more matches! Tap here.
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {form.photos.length === 0 && (
+        <View style={[st.socialProof, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+          <Text style={[st.socialProofText, { color: C.sub }]}>
+            📊 Profiles with 4+ photos receive 2× more matches on average.
+          </Text>
+        </View>
+      )}
+
+      <Text style={[st.photoHint, { color: C.muted }]}>
+        📌 First photo = profile photo shown in discover feed.{'\n'}
+        All photos are shown when someone views your full profile.{'\n'}
+        Tips: Good lighting · Face visible · Show variety.
+      </Text>
+    </View>
+  ), [C, form.photos, hasFullBody, hasFace, hasUpperBody, nextSlot, uploading, loading, uploadProgress, movePhoto, removePhoto, openCamera]);
+
+  const renderStep2 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>👤 Basic Info</Text>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>
+          First Name <Text style={{ color: C.danger }}>*</Text>
+        </Text>
+        <Text style={[st.hint, { color: C.muted }]}>Shown publicly as "Sarah, 28"</Text>
+        <TextInput
+          style={[
+            st.input,
+            { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder },
+            form.name.length > 0 && !validateName(form.name).valid && { borderColor: C.danger },
+            validateName(form.name).valid && { borderColor: C.success },
+          ]}
+          placeholder="Sarah"
+          placeholderTextColor={C.muted}
+          value={form.name}
+          onChangeText={(t) => set('name', t.replace(/[^a-zA-Z\s\-']/g, ''))}
+          onBlur={() => { if (form.name) set('name', formatName(form.name)); }}
+          editable={!loading}
+          maxLength={MAX_NAME}
+          autoCapitalize="words"
+          autoCorrect={false}
+        />
+        {form.name.length > 0 && !validateName(form.name).valid && (
+          <Text style={[st.err, { color: C.danger }]}>{validateName(form.name).reason}</Text>
+        )}
+      </View>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>
+          Date of Birth <Text style={{ color: C.danger }}>*</Text>
+        </Text>
+        <Text style={[st.hint, { color: C.muted }]}>We calculate your age and zodiac automatically</Text>
+        <View style={st.bdayRow}>
+          <TextInput
+            style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+            placeholder="MM" placeholderTextColor={C.muted}
+            value={form.bdayMonth}
+            onChangeText={(t) => set('bdayMonth', t.replace(/\D/g, '').slice(0, 2))}
+            keyboardType="number-pad" maxLength={2} editable={!loading}
+          />
+          <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
+          <TextInput
+            style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+            placeholder="DD" placeholderTextColor={C.muted}
+            value={form.bdayDay}
+            onChangeText={(t) => set('bdayDay', t.replace(/\D/g, '').slice(0, 2))}
+            keyboardType="number-pad" maxLength={2} editable={!loading}
+          />
+          <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
+          <TextInput
+            style={[st.input, st.bdayInY, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+            placeholder="YYYY" placeholderTextColor={C.muted}
+            value={form.bdayYear}
+            onChangeText={(t) => set('bdayYear', t.replace(/\D/g, '').slice(0, 4))}
+            keyboardType="number-pad" maxLength={4} editable={!loading}
+          />
+        </View>
+        {birthday && age !== null && (
+          <View style={st.ageRow}>
+            <Text style={[st.ageDisplay, { color: age >= MIN_AGE && age <= MAX_AGE ? C.success : C.danger }]}>
+              Age: {age} {age < MIN_AGE ? '(Must be 18+)' : age > MAX_AGE ? '(Invalid)' : '✓'}
             </Text>
+            {zodiac && <Text style={[st.zodiac, { color: C.accent }]}>{zodiac.emoji} {zodiac.sign}</Text>}
           </View>
         )}
-
-        <Text style={[st.photoHint, { color: C.muted }]}>
-          📌 First photo = profile photo shown in discover feed.{'\n'}
-          All photos are shown when someone views your full profile.{'\n'}
-          Tips: Good lighting · Face visible · Show variety.
-        </Text>
+        {form.ageEstimate != null && age != null && Math.abs(age - form.ageEstimate) > AGE_TOL && (
+          <Text style={[st.warn, { color: C.warning }]}>
+            ⚠️ Your photos suggest approximately {form.ageEstimate} years old
+          </Text>
+        )}
       </View>
-    ),
-    [
-      C,
-      form.photos,
-      hasFullBody,
-      hasFace,
-      hasUpperBody,
-      nextSlot,
-      uploading,
-      loading,
-      uploadProgress,
-      movePhoto,
-      removePhoto,
-      openCamera,
-    ]
-  );
 
-  const renderStep2 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          👤 Basic Info
-        </Text>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Gender <Text style={{ color: C.danger }}>*</Text></Text>
+        <View style={st.chipWrap}>
+          {GENDER_OPTIONS.map((g) => renderChip(g.value, form.gender === g.value, () => set('gender', g.value), g.icon))}
+        </View>
+      </View>
 
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            First Name <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Shown publicly as "Sarah, 28"
-          </Text>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Interested In <Text style={{ color: C.danger }}>*</Text></Text>
+        <Text style={[st.hint, { color: C.muted }]}>Used for matching — not shown publicly</Text>
+        <View style={st.chipWrap}>
+          {INTERESTED_IN_OPTIONS.map((o) => renderChip(o.value, form.interestedIn === o.value, () => set('interestedIn', o.value), o.icon))}
+        </View>
+      </View>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Pronouns</Text>
+        <View style={st.chipWrap}>
+          {PRONOUN_OPTIONS.map((p) => renderChip(p.value, form.pronouns === p.value, () => set('pronouns', form.pronouns === p.value ? '' : p.value)))}
+        </View>
+      </View>
+
+      <View style={st.fg}>
+        <View style={st.labelRow}>
+          <Text style={[st.label, { color: C.text }]}>Height <Text style={{ color: C.danger }}>*</Text></Text>
+          <TouchableOpacity style={[st.unitBtn, { backgroundColor: C.input, borderColor: C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7}>
+            <Text style={[st.unitBtnText, { color: C.accent }]}>
+              {form.heightUnit === 'cm' ? 'Switch to ft/in' : 'Switch to cm'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {form.heightUnit === 'cm' ? (
           <TextInput
             style={[
               st.input,
-              { backgroundColor: C.input, color: C.text },
-              form.name.length > 0 &&
-                !validateName(form.name).valid && { borderColor: C.danger },
-              validateName(form.name).valid && { borderColor: C.success },
+              { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder },
+              form.heightCm.length > 0 && (hCm < MIN_H || hCm > MAX_H) && { borderColor: C.danger },
+              hCm >= MIN_H && hCm <= MAX_H && { borderColor: C.success },
             ]}
-            placeholder="Sarah"
-            placeholderTextColor={C.dim}
-            value={form.name}
-            onChangeText={(t) => set('name', t.replace(/[^a-zA-Z\s\-']/g, ''))}
-            onBlur={() => {
-              if (form.name) set('name', formatName(form.name));
-            }}
-            editable={!loading}
-            maxLength={MAX_NAME}
-            autoCapitalize="words"
-            autoCorrect={false}
+            placeholder="170" placeholderTextColor={C.muted}
+            value={form.heightCm}
+            onChangeText={(t) => set('heightCm', t.replace(/\D/g, ''))}
+            keyboardType="number-pad" maxLength={3} editable={!loading}
           />
-          {form.name.length > 0 && !validateName(form.name).valid && (
-            <Text style={[st.err, { color: C.danger }]}>
-              {validateName(form.name).reason}
-            </Text>
-          )}
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Date of Birth <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            We calculate your age and zodiac automatically
-          </Text>
-          <View style={st.bdayRow}>
+        ) : (
+          <View style={st.ftRow}>
             <TextInput
-              style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="MM"
-              placeholderTextColor={C.dim}
-              value={form.bdayMonth}
-              onChangeText={(t) => set('bdayMonth', t.replace(/\D/g, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={!loading}
+              style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+              placeholder="5" placeholderTextColor={C.muted}
+              value={form.heightFt}
+              onChangeText={(t) => set('heightFt', t.replace(/\D/g, '').slice(0, 1))}
+              keyboardType="number-pad" maxLength={1} editable={!loading}
             />
-            <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
+            <Text style={[st.ftLbl, { color: C.muted }]}>ft</Text>
             <TextInput
-              style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="DD"
-              placeholderTextColor={C.dim}
-              value={form.bdayDay}
-              onChangeText={(t) => set('bdayDay', t.replace(/\D/g, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={!loading}
+              style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+              placeholder="8" placeholderTextColor={C.muted}
+              value={form.heightIn}
+              onChangeText={(t) => {
+                const cleaned = t.replace(/\D/g, '');
+                if (cleaned === '') { set('heightIn', ''); return; }
+                const val = parseInt(cleaned);
+                if (val > 11) { Alert.alert('Invalid', 'Inches must be 0–11.'); return; }
+                set('heightIn', cleaned);
+              }}
+              keyboardType="number-pad" maxLength={2} editable={!loading}
             />
-            <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
-            <TextInput
-              style={[st.input, st.bdayInY, { backgroundColor: C.input, color: C.text }]}
-              placeholder="YYYY"
-              placeholderTextColor={C.dim}
-              value={form.bdayYear}
-              onChangeText={(t) => set('bdayYear', t.replace(/\D/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              maxLength={4}
-              editable={!loading}
-            />
+            <Text style={[st.ftLbl, { color: C.muted }]}>in</Text>
           </View>
-          {birthday && age !== null && (
-            <View style={st.ageRow}>
-              <Text
-                style={[
-                  st.ageDisplay,
-                  { color: age >= MIN_AGE && age <= MAX_AGE ? C.success : C.danger },
-                ]}
-              >
-                Age: {age}{' '}
-                {age < MIN_AGE ? '(Must be 18+)' : age > MAX_AGE ? '(Invalid)' : '✓'}
-              </Text>
-              {zodiac && (
-                <Text style={[st.zodiac, { color: C.accent }]}>
-                  {zodiac.emoji} {zodiac.sign}
-                </Text>
-              )}
-            </View>
-          )}
-          {form.ageEstimate != null &&
-            age != null &&
-            Math.abs(age - form.ageEstimate) > AGE_TOL && (
-              <Text style={[st.warn, { color: C.warning }]}>
-                ⚠️ Your photos suggest approximately {form.ageEstimate} years old
-              </Text>
-            )}
-        </View>
+        )}
+        {hDisplay !== '' && <Text style={[st.hPreview, { color: C.success }]}>📏 {hDisplay}</Text>}
+      </View>
+    </View>
+  ), [C, form.name, form.bdayMonth, form.bdayDay, form.bdayYear, form.gender, form.interestedIn, form.pronouns, form.heightUnit, form.heightCm, form.heightFt, form.heightIn, form.ageEstimate, birthday, age, zodiac, hCm, hDisplay, loading, set, renderChip, switchHeightUnit]);
 
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Gender <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <View style={st.chipWrap}>
-            {GENDER_OPTIONS.map((g) =>
-              renderChip(
-                g.value,
-                form.gender === g.value,
-                () => set('gender', g.value),
-                g.icon
-              )
-            )}
-          </View>
-        </View>
+  const renderStep3 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>💪 Body & Appearance</Text>
+      <BodyTypeSelector
+        label="Your Body Type *"
+        selectedType={form.bodyType as any}
+        onSelect={(v) => set('bodyType', v)}
+        disabled={loading}
+      />
+      <View style={st.spacer} />
+      <BodyTypeSelector
+        label="Body Type Preference *"
+        selectedType={form.lookingForBody as any}
+        onSelect={(v) => set('lookingForBody', v)}
+        disabled={loading}
+        showLookingFor
+      />
+    </View>
+  ), [C, form.bodyType, form.lookingForBody, loading, set]);
 
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Interested In <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Used for matching — not shown publicly
-          </Text>
-          <View style={st.chipWrap}>
-            {INTERESTED_IN_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.interestedIn === o.value,
-                () => set('interestedIn', o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Pronouns</Text>
-          <View style={st.chipWrap}>
-            {PRONOUN_OPTIONS.map((p) =>
-              renderChip(
-                p.value,
-                form.pronouns === p.value,
-                () => set('pronouns', form.pronouns === p.value ? '' : p.value)
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <View style={st.labelRow}>
-            <Text style={[st.label, { color: C.text }]}>
-              Height <Text style={{ color: C.danger }}>*</Text>
-            </Text>
-            <TouchableOpacity
-              style={[st.unitBtn, { backgroundColor: C.input }]}
-              onPress={switchHeightUnit}
-              activeOpacity={0.7}
-            >
-              <Text style={[st.unitBtnText, { color: C.accent }]}>
-                {form.heightUnit === 'cm' ? 'Switch to ft/in' : 'Switch to cm'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {form.heightUnit === 'cm' ? (
-            <TextInput
-              style={[
-                st.input,
-                { backgroundColor: C.input, color: C.text },
-                form.heightCm.length > 0 &&
-                  (hCm < MIN_H || hCm > MAX_H) && { borderColor: C.danger },
-                hCm >= MIN_H && hCm <= MAX_H && { borderColor: C.success },
-              ]}
-              placeholder="170"
-              placeholderTextColor={C.dim}
-              value={form.heightCm}
-              onChangeText={(t) => set('heightCm', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={3}
-              editable={!loading}
-            />
-          ) : (
-            <View style={st.ftRow}>
-              <TextInput
-                style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text }]}
-                placeholder="5"
-                placeholderTextColor={C.dim}
-                value={form.heightFt}
-                onChangeText={(t) => set('heightFt', t.replace(/\D/g, '').slice(0, 1))}
-                keyboardType="number-pad"
-                maxLength={1}
-                editable={!loading}
-              />
-              <Text style={[st.ftLbl, { color: C.muted }]}>ft</Text>
-              <TextInput
-                style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text }]}
-                placeholder="8"
-                placeholderTextColor={C.dim}
-                value={form.heightIn}
-                onChangeText={(t) => {
-                  const cleaned = t.replace(/\D/g, '');
-                  if (cleaned === '') {
-                    set('heightIn', '');
-                    return;
-                  }
-                  const val = parseInt(cleaned);
-                  if (val > 11) {
-                    Alert.alert('Invalid', 'Inches must be 0–11.');
-                    return;
-                  }
-                  set('heightIn', cleaned);
-                }}
-                keyboardType="number-pad"
-                maxLength={2}
-                editable={!loading}
-              />
-              <Text style={[st.ftLbl, { color: C.muted }]}>in</Text>
-            </View>
-          )}
-
-          {hDisplay !== '' && (
-            <Text style={[st.hPreview, { color: C.success }]}>📏 {hDisplay}</Text>
-          )}
+  const renderStep4 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>🌟 Lifestyle & Values</Text>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Religious Views <Text style={{ color: C.danger }}>*</Text></Text>
+        {RELIGIOUS_OPTIONS.map((o) => renderOpt(o, form.religion, (v) => set('religion', v)))}
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Lifestyle <Text style={{ color: C.danger }}>*</Text></Text>
+        <View style={st.chipWrap}>
+          {LIFESTYLE_OPTIONS.map((o) => renderChip(o.value, form.lifestyle === o.value, () => set('lifestyle', o.value), o.icon))}
         </View>
       </View>
-    ),
-    [
-      C,
-      form.name,
-      form.bdayMonth,
-      form.bdayDay,
-      form.bdayYear,
-      form.gender,
-      form.interestedIn,
-      form.pronouns,
-      form.heightUnit,
-      form.heightCm,
-      form.heightFt,
-      form.heightIn,
-      form.ageEstimate,
-      birthday,
-      age,
-      zodiac,
-      hCm,
-      hDisplay,
-      loading,
-      set,
-      renderChip,
-      switchHeightUnit,
-    ]
-  );
-
-  const renderStep3 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          💪 Body & Appearance
-        </Text>
-        <BodyTypeSelector
-          label="Your Body Type *"
-          selectedType={form.bodyType as any}
-          onSelect={(v) => set('bodyType', v)}
-          disabled={loading}
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Relationship Goal <Text style={{ color: C.danger }}>*</Text></Text>
+        {RELATIONSHIP_OPTIONS.map((o) => renderOpt(o, form.relationship, (v) => set('relationship', v)))}
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Education</Text>
+        <View style={st.chipWrap}>
+          {EDUCATION_OPTIONS.map((o) => renderChip(o.value, form.education === o.value, () => set('education', form.education === o.value ? '' : o.value), o.icon))}
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Occupation</Text>
+        <TextInput
+          style={[st.input, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+          placeholder="Software Engineer, Teacher…" placeholderTextColor={C.muted}
+          value={form.occupation}
+          onChangeText={(t) => set('occupation', t)}
+          editable={!loading} maxLength={50} autoCapitalize="words" returnKeyType="done"
+          onSubmitEditing={() => { if (!IS_WEB) Keyboard.dismiss(); }}
         />
-        <View style={st.spacer} />
-        <BodyTypeSelector
-          label="Body Type Preference *"
-          selectedType={form.lookingForBody as any}
-          onSelect={(v) => set('lookingForBody', v)}
-          disabled={loading}
-          showLookingFor
-        />
-      </View>
-    ),
-    [C, form.bodyType, form.lookingForBody, loading, set]
-  );
-
-  const renderStep4 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          🌟 Lifestyle & Values
+        <Text style={[st.charCt, { color: form.occupation.length >= 45 ? C.warning : C.muted }]}>
+          {form.occupation.length}/50
         </Text>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Religious Views <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          {RELIGIOUS_OPTIONS.map((o) =>
-            renderOpt(o, form.religion, (v) => set('religion', v))
-          )}
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Lifestyle <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <View style={st.chipWrap}>
-            {LIFESTYLE_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.lifestyle === o.value,
-                () => set('lifestyle', o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Relationship Goal <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          {RELATIONSHIP_OPTIONS.map((o) =>
-            renderOpt(o, form.relationship, (v) => set('relationship', v))
-          )}
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Education</Text>
-          <View style={st.chipWrap}>
-            {EDUCATION_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.education === o.value,
-                () => set('education', form.education === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Occupation</Text>
-          <TextInput
-            style={[st.input, { backgroundColor: C.input, color: C.text }]}
-            placeholder="Software Engineer, Teacher…"
-            placeholderTextColor={C.dim}
-            value={form.occupation}
-            onChangeText={(t) => set('occupation', t)}
-            editable={!loading}
-            maxLength={50}
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={() => {
-              if (Platform.OS !== 'web') Keyboard.dismiss();
-            }}
-          />
-          <Text
-            style={[
-              st.charCt,
-              { color: form.occupation.length >= 45 ? C.warning : C.dim },
-            ]}
-          >
-            {form.occupation.length}/50
-          </Text>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Smoking</Text>
-          <View style={st.chipWrap}>
-            {SMOKING_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.smoking === o.value,
-                () => set('smoking', form.smoking === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Drinking</Text>
-          <View style={st.chipWrap}>
-            {DRINKING_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.drinking === o.value,
-                () => set('drinking', form.drinking === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Children</Text>
-          <View style={st.chipWrap}>
-            {CHILDREN_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.children === o.value,
-                () => set('children', form.children === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Pets</Text>
-          <View style={st.chipWrap}>
-            {PET_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.pets === o.value,
-                () => set('pets', form.pets === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Diet</Text>
-          <View style={st.chipWrap}>
-            {DIET_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.diet === o.value,
-                () => set('diet', form.diet === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Political Views</Text>
-          <View style={st.chipWrap}>
-            {POLITICAL_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.politics === o.value,
-                () => set('politics', form.politics === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Smoking</Text>
+        <View style={st.chipWrap}>
+          {SMOKING_OPTIONS.map((o) => renderChip(o.value, form.smoking === o.value, () => set('smoking', form.smoking === o.value ? '' : o.value), o.icon))}
         </View>
       </View>
-    ),
-    [
-      C,
-      form.religion,
-      form.lifestyle,
-      form.relationship,
-      form.education,
-      form.occupation,
-      form.smoking,
-      form.drinking,
-      form.children,
-      form.pets,
-      form.diet,
-      form.politics,
-      loading,
-      set,
-      renderChip,
-      renderOpt,
-    ]
-  );
-
-  const renderStep5 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          ✨ Interests & Personality
-        </Text>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>
-            Interests <Text style={{ color: C.danger }}>*</Text>
-          </Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Pick 3–10 · {form.interests.length}/10 selected
-          </Text>
-          <View style={st.chipWrap}>
-            {INTEREST_TAGS.map((t) =>
-              renderChip(
-                t,
-                form.interests.includes(t),
-                () =>
-                  dispatch({
-                    type: 'TOGGLE_LIST',
-                    field: 'interests',
-                    value: t,
-                    max: 10,
-                  }),
-                undefined,
-                !form.interests.includes(t) && form.interests.length >= 10
-              )
-            )}
-          </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Drinking</Text>
+        <View style={st.chipWrap}>
+          {DRINKING_OPTIONS.map((o) => renderChip(o.value, form.drinking === o.value, () => set('drinking', form.drinking === o.value ? '' : o.value), o.icon))}
         </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Children</Text>
+        <View style={st.chipWrap}>
+          {CHILDREN_OPTIONS.map((o) => renderChip(o.value, form.children === o.value, () => set('children', form.children === o.value ? '' : o.value), o.icon))}
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Pets</Text>
+        <View style={st.chipWrap}>
+          {PET_OPTIONS.map((o) => renderChip(o.value, form.pets === o.value, () => set('pets', form.pets === o.value ? '' : o.value), o.icon))}
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Diet</Text>
+        <View style={st.chipWrap}>
+          {DIET_OPTIONS.map((o) => renderChip(o.value, form.diet === o.value, () => set('diet', form.diet === o.value ? '' : o.value), o.icon))}
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Political Views</Text>
+        <View style={st.chipWrap}>
+          {POLITICAL_OPTIONS.map((o) => renderChip(o.value, form.politics === o.value, () => set('politics', form.politics === o.value ? '' : o.value), o.icon))}
+        </View>
+      </View>
+    </View>
+  ), [C, form.religion, form.lifestyle, form.relationship, form.education, form.occupation, form.smoking, form.drinking, form.children, form.pets, form.diet, form.politics, loading, set, renderChip, renderOpt]);
 
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Love Language</Text>
-          {LOVE_LANGUAGE_OPTIONS.map((o) =>
-            renderOpt(o, form.loveLang, (v) =>
-              set('loveLang', form.loveLang === v ? '' : v)
+  const renderStep5 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>✨ Interests & Personality</Text>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Interests <Text style={{ color: C.danger }}>*</Text></Text>
+        <Text style={[st.hint, { color: C.muted }]}>Pick 3–10 · {form.interests.length}/10 selected</Text>
+        <View style={st.chipWrap}>
+          {INTEREST_TAGS.map((t) =>
+            renderChip(
+              t, form.interests.includes(t),
+              () => dispatch({ type: 'TOGGLE_LIST', field: 'interests', value: t, max: 10 }),
+              undefined,
+              !form.interests.includes(t) && form.interests.length >= 10
             )
           )}
         </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Communication Style</Text>
-          <View style={st.chipWrap}>
-            {COMMUNICATION_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.commStyle === o.value,
-                () => set('commStyle', form.commStyle === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Preferred First Date</Text>
-          <View style={st.chipWrap}>
-            {FIRST_DATE_OPTIONS.map((o) =>
-              renderChip(
-                o.value,
-                form.firstDate === o.value,
-                () => set('firstDate', form.firstDate === o.value ? '' : o.value),
-                o.icon
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Your Vibes</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Pick up to 3 emojis that describe your energy
-          </Text>
-          <View style={st.vibeGrid}>
-            {VIBE_EMOJIS.map((e, idx) => {
-              const selected = form.vibes.includes(e);
-              const maxed = !selected && form.vibes.length >= 3;
-              return (
-                <TouchableOpacity
-                  key={`vibe_${idx}`}
-                  style={[
-                    st.vibeItem,
-                    { backgroundColor: C.input },
-                    selected && {
-                      borderColor: C.accent,
-                      backgroundColor: C.card,
-                    },
-                    maxed && st.chipOff,
-                  ]}
-                  onPress={() => {
-                    haptic();
-                    dispatch({
-                      type: 'TOGGLE_LIST',
-                      field: 'vibes',
-                      value: e,
-                      max: 3,
-                    });
-                  }}
-                  disabled={maxed}
-                  activeOpacity={0.7}
-                >
-                  <Text style={st.vibeEmoji}>{e}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Love Language</Text>
+        {LOVE_LANGUAGE_OPTIONS.map((o) => renderOpt(o, form.loveLang, (v) => set('loveLang', form.loveLang === v ? '' : v)))}
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Communication Style</Text>
+        <View style={st.chipWrap}>
+          {COMMUNICATION_OPTIONS.map((o) => renderChip(o.value, form.commStyle === o.value, () => set('commStyle', form.commStyle === o.value ? '' : o.value), o.icon))}
         </View>
       </View>
-    ),
-    [
-      C,
-      form.interests,
-      form.loveLang,
-      form.commStyle,
-      form.firstDate,
-      form.vibes,
-      haptic,
-      set,
-      renderChip,
-      renderOpt,
-    ]
-  );
-
-  const renderStep6 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          🎯 Preferences & Deal-breakers
-        </Text>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Age Range</Text>
-          <View style={st.rangeRow}>
-            <TextInput
-              style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="18"
-              placeholderTextColor={C.dim}
-              value={form.ageMin}
-              onChangeText={(t) => set('ageMin', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={!loading}
-            />
-            <Text style={[st.rangeDash, { color: C.muted }]}>—</Text>
-            <TextInput
-              style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="50"
-              placeholderTextColor={C.dim}
-              value={form.ageMax}
-              onChangeText={(t) => set('ageMax', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={!loading}
-            />
-            <Text style={[st.rangeU, { color: C.muted }]}>years</Text>
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Maximum Distance</Text>
-          <View style={st.rangeRow}>
-            <TextInput
-              style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="50"
-              placeholderTextColor={C.dim}
-              value={form.distKm}
-              onChangeText={(t) => set('distKm', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={4}
-              editable={!loading}
-            />
-            <Text style={[st.rangeU, { color: C.muted }]}>km</Text>
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Height Preference (cm)</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Optional — leave blank to see all heights
-          </Text>
-          <View style={st.rangeRow}>
-            <TextInput
-              style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="150"
-              placeholderTextColor={C.dim}
-              value={form.heightPrefMinCm}
-              onChangeText={(t) => set('heightPrefMinCm', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={3}
-              editable={!loading}
-            />
-            <Text style={[st.rangeDash, { color: C.muted }]}>—</Text>
-            <TextInput
-              style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text }]}
-              placeholder="200"
-              placeholderTextColor={C.dim}
-              value={form.heightPrefMaxCm}
-              onChangeText={(t) => set('heightPrefMaxCm', t.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              maxLength={3}
-              editable={!loading}
-            />
-            <Text style={[st.rangeU, { color: C.muted }]}>cm</Text>
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Deal-breakers</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Up to 5 · {form.dealbreakers.length}/5
-          </Text>
-          <View style={st.chipWrap}>
-            {DEALBREAKER_TAGS.map((t) =>
-              renderChip(
-                t,
-                form.dealbreakers.includes(t),
-                () =>
-                  dispatch({
-                    type: 'TOGGLE_LIST',
-                    field: 'dealbreakers',
-                    value: t,
-                    max: 5,
-                  }),
-                undefined,
-                !form.dealbreakers.includes(t) && form.dealbreakers.length >= 5
-              )
-            )}
-          </View>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>What matters most to you?</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Helps our matching algorithm prioritise your preferences
-          </Text>
-          <View style={st.chipWrap}>
-            {IMPORTANT_FIELD_OPTIONS.map((f) =>
-              renderChip(
-                f,
-                form.importantFields.includes(f),
-                () =>
-                  dispatch({
-                    type: 'TOGGLE_LIST',
-                    field: 'importantFields',
-                    value: f,
-                  })
-              )
-            )}
-          </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Preferred First Date</Text>
+        <View style={st.chipWrap}>
+          {FIRST_DATE_OPTIONS.map((o) => renderChip(o.value, form.firstDate === o.value, () => set('firstDate', form.firstDate === o.value ? '' : o.value), o.icon))}
         </View>
       </View>
-    ),
-    [
-      C,
-      form.ageMin,
-      form.ageMax,
-      form.distKm,
-      form.heightPrefMinCm,
-      form.heightPrefMaxCm,
-      form.dealbreakers,
-      form.importantFields,
-      loading,
-      set,
-      renderChip,
-    ]
-  );
-
-  const renderStep7 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          💬 About You
-        </Text>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Bio</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            No contact info or social handles allowed
-          </Text>
-          {form.bio.length === 0 && (
-            <TouchableOpacity
-              onPress={() =>
-                set(
-                  'bio',
-                  "I'm a curious soul who loves exploring new places and good conversations over coffee. ☕"
-                )
-              }
-              activeOpacity={0.7}
-            >
-              <Text style={[st.bioSuggestion, { color: C.accent }]}>
-                💡 Tap to see an example bio
-              </Text>
-            </TouchableOpacity>
-          )}
-          <TextInput
-            style={[st.bioIn, { backgroundColor: C.input, color: C.text }]}
-            placeholder="What makes you unique…"
-            placeholderTextColor={C.dim}
-            value={form.bio}
-            onChangeText={(t) => {
-              const cropped = t.slice(0, MAX_BIO);
-              const blocked = checkBlocked(cropped);
-              if (blocked) {
-                Alert.alert('Not Allowed', blocked);
-                return;
-              }
-              set('bio', cropped);
-            }}
-            multiline
-            maxLength={MAX_BIO}
-            editable={!loading}
-            textAlignVertical="top"
-          />
-          <Text
-            style={[
-              st.charCt,
-              { color: form.bio.length >= MAX_BIO * 0.9 ? C.warning : C.dim },
-            ]}
-          >
-            {form.bio.length}/{MAX_BIO}
-          </Text>
-        </View>
-
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>Profile Prompts</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Up to 3 conversation starters shown on your profile
-          </Text>
-
-          {form.prompts.map((p, i) => (
-            <View key={`pr_${i}`} style={[st.promptCard, { backgroundColor: C.input }]}>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Your Vibes</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Pick up to 3 emojis that describe your energy</Text>
+        <View style={st.vibeGrid}>
+          {VIBE_EMOJIS.map((e, idx) => {
+            const selected = form.vibes.includes(e);
+            const maxed = !selected && form.vibes.length >= 3;
+            return (
               <TouchableOpacity
-                style={st.promptQ}
-                onPress={() => setPromptPicker(i)}
+                key={`vibe_${idx}`}
+                style={[
+                  st.vibeItem,
+                  { backgroundColor: C.input, borderColor: selected ? C.accent : C.inputBorder },
+                  selected && { backgroundColor: C.accentGlow },
+                  maxed && st.chipOff,
+                ]}
+                onPress={() => { haptic(); dispatch({ type: 'TOGGLE_LIST', field: 'vibes', value: e, max: 3 }); }}
+                disabled={maxed}
                 activeOpacity={0.7}
               >
-                <Text style={[st.promptQText, { color: C.accent }]}>
-                  {p.q || 'Tap to pick a question…'}
-                </Text>
-                <Text style={[st.promptArr, { color: C.accent }]}>▼</Text>
+                <Text style={st.vibeEmoji}>{e}</Text>
               </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  ), [C, form.interests, form.loveLang, form.commStyle, form.firstDate, form.vibes, haptic, set, renderChip, renderOpt]);
 
-              {p.q !== '' && (
-                <TextInput
-                  style={[st.promptIn, { backgroundColor: C.card, color: C.text }]}
-                  placeholder="Your answer…"
-                  placeholderTextColor={C.dim}
-                  value={p.a}
-                  onChangeText={(t) => {
-                    const cropped = t.slice(0, MAX_PROMPT);
-                    const blocked = checkBlocked(cropped);
-                    if (blocked) {
-                      Alert.alert('Not Allowed', blocked);
-                      return;
-                    }
-                    dispatch({
-                      type: 'SET_PROMPT',
-                      index: i,
-                      q: p.q,
-                      a: cropped,
-                    });
-                  }}
-                  multiline
-                  maxLength={MAX_PROMPT}
-                  editable={!loading}
-                  textAlignVertical="top"
-                />
-              )}
-
-              {p.q !== '' && (
-                <Text
-                  style={[
-                    st.charCt,
-                    { color: p.a.length >= MAX_PROMPT * 0.9 ? C.warning : C.dim },
-                  ]}
-                >
-                  {p.a.length}/{MAX_PROMPT}
-                </Text>
-              )}
-
-              <TouchableOpacity
-                style={st.promptRm}
-                onPress={() => dispatch({ type: 'DEL_PROMPT', index: i })}
-              >
-                <Text style={[st.promptRmText, { color: C.danger }]}>
-                  ✕ Remove
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {form.prompts.length < 3 && (
-            <TouchableOpacity
-              style={[st.addPrompt, { borderColor: C.accent }]}
-              onPress={() => dispatch({ type: 'ADD_PROMPT' })}
-              activeOpacity={0.7}
-            >
-              <Text style={[st.addPromptText, { color: C.accent }]}>
-                + Add Prompt
-              </Text>
-            </TouchableOpacity>
+  const renderStep6 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>🎯 Preferences & Deal-breakers</Text>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Age Range</Text>
+        <View style={st.rangeRow}>
+          <TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="18" placeholderTextColor={C.muted} value={form.ageMin} onChangeText={(t) => set('ageMin', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={2} editable={!loading} />
+          <Text style={[st.rangeDash, { color: C.muted }]}>—</Text>
+          <TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.ageMax} onChangeText={(t) => set('ageMax', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={2} editable={!loading} />
+          <Text style={[st.rangeU, { color: C.muted }]}>years</Text>
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Maximum Distance</Text>
+        <View style={st.rangeRow}>
+          <TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.distKm} onChangeText={(t) => set('distKm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={4} editable={!loading} />
+          <Text style={[st.rangeU, { color: C.muted }]}>km</Text>
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Height Preference (cm)</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Optional — leave blank to see all heights</Text>
+        <View style={st.rangeRow}>
+          <TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="150" placeholderTextColor={C.muted} value={form.heightPrefMinCm} onChangeText={(t) => set('heightPrefMinCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} />
+          <Text style={[st.rangeDash, { color: C.muted }]}>—</Text>
+          <TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="200" placeholderTextColor={C.muted} value={form.heightPrefMaxCm} onChangeText={(t) => set('heightPrefMaxCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} />
+          <Text style={[st.rangeU, { color: C.muted }]}>cm</Text>
+        </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Deal-breakers</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Up to 5 · {form.dealbreakers.length}/5</Text>
+        <View style={st.chipWrap}>
+          {DEALBREAKER_TAGS.map((t) =>
+            renderChip(
+              t, form.dealbreakers.includes(t),
+              () => dispatch({ type: 'TOGGLE_LIST', field: 'dealbreakers', value: t, max: 5 }),
+              undefined,
+              !form.dealbreakers.includes(t) && form.dealbreakers.length >= 5
+            )
           )}
         </View>
+      </View>
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>What matters most to you?</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Helps our matching algorithm prioritise your preferences</Text>
+        <View style={st.chipWrap}>
+          {IMPORTANT_FIELD_OPTIONS.map((f) =>
+            renderChip(f, form.importantFields.includes(f), () => dispatch({ type: 'TOGGLE_LIST', field: 'importantFields', value: f }))
+          )}
+        </View>
+      </View>
+    </View>
+  ), [C, form.ageMin, form.ageMax, form.distKm, form.heightPrefMinCm, form.heightPrefMaxCm, form.dealbreakers, form.importantFields, loading, set, renderChip]);
 
-        <View style={st.fg}>
-          <Text style={[st.label, { color: C.text }]}>📍 Location</Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Only your city is shown — never your exact location
-          </Text>
+  const renderStep7 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>💬 About You</Text>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Bio</Text>
+        <Text style={[st.hint, { color: C.muted }]}>No contact info or social handles allowed</Text>
+        {form.bio.length === 0 && (
           <TouchableOpacity
-            style={[
-              st.locBtn,
-              { backgroundColor: C.input },
-              form.locCity !== '' && { borderColor: C.success },
-              (gettingLoc || loading) && st.btnOff,
-            ]}
-            onPress={() => void getLoc()}
-            disabled={gettingLoc || loading}
+            onPress={() => set('bio', "I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")}
             activeOpacity={0.7}
           >
-            {gettingLoc ? (
-              <View style={st.locRow}>
-                <ActivityIndicator size="small" color={C.white} />
-                <Text style={[st.locBtnText, { color: C.accent }]}>
-                  Getting Location…
-                </Text>
-              </View>
-            ) : (
-              <View style={st.locRow}>
-                <Text>{form.locCity ? '✓' : '📍'}</Text>
-                <Text style={[st.locBtnText, { color: C.accent }]}>
-                  {form.locCity || 'Enable Location'}
-                </Text>
+            <Text style={[st.bioSuggestion, { color: C.accent }]}>💡 Tap to see an example bio</Text>
+          </TouchableOpacity>
+        )}
+        <TextInput
+          style={[st.bioIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
+          placeholder="What makes you unique…" placeholderTextColor={C.muted}
+          value={form.bio}
+          onChangeText={(t) => {
+            const cropped = t.slice(0, MAX_BIO);
+            const blocked = checkBlocked(cropped);
+            if (blocked) { Alert.alert('Not Allowed', blocked); return; }
+            set('bio', cropped);
+          }}
+          multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top"
+        />
+        <Text style={[st.charCt, { color: form.bio.length >= MAX_BIO * 0.9 ? C.warning : C.muted }]}>
+          {form.bio.length}/{MAX_BIO}
+        </Text>
+      </View>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>Profile Prompts</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Up to 3 conversation starters shown on your profile</Text>
+
+        {form.prompts.map((p, i) => (
+          <View key={`pr_${i}`} style={[st.promptCard, { backgroundColor: C.input, borderColor: C.inputBorder }]}>
+            <TouchableOpacity style={st.promptQ} onPress={() => setPromptPicker(i)} activeOpacity={0.7}>
+              <Text style={[st.promptQText, { color: C.accent }]}>{p.q || 'Tap to pick a question…'}</Text>
+              <Text style={[st.promptArr, { color: C.accent }]}>▼</Text>
+            </TouchableOpacity>
+            {p.q !== '' && (
+              <TextInput
+                style={[st.promptIn, { backgroundColor: C.card, color: C.text, borderColor: C.inputBorder }]}
+                placeholder="Your answer…" placeholderTextColor={C.muted}
+                value={p.a}
+                onChangeText={(t) => {
+                  const cropped = t.slice(0, MAX_PROMPT);
+                  const blocked = checkBlocked(cropped);
+                  if (blocked) { Alert.alert('Not Allowed', blocked); return; }
+                  dispatch({ type: 'SET_PROMPT', index: i, q: p.q, a: cropped });
+                }}
+                multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top"
+              />
+            )}
+            {p.q !== '' && (
+              <Text style={[st.charCt, { color: p.a.length >= MAX_PROMPT * 0.9 ? C.warning : C.muted }]}>
+                {p.a.length}/{MAX_PROMPT}
+              </Text>
+            )}
+            <TouchableOpacity style={st.promptRm} onPress={() => dispatch({ type: 'DEL_PROMPT', index: i })}>
+              <Text style={[st.promptRmText, { color: C.danger }]}>✕ Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {form.prompts.length < 3 && (
+          <TouchableOpacity
+            style={[st.addPrompt, { borderColor: C.accent }]}
+            onPress={() => dispatch({ type: 'ADD_PROMPT' })}
+            activeOpacity={0.7}
+          >
+            <Text style={[st.addPromptText, { color: C.accent }]}>+ Add Prompt</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={st.fg}>
+        <Text style={[st.label, { color: C.text }]}>📍 Location</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Only your city is shown — never your exact location</Text>
+        <TouchableOpacity
+          style={[
+            st.locBtn,
+            { backgroundColor: C.input, borderColor: form.locCity !== '' ? C.success : C.inputBorder },
+            (gettingLoc || loading) && st.btnOff,
+          ]}
+          onPress={() => void getLoc()}
+          disabled={gettingLoc || loading}
+          activeOpacity={0.7}
+        >
+          {gettingLoc ? (
+            <View style={st.locRow}>
+              <ActivityIndicator size="small" color={C.accent} />
+              <Text style={[st.locBtnText, { color: C.accent }]}>Getting Location…</Text>
+            </View>
+          ) : (
+            <View style={st.locRow}>
+              <Text>{form.locCity ? '✓' : '📍'}</Text>
+              <Text style={[st.locBtnText, { color: C.accent }]}>{form.locCity || 'Enable Location'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {form.locCity !== '' && (
+          <Text style={[st.locConf, { color: C.success }]}>📍 {form.locCity}</Text>
+        )}
+      </View>
+    </View>
+  ), [C, form.bio, form.prompts, form.locCity, loading, gettingLoc, set, getLoc]);
+
+  const renderStep8 = useCallback(() => (
+    <View>
+      <Text style={[st.title, { color: C.accent }]}>👀 Preview & Privacy</Text>
+
+      <View style={[st.privacyCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+        <Text style={[st.privacyTitle, { color: C.text }]}>🔒 Privacy Settings</Text>
+        <Text style={[st.hint, { color: C.muted }]}>Control who sees your profile</Text>
+        {(
+          [
+            { key: 'blurUntilMatch' as const, label: '🔵 Blur photos until match', desc: 'Your photos are blurred in discover. They unlock when you match.', val: form.blurUntilMatch },
+            { key: 'incognito' as const, label: '👻 Incognito mode', desc: 'Only people you like first can see your profile.', val: form.incognito },
+            { key: 'verifiedOnly' as const, label: '✅ Verified users only', desc: 'Only selfie-verified users can discover you.', val: form.verifiedOnly },
+          ] as const
+        ).map((item) => (
+          <View key={item.key} style={[st.privRow, { borderBottomColor: C.inputBorder }]}>
+            <View style={st.privInfo}>
+              <Text style={[st.privLabel, { color: C.text }]}>{item.label}</Text>
+              <Text style={[st.privDesc, { color: C.muted }]}>{item.desc}</Text>
+            </View>
+            <Switch
+              value={item.val}
+              onValueChange={(v) => set(item.key, v)}
+              trackColor={{ false: C.inputBorder, true: C.accent }}
+              thumbColor={item.val ? C.success : C.dim}
+            />
+          </View>
+        ))}
+      </View>
+
+      <Text style={[st.previewLabel, { color: C.sub }]}>How others see you:</Text>
+      <View style={[st.preview, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+        {form.photos.length > 0 && (
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>
+              {form.photos.map((p, i) => (
+                <Image
+                  key={`prev_${i}`}
+                  source={{ uri: p.uri }}
+                  style={[st.previewThumb, i === 0 && st.previewThumbMain, form.blurUntilMatch && { opacity: 0.15 }]}
+                  contentFit="cover"
+                  transition={150}
+                />
+              ))}
+            </ScrollView>
+            {form.blurUntilMatch && (
+              <View style={st.blurOverlay}>
+                <Text style={[st.blurText, { color: C.accent }]}>🔒 Blurred until match</Text>
               </View>
             )}
-          </TouchableOpacity>
-          {form.locCity !== '' && (
-            <Text style={[st.locConf, { color: C.success }]}>
-              📍 {form.locCity}
-            </Text>
-          )}
-        </View>
-      </View>
-    ),
-    [C, form.bio, form.prompts, form.locCity, loading, gettingLoc, set, getLoc]
-  );
+          </View>
+        )}
 
-  const renderStep8 = useCallback(
-    () => (
-      <View>
-        <Text ref={stepTitleRef} style={[st.title, { color: C.accent }]}>
-          👀 Preview & Privacy
-        </Text>
-
-        <View style={[st.privacyCard, { backgroundColor: C.card, borderColor: C.accent }]}>
-          <Text style={[st.privacyTitle, { color: C.text }]}>
-            🔒 Privacy Settings
+        <View style={st.previewInfo}>
+          <Text style={[st.previewName, { color: C.text }]}>
+            {formatName(form.name) || 'Your Name'}, {age ?? '??'}{zodiac ? ` ${zodiac.emoji}` : ''}
           </Text>
-          <Text style={[st.hint, { color: C.muted }]}>
-            Control who sees your profile
-          </Text>
-
-          {(
-            [
-              {
-                key: 'blurUntilMatch' as const,
-                label: '🔵 Blur photos until match',
-                desc: 'Your photos are blurred in discover. They unlock when you match.',
-                val: form.blurUntilMatch,
-              },
-              {
-                key: 'incognito' as const,
-                label: '👻 Incognito mode',
-                desc: 'Only people you like first can see your profile.',
-                val: form.incognito,
-              },
-              {
-                key: 'verifiedOnly' as const,
-                label: '✅ Verified users only',
-                desc: 'Only selfie-verified users can discover you.',
-                val: form.verifiedOnly,
-              },
-            ] as const
-          ).map((item) => (
-            <View key={item.key} style={[st.privRow, { borderBottomColor: C.input }]}>
-              <View style={st.privInfo}>
-                <Text style={[st.privLabel, { color: C.text }]}>
-                  {item.label}
-                </Text>
-                <Text style={[st.privDesc, { color: C.muted }]}>
-                  {item.desc}
-                </Text>
-              </View>
-              <Switch
-                value={item.val}
-                onValueChange={(v) => set(item.key, v)}
-                trackColor={{ false: C.input, true: C.accent }}
-                thumbColor={item.val ? C.success : C.dim}
-              />
-            </View>
-          ))}
-        </View>
-
-        <Text style={[st.previewLabel, { color: C.sub }]}>
-          How others see you:
-        </Text>
-        <View style={[st.preview, { backgroundColor: C.card, borderColor: C.accent }]}>
-          {form.photos.length > 0 && (
-            <View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>
-                {form.photos.map((p, i) => (
-                  <Image
-                    key={`prev_${i}`}
-                    source={{ uri: p.uri }}
-                    style={[
-                      st.previewThumb,
-                      i === 0 && st.previewThumbMain,
-                      form.blurUntilMatch && { opacity: 0.15 },
-                    ]}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ))}
-              </ScrollView>
-              {form.blurUntilMatch && (
-                <View style={st.blurOverlay}>
-                  <Text style={[st.blurText, { color: C.accent }]}>
-                    🔒 Blurred until match
-                  </Text>
+          {form.pronouns !== '' && <Text style={[st.previewSub, { color: C.muted }]}>{form.pronouns}</Text>}
+          {hDisplay !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>📏 {hDisplay}</Text>}
+          {form.occupation.trim() !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>💼 {form.occupation}</Text>}
+          {form.education !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>🎓 {form.education}</Text>}
+          {form.locCity !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>📍 {form.locCity}</Text>}
+          {form.vibes.length > 0 && <Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>}
+          {form.bio.trim() !== '' && <Text style={[st.previewBio, { color: C.text }]}>{form.bio.trim()}</Text>}
+          {form.interests.length > 0 && (
+            <View style={st.previewTags}>
+              {form.interests.slice(0, 5).map((t) => (
+                <View key={t} style={[st.previewTag, { backgroundColor: C.input }]}>
+                  <Text style={[st.previewTagText, { color: C.accent }]}>{t}</Text>
                 </View>
+              ))}
+              {form.interests.length > 5 && (
+                <Text style={[st.previewMore, { color: C.muted }]}>+{form.interests.length - 5} more</Text>
               )}
             </View>
           )}
-
-          <View style={st.previewInfo}>
-            <Text style={[st.previewName, { color: C.text }]}>
-              {formatName(form.name) || 'Your Name'}, {age ?? '??'}
-              {zodiac ? ` ${zodiac.emoji}` : ''}
-            </Text>
-
-            {form.pronouns !== '' && (
-              <Text style={[st.previewSub, { color: C.muted }]}>
-                {form.pronouns}
-              </Text>
-            )}
-
-            {hDisplay !== '' && (
-              <Text style={[st.previewDetail, { color: C.sub }]}>
-                📏 {hDisplay}
-              </Text>
-            )}
-
-            {form.occupation.trim() !== '' && (
-              <Text style={[st.previewDetail, { color: C.sub }]}>
-                💼 {form.occupation}
-              </Text>
-            )}
-
-            {form.education !== '' && (
-              <Text style={[st.previewDetail, { color: C.sub }]}>
-                🎓 {form.education}
-              </Text>
-            )}
-
-            {form.locCity !== '' && (
-              <Text style={[st.previewDetail, { color: C.sub }]}>
-                📍 {form.locCity}
-              </Text>
-            )}
-
-            {form.vibes.length > 0 && (
-              <Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>
-            )}
-
-            {form.bio.trim() !== '' && (
-              <Text style={[st.previewBio, { color: C.text }]}>
-                {form.bio.trim()}
-              </Text>
-            )}
-
-            {form.interests.length > 0 && (
-              <View style={st.previewTags}>
-                {form.interests.slice(0, 5).map((t) => (
-                  <View key={t} style={[st.previewTag, { backgroundColor: C.input }]}>
-                    <Text style={[st.previewTagText, { color: C.accent }]}>
-                      {t}
-                    </Text>
-                  </View>
-                ))}
-                {form.interests.length > 5 && (
-                  <Text style={[st.previewMore, { color: C.muted }]}>
-                    +{form.interests.length - 5} more
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <Text style={[st.previewPhotoCt, { color: C.muted }]}>
-              📸 {form.photos.length} photo{form.photos.length !== 1 ? 's' : ''} (
-              {form.photos.map((p) => getPhotoLabel(p.type)).join(', ')})
-            </Text>
-          </View>
-        </View>
-
-        <View style={[st.pctCard, { backgroundColor: C.card }]}>
-          <Text style={[st.pctTitle, { color: C.text }]}>
-            Profile Completion: {pct}%
+          <Text style={[st.previewPhotoCt, { color: C.muted }]}>
+            📸 {form.photos.length} photo{form.photos.length !== 1 ? 's' : ''} ({form.photos.map((p) => getPhotoLabel(p.type)).join(', ')})
           </Text>
-          <View style={[st.pctBarBg, { backgroundColor: C.input }]}>
-            <View
-              style={[
-                st.pctBarFill,
-                {
-                  width: `${pct}%`,
-                  backgroundColor:
-                    pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger,
-                },
-              ]}
-            />
-          </View>
-          {pct < 100 && (
-            <Text style={[st.pctHint, { color: C.muted }]}>
-              Complete more fields to increase your visibility in search results!
-            </Text>
-          )}
-        </View>
-
-        <View style={[st.termsRow, { backgroundColor: C.card }]}>
-          <Switch
-            value={form.termsAccepted}
-            onValueChange={(v) => set('termsAccepted', v)}
-            trackColor={{ false: C.input, true: C.accent }}
-            thumbColor={form.termsAccepted ? C.success : C.dim}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={[st.termsText, { color: C.sub }]}>
-              I agree to the{' '}
-              <Text
-                style={[st.termsLink, { color: C.accent }]}
-                onPress={() =>
-                  Linking.openURL('https://myarchetype.vercel.app/terms').catch(() => {})
-                }
-              >
-                Terms of Service
-              </Text>{' '}
-              and{' '}
-              <Text
-                style={[st.termsLink, { color: C.accent }]}
-                onPress={() =>
-                  Linking.openURL('https://myarchetype.vercel.app/privacy').catch(() => {})
-                }
-              >
-                Privacy Policy
-              </Text>
-            </Text>
-          </View>
         </View>
       </View>
-    ),
-    [
-      C,
-      form.blurUntilMatch,
-      form.incognito,
-      form.verifiedOnly,
-      form.photos,
-      form.name,
-      form.pronouns,
-      form.occupation,
-      form.education,
-      form.locCity,
-      form.vibes,
-      form.bio,
-      form.interests,
-      form.termsAccepted,
-      age,
-      zodiac,
-      hDisplay,
-      pct,
-      set,
-    ]
-  );
+
+      <View style={[st.pctCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+        <Text style={[st.pctTitle, { color: C.text }]}>Profile Completion: {pct}%</Text>
+        <View style={[st.pctBarBg, { backgroundColor: C.inputBorder }]}>
+          <View style={[st.pctBarFill, { width: `${pct}%` as any, backgroundColor: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger }]} />
+        </View>
+        {pct < 100 && (
+          <Text style={[st.pctHint, { color: C.muted }]}>
+            Complete more fields to increase your visibility in search results!
+          </Text>
+        )}
+      </View>
+
+      <View style={[st.termsRow, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+        <Switch
+          value={form.termsAccepted}
+          onValueChange={(v) => set('termsAccepted', v)}
+          trackColor={{ false: C.inputBorder, true: C.accent }}
+          thumbColor={form.termsAccepted ? C.success : C.dim}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[st.termsText, { color: C.sub }]}>
+            I agree to the{' '}
+            <Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/terms').catch(() => {})}>
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/privacy').catch(() => {})}>
+              Privacy Policy
+            </Text>
+          </Text>
+        </View>
+      </View>
+    </View>
+  ), [C, form.blurUntilMatch, form.incognito, form.verifiedOnly, form.photos, form.name, form.pronouns, form.occupation, form.education, form.locCity, form.vibes, form.bio, form.interests, form.termsAccepted, age, zodiac, hDisplay, pct, set]);
 
   const renderCurrent = useCallback(() => {
     switch (step) {
-      case 1:
-        return renderStep1();
-      case 2:
-        return renderStep2();
-      case 3:
-        return renderStep3();
-      case 4:
-        return renderStep4();
-      case 5:
-        return renderStep5();
-      case 6:
-        return renderStep6();
-      case 7:
-        return renderStep7();
-      case 8:
-        return renderStep8();
-      default:
-        return null;
+      case 1: return renderStep1();
+      case 2: return renderStep2();
+      case 3: return renderStep3();
+      case 4: return renderStep4();
+      case 5: return renderStep5();
+      case 6: return renderStep6();
+      case 7: return renderStep7();
+      case 8: return renderStep8();
+      default: return null;
     }
-  }, [
-    step,
-    renderStep1,
-    renderStep2,
-    renderStep3,
-    renderStep4,
-    renderStep5,
-    renderStep6,
-    renderStep7,
-    renderStep8,
-  ]);
+  }, [step, renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6, renderStep7, renderStep8]);
 
   return (
     <KeyboardAvoidingView
       style={[st.root, { backgroundColor: C.bg }]}
       behavior={IS_IOS ? 'padding' : 'height'}
     >
-      <View style={[st.topBar, { backgroundColor: C.card }]}>
-        <TouchableOpacity onPress={goBack}>
+      {/* Background gradient matching login/signup */}
+      <LinearGradient
+        colors={[C.bgGradientStart, C.bgGradientMid, C.bgGradientEnd]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+
+      {/* Top bar */}
+      <View style={[st.topBar, { backgroundColor: C.card, borderBottomColor: C.cardBorder }]}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={[st.backBtn, { color: C.accent }]}>
             {step === 1 ? '✕' : '← Back'}
           </Text>
         </TouchableOpacity>
-
         <Text style={[st.topTitle, { color: C.text }]}>
           {step}/{TOTAL_STEPS} · {STEP_NAMES[step - 1]}
         </Text>
-
-        <Text style={[st.draftLabel, { color: C.dim }]}>💾 Draft</Text>
+        <Text style={[st.draftLabel, { color: C.muted }]}>💾 Draft</Text>
       </View>
 
-      <View style={st.stepDots}>
+      {/* Step dots */}
+      <View style={[st.stepDots, { backgroundColor: C.card }]}>
         {STEP_NAMES.map((name, i) => (
           <View
             key={name}
             style={[
               st.stepDot,
-              { backgroundColor: C.input },
+              { backgroundColor: C.inputBorder },
               i + 1 < step && { backgroundColor: C.success },
-              i + 1 === step && {
-                backgroundColor: C.accent,
-                transform: [{ scale: 1.3 }],
-              },
+              i + 1 === step && { backgroundColor: C.accent, transform: [{ scale: 1.3 }] },
             ]}
           />
         ))}
       </View>
 
-      <View style={[st.progBg, { backgroundColor: C.input }]}>
+      {/* Progress bar */}
+      <View style={[st.progBg, { backgroundColor: C.inputBorder }]}>
         <Animated.View
           style={[
             st.progFill,
             {
-              backgroundColor: C.success,
-              width: progAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
+              backgroundColor: C.accent,
+              width: progAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
             },
           ]}
         />
       </View>
 
+      {/* Scrollable content */}
       <Pressable
         style={{ flex: 1 }}
-        onPress={() => {
-          if (Platform.OS !== 'web') Keyboard.dismiss();
-        }}
+        onPress={() => { if (!IS_WEB) Keyboard.dismiss(); }}
       >
         <ScrollView
           ref={scrollRef}
@@ -3601,81 +2804,89 @@ export default function ProfileSetupScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateX: slideAnim }],
-            }}
-          >
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
             {renderCurrent()}
           </Animated.View>
           <View style={{ height: SPACING.xl }} />
         </ScrollView>
       </Pressable>
 
-      <View style={[st.botBar, { backgroundColor: C.card }]}>
+      {/* Bottom bar with gradient button */}
+      <View style={[st.botBar, { backgroundColor: C.card, borderTopColor: C.cardBorder }]}>
         {step < TOTAL_STEPS ? (
-          <TouchableOpacity
-            style={[
-              st.nextBtn,
-              { backgroundColor: stepOk ? C.accent : C.dim },
-              !stepOk && { opacity: 0.6 },
-            ]}
-            onPress={goNext}
-            activeOpacity={0.8}
-          >
-            <Text style={[st.nextBtnText, { color: C.white }]}>
-              {stepOk
-                ? `Next → ${STEP_NAMES[step]}`
-                : getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm)}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[
-              st.saveBtn,
-              { backgroundColor: form.termsAccepted ? C.success : C.dim },
-              (!form.termsAccepted || loading) && { opacity: 0.6 },
-            ]}
-            onPress={() => void handleSave()}
-            disabled={!form.termsAccepted || loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <View style={st.saveBtnRow}>
-                <ActivityIndicator size="small" color={C.white} />
-                <Text style={[st.saveBtnText, { color: C.white }]}> Creating…</Text>
+          stepOk ? (
+            // Active: gradient button matching login/signup style
+            <TouchableOpacity
+              style={st.nextBtnWrap}
+              onPress={goNext}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[C.buttonGradStart, C.buttonGradEnd] as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={st.nextBtn}
+              >
+                <Text style={[st.nextBtnText, { color: C.white }]}>
+                  Next → {STEP_NAMES[step]}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            // Disabled state
+            <View style={[st.nextBtnWrap, { opacity: 0.6 }]}>
+              <View style={[st.nextBtn, { backgroundColor: C.disabledBg }]}>
+                <Text style={[st.nextBtnText, { color: C.disabledText }]}>
+                  {getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm)}
+                </Text>
               </View>
-            ) : (
-              <Text style={[st.saveBtnText, { color: C.white }]}>
-                ✓ Create Profile
-              </Text>
-            )}
-          </TouchableOpacity>
+            </View>
+          )
+        ) : (
+          form.termsAccepted && !loading ? (
+            <TouchableOpacity style={st.nextBtnWrap} onPress={() => void handleSave()} activeOpacity={0.85}>
+              <LinearGradient
+                colors={[C.success, '#3aaa50'] as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={st.nextBtn}
+              >
+                <Text style={[st.nextBtnText, { color: C.white }]}>✓ Create Profile</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <View style={[st.nextBtnWrap, { opacity: loading ? 0.8 : 0.5 }]}>
+              <View style={[st.nextBtn, { backgroundColor: loading ? C.accent : C.disabledBg }]}>
+                {loading ? (
+                  <View style={st.saveBtnRow}>
+                    <ActivityIndicator size="small" color={C.white} />
+                    <Text style={[st.nextBtnText, { color: C.white, marginLeft: SPACING.sm }]}> Creating…</Text>
+                  </View>
+                ) : (
+                  <Text style={[st.nextBtnText, { color: C.disabledText }]}>Accept Terms to Continue</Text>
+                )}
+              </View>
+            </View>
+          )
         )}
       </View>
 
-      <Modal
-        visible={camOpen}
-        animationType="slide"
-        onRequestClose={closeCam}
-        statusBarTranslucent
-      >
+      {/* Camera modal */}
+      <Modal visible={camOpen} animationType="slide" onRequestClose={closeCam} statusBarTranslucent>
         <View style={[st.camModal, { backgroundColor: C.bg }]}>
-          <View style={[st.camHead, { backgroundColor: C.card }]}>
-            <TouchableOpacity onPress={closeCam} activeOpacity={0.7}>
+          <LinearGradient
+            colors={[C.bgGradientStart, C.bgGradientEnd] as [string, string]}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <View style={[st.camHead, { backgroundColor: C.card, borderBottomColor: C.cardBorder }]}>
+            <TouchableOpacity onPress={closeCam} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={[st.camCancel, { color: C.danger }]}>✕ Cancel</Text>
             </TouchableOpacity>
-
             <View style={st.camHeadCenter}>
-              <Text style={[st.camTitle, { color: C.text }]}>
-                {camSlot?.icon} {camSlot?.label}
-              </Text>
-              <Text style={[st.camInstr, { color: C.muted }]}>
-                {camSlot?.instruction}
-              </Text>
+              <Text style={[st.camTitle, { color: C.text }]}>{camSlot?.icon} {camSlot?.label}</Text>
+              <Text style={[st.camInstr, { color: C.muted }]}>{camSlot?.instruction}</Text>
             </View>
-
             <View style={st.camSpacer} />
           </View>
 
@@ -3685,48 +2896,45 @@ export default function ProfileSetupScreen() {
                 {camErr ? (
                   <View style={st.camErrWrap}>
                     <Text style={st.camErrIcon}>📷</Text>
-                    <Text style={[st.camErrText, { color: C.danger }]}>
-                      {camErr}
-                    </Text>
+                    <Text style={[st.camErrText, { color: C.danger }]}>{camErr}</Text>
                     <TouchableOpacity
-                      style={[st.retryBtn, { backgroundColor: C.warning }]}
-                      onPress={() => void openCamera(camSlot ?? undefined)}
+                      style={[st.retryBtn, { backgroundColor: C.accent }]}
+                      onPress={() => {
+                        if (isMountedRef.current) {
+                          setCamErr(null);
+                          setCamReady(false);
+                        }
+                        if (camSlot) startWebStream(camSlot.cameraSide);
+                      }}
                       activeOpacity={0.7}
                     >
-                      <Text style={[st.retryBtnText, { color: C.white }]}>
-                        Try Again
-                      </Text>
+                      <Text style={[st.retryBtnText, { color: C.white }]}>Try Again</Text>
                     </TouchableOpacity>
                   </View>
-                ) : !camReady ? (
-                  <View style={st.camLoadWrap}>
-                    <ActivityIndicator size="large" color={C.accent} />
-                    <Text style={[st.camLoadText, { color: C.muted }]}>
-                      Starting camera…
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View style={camReady ? st.camVideo : st.hidden}>
-                  {IS_WEB && (
-                    // @ts-ignore web only
-                    <video
-                      id="cam-preview"
-                      ref={videoRefCallback}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        transform: camFacing === 'front' ? 'scaleX(-1)' : 'none',
-                      }}
-                    />
-                  )}
-                </View>
-
-                {camReady && camSlot && <CameraGuide type={camSlot.type} C={C} />}
+                ) : (
+                  <>
+                    {!camReady && (
+                      <View style={[StyleSheet.absoluteFillObject, st.camLoadWrap]}>
+                        <ActivityIndicator size="large" color={C.accent} />
+                        <Text style={[st.camLoadText, { color: C.muted }]}>Starting camera…</Text>
+                      </View>
+                    )}
+                    {/*
+                     * ✅ FIX: WebVideoPreview is always rendered when camera is open
+                     * (not conditionally based on camReady). The video element needs
+                     * to be in the DOM so handleVideoRef can fire and attach the stream.
+                     * We hide it with opacity when not ready.
+                     */}
+                    <View style={[StyleSheet.absoluteFillObject, !camReady && { opacity: 0 }]}>
+                      <WebVideoPreview
+                        streamReady={!!streamRef.current}
+                        facing={camFacing}
+                        onReady={handleVideoRef}
+                      />
+                    </View>
+                    {camReady && camSlot && <CameraGuide type={camSlot.type} C={C} />}
+                  </>
+                )}
               </View>
             ) : (
               <View style={[st.camBox, { borderColor: C.accent }]}>
@@ -3734,8 +2942,9 @@ export default function ProfileSetupScreen() {
                   ref={cameraRef}
                   style={st.camNative}
                   facing={camFacing}
-                  onCameraReady={() => {
-                    if (isMountedRef.current) setCamReady(true);
+                  onCameraReady={() => { if (isMountedRef.current) setCamReady(true); }}
+                  onMountError={(err) => {
+                    if (isMountedRef.current) setCamErr(err.message ?? 'Camera failed to start.');
                   }}
                 />
                 {camSlot && <CameraGuide type={camSlot.type} C={C} />}
@@ -3744,31 +2953,23 @@ export default function ProfileSetupScreen() {
 
             {countdown !== null && (
               <View style={st.countdownOverlay}>
-                <Text style={[st.countdownText, { color: C.white }]}>
-                  {countdown}
-                </Text>
+                <Text style={[st.countdownText, { color: C.white }]}>{countdown}</Text>
               </View>
             )}
           </View>
 
-          <View style={[st.camControls, { backgroundColor: C.bg }]}>
+          <View style={[st.camControls, { backgroundColor: C.card, borderTopColor: C.cardBorder }]}>
             {camSlot?.timerAvailable && (
               <TouchableOpacity
                 style={[
                   st.timerBtn,
-                  { backgroundColor: C.input },
-                  timerEnabled && {
-                    borderColor: C.warning,
-                    backgroundColor: C.card,
-                  },
+                  { backgroundColor: C.input, borderColor: timerEnabled ? C.accent : C.inputBorder },
+                  timerEnabled && { backgroundColor: C.accentGlow },
                 ]}
-                onPress={() => {
-                  setTimerEnabled((v) => !v);
-                  haptic();
-                }}
+                onPress={() => { setTimerEnabled((v) => !v); haptic(); }}
                 activeOpacity={0.7}
               >
-                <Text style={[st.timerBtnText, { color: C.text }]}>
+                <Text style={[st.timerBtnText, { color: timerEnabled ? C.accent : C.text }]}>
                   {timerEnabled ? `⏱ ${TIMER_SECONDS}s ON` : '⏱ Timer'}
                 </Text>
               </TouchableOpacity>
@@ -3776,7 +2977,7 @@ export default function ProfileSetupScreen() {
 
             <View style={st.camBtnRow}>
               <TouchableOpacity
-                style={[st.flipBtn, { backgroundColor: C.input }]}
+                style={[st.flipBtn, { backgroundColor: C.input, borderColor: C.inputBorder }]}
                 onPress={flipCamera}
                 activeOpacity={0.7}
               >
@@ -3787,8 +2988,7 @@ export default function ProfileSetupScreen() {
                 style={[
                   st.captureBtn,
                   { borderColor: C.accent },
-                  ((IS_WEB && !camReady) || capturing || countdown !== null) &&
-                    st.captureBtnOff,
+                  ((IS_WEB && !camReady) || capturing || countdown !== null) && st.captureBtnOff,
                 ]}
                 onPress={handleCapture}
                 disabled={(IS_WEB && !camReady) || capturing || countdown !== null}
@@ -3797,9 +2997,7 @@ export default function ProfileSetupScreen() {
                 {capturing ? (
                   <ActivityIndicator size="small" color={C.accent} />
                 ) : (
-                  <View
-                    style={[st.captureBtnInner, { backgroundColor: C.accent }]}
-                  />
+                  <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />
                 )}
               </TouchableOpacity>
 
@@ -3809,6 +3007,7 @@ export default function ProfileSetupScreen() {
         </View>
       </Modal>
 
+      {/* Prompt picker modal */}
       <Modal
         visible={promptPicker !== null}
         animationType="slide"
@@ -3816,11 +3015,8 @@ export default function ProfileSetupScreen() {
         onRequestClose={() => setPromptPicker(null)}
       >
         <View style={st.pickerOverlay}>
-          <View style={[st.pickerContent, { backgroundColor: C.card }]}>
-            <Text style={[st.pickerTitle, { color: C.text }]}>
-              Choose a Question
-            </Text>
-
+          <View style={[st.pickerContent, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+            <Text style={[st.pickerTitle, { color: C.text }]}>Choose a Question</Text>
             <FlatList
               data={PROMPT_QUESTIONS}
               keyExtractor={(item, index) => `pq_${index}`}
@@ -3830,53 +3026,25 @@ export default function ProfileSetupScreen() {
                   promptPicker !== null &&
                   promptPicker < form.prompts.length &&
                   form.prompts.some((p, i) => p.q === item && i !== promptPicker);
-
                 return (
                   <TouchableOpacity
-                    style={[
-                      st.pickerItem,
-                      { borderBottomColor: C.input },
-                      used && st.pickerItemOff,
-                    ]}
+                    style={[st.pickerItem, { borderBottomColor: C.inputBorder }, used && st.pickerItemOff]}
                     onPress={() => {
-                      if (
-                        used ||
-                        promptPicker === null ||
-                        promptPicker >= form.prompts.length
-                      )
-                        return;
-                      dispatch({
-                        type: 'SET_PROMPT',
-                        index: promptPicker,
-                        q: item,
-                        a: form.prompts[promptPicker]?.a ?? '',
-                      });
+                      if (used || promptPicker === null || promptPicker >= form.prompts.length) return;
+                      dispatch({ type: 'SET_PROMPT', index: promptPicker, q: item, a: form.prompts[promptPicker]?.a ?? '' });
                       setPromptPicker(null);
                     }}
                     disabled={used}
                     activeOpacity={0.7}
                   >
-                    <Text style={[st.pickerItemText, { color: used ? C.dim : C.text }]}>
-                      {item}
-                    </Text>
-                    {used && (
-                      <Text style={[st.pickerUsed, { color: C.muted }]}>
-                        Already used
-                      </Text>
-                    )}
+                    <Text style={[st.pickerItemText, { color: used ? C.muted : C.text }]}>{item}</Text>
+                    {used && <Text style={[st.pickerUsed, { color: C.muted }]}>Already used</Text>}
                   </TouchableOpacity>
                 );
               }}
             />
-
-            <TouchableOpacity
-              style={st.pickerCancel}
-              onPress={() => setPromptPicker(null)}
-              activeOpacity={0.7}
-            >
-              <Text style={[st.pickerCancelText, { color: C.danger }]}>
-                Cancel
-              </Text>
+            <TouchableOpacity style={st.pickerCancel} onPress={() => setPromptPicker(null)} activeOpacity={0.7}>
+              <Text style={[st.pickerCancelText, { color: C.danger }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3890,10 +3058,7 @@ export default function ProfileSetupScreen() {
 const st = StyleSheet.create({
   root: { flex: 1 },
   sv: { flex: 1 },
-  svContent: {
-    padding: SPACING.xl,
-    paddingBottom: SPACING.xxxxl,
-  },
+  svContent: { padding: SPACING.xl, paddingBottom: SPACING.xxxxl },
 
   topBar: {
     flexDirection: 'row',
@@ -3902,6 +3067,7 @@ const st = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingTop: IS_IOS ? 56 : 44,
     paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
   },
   backBtn: { fontSize: FONT.lg, fontWeight: '600' },
   topTitle: { fontSize: FONT.md, fontWeight: '600' },
@@ -3915,11 +3081,7 @@ const st = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
   },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: RADIUS.full,
-  },
+  stepDot: { width: 8, height: 8, borderRadius: RADIUS.full },
 
   progBg: { height: 3 },
   progFill: { height: '100%', borderRadius: RADIUS.sm },
@@ -3927,90 +3089,42 @@ const st = StyleSheet.create({
   botBar: {
     padding: SPACING.lg,
     paddingBottom: IS_IOS ? 34 : SPACING.lg,
+    borderTopWidth: 1,
   },
+  nextBtnWrap: { width: '100%', borderRadius: RADIUS.xxl, overflow: 'hidden' },
   nextBtn: {
     paddingVertical: SPACING.lg,
     borderRadius: RADIUS.xxl,
     alignItems: 'center',
-    minHeight: 52,
+    minHeight: 56,
     justifyContent: 'center',
   },
-  nextBtnText: { fontSize: FONT.lg, fontWeight: 'bold' },
-  saveBtn: {
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.xxl,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  saveBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnText: { fontSize: FONT.lg, fontWeight: 'bold' },
+  nextBtnText: { fontSize: FONT.lg, fontWeight: '700', letterSpacing: 0.3 },
+  saveBtnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 
-  title: {
-    fontSize: FONT.xxxl,
-    fontWeight: 'bold',
-    marginBottom: SPACING.sm,
-  },
-  sub: {
-    fontSize: FONT.base,
-    marginBottom: SPACING.xl,
-    lineHeight: 22,
-  },
+  title: { fontSize: FONT.xxxl, fontWeight: '800', marginBottom: SPACING.sm, letterSpacing: -0.3 },
+  sub: { fontSize: FONT.base, marginBottom: SPACING.xl, lineHeight: 22 },
   fg: { marginBottom: SPACING.xl + 2 },
   spacer: { height: SPACING.xl },
-  label: {
-    fontSize: FONT.lg,
-    fontWeight: '600',
-    marginBottom: SPACING.sm,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  hint: {
-    fontSize: FONT.sm,
-    marginBottom: SPACING.sm + 2,
-    fontStyle: 'italic',
-  },
+  label: { fontSize: FONT.lg, fontWeight: '600', marginBottom: SPACING.sm },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+  hint: { fontSize: FONT.sm, marginBottom: SPACING.sm + 2, fontStyle: 'italic' },
   err: { fontSize: FONT.sm, marginTop: SPACING.xs + 2 },
-  warn: {
-    fontSize: FONT.sm,
-    marginTop: SPACING.xs + 2,
-    fontStyle: 'italic',
-  },
+  warn: { fontSize: FONT.sm, marginTop: SPACING.xs + 2, fontStyle: 'italic' },
 
   input: {
     padding: SPACING.lg,
     borderRadius: RADIUS.md,
     fontSize: FONT.lg,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
-  charCt: {
-    fontSize: FONT.sm,
-    textAlign: 'right',
-    marginTop: SPACING.xs + 2,
-  },
+  charCt: { fontSize: FONT.sm, textAlign: 'right', marginTop: SPACING.xs + 2 },
 
-  bdayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
+  bdayRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   bdayIn: { flex: 1, textAlign: 'center' },
   bdayInY: { flex: 1.6, textAlign: 'center' },
   bdaySep: { fontSize: FONT.xxl, fontWeight: 'bold' },
-  ageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.sm + 2,
-  },
+  ageRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.sm + 2 },
   ageDisplay: { fontSize: FONT.base },
   zodiac: { fontSize: FONT.base },
 
@@ -4018,29 +3132,22 @@ const st = StyleSheet.create({
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
   },
   unitBtnText: { fontSize: FONT.sm, fontWeight: '600' },
-  ftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
+  ftRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   ftIn: { flex: 1, textAlign: 'center' },
   ftLbl: { fontSize: FONT.lg },
   hPreview: { fontSize: FONT.base, marginTop: SPACING.sm },
 
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.sm + 2,
     paddingHorizontal: SPACING.md + 2,
     borderRadius: RADIUS.xxl,
-    borderWidth: 2,
+    borderWidth: 1.5,
     gap: SPACING.xs + 2,
   },
   chipOn: {},
@@ -4052,46 +3159,27 @@ const st = StyleSheet.create({
   optRow: {
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
     marginBottom: SPACING.sm,
   },
-  optHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
+  optHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   optIcon: { fontSize: FONT.xxl },
   optText: { fontSize: FONT.lg, fontWeight: '600', flex: 1 },
   optCheck: { fontSize: FONT.xl, fontWeight: 'bold' },
-  optDesc: {
-    fontSize: FONT.sm,
-    marginTop: SPACING.xs,
-    marginLeft: 28,
-    lineHeight: 18,
-  },
+  optDesc: { fontSize: FONT.sm, marginTop: SPACING.xs, marginLeft: 28, lineHeight: 18 },
 
-  vibeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
+  vibeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   vibeItem: {
     width: 52,
     height: 52,
     borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
   vibeEmoji: { fontSize: FONT.xxl + 2 },
 
-  rangeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm + 2,
-  },
+  rangeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm + 2 },
   rangeIn: { flex: 1, textAlign: 'center' },
   rangeDash: { fontSize: FONT.xxl },
   rangeU: { fontSize: FONT.base },
@@ -4103,24 +3191,17 @@ const st = StyleSheet.create({
     minHeight: 130,
     textAlignVertical: 'top',
     lineHeight: 24,
+    borderWidth: 1.5,
   },
-  bioSuggestion: {
-    fontSize: FONT.base,
-    marginBottom: SPACING.sm,
-    fontStyle: 'italic',
-  },
+  bioSuggestion: { fontSize: FONT.base, marginBottom: SPACING.sm, fontStyle: 'italic' },
 
   promptCard: {
     borderRadius: RADIUS.lg,
     padding: SPACING.md + 2,
     marginBottom: SPACING.md,
+    borderWidth: 1.5,
   },
-  promptQ: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
+  promptQ: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
   promptQText: { fontSize: FONT.base, fontWeight: '600', flex: 1 },
   promptArr: { fontSize: FONT.sm },
   promptIn: {
@@ -4129,11 +3210,12 @@ const st = StyleSheet.create({
     fontSize: FONT.base,
     minHeight: 64,
     textAlignVertical: 'top',
+    borderWidth: 1,
   },
   promptRm: { marginTop: SPACING.sm, alignSelf: 'flex-end' },
   promptRmText: { fontSize: FONT.sm },
   addPrompt: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
     borderRadius: RADIUS.lg,
     padding: SPACING.md + 2,
@@ -4146,28 +3228,14 @@ const st = StyleSheet.create({
     paddingVertical: SPACING.lg,
     borderRadius: RADIUS.lg,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
   btnOff: { opacity: 0.5 },
-  locRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm + 2,
-  },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm + 2 },
   locBtnText: { fontSize: FONT.lg, fontWeight: '600' },
-  locConf: {
-    fontSize: FONT.base,
-    marginTop: SPACING.sm + 2,
-    textAlign: 'center',
-  },
+  locConf: { fontSize: FONT.base, marginTop: SPACING.sm + 2, textAlign: 'center' },
 
-  slotStatus: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-    flexWrap: 'wrap',
-  },
+  slotStatus: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg, flexWrap: 'wrap' },
   statusItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4175,8 +3243,7 @@ const st = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.xxl,
     gap: SPACING.xs + 2,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
   statusIcon: { fontSize: FONT.lg },
   statusText: { fontSize: FONT.md, fontWeight: '600' },
@@ -4189,26 +3256,11 @@ const st = StyleSheet.create({
     gap: SPACING.sm,
   },
   loadRowText: { fontSize: FONT.base },
-  uploadBarBg: {
-    height: 4,
-    borderRadius: RADIUS.sm,
-    overflow: 'hidden',
-    marginTop: SPACING.xs + 2,
-    flex: 1,
-  },
+  uploadBarBg: { height: 4, borderRadius: RADIUS.sm, overflow: 'hidden', marginTop: SPACING.xs + 2, flex: 1 },
   uploadBarFill: { height: '100%', borderRadius: RADIUS.sm },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-  },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
   photoSlot: { position: 'relative' },
-  photoImg: {
-    width: 100,
-    height: 130,
-    borderRadius: RADIUS.lg,
-    borderWidth: 2,
-  },
+  photoImg: { width: 100, height: 130, borderRadius: RADIUS.lg, borderWidth: 1.5 },
   photoTypeTag: {
     position: 'absolute',
     bottom: 30,
@@ -4246,13 +3298,7 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.xxs + 2,
   },
-  moveBtn: {
-    borderRadius: RADIUS.md,
-    width: 22,
-    height: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  moveBtn: { borderRadius: RADIUS.md, width: 22, height: 22, justifyContent: 'center', alignItems: 'center' },
   moveBtnText: { fontSize: FONT.md, fontWeight: 'bold' },
   rmBtn: {
     position: 'absolute',
@@ -4270,7 +3316,7 @@ const st = StyleSheet.create({
     width: 100,
     height: 130,
     borderRadius: RADIUS.lg,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
@@ -4279,152 +3325,47 @@ const st = StyleSheet.create({
   addBtnIcon: { fontSize: FONT.xxxl, marginBottom: SPACING.xxs + 2 },
   addBtnLabel: { fontSize: FONT.xs, fontWeight: '600' },
   addBtnReq: { fontSize: 9, marginTop: SPACING.xxs },
-  tipBox: {
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.md + 2,
-    borderWidth: 1,
-  },
+  tipBox: { padding: SPACING.md, borderRadius: RADIUS.md, marginTop: SPACING.md + 2, borderWidth: 1 },
   tipText: { fontSize: FONT.md, textAlign: 'center' },
-  socialProof: {
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.md,
-    borderWidth: 1,
-  },
-  socialProofText: {
-    fontSize: FONT.md,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  photoHint: {
-    fontSize: FONT.sm,
-    marginTop: SPACING.md + 2,
-    lineHeight: 18,
-  },
+  socialProof: { padding: SPACING.md, borderRadius: RADIUS.md, marginTop: SPACING.md, borderWidth: 1 },
+  socialProofText: { fontSize: FONT.md, textAlign: 'center', lineHeight: 20 },
+  photoHint: { fontSize: FONT.sm, marginTop: SPACING.md + 2, lineHeight: 18 },
 
-  privacyCard: {
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    marginBottom: SPACING.xl,
-    borderWidth: 2,
-  },
-  privacyTitle: {
-    fontSize: FONT.xl,
-    fontWeight: 'bold',
-    marginBottom: SPACING.xxs + 2,
-  },
-  privRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md + 2,
-    borderBottomWidth: 1,
-  },
+  privacyCard: { borderRadius: RADIUS.xl, padding: SPACING.xl, marginBottom: SPACING.xl, borderWidth: 1.5 },
+  privacyTitle: { fontSize: FONT.xl, fontWeight: '800', marginBottom: SPACING.xxs + 2 },
+  privRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.md + 2, borderBottomWidth: 1 },
   privInfo: { flex: 1, marginRight: SPACING.md },
-  privLabel: {
-    fontSize: FONT.lg - 1,
-    fontWeight: '600',
-    marginBottom: SPACING.xxs + 2,
-  },
+  privLabel: { fontSize: FONT.lg - 1, fontWeight: '600', marginBottom: SPACING.xxs + 2 },
   privDesc: { fontSize: FONT.sm, lineHeight: 17 },
 
-  previewLabel: {
-    fontSize: FONT.base,
-    marginBottom: SPACING.sm + 2,
-    fontWeight: '600',
-  },
-  preview: {
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-    marginBottom: SPACING.xl,
-    borderWidth: 2,
-  },
+  previewLabel: { fontSize: FONT.base, marginBottom: SPACING.sm + 2, fontWeight: '600' },
+  preview: { borderRadius: RADIUS.xl, overflow: 'hidden', marginBottom: SPACING.xl, borderWidth: 1.5 },
   previewPhotoScroll: { height: 180 },
-  previewThumb: {
-    width: 140,
-    height: 180,
-    marginRight: SPACING.xxs + 2,
-  },
+  previewThumb: { width: 140, height: 180, marginRight: SPACING.xxs + 2 },
   previewThumbMain: { width: 180 },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(26,26,46,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  blurOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26,26,46,0.75)', justifyContent: 'center', alignItems: 'center' },
   blurText: { fontSize: FONT.xl, fontWeight: 'bold' },
   previewInfo: { padding: SPACING.xl },
-  previewName: {
-    fontSize: FONT.xxxl,
-    fontWeight: 'bold',
-    marginBottom: SPACING.xxs + 2,
-  },
+  previewName: { fontSize: FONT.xxxl, fontWeight: '800', marginBottom: SPACING.xxs + 2, letterSpacing: -0.3 },
   previewSub: { fontSize: FONT.base, marginBottom: SPACING.sm },
-  previewDetail: {
-    fontSize: FONT.base,
-    marginBottom: SPACING.xxs + 2,
-  },
-  previewVibes: {
-    fontSize: FONT.xxl + 2,
-    marginVertical: SPACING.sm,
-  },
-  previewBio: {
-    fontSize: FONT.lg - 1,
-    lineHeight: 22,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  previewTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs + 2,
-    marginTop: SPACING.sm,
-  },
-  previewTag: {
-    paddingVertical: SPACING.xxs + 2,
-    paddingHorizontal: SPACING.sm + 2,
-    borderRadius: RADIUS.md,
-  },
+  previewDetail: { fontSize: FONT.base, marginBottom: SPACING.xxs + 2 },
+  previewVibes: { fontSize: FONT.xxl + 2, marginVertical: SPACING.sm },
+  previewBio: { fontSize: FONT.lg - 1, lineHeight: 22, marginTop: SPACING.sm, marginBottom: SPACING.md },
+  previewTags: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs + 2, marginTop: SPACING.sm },
+  previewTag: { paddingVertical: SPACING.xxs + 2, paddingHorizontal: SPACING.sm + 2, borderRadius: RADIUS.md },
   previewTagText: { fontSize: FONT.sm },
   previewMore: { fontSize: FONT.sm, alignSelf: 'center' },
   previewPhotoCt: { fontSize: FONT.sm, marginTop: SPACING.md },
 
-  pctCard: {
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-  },
-  pctTitle: {
-    fontSize: FONT.lg,
-    fontWeight: '600',
-    marginBottom: SPACING.sm + 2,
-  },
-  pctBarBg: {
-    height: 10,
-    borderRadius: RADIUS.sm,
-    overflow: 'hidden',
-  },
+  pctCard: { borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1 },
+  pctTitle: { fontSize: FONT.lg, fontWeight: '600', marginBottom: SPACING.sm + 2 },
+  pctBarBg: { height: 10, borderRadius: RADIUS.sm, overflow: 'hidden' },
   pctBarFill: { height: '100%', borderRadius: RADIUS.sm },
-  pctHint: {
-    fontSize: FONT.sm,
-    marginTop: SPACING.sm,
-    fontStyle: 'italic',
-  },
+  pctHint: { fontSize: FONT.sm, marginTop: SPACING.sm, fontStyle: 'italic' },
 
-  termsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.xl,
-  },
+  termsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, padding: SPACING.lg, borderRadius: RADIUS.lg, marginBottom: SPACING.xl, borderWidth: 1 },
   termsText: { fontSize: FONT.base, lineHeight: 22 },
-  termsLink: {
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
+  termsLink: { fontWeight: '600', textDecorationLine: 'underline' },
 
   camModal: { flex: 1 },
   camHead: {
@@ -4433,71 +3374,35 @@ const st = StyleSheet.create({
     alignItems: 'flex-start',
     padding: SPACING.lg,
     paddingTop: IS_IOS ? 56 : 44,
+    borderBottomWidth: 1,
   },
   camCancel: { fontSize: FONT.lg, fontWeight: '600' },
-  camHeadCenter: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: SPACING.sm + 2,
-  },
-  camTitle: { fontSize: FONT.xl, fontWeight: 'bold' },
-  camInstr: {
-    fontSize: FONT.sm,
-    textAlign: 'center',
-    marginTop: SPACING.xxs + 2,
-    lineHeight: 18,
-  },
+  camHeadCenter: { flex: 1, alignItems: 'center', marginHorizontal: SPACING.sm + 2 },
+  camTitle: { fontSize: FONT.xl, fontWeight: '800' },
+  camInstr: { fontSize: FONT.sm, textAlign: 'center', marginTop: SPACING.xxs + 2, lineHeight: 18 },
   camSpacer: { width: 70 },
-  camContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.xl,
-  },
+  camContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
   camBox: {
     width: 300,
     height: 400,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
     backgroundColor: '#000',
-    borderWidth: 3,
+    borderWidth: 2,
     position: 'relative',
   },
   camNative: { width: '100%', height: '100%' },
-  camVideo: { width: '100%', height: '100%' },
-  hidden: { width: 0, height: 0, overflow: 'hidden' },
-  camErrWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.xl,
-  },
+  camErrWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
   camErrIcon: { fontSize: 50, marginBottom: SPACING.lg },
-  camErrText: {
-    fontSize: FONT.base,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-    lineHeight: 22,
-  },
-  camLoadWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  camErrText: { fontSize: FONT.base, textAlign: 'center', marginBottom: SPACING.xl, lineHeight: 22 },
+  camLoadWrap: { justifyContent: 'center', alignItems: 'center' },
   camLoadText: { marginTop: SPACING.lg, fontSize: FONT.base },
-  retryBtn: {
-    paddingVertical: SPACING.md + 2,
-    paddingHorizontal: SPACING.xxxl,
-    borderRadius: RADIUS.xxl,
-  },
+  retryBtn: { paddingVertical: SPACING.md + 2, paddingHorizontal: SPACING.xxxl, borderRadius: RADIUS.xxl },
   retryBtnText: { fontSize: FONT.base, fontWeight: '600' },
 
   countdownOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 80,
+    top: 0, left: 0, right: 0, bottom: 80,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 20,
@@ -4514,30 +3419,18 @@ const st = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: IS_IOS ? 44 : SPACING.lg,
     paddingTop: SPACING.lg,
+    borderTopWidth: 1,
   },
   timerBtn: {
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.xxl,
     marginBottom: SPACING.lg,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
   },
   timerBtnText: { fontSize: FONT.base, fontWeight: '600' },
-  camBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingHorizontal: SPACING.xxxxl,
-  },
-  flipBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  camBtnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', width: '100%', paddingHorizontal: SPACING.xxxxl },
+  flipBtn: { width: 52, height: 52, borderRadius: RADIUS.full, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   flipBtnText: { fontSize: FONT.xxxl },
   captureBtn: {
     width: 84,
@@ -4551,32 +3444,20 @@ const st = StyleSheet.create({
   captureBtnOff: { opacity: 0.4 },
   captureBtnInner: { width: 68, height: 68, borderRadius: 34 },
 
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'flex-end',
-  },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   pickerContent: {
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
     padding: SPACING.xl,
     maxHeight: '72%',
     paddingBottom: IS_IOS ? 34 : SPACING.xl,
+    borderWidth: 1,
   },
-  pickerTitle: {
-    fontSize: FONT.xxl,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
+  pickerTitle: { fontSize: FONT.xxl, fontWeight: '800', textAlign: 'center', marginBottom: SPACING.lg },
   pickerItem: { padding: SPACING.lg, borderBottomWidth: 1 },
   pickerItemOff: { opacity: 0.35 },
   pickerItemText: { fontSize: FONT.lg - 1, lineHeight: 22 },
   pickerUsed: { fontSize: FONT.xs, marginTop: SPACING.xxs + 2 },
-  pickerCancel: {
-    marginTop: SPACING.lg,
-    padding: SPACING.md + 2,
-    alignItems: 'center',
-  },
+  pickerCancel: { marginTop: SPACING.lg, padding: SPACING.md + 2, alignItems: 'center' },
   pickerCancelText: { fontSize: FONT.lg, fontWeight: '600' },
 });
