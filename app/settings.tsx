@@ -19,9 +19,7 @@ import {
 import { auth, db } from '../firebaseConfig';
 import { Language, languageNames, SUPPORTED_LANGUAGES } from '../utils/i18n';
 import { useLanguage } from '../utils/languageContext';
-
-const storage = new MMKV({ id: 'settings-storage' });
-
+import { settingsStorage } from '../utils/storage';
 export default function SettingsScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
@@ -104,7 +102,7 @@ export default function SettingsScreen() {
       }
 
       // ✅ MMKV is synchronous — no await needed
-      const savedLang = storage.getString('app_language');
+      const savedLang = settingsStorage.getString('app_language');
       if (savedLang) {
         setLanguage(savedLang as Language);
       }
@@ -257,7 +255,7 @@ export default function SettingsScreen() {
   // ── Language ───────────────────────────────────────────
   const handleLanguageChange = useCallback(async (lang: Language) => {
     // ✅ Save to MMKV synchronously
-    storage.set('app_language', lang);
+    settingsStorage.set('app_language', lang);
     await setLanguage(lang);
     setShowLanguageModal(false);
   }, [setLanguage]);

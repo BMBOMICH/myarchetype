@@ -1,3 +1,11 @@
+// ─── Web-only DOM type declarations ───────────────────────────────
+// Guarded by Platform.OS === 'web' at runtime. Avoids adding
+// "lib": ["dom"] to tsconfig which would pollute native typings.
+/* eslint-disable no-var */
+declare var window: any;
+declare var document: any;
+/* eslint-enable no-var */
+
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -20,7 +28,7 @@ import {
   Alert,
   Animated,
   AppState,
-  AppStateStatus,
+  type AppStateStatus,
   BackHandler,
   Dimensions,
   I18nManager,
@@ -44,7 +52,7 @@ import { auth } from '../firebaseConfig';
 // ─── Platform flags ───────────────────────────────────────────────
 const IS_WEB     = Platform.OS === 'web';
 const IS_IOS     = Platform.OS === 'ios';
-const IS_ANDROID = Platform.OS === 'android';
+const IS_ANDROID = Platform.OS === 'android';   // ← was missing
 const IS_RTL     = I18nManager.isRTL;
 
 // ─── Route constants ──────────────────────────────────────────────
@@ -84,7 +92,7 @@ const getScreenData = () => {
 // ─── Reduced motion (reactive) ────────────────────────────────────
 const getReducedMotion = (): boolean => {
   if (!IS_WEB || typeof window === 'undefined') return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 };
 let prefersReducedMotion = getReducedMotion();
 
@@ -165,7 +173,8 @@ const lightTokens = {
   autofillCaret:      '#2d8a9a',
 } as const;
 
-type Tokens = typeof darkTokens;
+// ← FIX: structural type so both dark & light tokens satisfy it
+type Tokens = { readonly [K in keyof typeof darkTokens]: string };
 
 // ─── Web CSS injection (theme-aware, cleans up on HMR) ────────────
 const CSS_ID       = 'login-screen-styles';
@@ -220,10 +229,8 @@ const injectWebStyles = (tokens: Tokens, theme: 'dark' | 'light') => {
     sentinel.id = META_ID;
     document.head.appendChild(sentinel);
 
-    // Title (set once, not on every theme change)
     document.title = 'Log In – MyArchetype';
 
-    // Viewport
     let vp = document.querySelector('meta[name="viewport"]');
     if (!vp) {
       vp = document.createElement('meta');
@@ -232,11 +239,9 @@ const injectWebStyles = (tokens: Tokens, theme: 'dark' | 'light') => {
     }
     vp.setAttribute('content', 'width=device-width, initial-scale=1');
 
-    // Language
     document.documentElement.lang = 'en';
     document.documentElement.dir  = 'ltr';
 
-    // Robots
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) {
       robots = document.createElement('meta');
@@ -245,7 +250,6 @@ const injectWebStyles = (tokens: Tokens, theme: 'dark' | 'light') => {
     }
     robots.setAttribute('content', 'noindex, nofollow');
 
-    // Canonical
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');
@@ -282,12 +286,17 @@ const getErrorMessage = (code?: string): string =>
   (code && ERROR_MESSAGES[code]) ?? 'An unexpected error occurred. Please try again.';
 
 // ─── Native alert utility ─────────────────────────────────────────
-type AlertButton = { text: string; onPress?: () => void; style?: string };
+// ← FIX: style uses the literal union RN expects
+type AlertButton = {
+  text: string;
+  onPress?: () => void;
+  style?: 'default' | 'cancel' | 'destructive';
+};
 
 const showNativeAlert = (
   title: string,
   message: string,
-  buttons?: AlertButton[]
+  buttons?: AlertButton[],
 ) => {
   Alert.alert(title, message, buttons ?? [{ text: 'OK' }]);
 };
@@ -375,13 +384,12 @@ function formReducer(state: FormState, action: FormAction): FormState {
     case 'SET_CAPS_LOCK':        return { ...state, capsLockOn:     action.payload };
     case 'CLEAR_ERRORS':         return { ...state, emailError: '', passwordError: '' };
     case 'CLEAR_PASSWORD':       return { ...state, password: '' };
-    // Hide password when loading so it's not visible during network request
     case 'HIDE_PASSWORD':        return { ...state, showPassword: false };
-    // Wipe only password on unmount — preserve email so back-navigation is friendly
     case 'WIPE_SENSITIVE':       return { ...state, password: '' };
     case 'RESET':                return { ...initialFormState, email: state.email };
+    // ← FIX: exhaustive check without unused variable
     default: {
-      const _: never = action;
+      void (action satisfies never);
       return state;
     }
   }
@@ -413,14 +421,13 @@ const AnimatedError = React.memo(
         translateY.setValue(-8);
         announced.current = false;
       }
-    }, [message]);
+    }, [message, opacity, translateY]);
 
     if (!message) return null;
 
     return (
       <Animated.View
         style={[s.errorRow, { opacity, transform: [{ translateY }] }]}
-        // Use live region only — no accessibilityRole="alert" to avoid double announcement
         accessibilityLiveRegion="assertive"
         {...(IS_WEB
           ? ({ 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` } as any)
@@ -435,7 +442,6 @@ const AnimatedError = React.memo(
         />
         <Text
           style={[s.errorText, { color: C.error }]}
-          // Allow font scaling for accessibility
           allowFontScaling
           maxFontSizeMultiplier={1.3}
         >
@@ -443,7 +449,7 @@ const AnimatedError = React.memo(
         </Text>
       </Animated.View>
     );
-  }
+  },
 );
 
 // ─── Pulse logo ───────────────────────────────────────────────────
@@ -461,19 +467,18 @@ const PulseLogo = React.memo(({ C, paused }: { C: Tokens; paused: boolean }) => 
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.08, duration: getAnimDuration(1800), useNativeDriver: nativeDriver }),
         Animated.timing(pulse, { toValue: 1,    duration: getAnimDuration(1800), useNativeDriver: nativeDriver }),
-      ])
+      ]),
     );
     loopRef.current = loop;
     const task = InteractionManager.runAfterInteractions(() => loop.start());
     return () => { task.cancel(); loop.stop(); };
-  }, [paused]);
+  }, [paused, pulse]);
 
   return (
     <Animated.View
       style={[s.logoOuter, { transform: [{ scale: pulse }] }]}
       accessibilityElementsHidden
       importantForAccessibility="no"
-      // Prevent screen readers from announcing the decorative logo
       accessible={false}
     >
       <LinearGradient colors={[C.accentGlow, 'transparent']} style={s.logoGlow} />
@@ -509,41 +514,38 @@ const CustomModal = React.memo(({
   const firstBtnRef   = useRef<View>(null);
   const isClosing     = useRef(false);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(200), useNativeDriver: nativeDriver }),
-      Animated.spring(scale,   { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 6 }),
-    ]).start(() => {
-      // Move focus to first button after animation
-      if (IS_WEB) {
-        setTimeout(() => (firstBtnRef.current as any)?.focus?.(), 50);
-      }
-    });
-
-    // Escape key to close on web
-    if (!IS_WEB) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') doClose(config.buttons.find(b => !b.primary && !b.danger));
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
-
   const doClose = useCallback((btn?: ModalButton) => {
     if (isClosing.current) return;
     isClosing.current = true;
     Animated.timing(opacity, {
       toValue: 0, duration: getAnimDuration(150), useNativeDriver: nativeDriver,
     }).start(async () => {
-      // Await onPress so async actions finish before modal disappears
       if (btn?.onPress) await btn.onPress();
       onClose();
     });
   }, [opacity, onClose]);
 
-  // Backdrop press closes with cancel button behaviour
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(200), useNativeDriver: nativeDriver }),
+      Animated.spring(scale,   { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 6 }),
+    ]).start(() => {
+      if (IS_WEB) {
+        setTimeout(() => (firstBtnRef.current as any)?.focus?.(), 50);
+      }
+    });
+
+    if (!IS_WEB || typeof window === 'undefined') return;
+    // ← FIX: typed as `any` — no DOM KeyboardEvent available
+    const handleKey = (e: any) => {
+      if (e.key === 'Escape') doClose(config.buttons.find((b) => !b.primary && !b.danger));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [opacity, scale, doClose, config.buttons]);
+
   const handleBackdrop = useCallback(() => {
-    const cancelBtn = config.buttons.find(b => !b.primary && !b.danger);
+    const cancelBtn = config.buttons.find((b) => !b.primary && !b.danger);
     doClose(cancelBtn);
   }, [config.buttons, doClose]);
 
@@ -555,7 +557,6 @@ const CustomModal = React.memo(({
         : {})}
       accessibilityViewIsModal
     >
-      {/* Backdrop tap area */}
       <Pressable style={StyleSheet.absoluteFillObject} onPress={handleBackdrop} accessibilityLabel="Close dialog" />
 
       <Animated.View
@@ -577,7 +578,6 @@ const CustomModal = React.memo(({
 
         <Text
           style={[s.modalMessage, { color: C.textSecondary }]}
-          // white-space:pre-wrap applied via className on web
           {...(IS_WEB ? ({ className: 'modal-message' } as any) : {})}
           allowFontScaling
           maxFontSizeMultiplier={1.3}
@@ -586,10 +586,10 @@ const CustomModal = React.memo(({
         </Text>
 
         <View style={s.modalButtons}>
-          {config.buttons.map((btn, i) => (
+          {config.buttons.map((btn, idx) => (
             <Pressable
-              key={i}
-              ref={i === 0 ? (firstBtnRef as any) : undefined}
+              key={btn.label + String(idx)}
+              ref={idx === 0 ? (firstBtnRef as any) : undefined}
               onPress={() => doClose(btn)}
               style={({ pressed }) => [
                 s.modalButton,
@@ -609,7 +609,6 @@ const CustomModal = React.memo(({
               ]}
               accessibilityRole="button"
               accessibilityLabel={btn.label}
-              // Minimum 44pt touch target
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text
@@ -677,7 +676,7 @@ const GradientButton = React.memo(({
     () => (disabled
       ? [C.disabledBg, C.disabledBg]
       : [C.buttonGradStart, C.buttonGradEnd]) as [string, string],
-    [disabled, C.disabledBg, C.buttonGradStart, C.buttonGradEnd]
+    [disabled, C.disabledBg, C.buttonGradStart, C.buttonGradEnd],
   );
 
   return (
@@ -691,7 +690,6 @@ const GradientButton = React.memo(({
         accessibilityLabel={label}
         accessibilityState={{ disabled: disabled || loading, busy: loading }}
         accessibilityHint={disabled ? 'Fill in all fields correctly to enable' : undefined}
-        // Minimum 44pt touch target
         hitSlop={disabled ? undefined : { top: 4, bottom: 4 }}
       >
         <LinearGradient
@@ -774,7 +772,7 @@ const InputField = React.memo(({
   webAutoComplete?:   string;
   returnKeyType?:     'next' | 'go';
   onSubmitEditing?:   () => void;
-  inputRef?:          React.RefObject<TextInput>;
+  inputRef?:          React.RefObject<TextInput | null>;   // ← FIX: accept null
   editable?:          boolean;
   accessibilityLabel: string;
   inputId:            string;
@@ -789,9 +787,9 @@ const InputField = React.memo(({
     Animated.timing(borderAnim, {
       toValue:         focused ? 1 : 0,
       duration:        getAnimDuration(200),
-      useNativeDriver: false, // must be false for color interpolation
+      useNativeDriver: false,
     }).start();
-  }, [focused]);
+  }, [focused, borderAnim]);
 
   const animatedBorderColor = borderAnim.interpolate({
     inputRange:  [0, 1],
@@ -803,7 +801,6 @@ const InputField = React.memo(({
 
   return (
     <View style={s.inputContainer}>
-      {/* Label — visible but hidden from screen reader; input has accessibilityLabel */}
       <Text
         style={[
           s.inputLabel,
@@ -841,7 +838,7 @@ const InputField = React.memo(({
 
         {IS_WEB ? (
           <TextInput
-            ref={inputRef}
+            ref={inputRef as React.RefObject<TextInput>}
             nativeID={inputId}
             style={webInputStyle as any}
             placeholder={placeholder}
@@ -869,7 +866,7 @@ const InputField = React.memo(({
           />
         ) : (
           <TextInput
-            ref={inputRef}
+            ref={inputRef as React.RefObject<TextInput>}
             nativeID={inputId}
             accessibilityLabelledBy={inputId}
             style={[s.inputNative, { color: C.textPrimary }]}
@@ -938,14 +935,13 @@ const LockoutBanner = React.memo(({ seconds, C }: { seconds: number; C: Tokens }
       duration:        getAnimDuration(200),
       useNativeDriver: nativeDriver,
     }).start();
-  }, [seconds]);
+  }, [seconds, opacity]);
 
-  // Announce updated countdown every 10s to avoid spamming screen readers
   useEffect(() => {
     if (seconds <= 0 || seconds % 10 !== 0) return;
     if (!IS_WEB) {
       AccessibilityInfo.announceForAccessibility(
-        `Too many attempts. Try again in ${seconds} seconds.`
+        `Too many attempts. Try again in ${seconds} seconds.`,
       );
     }
   }, [seconds]);
@@ -995,7 +991,7 @@ const SuccessOverlay = React.memo(({ C, secondsLeft }: { C: Tokens; secondsLeft:
     if (!IS_WEB) {
       AccessibilityInfo.announceForAccessibility('Login successful. Welcome back!');
     }
-  }, []);
+  }, [opacity, scale, iconScale]);
 
   return (
     <Animated.View
@@ -1036,17 +1032,18 @@ class LoginErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
 > {
-  state = { hasError: false };
+  // ← FIX: add `override` modifiers
+  override state = { hasError: false };
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
+  override componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[LoginScreen] Uncaught error:', error, info);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <View style={[s.errorFallback, { backgroundColor: darkTokens.bg }]}>
@@ -1094,18 +1091,18 @@ export default function LoginScreen() {
   const router      = useRouter();
   const colorScheme = useColorScheme();
   const isDark      = colorScheme !== 'light';
+  // ← FIX: widen type so both token sets are assignable
   const C: Tokens   = isDark ? darkTokens : lightTokens;
 
-  // Inject web CSS whenever theme changes
   useEffect(() => {
     injectWebStyles(C, isDark ? 'dark' : 'light');
-  }, [isDark]);
+  }, [C, isDark]);
 
-  // React to OS reduced-motion changes
+  // ← FIX: typed as `any` instead of `MediaQueryListEvent`
   useEffect(() => {
     if (!IS_WEB || typeof window === 'undefined') return;
     const mq      = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handler = (e: MediaQueryListEvent) => { prefersReducedMotion = e.matches; };
+    const handler = (e: any) => { prefersReducedMotion = e.matches; };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
@@ -1114,7 +1111,7 @@ export default function LoginScreen() {
   const [screenData, setSD]       = useState(getScreenData);
   const [showSuccess, setSuccess] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(
-    Math.ceil(SUCCESS_NAV_DELAY_MS / 1000)
+    Math.ceil(SUCCESS_NAV_DELAY_MS / 1000),
   );
   const [modal, setModal]         = useState<ModalConfig | null>(null);
   const [appActive, setAppActive] = useState(true);
@@ -1131,7 +1128,6 @@ export default function LoginScreen() {
   const typingTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping          = useRef(false);
 
-  // Per-action rate limits
   const resendAttempts    = useRef(0);
   const resendLockUntil   = useRef(0);
   const forgotAttempts    = useRef(0);
@@ -1139,7 +1135,6 @@ export default function LoginScreen() {
 
   const { shakeAnim, shake } = useShake();
 
-  // Entrance animations
   const fadeAnim    = useRef(new Animated.Value(0)).current;
   const slideAnim   = useRef(new Animated.Value(prefersReducedMotion ? 0 : 40)).current;
   const headerFade  = useRef(new Animated.Value(0)).current;
@@ -1157,14 +1152,13 @@ export default function LoginScreen() {
       if (navTimeout.current)    clearTimeout(navTimeout.current);
       if (typingTimer.current)   clearTimeout(typingTimer.current);
       if (successTimer.current)  clearInterval(successTimer.current);
-      // Wipe password only — preserve email for back-navigation UX
       dispatch({ type: 'WIPE_SENSITIVE' });
     };
   }, []);
 
   // ── Responsive resize (debounced) ────────────────────────────────
   useEffect(() => {
-    if (!IS_WEB) return;
+    if (!IS_WEB || typeof window === 'undefined') return;
     const handler = debounce(() => setSD(getScreenData()), RESIZE_DEBOUNCE_MS);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
@@ -1173,8 +1167,8 @@ export default function LoginScreen() {
   // ── AppState — pause logo when backgrounded ──────────────────────
   useEffect(() => {
     if (IS_WEB) return;
-    const sub = AppState.addEventListener('change', (s: AppStateStatus) => {
-      setAppActive(s === 'active');
+    const sub = AppState.addEventListener('change', (status: AppStateStatus) => {
+      setAppActive(status === 'active');
     });
     return () => sub.remove();
   }, []);
@@ -1210,6 +1204,8 @@ export default function LoginScreen() {
       ]).start();
     });
     return () => task.cancel();
+    // Animated values are stable refs — intentionally run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Lockout countdown ────────────────────────────────────────────
@@ -1252,13 +1248,14 @@ export default function LoginScreen() {
   const showAppAlert = useCallback((
     title: string,
     message: string,
-    buttons?: AlertButton[]
+    buttons?: AlertButton[],
   ) => {
     if (IS_WEB) {
       openModal({
         title,
         message,
-        buttons: (buttons ?? [{ text: 'OK' }]).map((b, i, arr) => ({
+        // ← FIX: `_` for unused index (needed to reach `arr`)
+        buttons: (buttons ?? [{ text: 'OK' }]).map((b, _, arr) => ({
           label:   b.text,
           onPress: b.onPress,
           primary: b.style !== 'cancel' && arr.length > 1,
@@ -1294,7 +1291,7 @@ export default function LoginScreen() {
       !state.loading     && state.lockoutSeconds === 0
     ),
     [state.email, state.password, state.emailError, state.passwordError,
-     state.loading, state.lockoutSeconds]
+     state.loading, state.lockoutSeconds],
   );
 
   // ── Focus handlers ───────────────────────────────────────────────
@@ -1303,7 +1300,6 @@ export default function LoginScreen() {
   const onPasswordFocus = useCallback(() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true  }), []);
   const onPasswordBlur  = useCallback(() => {
     dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false });
-    // Hide password when leaving the field
     dispatch({ type: 'HIDE_PASSWORD' });
   }, []);
   const togglePassword  = useCallback(() => dispatch({ type: 'TOGGLE_PASSWORD' }), []);
@@ -1331,103 +1327,89 @@ export default function LoginScreen() {
   const signInUser = useCallback(
     (email: string, password: string) =>
       signInWithEmailAndPassword(auth, email, password),
-    []
+    [],
   );
 
   // ── Login ────────────────────────────────────────────────────────
-const handleLogin = useCallback(async () => {
-  dismissKeyboard();
-  dispatch({ type: 'CLEAR_ERRORS' });
+  const handleLogin = useCallback(async () => {
+    dismissKeyboard();
+    dispatch({ type: 'CLEAR_ERRORS' });
 
-  const email    = state.email.trim().toLowerCase();
-  const password = state.password;
+    const email    = state.email.trim().toLowerCase();
+    const password = state.password;
 
-  const emailErr    = validators.email(email);
-  const passwordErr = validators.password(password);
+    const emailErr    = validators.email(email);
+    const passwordErr = validators.password(password);
 
-  if (emailErr)    { dispatch({ type: 'SET_EMAIL_ERROR',    payload: emailErr    }); shake(); return; }
-  if (passwordErr) { dispatch({ type: 'SET_PASSWORD_ERROR', payload: passwordErr }); shake(); return; }
+    if (emailErr)    { dispatch({ type: 'SET_EMAIL_ERROR',    payload: emailErr    }); shake(); return; }
+    if (passwordErr) { dispatch({ type: 'SET_PASSWORD_ERROR', payload: passwordErr }); shake(); return; }
 
-  if (Date.now() < lockoutUntil.current) { startLockoutCountdown(); shake(); return; }
+    if (Date.now() < lockoutUntil.current) { startLockoutCountdown(); shake(); return; }
 
-  dispatch({ type: 'SET_LOADING', payload: true });
-  dispatch({ type: 'HIDE_PASSWORD' });
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'HIDE_PASSWORD' });
 
-  try {
-    const { user } = await signInUser(email, password);
+    try {
+      const { user } = await signInUser(email, password);
 
-    if (!user.emailVerified) {
-      await auth.signOut();
+      if (!user.emailVerified) {
+        await auth.signOut();
+        if (!isMounted.current) return;
+
+        dispatch({ type: 'SET_LOADING', payload: false });
+        shake();
+
+        await new Promise<void>((resolve) => {
+          showAppAlert(
+            'Email Not Verified',
+            'Please verify your email before logging in.\n\nCheck your inbox (and spam folder).',
+            [{ text: 'OK', onPress: () => resolve() }],
+          );
+        });
+        return;
+      }
+
+      loginAttempts.current = 0;
+      if (lockoutTimer.current) {
+        clearInterval(lockoutTimer.current);
+        lockoutTimer.current = null;
+      }
+      triggerHaptic('success');
+      dispatch({ type: 'CLEAR_PASSWORD' });
+
       if (!isMounted.current) return;
-
-      // ── Stop loading FIRST, then show alert ──────────────────
-      // Do NOT navigate — wait for user to dismiss the alert
       dispatch({ type: 'SET_LOADING', payload: false });
+      setSuccess(true);
+      startSuccessCountdown();
+
+      navTimeout.current = setTimeout(() => {
+        if (isMounted.current) router.replace(ROUTES.HOME);
+      }, getAnimDuration(SUCCESS_NAV_DELAY_MS));
+
+    } catch (error: any) {
+      loginAttempts.current += 1;
+      if (loginAttempts.current >= MAX_LOGIN_ATTEMPTS) {
+        lockoutUntil.current  = Date.now() + LOCKOUT_DURATION_MS;
+        loginAttempts.current = 0;
+        startLockoutCountdown();
+      }
+      triggerHaptic('error');
       shake();
 
-      // Use a promise so we wait for the user to press OK
-      // before doing anything else
-      await new Promise<void>((resolve) => {
-        showAppAlert(
-          'Email Not Verified',
-          'Please verify your email before logging in.\n\nCheck your inbox (and spam folder).',
-          [
-            {
-              text: 'OK',
-              onPress: () => resolve(),
-            },
-          ]
-        );
-      });
+      if (!isMounted.current) return;
 
-      // After user dismisses — do nothing, just return
-      // User stays on login screen
-      return;
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        dispatch({ type: 'CLEAR_PASSWORD' });
+        setTimeout(() => passwordRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
+      } else if (error.code === 'auth/invalid-email') {
+        setTimeout(() => emailRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
+      }
+
+      showAppAlert('Login Failed', getErrorMessage(error.code));
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-
-    // ── Email is verified — proceed with login ────────────────
-    loginAttempts.current = 0;
-    if (lockoutTimer.current) {
-      clearInterval(lockoutTimer.current);
-      lockoutTimer.current = null;
-    }
-    triggerHaptic('success');
-
-    dispatch({ type: 'CLEAR_PASSWORD' });
-
-    if (!isMounted.current) return;
-    dispatch({ type: 'SET_LOADING', payload: false });
-    setSuccess(true);
-    startSuccessCountdown();
-
-    navTimeout.current = setTimeout(() => {
-      if (isMounted.current) router.replace(ROUTES.HOME);
-    }, getAnimDuration(SUCCESS_NAV_DELAY_MS));
-
-  } catch (error: any) {
-    loginAttempts.current += 1;
-    if (loginAttempts.current >= MAX_LOGIN_ATTEMPTS) {
-      lockoutUntil.current  = Date.now() + LOCKOUT_DURATION_MS;
-      loginAttempts.current = 0;
-      startLockoutCountdown();
-    }
-    triggerHaptic('error');
-    shake();
-
-    if (!isMounted.current) return;
-
-    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-      dispatch({ type: 'CLEAR_PASSWORD' });
-      setTimeout(() => passwordRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
-    } else if (error.code === 'auth/invalid-email') {
-      setTimeout(() => emailRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
-    }
-
-    showAppAlert('Login Failed', getErrorMessage(error.code));
-    dispatch({ type: 'SET_LOADING', payload: false });
-  }
-}, [state.email, state.password, router, dismissKeyboard,
-    startLockoutCountdown, startSuccessCountdown, shake, showAppAlert, signInUser]);
+  }, [state.email, state.password, router, dismissKeyboard,
+      startLockoutCountdown, startSuccessCountdown, shake, showAppAlert, signInUser]);
 
   // ── Resend verification (rate-limited) ───────────────────────────
   const handleResendVerification = useCallback(async () => {
@@ -1440,7 +1422,6 @@ const handleLogin = useCallback(async () => {
     if (!password) { showAppAlert('Password Required', 'Please enter your password to verify identity.'); return; }
     if (validators.email(email)) { showAppAlert('Invalid Email', 'Please enter a valid email address.'); return; }
 
-    // Rate limit resend
     if (Date.now() < resendLockUntil.current) {
       const secs = Math.ceil((resendLockUntil.current - Date.now()) / 1000);
       showAppAlert('Please Wait', `You can resend again in ${secs} seconds.`);
@@ -1468,7 +1449,7 @@ const handleLogin = useCallback(async () => {
       if (isMounted.current)
         showAppAlert(
           'Verification Email Sent',
-          `A new verification email has been sent to:\n${email}\n\nCheck your inbox and spam folder.`
+          `A new verification email has been sent to:\n${email}\n\nCheck your inbox and spam folder.`,
         );
     } catch (error: any) {
       if (isMounted.current) showAppAlert('Error', getErrorMessage(error.code));
@@ -1491,7 +1472,6 @@ const handleLogin = useCallback(async () => {
       return;
     }
 
-    // Rate limit forgot password
     if (Date.now() < forgotLockUntil.current) {
       const secs = Math.ceil((forgotLockUntil.current - Date.now()) / 1000);
       showAppAlert('Please Wait', `You can request another reset in ${secs} seconds.`);
@@ -1509,7 +1489,7 @@ const handleLogin = useCallback(async () => {
       'Reset Password',
       `Send password reset email to:\n${email}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' as const },
         {
           text: 'Send Reset Email',
           onPress: async () => {
@@ -1526,7 +1506,7 @@ const handleLogin = useCallback(async () => {
             }
           },
         },
-      ]
+      ],
     );
   }, [state.email, dismissKeyboard, showAppAlert]);
 
@@ -1536,7 +1516,7 @@ const handleLogin = useCallback(async () => {
   const IS_SMALL = screenData.isSmall;
 
   // ── Memoized inner props ─────────────────────────────────────────
-  const innerContentProps = useMemo(() => ({
+  const innerContentProps: InnerContentProps = useMemo(() => ({
     C, state, IS_SMALL,
     fadeAnim, slideAnim, headerFade, headerSlide,
     formFade, formSlide, footerFade,
@@ -1546,12 +1526,14 @@ const handleLogin = useCallback(async () => {
     togglePassword, handleLogin, handleEmailSubmit,
     handleForgotPassword, handleResendVerification, handleSignUp,
     handleKeyPress,
-    logoPaused: state.emailFocused || state.passwordFocused || isTyping.current || !appActive,
+    logoPaused: state.emailFocused || state.passwordFocused || !appActive,
   }), [
     C, IS_SMALL, canSubmit, appActive,
     state.email, state.password, state.emailError, state.passwordError,
     state.showPassword, state.emailFocused, state.passwordFocused,
     state.loading, state.lockoutSeconds, state.capsLockOn,
+    fadeAnim, slideAnim, headerFade, headerSlide,
+    formFade, formSlide, footerFade, shakeAnim,
     validateEmail, validatePassword,
     onEmailFocus, onEmailBlur, onPasswordFocus, onPasswordBlur,
     togglePassword, handleLogin, handleEmailSubmit,
@@ -1613,7 +1595,6 @@ const handleLogin = useCallback(async () => {
               </Pressable>
             )}
 
-            {/* Loading overlay */}
             {state.loading && !showSuccess && (
               <View
                 style={[s.loadingOverlay, { backgroundColor: C.overlay }]}
@@ -1662,8 +1643,8 @@ type InnerContentProps = {
   formFade:             Animated.Value;
   formSlide:            Animated.Value;
   footerFade:           Animated.Value;
-  emailRef:             React.RefObject<TextInput>;
-  passwordRef:          React.RefObject<TextInput>;
+  emailRef:             React.RefObject<TextInput | null>;     // ← FIX
+  passwordRef:          React.RefObject<TextInput | null>;     // ← FIX
   canSubmit:            boolean;
   shakeAnim:            Animated.Value;
   logoPaused:           boolean;
@@ -1764,7 +1745,6 @@ const InnerContent = React.memo(({
         accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress}
       />
 
-      {/* Caps lock warning — web only */}
       {IS_WEB && state.capsLockOn && state.passwordFocused && (
         <View
           style={[s.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]}
@@ -1856,7 +1836,6 @@ const s = StyleSheet.create({
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: 40 },
   content:       { width: '100%', alignSelf: 'center' },
 
-  // Header
   headerContainer: { alignItems: 'center' },
   logoOuter: {
     width: 100, height: 100,
@@ -1871,21 +1850,18 @@ const s = StyleSheet.create({
   title:    { fontWeight: '800', marginBottom: 8, letterSpacing: 0.3 },
   subtitle: { textAlign: 'center', lineHeight: 22 },
 
-  // Lockout
   lockoutBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 16,
   },
   lockoutText: { fontSize: 13, fontWeight: '600', flex: 1 },
 
-  // Form card
   formCard: {
     borderRadius: 24, borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.4, shadowRadius: 24, elevation: 14,
   },
 
-  // Input
   inputContainer: { marginBottom: 22 },
   inputLabel: {
     fontSize: 12, fontWeight: '700', marginBottom: 8, marginLeft: 4,
@@ -1902,25 +1878,21 @@ const s = StyleSheet.create({
   inputNative: { flex: 1, fontSize: 16, paddingVertical: IS_IOS ? 16 : 13, letterSpacing: 0.2, backgroundColor: 'transparent' },
   eyeButton:   { padding: 8, marginLeft: 4, borderRadius: 20 },
 
-  // Caps lock
   capsLockRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     padding: 8, borderRadius: 8, borderWidth: 1, marginBottom: 12, marginTop: -8,
   },
   capsLockText: { fontSize: 12, fontWeight: '600' },
 
-  // Error
   errorRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 6, marginLeft: 4, gap: 5 },
   errorText: { fontSize: 12, fontWeight: '500', flex: 1 },
 
-  // Forgot
   forgotInline: {
     alignSelf: 'flex-end', marginBottom: 24, marginTop: 8,
     paddingVertical: 8, paddingHorizontal: 8,
   },
   forgotInlineText: { fontSize: 13, fontWeight: '600' },
 
-  // Button
   buttonOuter: {
     width: '100%', borderRadius: 16,
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 8,
@@ -1934,7 +1906,6 @@ const s = StyleSheet.create({
   buttonText:     { color: '#ffffff', fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
   buttonIcon:     { marginTop: 1 },
 
-  // Footer
   footer: { alignItems: 'center', marginTop: 28 },
   secondaryButton: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1952,7 +1923,6 @@ const s = StyleSheet.create({
   signUpText:    { fontSize: 15, lineHeight: 22 },
   signUpLink:    { fontWeight: '700' },
 
-  // Loading overlay
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center', zIndex: 10,
@@ -1964,7 +1934,6 @@ const s = StyleSheet.create({
   },
   loadingText: { fontSize: 14, fontWeight: '500' },
 
-  // Success overlay
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center', zIndex: 20,
@@ -1977,8 +1946,7 @@ const s = StyleSheet.create({
   successText: { fontSize: 22, fontWeight: '800' },
   successSub:  { fontSize: 14, fontWeight: '500', marginTop: -8 },
 
-  // Custom modal
-  modalOverlay: {
+    modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center', zIndex: 30, padding: 24,
   },
@@ -1993,7 +1961,6 @@ const s = StyleSheet.create({
   modalButton:     { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, borderWidth: 1 },
   modalButtonText: { fontSize: 14 },
 
-  // Error boundary
   errorFallback:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
   errorFallbackTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   errorFallbackSub:   { fontSize: 15, textAlign: 'center', lineHeight: 22 },

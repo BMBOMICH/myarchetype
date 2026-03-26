@@ -1,5 +1,5 @@
-import CryptoJS from 'crypto-js';
 import { AudioModule, RecordingPresets, useAudioPlayer, useAudioRecorder } from 'expo-audio';
+import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -97,12 +97,84 @@ interface MatchData {
   lifestyle?: any;
 }
 
-// ============ HELPERS (outside component) ============
-const generateChatEncryptionKey = (chatId: string): string => {
+// ============ ENCRYPTION HELPERS ============
+const generateChatEncryptionKey = async (chatId: string): Promise<string> => {
   const salt = 'MyArchetype-Secure-Salt-2026-v2';
-  return CryptoJS.SHA256(chatId + salt).toString();
+  return await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    chatId + salt
+  );
 };
 
+const encryptMessage = async (text: string, key: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+
+  const keyHash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    key,
+    { encoding: Crypto.CryptoEncoding.BASE64 }
+  );
+
+  const keyBytes = Uint8Array.from(atob(keyHash), c => c.charCodeAt(0)).slice(0, 32);
+  const iv = Crypto.getRandomBytes(12);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    data
+  );
+
+  const combined = new Uint8Array(iv.length + new Uint8Array(encrypted).length);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+};
+
+const decryptMessage = async (encryptedBase64: string, key: string): Promise<string> => {
+  try {
+    const keyHash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      key,
+      { encoding: Crypto.CryptoEncoding.BASE64 }
+    );
+
+    const keyBytes = Uint8Array.from(atob(keyHash), c => c.charCodeAt(0)).slice(0, 32);
+    const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      cryptoKey,
+      ciphertext
+    );
+
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    return '[Unable to decrypt]';
+  }
+};
+
+// ============ OTHER HELPERS ============
 const formatDuration = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -130,7 +202,6 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
-// Stable waveform heights (generated once, not on every render)
 const WAVEFORM_BARS = Array.from({ length: 12 }, () => 8 + Math.random() * 20);
 
 // ============ MAIN COMPONENT ============
@@ -141,7 +212,13 @@ export default function ChatScreen() {
 
   const user = auth.currentUser;
   const chatId = useMemo(() => [user?.uid, matchId].sort().join('_'), [user?.uid, matchId]);
-  const ENCRYPTION_KEY = useMemo(() => generateChatEncryptionKey(chatId), [chatId]);
+
+  // Encryption key (async)
+  const [ENCRYPTION_KEY, setEncryptionKey] = useState<string>('');
+
+  useEffect(() => {
+    generateChatEncryptionKey(chatId).then(setEncryptionKey);
+  }, [chatId]);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
@@ -172,7 +249,6 @@ export default function ChatScreen() {
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [waitingForVoiceUri, setWaitingForVoiceUri] = useState(false);
 
-  // expo-audio hooks
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const audioPlayer = useAudioPlayer(null);
 
@@ -218,12 +294,10 @@ export default function ChatScreen() {
 
   // ============ EFFECTS ============
 
-  // Request audio permissions on mount
   useEffect(() => {
     AudioModule.requestRecordingPermissionsAsync().catch(() => {});
   }, []);
 
-  // Load chat settings and initial data
   useEffect(() => {
     const loadChatData = async () => {
       const [settings, pinned, disappearing, note] = await Promise.all([
@@ -245,7 +319,6 @@ export default function ChatScreen() {
     loadChatData();
   }, [chatId, matchId]);
 
-  // Load my location
   useEffect(() => {
     const loadMyLocation = async () => {
       if (!user) return;
@@ -255,12 +328,10 @@ export default function ChatScreen() {
     loadMyLocation();
   }, [user]);
 
-  // Auto-open date planner if param set
   useEffect(() => {
     if (showDatePlannerParam === 'true') setShowDatePlannerModal(true);
   }, [showDatePlannerParam]);
 
-  // Listen to match data
   useEffect(() => {
     if (!matchId) return;
 
@@ -278,7 +349,6 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [matchId]);
 
-  // Listen for typing indicator
   useEffect(() => {
     if (!matchId || !user) return;
 
@@ -296,7 +366,6 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [matchId, user, chatId]);
 
-  // Check rating prompt
   useEffect(() => {
     const checkRatingPrompt = async () => {
       if (!user || !matchId) return;
@@ -308,7 +377,7 @@ export default function ChatScreen() {
 
   // Listen to messages
   useEffect(() => {
-    if (!user || !matchId) return;
+    if (!user || !matchId || !ENCRYPTION_KEY) return;
 
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
@@ -317,15 +386,11 @@ export default function ChatScreen() {
       const loadedMessages: Message[] = [];
       const unreadMessages: string[] = [];
 
-      snapshot.forEach((docSnap) => {
+      for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
         let decryptedText = '';
         if (data.encryptedText) {
-          try {
-            decryptedText = CryptoJS.AES.decrypt(data.encryptedText, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
-          } catch {
-            decryptedText = '[Unable to decrypt]';
-          }
+          decryptedText = await decryptMessage(data.encryptedText, ENCRYPTION_KEY);
         }
 
         if (data.senderId !== user.uid && !data.read && chatSettings?.readReceiptsEnabled !== false) {
@@ -346,7 +411,7 @@ export default function ChatScreen() {
           reactions: data.reactions || [],
           isPinned: pinnedMessages.some((p) => p.messageId === docSnap.id),
         });
-      });
+      }
 
       setMessages(loadedMessages);
       setLoading(false);
@@ -370,7 +435,6 @@ export default function ChatScreen() {
     return () => unsubscribe();
   }, [user, matchId, ENCRYPTION_KEY, chatSettings?.readReceiptsEnabled, pinnedMessages]);
 
-  // Handle voice URI after recording stops
   useEffect(() => {
     if (waitingForVoiceUri && audioRecorder.uri) {
       setWaitingForVoiceUri(false);
@@ -378,7 +442,6 @@ export default function ChatScreen() {
     }
   }, [waitingForVoiceUri, audioRecorder.uri]);
 
-  // Detect audio playback end
   useEffect(() => {
     if (!playingAudio) return;
     const check = setInterval(() => {
@@ -389,7 +452,6 @@ export default function ChatScreen() {
     return () => clearInterval(check);
   }, [playingAudio, audioPlayer]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -398,7 +460,7 @@ export default function ChatScreen() {
     };
   }, []);
 
-  // ============ NOTIFICATION HELPER ============
+    // ============ NOTIFICATION HELPER ============
   const sendPushNotification = useCallback(
     async (messagePreview: string) => {
       if (!matchData?.pushToken || matchOnline || !user) return;
@@ -450,7 +512,7 @@ export default function ChatScreen() {
   // ============ SEND MESSAGE ============
 
   const sendMessage = useCallback(async () => {
-    if (!newMessage.trim() || !user || sending) return;
+    if (!newMessage.trim() || !user || sending || !ENCRYPTION_KEY) return;
     const messageText = newMessage.trim();
     setNewMessage('');
     setSending(true);
@@ -458,7 +520,7 @@ export default function ChatScreen() {
     updateTypingStatus(false);
 
     try {
-      const encryptedText = CryptoJS.AES.encrypt(messageText, ENCRYPTION_KEY).toString();
+      const encryptedText = await encryptMessage(messageText, ENCRYPTION_KEY);
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         encryptedText,
         senderId: user.uid,
@@ -599,7 +661,6 @@ export default function ChatScreen() {
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration((prev) => {
           if (prev >= 60) {
-            // Auto-stop at 60 seconds - clear interval, flag stop
             if (recordingTimerRef.current) {
               clearInterval(recordingTimerRef.current);
               recordingTimerRef.current = null;
@@ -700,11 +761,11 @@ export default function ChatScreen() {
 
   const sendGif = useCallback(
     async (gif: GiphyGif) => {
-      if (!user) return;
+      if (!user || !ENCRYPTION_KEY) return;
       setShowGifPicker(false);
       setSending(true);
       try {
-        const encryptedText = CryptoJS.AES.encrypt('[GIF]', ENCRYPTION_KEY).toString();
+        const encryptedText = await encryptMessage('[GIF]', ENCRYPTION_KEY);
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
           encryptedText,
           senderId: user.uid,
@@ -881,7 +942,7 @@ export default function ChatScreen() {
   }, []);
 
   const startCall = useCallback(async () => {
-    if (!user || !matchId) return;
+    if (!user || !matchId || !ENCRYPTION_KEY) return;
     const roomName = `myarchetype-${chatId}`;
     const jitsiUrl = callType === 'video'
       ? `https://meet.jit.si/${roomName}`
@@ -890,7 +951,7 @@ export default function ChatScreen() {
     const callMessage = `${callIcon} ${callType === 'video' ? 'Video' : 'Audio'} call started!\n\nJoin here: ${jitsiUrl}`;
 
     try {
-      const encryptedText = CryptoJS.AES.encrypt(callMessage, ENCRYPTION_KEY).toString();
+      const encryptedText = await encryptMessage(callMessage, ENCRYPTION_KEY);
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         encryptedText,
         senderId: user.uid,
@@ -1031,7 +1092,7 @@ export default function ChatScreen() {
     [selectedMessage, pinnedMessages, handleTranslateMessage, handlePinMessage, handleUnpinMessage]
   );
 
-  // ============ RENDER MESSAGE ============
+    // ============ RENDER MESSAGE ============
 
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => {
@@ -1129,7 +1190,7 @@ export default function ChatScreen() {
   const ageBadge = useMemo(() => getAgeVerificationLevel(matchData?.ageVerification), [matchData?.ageVerification]);
   const wallpaperStyle = useMemo(() => getWallpaperStyle(chatSettings?.wallpaper || null), [chatSettings?.wallpaper]);
 
-    // ============ MAIN RENDER ============
+  // ============ MAIN RENDER ============
 
   return (
     <KeyboardAvoidingView
@@ -1716,7 +1777,7 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
-      {/* Report Modal (cross-platform replacement for Alert.prompt) */}
+      {/* Report Modal */}
       <Modal visible={showReportModal} transparent animationType="fade" onRequestClose={() => setShowReportModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.promptContainer}>
@@ -1764,18 +1825,7 @@ export default function ChatScreen() {
 // ============ STYLES ============
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a2e' },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    paddingTop: 50,
-    backgroundColor: '#16213e',
-    borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, paddingTop: 50, backgroundColor: '#16213e', borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   backButtonContainer: { width: 70 },
   backButton: { color: '#53a8b6', fontSize: 16 },
   headerCenter: { flex: 1, alignItems: 'center' },
@@ -1792,43 +1842,20 @@ const styles = StyleSheet.create({
   typingText: { color: '#53a8b6', fontSize: 11, marginTop: 2, fontStyle: 'italic' },
   menuButton: { width: 70, alignItems: 'flex-end', padding: 5 },
   menuButtonText: { fontSize: 24, color: '#888', fontWeight: 'bold' },
-
-  // Quick Actions
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    backgroundColor: '#16213e',
-    borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
-  },
+  quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingVertical: 10, backgroundColor: '#16213e', borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   quickActionButton: { backgroundColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
   quickActionText: { fontSize: 18 },
-
-  // Pinned Bar
   pinnedBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f3460', padding: 10, gap: 10 },
   pinnedBarIcon: { fontSize: 16 },
   pinnedBarText: { flex: 1, color: '#aaa', fontSize: 13 },
   pinnedBarCount: { color: '#53a8b6', fontSize: 12 },
-
-  // Rating Banner
-  ratingBanner: {
-    backgroundColor: '#e67e22',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 15,
-  },
+  ratingBanner: { backgroundColor: '#e67e22', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 15 },
   ratingBannerContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   ratingBannerIcon: { fontSize: 24, marginRight: 12 },
   ratingBannerTextContainer: { flex: 1 },
   ratingBannerTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
   ratingBannerSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 },
   ratingBannerArrow: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-
-  // Loading & Empty
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#aaa', fontSize: 16, marginTop: 15 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
@@ -1836,8 +1863,6 @@ const styles = StyleSheet.create({
   emptyText: { color: '#888', fontSize: 16, textAlign: 'center', lineHeight: 24, marginBottom: 20 },
   starterPromptButton: { backgroundColor: '#0f3460', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
   starterPromptText: { color: '#53a8b6', fontSize: 14, fontWeight: '600' },
-
-  // Messages
   messagesList: { padding: 15 },
   messageBubble: { maxWidth: '75%', padding: 12, borderRadius: 18, marginBottom: 10 },
   myMessage: { alignSelf: 'flex-end', backgroundColor: '#53a8b6', borderBottomRightRadius: 4 },
@@ -1847,16 +1872,12 @@ const styles = StyleSheet.create({
   messageImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 8 },
   gifBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#9b59b6', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8 },
   gifBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-
-  // Voice
   voiceMessageContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   voicePlayButton: { fontSize: 24 },
   voiceWaveform: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
   voiceBar: { width: 3, borderRadius: 2 },
   voiceDuration: { color: '#888', fontSize: 12 },
   voiceDurationMe: { color: 'rgba(255,255,255,0.7)' },
-
-  // Text
   messageText: { color: '#eee', fontSize: 16, lineHeight: 22 },
   myMessageText: { color: '#fff' },
   translationContainer: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
@@ -1864,21 +1885,15 @@ const styles = StyleSheet.create({
   translatedText: { fontStyle: 'italic' },
   translatingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   translatingText: { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
-
-  // Reactions
   reactionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 8 },
   reactionBubble: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, gap: 4 },
   reactionBubbleActive: { backgroundColor: 'rgba(83,168,182,0.4)' },
   reactionEmoji: { fontSize: 14 },
   reactionCount: { color: '#fff', fontSize: 11 },
-
-  // Footer
   messageFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4 },
   messageTime: { color: '#888', fontSize: 11 },
   myMessageTime: { color: 'rgba(255,255,255,0.7)' },
   readReceipt: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
-
-  // Typing
   typingIndicatorContainer: { paddingHorizontal: 15, paddingBottom: 5 },
   typingBubble: { alignSelf: 'flex-start', backgroundColor: '#16213e', borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 12 },
   typingDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -1886,8 +1901,6 @@ const styles = StyleSheet.create({
   typingDot1: { opacity: 0.4 },
   typingDot2: { opacity: 0.7 },
   typingDot3: { opacity: 1 },
-
-  // Upload & Recording
   uploadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: '#16213e' },
   uploadingText: { color: '#53a8b6', marginLeft: 10, fontSize: 14 },
   recordingContainer: { flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#d9534f', gap: 10 },
@@ -1897,8 +1910,6 @@ const styles = StyleSheet.create({
   cancelRecordText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   stopRecordButton: { backgroundColor: '#fff', paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20 },
   stopRecordText: { color: '#d9534f', fontSize: 14, fontWeight: '600' },
-
-  // Input
   inputContainer: { flexDirection: 'row', padding: 15, backgroundColor: '#16213e', borderTopWidth: 1, borderTopColor: '#0f3460', alignItems: 'flex-end' },
   mediaButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
   mediaButtonText: { fontSize: 22 },
@@ -1908,11 +1919,7 @@ const styles = StyleSheet.create({
   sendButton: { backgroundColor: '#53a8b6', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20, justifyContent: 'center' },
   sendButtonDisabled: { backgroundColor: '#555' },
   sendButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-
-  // Modal Overlay
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-
-  // Menu
   menuContainer: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 30, width: '100%', position: 'absolute', bottom: 0, maxHeight: '80%' },
   menuTitle: { color: '#888', fontSize: 14, textAlign: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
@@ -1921,19 +1928,13 @@ const styles = StyleSheet.create({
   menuItemTextDestructive: { color: '#d9534f' },
   menuCancelButton: { marginTop: 10, marginHorizontal: 15, padding: 16, backgroundColor: '#16213e', borderRadius: 12, alignItems: 'center' },
   menuCancelText: { color: '#53a8b6', fontSize: 16, fontWeight: '600' },
-
-  // Message Options
   messageOptionsContainer: { backgroundColor: '#16213e', borderRadius: 20, padding: 10, flexDirection: 'row', gap: 15 },
   messageOption: { alignItems: 'center', padding: 10 },
   messageOptionIcon: { fontSize: 24, marginBottom: 4 },
   messageOptionText: { color: '#eee', fontSize: 12 },
-
-  // Reaction Picker
   reactionPicker: { flexDirection: 'row', backgroundColor: '#16213e', borderRadius: 30, padding: 10, gap: 8 },
   reactionPickerItem: { padding: 8 },
   reactionPickerEmoji: { fontSize: 28 },
-
-  // Full Modal
   fullModal: { flex: 1, backgroundColor: '#1a1a2e' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 50, backgroundColor: '#16213e', borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   modalClose: { fontSize: 24, color: '#d9534f', fontWeight: 'bold' },
@@ -1941,8 +1942,6 @@ const styles = StyleSheet.create({
   modalContent: { flex: 1, padding: 20 },
   modalInfo: { color: '#888', fontSize: 14, marginBottom: 20, lineHeight: 20 },
   emptyModalText: { color: '#888', fontSize: 16, textAlign: 'center', marginTop: 50 },
-
-  // GIF
   gifSearchContainer: { padding: 15, backgroundColor: '#16213e', borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   gifSearchInput: { backgroundColor: '#1a1a2e', color: '#fff', padding: 12, borderRadius: 10, fontSize: 16 },
   gifCategories: { maxHeight: 50, backgroundColor: '#16213e', borderBottomWidth: 1, borderBottomColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 15 },
@@ -1954,58 +1953,38 @@ const styles = StyleSheet.create({
   gifImage: { width: '100%', height: '100%' },
   gifFooter: { padding: 15, backgroundColor: '#16213e', borderTopWidth: 1, borderTopColor: '#0f3460', alignItems: 'center' },
   gifPoweredBy: { color: '#666', fontSize: 12 },
-
-  // Pinned Messages
   pinnedMessageCard: { backgroundColor: '#16213e', borderRadius: 12, padding: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   pinnedMessageText: { flex: 1, color: '#eee', fontSize: 14 },
   unpinButton: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 15 },
   unpinButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-
-  // Options
   optionItem: { backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   optionItemActive: { backgroundColor: '#0f3460', borderWidth: 2, borderColor: '#53a8b6' },
   optionItemText: { color: '#eee', fontSize: 16 },
   optionItemTextActive: { color: '#53a8b6', fontWeight: '600' },
   optionCheck: { color: '#53a8b6', fontSize: 18 },
-
-  // Section
   sectionTitle: { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 15 },
-
-  // Wallpaper
   wallpaperGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   wallpaperOption: { width: '30%', aspectRatio: 1, borderRadius: 12, justifyContent: 'flex-end', padding: 8 },
   wallpaperOptionActive: { borderWidth: 3, borderColor: '#53a8b6' },
   wallpaperName: { color: '#fff', fontSize: 10, fontWeight: '600' },
-
-  // Toggle
   toggleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 10 },
   toggleText: { color: '#eee', fontSize: 16 },
   toggleSwitch: { width: 50, height: 28, borderRadius: 14, backgroundColor: '#555', padding: 2 },
   toggleSwitchActive: { backgroundColor: '#53a8b6' },
   toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' },
   toggleKnobActive: { marginLeft: 22 },
-
-  // Note
   noteInput: { backgroundColor: '#16213e', color: '#fff', padding: 15, borderRadius: 12, fontSize: 16, height: 150, textAlignVertical: 'top' },
   charCount: { color: '#666', fontSize: 12, textAlign: 'right', marginTop: 5 },
-
-  // Primary Button
   primaryButton: { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 20 },
   primaryButtonDisabled: { backgroundColor: '#555' },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-
-  // Starters
   starterCard: { backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 12 },
   starterText: { color: '#eee', fontSize: 15, lineHeight: 22 },
-
-  // Date Ideas
   dateIdeaCard: { backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 12 },
   dateIdeaText: { color: '#eee', fontSize: 15, lineHeight: 22, marginBottom: 8 },
   dateIdeaVibe: { flexDirection: 'row' },
   dateIdeaVibeLabel: { color: '#888', fontSize: 12 },
   dateIdeaVibeValue: { color: '#e67e22', fontSize: 12, fontWeight: '600' },
-
-  // Date Planner
   errorText: { color: '#d9534f', fontSize: 16, textAlign: 'center', marginTop: 50, lineHeight: 24 },
   loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   placeCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#0f3460' },
@@ -2017,8 +1996,6 @@ const styles = StyleSheet.create({
   placeActions: { flexDirection: 'row', gap: 10 },
   placeActionButton: { flex: 1, backgroundColor: '#0f3460', paddingVertical: 10, borderRadius: 20, alignItems: 'center' },
   placeActionText: { color: '#53a8b6', fontSize: 14, fontWeight: '600' },
-
-  // Call Prompt
   promptContainer: { backgroundColor: '#16213e', borderRadius: 20, padding: 25, width: '85%', maxWidth: 400 },
   promptTitle: { fontSize: 22, fontWeight: 'bold', color: '#eee', textAlign: 'center', marginBottom: 15 },
   promptText: { color: '#aaa', fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 25 },
@@ -2027,8 +2004,6 @@ const styles = StyleSheet.create({
   promptCancelText: { color: '#888', fontSize: 16, fontWeight: '600' },
   promptConfirmButton: { flex: 1, backgroundColor: '#5cb85c', paddingVertical: 14, borderRadius: 20, alignItems: 'center' },
   promptConfirmText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-
-  // Image Preview
   imagePreviewModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   closePreviewButton: { position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   closePreviewText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },

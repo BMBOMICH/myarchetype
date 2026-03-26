@@ -1,14 +1,82 @@
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { onAuthStateChanged } from 'firebase/auth';
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
-import { auth } from '../firebaseConfig';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { doc, getDoc, getDocFromCache } from 'firebase/firestore';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
+  InteractionManager,
+  Platform,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { auth, db } from '../firebaseConfig';
 import { LanguageProvider } from '../utils/languageContext';
+import { logger } from '../utils/logger'; // Assumes you have a logger that respects __DEV__
 import { registerForPushNotifications } from '../utils/notifications';
 
-// ─── Notification handler (native only) ──────────────────
+// ─── Keep splash visible until ready ─────────────────────
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// ─── Constants ───────────────────────────────────────────
+const AUTH_TIMEOUT_MS = 10_000;
+const FIRESTORE_TIMEOUT_MS = 8_000;
+
+const COLORS = {
+  dark: {
+    bg: '#1a1a2e',
+    accent: '#53a8b6',
+    text: '#ffffff',
+  },
+  light: {
+    bg: '#f5f5f7',
+    accent: '#3a8a9a',
+    text: '#1a1a2e',
+  },
+} as const;
+
+// ─── Auth screen routes ──────────────────────────────────
+const AUTH_SCREENS = new Set(['login', 'signup', 'index']);
+const PROTECTED_SCREENS_ALLOW_UNVERIFIED = new Set(['login', 'signup', 'index']);
+
+// ─── Types ───────────────────────────────────────────────
+interface UserProfile {
+  name?: string;
+  age?: number;
+  gender?: string;
+  interestedIn?: string;
+  photos?: string[];
+  profileComplete?: boolean;
+}
+
+type AppRoute =
+  | '/home'
+  | '/login'
+  | '/signup'
+  | '/profile-setup'
+  | '/my-matches'
+  | '/chat'
+  | '/matches'
+  | '/profile-views'
+  | '/date-safety';
+
+interface NotificationData {
+  screen?: string;
+  matchId?: string;
+  matchName?: string;
+}
+
+// ─── Notification handler (module level, runs once) ──────
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -21,78 +89,285 @@ if (Platform.OS !== 'web') {
   });
 }
 
-// ─── Root layout content ──────────────────────────────────
+// ─── Pure helpers ────────────────────────────────────────
+function isProfileComplete(data: UserProfile | null): boolean {
+  if (!data) return false;
+  if (data.profileComplete === true) return true;
+  return !!(
+    data.name &&
+    data.age &&
+    data.gender &&
+    data.interestedIn &&
+    data.photos &&
+    data.photos.length > 0
+  );
+}
+
+/**
+ * Wraps a promise with a timeout.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+/**
+ * Fetches user profile from Firestore with cache fallback.
+ */
+async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  try {
+    // Try cache first for instant response
+    const cachedDoc = await getDocFromCache(doc(db, 'users', uid)).catch(() => null);
+    if (cachedDoc?.exists()) {
+      return cachedDoc.data() as UserProfile;
+    }
+  } catch {
+    // Cache miss — proceed to network
+  }
+
+  // Network fetch with timeout
+  const networkDoc = await withTimeout(
+    getDoc(doc(db, 'users', uid)),
+    FIRESTORE_TIMEOUT_MS,
+    'Firestore getDoc'
+  );
+
+  return networkDoc.exists() ? (networkDoc.data() as UserProfile) : null;
+}
+
+// ─── Error Boundary ──────────────────────────────────────
+class LayoutErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (__DEV__) {
+      console.error('[LayoutErrorBoundary]', error, info);
+    }
+    // In production, send to crash reporting
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorEmoji}>😕</Text>
+          <Text style={styles.errorText}>Something went wrong</Text>
+          <Text style={styles.errorSubtext}>Please restart the app</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Loading Screen ──────────────────────────────────────
+const LoadingScreen = React.memo(function LoadingScreen({
+  colorScheme,
+}: {
+  colorScheme: 'light' | 'dark';
+}) {
+  const colors = COLORS[colorScheme];
+
+  return (
+    <View
+      style={[styles.loadingContainer, { backgroundColor: colors.bg }]}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading application"
+      accessibilityState={{ busy: true }}
+    >
+      <ActivityIndicator size="large" color={colors.accent} />
+    </View>
+  );
+});
+
+// ─── Screen Options (memoized) ───────────────────────────
+const useScreenOptions = (colorScheme: 'light' | 'dark') => {
+  return useMemo(
+    () => ({
+      headerStyle: { backgroundColor: COLORS[colorScheme].bg },
+      headerTintColor: COLORS[colorScheme].text,
+      headerTitleStyle: { fontWeight: 'bold' as const },
+      contentStyle: { backgroundColor: COLORS[colorScheme].bg },
+    }),
+    [colorScheme]
+  );
+};
+
+// ─── Root Layout Content ─────────────────────────────────
 function RootLayoutContent() {
   const router = useRouter();
   const segments = useSegments();
+  const colorScheme = useColorScheme() ?? 'dark';
+
+  // ── State ──
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
 
-  const notificationListener = useRef<Notifications.EventSubscription | undefined>(undefined);
-  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
+  // ── Refs ──
+  const isMounted = useRef(true);
+  const notificationListener = useRef<Notifications.EventSubscription>();
+  const responseListener = useRef<Notifications.EventSubscription>();
+  const pushRegistered = useRef(false);
+  const authTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // ── Auth state listener ──────────────────────────────
+  // ── Derived values (memoized) ──
+  const currentSegment = useMemo(() => segments[0] ?? '', [segments]);
+  const isAuthScreen = useMemo(() => AUTH_SCREENS.has(currentSegment), [currentSegment]);
+  const isProfileSetupScreen = useMemo(() => currentSegment === 'profile-setup', [currentSegment]);
+
+  const screenOptions = useScreenOptions(colorScheme);
+
+  // ── Process authenticated user ──
+  const processAuthenticatedUser = useCallback(async (user: User) => {
+    // Check email verification first
+    if (!user.emailVerified) {
+      if (__DEV__) logger.info('[Layout] Email not verified');
+      setIsLoggedIn(false);
+      setProfileComplete(null);
+      return;
+    }
+
+    setIsLoggedIn(true);
+
+    // Fetch profile
+    try {
+      const profile = await fetchUserProfile(user.uid);
+      if (!isMounted.current) return;
+      setProfileComplete(isProfileComplete(profile));
+    } catch (err) {
+      if (__DEV__) logger.error('[Layout] Profile fetch failed:', err);
+      if (isMounted.current) setProfileComplete(false);
+    }
+
+    // Register push notifications (once per session)
+    if (Platform.OS !== 'web' && !pushRegistered.current) {
+      pushRegistered.current = true;
+      registerForPushNotifications().catch((err) => {
+        if (__DEV__) logger.warn('[Layout] Push registration failed:', err);
+      });
+    }
+  }, []);
+
+  // ── Auth state listener ──
   useEffect(() => {
+    isMounted.current = true;
+
+    // Set auth timeout
+    authTimeoutRef.current = setTimeout(() => {
+      if (isMounted.current && !isReady) {
+        if (__DEV__) logger.warn('[Layout] Auth timed out');
+        setAuthTimedOut(true);
+        setIsReady(true);
+      }
+    }, AUTH_TIMEOUT_MS);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!isMounted.current) return;
+
+      // Clear timeout on first auth response
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current);
+        authTimeoutRef.current = undefined;
+      }
 
       if (user) {
         try {
-          // ✅ Force reload to verify account still exists on Firebase
           await user.reload();
-          setIsLoggedIn(true);
-
-          if (Platform.OS !== 'web') {
-            registerForPushNotifications().catch((err) => {
-              console.log('[Layout] Push registration failed:', err);
-            });
+          if (!isMounted.current) return;
+          await processAuthenticatedUser(user);
+        } catch (error) {
+          const err = error as { code?: string };
+          if (__DEV__) logger.error('[Layout] Auth error:', err.code);
+          if (isMounted.current) {
+            setIsLoggedIn(false);
+            setProfileComplete(null);
           }
-        } catch (error: any) {
-          // ✅ Account deleted or token invalid — force sign out
-          console.log('[Layout] Account no longer valid:', error.code);
-          setIsLoggedIn(false);
           await auth.signOut().catch(() => {});
         }
       } else {
-        setIsLoggedIn(false);
+        if (isMounted.current) {
+          setIsLoggedIn(false);
+          setProfileComplete(null);
+        }
       }
 
-      // ✅ Only mark ready AFTER we've confirmed auth state
-      setIsReady(true);
+      if (isMounted.current) setIsReady(true);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      isMounted.current = false;
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+      unsubscribe();
+    };
+  }, [processAuthenticatedUser]);
 
-  // ── Notification listeners (native only) ─────────────
+  // ── Hide splash when ready ──
+  useEffect(() => {
+    if (isReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
+
+  // ── Notification routing ──
+  const handleNotificationRoute = useCallback(
+    (data: NotificationData) => {
+      if (!data.screen) return;
+
+      const routes: Record<string, () => void> = {
+        'my-matches': () => router.push('/my-matches' as AppRoute),
+        chat: () => {
+          if (data.matchId && data.matchName) {
+            router.push({
+              pathname: '/chat' as AppRoute,
+              params: { matchId: data.matchId, matchName: data.matchName },
+            });
+          } else {
+            router.push('/my-matches' as AppRoute);
+          }
+        },
+        matches: () => router.push('/matches' as AppRoute),
+        'profile-views': () => router.push('/profile-views' as AppRoute),
+        'check-in': () => router.push('/date-safety' as AppRoute),
+      };
+
+      const route = routes[data.screen];
+      if (route) {
+        route();
+      } else {
+        router.push('/home' as AppRoute);
+      }
+    },
+    [router]
+  );
+
+  // ── Notification listeners ──
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification) => {
-        console.log('[Layout] Notification received:', notification);
+        if (__DEV__) logger.info('[Layout] Notification received:', notification.request.identifier);
       }
     );
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        console.log('[Layout] Notification tapped:', response);
-        const data = response.notification.request.content.data as Record<string, string>;
-        if (!data?.screen) return;
-
-        switch (data.screen) {
-          case 'my-matches': router.push('/my-matches'); break;
-          case 'chat':
-            if (data.matchId && data.matchName) {
-              router.push({ pathname: '/chat', params: { matchId: data.matchId, matchName: data.matchName } });
-            } else {
-              router.push('/my-matches');
-            }
-            break;
-          case 'matches': router.push('/matches'); break;
-          case 'profile-views': router.push('/profile-views'); break;
-          case 'check-in': router.push('/date-safety'); break;
-          default: router.push('/home');
-        }
+        const data = response.notification.request.content.data as NotificationData;
+        handleNotificationRoute(data);
       }
     );
 
@@ -100,66 +375,86 @@ function RootLayoutContent() {
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
-  }, [router]);
+  }, [handleNotificationRoute]);
 
-  // ── Auth redirect logic ───────────────────────────────
+  // ── Auth redirect logic ──
   useEffect(() => {
     if (!isReady) return;
 
-    const isAuthScreen = ['login', 'signup', 'index'].includes(
-      segments[0] as string
-    );
+    // Use InteractionManager to avoid interrupting animations
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!isMounted.current) return;
 
-    if (isLoggedIn && isAuthScreen) {
-      router.replace('/home');
-    } else if (!isLoggedIn && !isAuthScreen && segments[0] !== undefined) {
-      router.replace('/login');
-    }
+      if (__DEV__) {
+        logger.info('[Layout] Route check:', {
+          isLoggedIn,
+          profileComplete,
+          currentSegment,
+        });
+      }
 
-  }, [isReady, isLoggedIn, segments, router]);
+      if (isLoggedIn) {
+        if (profileComplete === false && !isProfileSetupScreen) {
+          router.replace('/profile-setup' as AppRoute);
+        } else if (profileComplete === true && (isAuthScreen || isProfileSetupScreen)) {
+          router.replace('/home' as AppRoute);
+        }
+      } else {
+        if (!isAuthScreen && currentSegment !== '') {
+          router.replace('/login' as AppRoute);
+        }
+      }
+    });
 
-  // ✅ Show blank loading screen until auth is confirmed
-  // This prevents ANY screen from flashing before we know the auth state
+    return () => task.cancel();
+  }, [
+    isReady,
+    isLoggedIn,
+    profileComplete,
+    currentSegment,
+    isAuthScreen,
+    isProfileSetupScreen,
+    router,
+  ]);
+
+  // ── Loading state ──
   if (!isReady) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#53a8b6" />
-      </View>
-    );
+    return <LoadingScreen colorScheme={colorScheme} />;
+  }
+
+  // ── Auth timeout fallback ──
+  if (authTimedOut && !isLoggedIn) {
+    // Could show a retry button here
   }
 
   return (
     <>
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: '#1a1a2e' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
-          contentStyle: { backgroundColor: '#1a1a2e' },
-        }}
-      >
-        {/* ── Auth ── */}
+      <Stack screenOptions={screenOptions}>
+        {/* Auth */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'Log In' }} />
         <Stack.Screen name="signup" options={{ title: 'Sign Up' }} />
 
-        {/* ── Main ── */}
-        <Stack.Screen name="profile-setup" options={{ title: 'Create Profile', headerBackVisible: false }} />
-        <Stack.Screen name="home" options={{ title: 'Home', headerShown: false }} />
+        {/* Main */}
+        <Stack.Screen
+          name="profile-setup"
+          options={{ title: 'Create Profile', headerBackVisible: false, gestureEnabled: false }}
+        />
+        <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="matches" options={{ title: 'Find Matches' }} />
         <Stack.Screen name="my-matches" options={{ title: 'My Matches' }} />
         <Stack.Screen name="chat" options={{ headerShown: false }} />
 
-        {/* ── Profile ── */}
-        <Stack.Screen name="personality-quiz" options={{ title: 'Personality Quiz' }} />
+        {/* Profile */}
+        <Stack.Screen name="personality-quiz" options={{ title: 'Personality Quiz', headerBackVisible: false }} />
         <Stack.Screen name="edit-profile" options={{ title: 'Edit Profile' }} />
         <Stack.Screen name="video-profile-recorder" options={{ headerShown: false }} />
 
-        {/* ── Verification ── */}
+        {/* Verification */}
         <Stack.Screen name="height-verification" options={{ title: 'Verify Height' }} />
         <Stack.Screen name="selfie-verification" options={{ title: 'Verify Identity' }} />
 
-        {/* ── Features ── */}
+        {/* Features */}
         <Stack.Screen name="daily-question" options={{ headerShown: false }} />
         <Stack.Screen name="second-look" options={{ headerShown: false }} />
         <Stack.Screen name="dating-stats" options={{ headerShown: false }} />
@@ -175,13 +470,13 @@ function RootLayoutContent() {
         <Stack.Screen name="super-likes" options={{ headerShown: false }} />
         <Stack.Screen name="shared-playlist" options={{ headerShown: false }} />
 
-        {/* ── Safety ── */}
+        {/* Safety */}
         <Stack.Screen name="date-safety" options={{ headerShown: false }} />
         <Stack.Screen name="date-checkin" options={{ headerShown: false }} />
         <Stack.Screen name="post-date-rating" options={{ title: 'Rate Experience' }} />
         <Stack.Screen name="blocked-users" options={{ title: 'Blocked Users' }} />
 
-        {/* ── Social & Referral ── */}
+        {/* Social & Referral */}
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="referral" options={{ title: 'Invite Friends' }} />
         <Stack.Screen name="referral-leaderboard" options={{ title: 'Leaderboard' }} />
@@ -189,27 +484,59 @@ function RootLayoutContent() {
         <Stack.Screen name="social-verification" options={{ headerShown: false }} />
         <Stack.Screen name="date-spot-reviews" options={{ headerShown: false }} />
 
-        {/* ── Legal ── */}
+        {/* Legal */}
         <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
         <Stack.Screen name="terms" options={{ title: 'Terms of Service' }} />
 
-        {/* ── Admin ── */}
+        {/* Admin */}
         <Stack.Screen name="admin/index" options={{ title: 'Admin Dashboard' }} />
         <Stack.Screen name="admin/reports" options={{ title: 'User Reports' }} />
         <Stack.Screen name="admin/users" options={{ title: 'Manage Users' }} />
         <Stack.Screen name="admin/stats" options={{ title: 'Statistics' }} />
       </Stack>
 
-      <StatusBar style="light" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );
 }
 
-// ─── Root layout ──────────────────────────────────────────
+// ─── Root Layout ─────────────────────────────────────────
 export default function RootLayout() {
   return (
-    <LanguageProvider>
-      <RootLayoutContent />
-    </LanguageProvider>
+    <LayoutErrorBoundary>
+      <LanguageProvider>
+        <RootLayoutContent />
+      </LanguageProvider>
+    </LayoutErrorBoundary>
   );
 }
+
+// ─── Styles ──────────────────────────────────────────────
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    padding: 32,
+  },
+  errorEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: '#aaaaaa',
+  },
+});

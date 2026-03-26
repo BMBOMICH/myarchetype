@@ -1100,15 +1100,6 @@ export default function HomeScreen() {
     }
   }, [authReady, userId, router]);
 
-  // ── Redirect: incomplete profile → profile-setup ───────
-  // This runs only once userData has loaded
-  useEffect(() => {
-    if (!userData) return;
-    if (!isProfileComplete(userData)) {
-      router.replace('/profile-setup' as any);
-    }
-  }, [userData, router]);
-
   // ── Navigation items ───────────────────────────────────
   const navItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [

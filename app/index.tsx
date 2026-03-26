@@ -1,345 +1,683 @@
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import React, { useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type {
+  ListRenderItemInfo,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+} from 'react-native';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
-  Dimensions,
   FlatList,
+  InteractionManager,
+  LayoutAnimation,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  UIManager,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../firebaseConfig';
+import { getTranslation } from '../utils/i18n';
+import { appStorage } from '../utils/storage';
 
-const storage = new MMKV({ id: 'app-storage' });
+// ─── Android LayoutAnimation opt-in ──────────────────────────────────────────
 
-const { width } = Dimensions.get('window');
-
-interface OnboardingSlide {
-  id: string;
-  icon: string;
-  title: string;
-  titleAz: string;
-  description: string;
-  descriptionAz: string;
-  backgroundColor: string;
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
 
-const slides: OnboardingSlide[] = [
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY_ONBOARDING = 'onboarding.hasSeenOnboarding';
+const STORAGE_KEY_LANGUAGE   = 'app.language';
+const AUTH_TIMEOUT_MS        = 10_000;
+
+const COLORS = {
+  background:    '#1a1a2e',
+  backgroundAlt: '#0f3460',
+  backgroundDeep:'#16213e',
+  primary:       '#53a8b6',
+  success:       '#5cb85c',
+  textLight:     '#eee',
+  textMuted:     '#aaa',
+  textDim:       '#888',
+  inactive:      '#3a3a4e',
+  white:         '#fff',
+} as const;
+
+const BORDER_RADIUS = {
+  button: 25,
+  dot:    5,
+} as const;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type TitleKey       = 'onboardingTitle1' | 'onboardingTitle2' | 'onboardingTitle3';
+type DescriptionKey = 'onboardingDesc1'  | 'onboardingDesc2'  | 'onboardingDesc3';
+
+interface OnboardingSlide {
+  readonly id:              string;
+  readonly icon:            string;
+  readonly iconLabel:       string;
+  readonly titleKey:        TitleKey;
+  readonly descriptionKey:  DescriptionKey;
+  readonly backgroundColor: string;
+}
+
+// ─── Slide data ───────────────────────────────────────────────────────────────
+
+const SLIDES: readonly OnboardingSlide[] = [
   {
-    id: '1',
-    icon: '💕',
-    title: 'Welcome to MyArchetype',
-    titleAz: 'MyArchetype-a xoş gəlmisiniz',
-    description: 'A dating app designed for genuine connections.\nNo games. No superficial swiping. Just real people.',
-    descriptionAz: 'Həqiqi əlaqələr üçün yaradılmış tanışlıq tətbiqi.\nOyun yoxdur. Səthi sürüşdürmə yoxdur. Sadəcə həqiqi insanlar.',
-    backgroundColor: '#1a1a2e',
+    id:              '1',
+    icon:            '💕',
+    iconLabel:       'Two hearts',
+    titleKey:        'onboardingTitle1',
+    descriptionKey:  'onboardingDesc1',
+    backgroundColor: COLORS.background,
   },
   {
-    id: '2',
-    icon: '🧠',
-    title: 'Deep Compatibility',
-    titleAz: 'Dərin Uyğunluq',
-    description: 'Personality tests, verification systems, and smart matching based on values, lifestyle, and goals.',
-    descriptionAz: 'Şəxsiyyət testləri, doğrulama sistemləri və dəyərlərə, həyat tərzinə və məqsədlərə əsaslanan ağıllı uyğunluq.',
-    backgroundColor: '#0f3460',
+    id:              '2',
+    icon:            '🧠',
+    iconLabel:       'Brain',
+    titleKey:        'onboardingTitle2',
+    descriptionKey:  'onboardingDesc2',
+    backgroundColor: COLORS.backgroundAlt,
   },
   {
-    id: '3',
-    icon: '✅',
-    title: 'Trust & Verification',
-    titleAz: 'Etibar və Doğrulama',
-    description: 'Selfie verification, community ratings, and photo authenticity checks keep our community safe.',
-    descriptionAz: 'Selfie doğrulaması, icma reytinqləri və foto orijinallıq yoxlamaları icmamızı təhlükəsiz saxlayır.',
-    backgroundColor: '#16213e',
+    id:              '3',
+    icon:            '🆓',
+    iconLabel:       'Free label',
+    titleKey:        'onboardingTitle3',
+    descriptionKey:  'onboardingDesc3',
+    backgroundColor: COLORS.backgroundDeep,
   },
-  {
-    id: '4',
-    icon: '🆓',
-    title: '100% Free, Forever',
-    titleAz: '100% Pulsuz, Həmişə',
-    description: 'No premium subscriptions.\nNo hidden fees.\nNo restrictions.\nJust love, for everyone.',
-    descriptionAz: 'Premium abunəlik yoxdur.\nGizli ödəniş yoxdur.\nMəhdudiyyət yoxdur.\nHamı üçün sadəcə sevgi.',
-    backgroundColor: '#1a1a2e',
-  },
-];
+] as const;
+
+const SLIDES_COUNT = SLIDES.length;
+const LAST_INDEX   = SLIDES_COUNT - 1;
+
+// ─── Dot indices (stable reference, never re-created) ─────────────────────────
+
+const DOT_INDICES = Array.from({ length: SLIDES_COUNT }, (_, i) => i);
+
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
+
+const markOnboardingSeen = (): void =>
+  appStorage.set(STORAGE_KEY_ONBOARDING, true);                // boolean ✓
+
+const getStoredLanguage = (): Parameters<typeof getTranslation>[0] =>
+  (appStorage.getString(STORAGE_KEY_LANGUAGE) ?? 'en') as Parameters<typeof getTranslation>[0];
+
+// ─── LoadingScreen ────────────────────────────────────────────────────────────
+
+interface LoadingScreenProps {
+  message?:  string;
+  timedOut?: boolean;
+  onRetry?:  () => void;
+}
+
+const LoadingScreen = React.memo<LoadingScreenProps>(
+  ({ message, timedOut = false, onRetry }) => (
+    <View
+      style={styles.loadingContainer}
+      accessible
+      accessibilityLabel={message ?? 'Loading MyArchetype'}
+    >
+      <Text style={styles.logo}>MyArchetype</Text>
+      <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+
+      {message ? (
+        <Text style={styles.loadingMessage}>{message}</Text>
+      ) : null}
+
+      {timedOut && onRetry ? (
+        <Pressable
+          style={styles.retryButton}
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry connection"
+          accessibilityHint="Attempts to reconnect to the server"
+        >
+          <Text style={styles.retryButtonText}>Tap to retry</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  ),
+);
+LoadingScreen.displayName = 'LoadingScreen';
+
+// ─── Slide ────────────────────────────────────────────────────────────────────
+
+interface SlideProps {
+  item:        OnboardingSlide;
+  screenWidth: number;
+  title:       string;
+  description: string;
+}
+
+const Slide = React.memo<SlideProps>(({ item, screenWidth, title, description }) => (
+  <View
+    style={[
+      styles.slide,
+      { width: screenWidth, backgroundColor: item.backgroundColor },
+    ]}
+    accessible
+    accessibilityLabel={`${title}. ${description}`}
+  >
+    <Text style={styles.slideIcon} accessible accessibilityLabel={item.iconLabel}>
+      {item.icon}
+    </Text>
+    <Text style={styles.slideTitle}>{title}</Text>
+    <Text style={styles.slideDescription}>{description}</Text>
+  </View>
+));
+Slide.displayName = 'Slide';
+
+// ─── PaginationDots ───────────────────────────────────────────────────────────
+
+interface PaginationDotsProps {
+  total:        number;
+  currentIndex: number;
+}
+
+const PaginationDots = React.memo<PaginationDotsProps>(({ total, currentIndex }) => (
+  <View
+    style={styles.dotsContainer}
+    accessible
+    accessibilityLabel={`Slide ${currentIndex + 1} of ${total}`}
+    accessibilityRole="none"
+  >
+    {DOT_INDICES.map((index) => (
+      <View
+        key={index}
+        style={[styles.dot, currentIndex === index && styles.dotActive]}
+      />
+    ))}
+  </View>
+));
+PaginationDots.displayName = 'PaginationDots';
+
+// ─── WelcomeScreen ────────────────────────────────────────────────────────────
 
 export default function WelcomeScreen() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const router                 = useRouter();
+  const insets                 = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const t = useMemo(() => getTranslation(getStoredLanguage()), []);
+
+  // ── State ─────────────────────────────────────────────────────────────────
+
+  const [loading,        setLoading]        = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const [currentIndex,   setCurrentIndex]   = useState(0);
+  const [timedOut,       setTimedOut]       = useState(false);
+  const [reduceMotion,   setReduceMotion]   = useState(false);
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
+
+  const flatListRef    = useRef<FlatList<OnboardingSlide>>(null);
+  const isMounted      = useRef(true);
+  const unsubscribeRef = useRef<(() => void) | undefined>(undefined);
+  const timeoutRef     = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // ── Reduce-motion ─────────────────────────────────────────────────────────
 
   useEffect(() => {
-    checkFirstLaunch();
+    let active = true;
+
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+
+    const sub = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      (enabled) => { if (active) setReduceMotion(enabled); },
+    );
+
+    return () => { active = false; sub.remove(); };
   }, []);
 
-  const checkFirstLaunch = () => {
-    try {
-      // Check if user has seen onboarding (MMKV is synchronous)
-      const hasSeenOnboarding = storage.getString('hasSeenOnboarding');
+  // ── Auth gate ─────────────────────────────────────────────────────────────
 
-      // Check auth state
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-          // User is logged in, go to home
-          router.replace('/home');
-        } else if (hasSeenOnboarding === 'true') {
-          // User has seen onboarding but not logged in
-          router.replace('/login');
-        } else {
-          // First time user, show onboarding
-          setShowOnboarding(true);
-        }
-        setLoading(false);
-      });
+const runAuthCheck = useCallback(() => {
+  if (isMounted.current) { setTimedOut(false); setLoading(true); }
 
-      return () => unsubscribe();
-    } catch (error) {
-      console.error('Error checking first launch:', error);
+  try {
+    const hasSeenOnboarding = appStorage.getBoolean(STORAGE_KEY_ONBOARDING) === true;
+
+    timeoutRef.current = setTimeout(() => {
+      if (!isMounted.current) return;
+      unsubscribeRef.current?.();
+      setTimedOut(true);
       setShowOnboarding(true);
       setLoading(false);
+    }, AUTH_TIMEOUT_MS);
+
+    InteractionManager.runAfterInteractions(() => {
+      if (!isMounted.current) return;
+
+      unsubscribeRef.current = onAuthStateChanged(auth, (user) => {
+        clearTimeout(timeoutRef.current);
+        if (!isMounted.current) return;
+
+        if (user) {
+          // ✅ FIX: Don't route directly to /home
+          // Let _layout.tsx handle the profile check and routing
+          // Just stop loading — _layout will redirect appropriately
+          setLoading(false);
+        } else if (hasSeenOnboarding) {
+          router.replace('/login');
+        } else {
+          setShowOnboarding(true);
+        }
+
+        setLoading(false);
+      });
+    });
+  } catch (error) {
+    console.error('[WelcomeScreen] runAuthCheck error:', error);
+    clearTimeout(timeoutRef.current);
+    if (isMounted.current) { setShowOnboarding(true); setLoading(false); }
+  }
+}, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+    runAuthCheck();
+    return () => {
+      isMounted.current = false;
+      unsubscribeRef.current?.();
+      clearTimeout(timeoutRef.current);
+    };
+  }, [runAuthCheck]);
+
+  // ── Index helpers ─────────────────────────────────────────────────────────
+
+  const updateIndex = useCallback((next: number) => {
+    if (!reduceMotion) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     }
-  };
+    setCurrentIndex(next);
+  }, [reduceMotion]);
 
-  const handleNext = () => {
-    if (currentIndex < slides.length - 1) {
-      const nextIndex = currentIndex + 1;
-      flatListRef.current?.scrollToIndex({ index: nextIndex });
-      setCurrentIndex(nextIndex);
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  const handleNext = useCallback(() => {
+    const next = currentIndex + 1;
+    if (next < SLIDES_COUNT) {
+      flatListRef.current?.scrollToIndex({ index: next, animated: !reduceMotion });
+      updateIndex(next);
     }
-  };
+  }, [currentIndex, reduceMotion, updateIndex]);
 
-  const handleSkip = () => {
-    storage.set('hasSeenOnboarding', 'true');
-    router.replace('/login');
-  };
+  const handleSkip         = useCallback(() => { markOnboardingSeen(); router.replace('/login');  }, [router]);
+  const handleGetStarted   = useCallback(() => { markOnboardingSeen(); router.replace('/signup'); }, [router]);
+  const handleLoginPress   = useCallback(() => { router.push('/login');   }, [router]);
+  const handleTermsPress   = useCallback(() => { router.push('/terms');   }, [router]);
+  const handlePrivacyPress = useCallback(() => { router.push('/privacy'); }, [router]);
 
-  const handleGetStarted = () => {
-    storage.set('hasSeenOnboarding', 'true');
-    router.replace('/signup');
-  };
+  // ── Scroll ────────────────────────────────────────────────────────────────
 
-  const renderSlide = ({ item }: { item: OnboardingSlide }) => (
-    <View style={[styles.slide, { width, backgroundColor: item.backgroundColor }]}>
-      <Text style={styles.slideIcon}>{item.icon}</Text>
-      <Text style={styles.slideTitle}>{item.title}</Text>
-      <Text style={styles.slideTitleAz}>{item.titleAz}</Text>
-      <Text style={styles.slideDescription}>{item.description}</Text>
-      <Text style={styles.slideDescriptionAz}>{item.descriptionAz}</Text>
-    </View>
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const next = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+      if (next !== currentIndex) updateIndex(next);
+    },
+    [screenWidth, currentIndex, updateIndex],
   );
 
-  const renderDots = () => (
-    <View style={styles.dotsContainer}>
-      {slides.map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.dot,
-            currentIndex === index && styles.dotActive,
-          ]}
-        />
-      ))}
-    </View>
+  const handleScrollToIndexFailed = useCallback(
+    (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+      flatListRef.current?.scrollToOffset({
+        offset:   info.averageItemLength * info.index,
+        animated: !reduceMotion,
+      });
+    },
+    [reduceMotion],
   );
+
+  // ── FlatList helpers ──────────────────────────────────────────────────────
+
+  const renderSlide = useCallback(
+    ({ item }: ListRenderItemInfo<OnboardingSlide>) => (
+      <Slide
+        item={item}
+        screenWidth={screenWidth}
+        title={t[item.titleKey]}
+        description={t[item.descriptionKey]}
+      />
+    ),
+    [screenWidth, t],
+  );
+
+  const keyExtractor = useCallback((item: OnboardingSlide) => item.id, []);
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<OnboardingSlide> | null | undefined, index: number) => ({
+      length: screenWidth,
+      offset: screenWidth * index,
+      index,
+    }),
+    [screenWidth],
+  );
+
+  // ── Derived styles ────────────────────────────────────────────────────────
+
+  const containerStyle = useMemo(
+    () => [styles.container, { paddingTop: insets.top }],
+    [insets.top],
+  );
+  const buttonsContainerStyle = useMemo(
+    () => [styles.buttonsContainer, { paddingBottom: insets.bottom > 0 ? 8 : 20 }],
+    [insets.bottom],
+  );
+  const footerStyle = useMemo(
+    () => [styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }],
+    [insets.bottom],
+  );
+
+  const isLastSlide = currentIndex === LAST_INDEX;
+
+  // ── Early returns ─────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.logo}>MyArchetype</Text>
-        <ActivityIndicator size="large" color="#53a8b6" style={styles.loader} />
-      </View>
+      <LoadingScreen
+        message={timedOut ? t.somethingWentWrong : t.loading}
+        timedOut={timedOut}
+        onRetry={runAuthCheck}
+      />
     );
   }
 
   if (!showOnboarding) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#53a8b6" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
-  const isLastSlide = currentIndex === slides.length - 1;
+  // ── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.container}>
-      <FlatList
+    <View style={containerStyle}>
+
+      {/* Slides */}
+      <FlatList<OnboardingSlide>
         ref={flatListRef}
-        data={slides}
+        data={SLIDES}
         renderItem={renderSlide}
+        keyExtractor={keyExtractor}
+        getItemLayout={getItemLayout}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(index);
-        }}
-        keyExtractor={(item) => item.id}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews
+        accessibilityLabel="Onboarding slides"
       />
 
-      {renderDots()}
+      {/* Pagination */}
+      <PaginationDots total={SLIDES_COUNT} currentIndex={currentIndex} />
 
-      <View style={styles.buttonsContainer}>
-        {!isLastSlide ? (
-          <>
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-              <Text style={styles.skipButtonText}>Skip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Next →</Text>
-            </TouchableOpacity>
-          </>
+      {/* Buttons */}
+      <View style={buttonsContainerStyle}>
+        {isLastSlide ? (
+          <Pressable
+            style={({ pressed }) => [styles.getStartedButton, pressed && styles.buttonPressed]}
+            onPress={handleGetStarted}
+            accessibilityRole="button"
+            accessibilityLabel={t.getStarted}
+            accessibilityHint="Takes you to the sign-up screen"
+          >
+            <Text style={styles.getStartedButtonText}>{t.getStarted} 🚀</Text>
+          </Pressable>
         ) : (
-          <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStarted}>
-            <Text style={styles.getStartedButtonText}>Get Started 🚀</Text>
-          </TouchableOpacity>
+          <>
+            <Pressable
+              style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
+              onPress={handleSkip}
+              accessibilityRole="button"
+              accessibilityLabel={t.skip}
+              accessibilityHint="Skips onboarding and takes you to the login screen"
+            >
+              <Text style={styles.skipButtonText}>{t.skip}</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.nextButton, pressed && styles.buttonPressed]}
+              onPress={handleNext}
+              accessibilityRole="button"
+              accessibilityLabel={t.next}
+              accessibilityHint={`Goes to slide ${currentIndex + 2} of ${SLIDES_COUNT}`}
+            >
+              <Text style={styles.nextButtonText}>{t.next} →</Text>
+            </Pressable>
+          </>
         )}
       </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity onPress={() => router.push('/login')}>
-          <Text style={styles.footerText}>
-            Already have an account? <Text style={styles.footerLink}>Log In</Text>
-          </Text>
-        </TouchableOpacity>
+      {/* Footer */}
+      <View style={footerStyle}>
+
+        <Pressable
+  onPress={handleLoginPress}
+  accessibilityRole="link"
+  accessibilityLabel={t.alreadyHaveAccount}
+  accessibilityHint="Takes you to the login screen"
+  hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+>
+  <Text style={styles.footerText}>
+    {t.alreadyHaveAccountPrompt}{' '}
+    <Text style={styles.footerLink}>{t.login}</Text>
+  </Text>
+</Pressable>
+
+        {/* Legal links — ToS and Privacy stay in their own screens */}
+        <View style={styles.legalRow}>
+          <Pressable
+            onPress={handleTermsPress}
+            accessibilityRole="link"
+            accessibilityLabel={t.termsOfService}
+            accessibilityHint="Opens the Terms of Service"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.legalLink}>{t.termsOfService}</Text>
+          </Pressable>
+
+          <Text style={styles.legalSeparator}>·</Text>
+
+          <Pressable
+            onPress={handlePrivacyPress}
+            accessibilityRole="link"
+            accessibilityLabel={t.privacyPolicy}
+            accessibilityHint="Opens the Privacy Policy"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.legalLink}>{t.privacyPolicy}</Text>
+          </Pressable>
+        </View>
+
       </View>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
+    flex:            1,
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex:              1,
+    backgroundColor:   COLORS.background,
+    justifyContent:    'center',
+    alignItems:        'center',
+    paddingHorizontal: 32,
   },
   logo: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#eee',
+    fontSize:     36,
+    fontWeight:   '700',
+    color:        COLORS.textLight,
     marginBottom: 30,
   },
   loader: {
     marginTop: 20,
   },
+  loadingMessage: {
+    marginTop: 16,
+    fontSize:  14,
+    color:     COLORS.textMuted,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop:         24,
+    paddingVertical:   12,
+    paddingHorizontal: 28,
+    borderRadius:      BORDER_RADIUS.button,
+    backgroundColor:   COLORS.primary,
+  },
+  retryButtonText: {
+    color:      COLORS.white,
+    fontSize:   15,
+    fontWeight: '600',
+  },
   slide: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex:              1,
+    justifyContent:    'center',
+    alignItems:        'center',
     paddingHorizontal: 40,
   },
   slideIcon: {
-    fontSize: 80,
+    fontSize:     80,
     marginBottom: 30,
+    textAlign:    'center',
   },
   slideTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#eee',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  slideTitleAz: {
-    fontSize: 18,
-    color: '#53a8b6',
-    textAlign: 'center',
-    marginBottom: 25,
-    fontStyle: 'italic',
+    fontSize:     28,
+    fontWeight:   '700',
+    color:        COLORS.textLight,
+    textAlign:    'center',
+    marginBottom: 20,
   },
   slideDescription: {
-    fontSize: 16,
-    color: '#aaa',
+    fontSize:  16,
+    color:     COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 10,
-  },
-  slideDescriptionAz: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    fontStyle: 'italic',
   },
   dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection:   'row',
+    justifyContent:  'center',
+    alignItems:      'center',
     paddingVertical: 20,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#3a3a4e',
+    width:            10,
+    height:           10,
+    borderRadius:     BORDER_RADIUS.dot,
+    backgroundColor:  COLORS.inactive,
     marginHorizontal: 5,
   },
   dotActive: {
-    backgroundColor: '#53a8b6',
-    width: 25,
+    backgroundColor: COLORS.primary,
+    width:           25,
   },
   buttonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection:     'row',
+    justifyContent:    'space-between',
     paddingHorizontal: 30,
-    paddingBottom: 20,
-    gap: 15,
+    gap:               15,
+  },
+  buttonPressed: {
+    opacity: 0.72,
   },
   skipButton: {
-    flex: 1,
+    flex:            1,
     paddingVertical: 16,
-    borderRadius: 25,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#3a3a4e',
+    borderRadius:    BORDER_RADIUS.button,
+    alignItems:      'center',
+    borderWidth:     2,
+    borderColor:     COLORS.inactive,
+    minHeight:       44,
   },
   skipButtonText: {
-    color: '#888',
-    fontSize: 16,
+    color:      COLORS.textDim,
+    fontSize:   16,
     fontWeight: '600',
   },
   nextButton: {
-    flex: 1,
-    backgroundColor: '#53a8b6',
+    flex:            1,
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 25,
-    alignItems: 'center',
+    borderRadius:    BORDER_RADIUS.button,
+    alignItems:      'center',
+    minHeight:       44,
   },
   nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color:      COLORS.white,
+    fontSize:   16,
     fontWeight: '600',
   },
   getStartedButton: {
-    flex: 1,
-    backgroundColor: '#5cb85c',
+    flex:            1,
+    backgroundColor: COLORS.success,
     paddingVertical: 18,
-    borderRadius: 25,
-    alignItems: 'center',
+    borderRadius:    BORDER_RADIUS.button,
+    alignItems:      'center',
+    minHeight:       44,
   },
   getStartedButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color:      COLORS.white,
+    fontSize:   18,
+    fontWeight: '700',
   },
   footer: {
-    paddingBottom: 40,
     alignItems: 'center',
+    paddingTop: 12,
+    gap:        12,
   },
   footerText: {
-    color: '#888',
+    color:    COLORS.textDim,
     fontSize: 14,
   },
   footerLink: {
-    color: '#53a8b6',
+    color:      COLORS.primary,
     fontWeight: '600',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+  },
+  legalLink: {
+    color:              COLORS.textDim,
+    fontSize:           12,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    color:    COLORS.inactive,
+    fontSize: 12,
   },
 });

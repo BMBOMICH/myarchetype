@@ -19,14 +19,13 @@ import {
   Alert,
   Animated,
   AppState,
-  AppStateStatus,
+  type AppStateStatus,
   BackHandler,
   Dimensions,
   I18nManager,
   InteractionManager,
   Keyboard,
   KeyboardAvoidingView,
-  Linking, // ← add this
   Platform,
   Pressable,
   ScrollView,
@@ -982,13 +981,8 @@ export default function SignupScreen() {
       dismissKeyboard, shake, showAppAlert, startLockout, router]);
 
   const handleLogin      = useCallback(() => { if (!state.loading) router.replace(ROUTES.LOGIN); }, [state.loading, router]);
-  const handleTerms = useCallback(() => {
-  Linking.openURL('https://myarchetype.vercel.app/terms');
-}, []);
-
-const handlePrivacy = useCallback(() => {
-  Linking.openURL('https://myarchetype.vercel.app/privacy');
-}, []);
+const handleTerms   = useCallback(() => { router.push('/terms');   }, [router]);
+const handlePrivacy = useCallback(() => { router.push('/privacy'); }, [router]);
   const focusPassword    = useCallback(() => passwordRef.current?.focus(), []);
   const focusConfirm     = useCallback(() => confirmRef.current?.focus(), []);
 

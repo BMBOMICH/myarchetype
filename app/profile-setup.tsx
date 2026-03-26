@@ -1,3 +1,4 @@
+
 // ═══════════════════════════════════════
 // PART 1 OF 8 — paste first
 // ═══════════════════════════════════════
@@ -16,7 +17,6 @@
  *  8. Privacy, Preview & Submit
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -36,7 +36,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  findNodeHandle,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -61,7 +60,7 @@ import { uploadToCloudinary } from '../utils/cloudinaryUpload';
 import { requestLocationPermission, saveUserLocation } from '../utils/location';
 import { logger } from '../utils/logger';
 import { formatName, validateName } from '../utils/nameValidation';
-
+import { profileStorage } from '../utils/storage';
 // ─── Platform ─────────────────────────────────────────────
 
 const IS_WEB = Platform.OS === 'web';
@@ -1207,8 +1206,8 @@ export default function ProfileSetupScreen() {
     (async () => {
       try {
         const [rawDraft, rawStep] = await Promise.all([
-          AsyncStorage.getItem(draftKey),
-          AsyncStorage.getItem(stepKey),
+          Promise.resolve(profileStorage.getString(draftKey) ?? null),
+          Promise.resolve(profileStorage.getString(stepKey) ?? null),
         ]);
         if (rawDraft) {
           const parsed = JSON.parse(rawDraft) as Partial<FormState>;
@@ -1242,8 +1241,8 @@ export default function ProfileSetupScreen() {
       if (!isDirtyRef.current) return;
       isDirtyRef.current = false;
       const { photos: _photos, ...rest } = form;
-      AsyncStorage.setItem(draftKey, JSON.stringify(rest)).catch(() => {});
-      AsyncStorage.setItem(stepKey, String(step)).catch(() => {});
+      (() => { try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch (_e) {} })();
+      (() => { try { profileStorage.set(stepKey, String(step)); } catch (_e) {} })();
     }, 2000);
     return () => clearTimeout(t);
   }, [form, step, draftKey, stepKey]);
@@ -1288,9 +1287,10 @@ export default function ProfileSetupScreen() {
     AccessibilityInfo.announceForAccessibility(
       `Step ${step} of ${TOTAL_STEPS}: ${name}`,
     );
-    // Move screen reader focus to step title
-    if (stepTitleRef.current) {
-      const node = findNodeHandle(stepTitleRef.current);
+    // Move screen reader focus to step title (native only)
+    if (Platform.OS !== 'web' && stepTitleRef.current) {
+      const nodeHandle = require('react-native').findNodeHandle;
+      const node = nodeHandle(stepTitleRef.current);
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     }
   }, [step]);
@@ -2050,8 +2050,8 @@ export default function ProfileSetupScreen() {
       await setDoc(doc(db, 'users', userId), profileData, { merge: false });
 
       // Clear draft
-      if (draftKey) AsyncStorage.removeItem(draftKey).catch(() => {});
-      if (stepKey)  AsyncStorage.removeItem(stepKey).catch(() => {});
+      if (draftKey) (() => { try { profileStorage.delete(draftKey); } catch (_e) {} })();
+      if (stepKey)  (() => { try { profileStorage.delete(stepKey); } catch (_e) {} })();
 
       // Reset form
       dispatch({ type: 'RESET' });
@@ -2892,7 +2892,7 @@ export default function ProfileSetupScreen() {
           maxLength={50}
           autoCapitalize="words"
           returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
+          onSubmitEditing={() => { if (Platform.OS !== 'web') Keyboard.dismiss(); }}
           accessibilityLabel="Occupation"
           maxFontSizeMultiplier={MAX_FONT_SCALE}
         />
@@ -3960,7 +3960,7 @@ export default function ProfileSetupScreen() {
       </View>
 
       {/* ── Scrollable step content ── */}
-      <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss}>
+      <Pressable style={{ flex: 1 }} onPress={() => { if (Platform.OS !== 'web') Keyboard.dismiss(); }}>
         <ScrollView
           ref={scrollRef}
           style={st.sv}
