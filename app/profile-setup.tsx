@@ -1018,7 +1018,7 @@ const WebVideoPreview = React.memo(function WebVideoPreview({
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
+          objectFit: 'cover' as any,
           display: 'block',
           transform: facing === 'front' ? 'scaleX(-1)' : 'none',
         }}
@@ -1367,80 +1367,177 @@ export default function ProfileSetupScreen() {
   // the stream arrives AND when the video element mounts, whichever
   // happens second. This handles the race condition between
   // getUserMedia resolving and the video element rendering.
-  const attachStreamToVideo = useCallback(() => {
-    const video = webVideoElRef.current;
-    const stream = streamRef.current;
-    if (!video || !stream) return;
-    if (video.srcObject === stream) return; // already attached
-    video.srcObject = stream;
-    video.onloadedmetadata = () => {
-      video.play().catch(() => {});
-      if (isMountedRef.current) setCamReady(true);
+const attachStreamToVideo = useCallback(() => {
+  const video = webVideoElRef.current;
+  const stream = streamRef.current;
+
+  // Need both video element and stream to proceed
+  if (!video || !stream) return;
+
+  // Already attached and playing — just ensure camReady is true
+  if (video.srcObject === stream) {
+    if (video.readyState >= 2 && isMountedRef.current) {
+      setCamReady(true);
+    }
+    return;
+  }
+
+  // Attach stream to video element
+  video.srcObject = stream;
+
+  // ✅ FIX: Check if metadata already loaded (race condition where
+  // getUserMedia resolved and video processed before this runs)
+  if (video.readyState >= 2) {
+    video.play().catch(() => {});
+    if (isMountedRef.current) setCamReady(true);
+    return;
+  }
+
+  // Normal case: wait for metadata to load
+  video.onloadedmetadata = () => {
+    video.play().catch(() => {});
+    if (isMountedRef.current) setCamReady(true);
+  };
+
+  // ✅ FIX: Fallback for browsers that skip onloadedmetadata
+  // for certain MediaStream types (observed in Firefox + Safari)
+  video.oncanplay = () => {
+    if (!video.paused) return; // already playing
+    video.play().catch(() => {});
+    if (isMountedRef.current) setCamReady(true);
+  };
+
+  // ✅ FIX: Handle stream errors after attachment
+  video.onerror = () => {
+    if (isMountedRef.current) {
+      setCamReady(false);
+      setCamErr('Camera stream error. Please try again.');
+    }
+  };
+
+  // ✅ FIX: Also detect if the stream tracks end unexpectedly
+  // (user revokes permission, hardware disconnect, etc.)
+  const tracks = stream.getTracks();
+  tracks.forEach((track) => {
+    track.onended = () => {
+      if (isMountedRef.current) {
+        setCamReady(false);
+        setCamErr('Camera disconnected. Please try again.');
+      }
     };
-  }, []);
+  });
+}, []);
 
   // ✅ FIX: Callback ref for the web video element.
   // Called when the <video> DOM node mounts or unmounts.
   // If the stream is already ready when this fires, attach immediately.
-  const handleVideoRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      if (!el) {
-        webVideoElRef.current = null;
+const handleVideoRef = useCallback(
+  (el: HTMLVideoElement | null) => {
+    if (!el) {
+      // Element unmounting — clean up listeners
+      if (webVideoElRef.current) {
+        webVideoElRef.current.onloadedmetadata = null;
+        webVideoElRef.current.oncanplay = null;
+        webVideoElRef.current.onerror = null;
+        webVideoElRef.current.srcObject = null;
+      }
+      webVideoElRef.current = null;
+      return;
+    }
+    webVideoElRef.current = el;
+    // If stream already exists, attach now
+    attachStreamToVideo();
+  },
+  [attachStreamToVideo]
+);
+
+const startWebStream = useCallback(
+  async (facing: 'front' | 'back') => {
+    try {
+      // Stop any existing stream first
+      stopWebStream();
+
+      if (!IS_WEB) return;
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (isMountedRef.current) setCamErr('Camera not supported in this browser.');
         return;
       }
-      webVideoElRef.current = el;
-      // If stream already exists (getUserMedia resolved before render), attach now
-      attachStreamToVideo();
-    },
-    [attachStreamToVideo]
-  );
 
-  const startWebStream = useCallback(
-    async (facing: 'front' | 'back') => {
-      try {
-        stopWebStream();
-        if (!navigator.mediaDevices?.getUserMedia) {
-          if (isMountedRef.current) setCamErr('Camera not supported in this browser.');
-          return;
-        }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+      const facingMode = facing === 'front' ? 'user' : 'environment';
 
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-        const facingMode = facing === 'front' ? 'user' : 'environment';
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: videoDevices.length > 1 ? facingMode : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
+      });
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: videoDevices.length > 1 ? facingMode : undefined,
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-          },
-          audio: false,
-        });
-
-        if (!isMountedRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-        // ✅ FIX: Try to attach immediately. If the video element is already
-        // mounted this works. If not, handleVideoRef will attach when it mounts.
-        attachStreamToVideo();
-      } catch (err: unknown) {
-        const name = err instanceof Error ? (err as any).name : '';
-        const msg =
-          name === 'NotAllowedError'
-            ? 'Camera access blocked. Allow it in browser settings.'
-            : name === 'NotFoundError'
-              ? 'No camera found on this device.'
-              : name === 'NotReadableError'
-                ? 'Camera is in use by another app.'
-                : 'Could not start camera. Try refreshing.';
-        if (isMountedRef.current) setCamErr(msg);
+      // ✅ FIX: If component unmounted or camera was closed while
+      // getUserMedia was resolving, stop the stream immediately
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
       }
-    },
-    [stopWebStream, attachStreamToVideo]
-  );
+
+      streamRef.current = stream;
+
+      // Try to attach immediately — if the video element is already
+      // mounted this will work. If not, handleVideoRef will do it
+      // when the element mounts.
+      attachStreamToVideo();
+
+      // ✅ FIX: If attachment didn't work yet (video not mounted),
+      // retry after a short delay to handle slow renders
+      setTimeout(() => {
+        if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) {
+          attachStreamToVideo();
+        }
+      }, 300);
+    } catch (err: unknown) {
+      const name = err instanceof Error ? (err as any).name : '';
+      let msg: string;
+      switch (name) {
+        case 'NotAllowedError':
+          msg = 'Camera access blocked. Allow it in your browser settings.';
+          break;
+        case 'NotFoundError':
+          msg = 'No camera found on this device.';
+          break;
+        case 'NotReadableError':
+          msg = 'Camera is in use by another app. Close other tabs using the camera.';
+          break;
+        case 'OverconstrainedError':
+          msg = 'Camera does not support the requested settings. Trying again...';
+          // ✅ FIX: Retry with minimal constraints
+          try {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false,
+            });
+            if (!isMountedRef.current) {
+              fallbackStream.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            streamRef.current = fallbackStream;
+            attachStreamToVideo();
+            return; // Success on retry — don't show error
+          } catch {
+            msg = 'Could not start camera. Try a different browser.';
+          }
+          break;
+        default:
+          msg = 'Could not start camera. Try refreshing the page.';
+      }
+      if (isMountedRef.current) setCamErr(msg);
+    }
+  },
+  [stopWebStream, attachStreamToVideo]
+);
 
   const closeCam = useCallback(() => {
     stopWebStream();
@@ -1530,85 +1627,204 @@ export default function ProfileSetupScreen() {
     }
   }, [camFacing, startWebStream]);
 
-  const processPhoto = useCallback(
-    async (uri: string, type: PhotoType, currentPhotoCount: number) => {
+const processPhoto = useCallback(
+  async (uri: string, type: PhotoType, currentPhotoCount: number) => {
+    if (isMountedRef.current) {
+      setUploading(true);
+      setUploadProgress(0);
+    }
+
+    try {
+      // ── Step 1: Upload to Cloudinary ──────────────────────
+      const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
+
+      if (isMountedRef.current) setUploadProgress(40);
+
+      if (!upload.success || !upload.url) {
+        Alert.alert(
+          'Upload Failed',
+          upload.error ?? 'Could not upload photo. Check your connection.'
+        );
+        return;
+      }
+
+      // ── Step 2: NSFW / moderation check ───────────────────
+      if (upload.moderationStatus === 'rejected') {
+        Alert.alert(
+          'Photo Rejected',
+          'This photo was flagged as inappropriate. Please use a different photo.'
+        );
+        return;
+      }
+
+      // If moderation returned pending, warn but allow
+      // (Cloudinary async moderation — will be reviewed later)
+      if (upload.moderationStatus === 'pending' && __DEV__) {
+        console.warn(
+          '[ProfileSetup] Photo moderation is pending — will be reviewed async.'
+        );
+      }
+
+      if (isMountedRef.current) setUploadProgress(60);
+
+      // ── Step 3: Type-specific validation ──────────────────
+
+      // FACE PHOTO: Must actually contain a human face
+      if (type === 'face') {
+        try {
+          const ageResult: AgeEstimationResult | null =
+            await estimateAgeFromPhoto(upload.url);
+
+          if (!ageResult || !ageResult.estimatedAge || ageResult.confidence < 0.1) {
+            // No face detected — reject the photo
+            Alert.alert(
+              'No Face Detected',
+              'We couldn\'t detect a clear human face in this photo.\n\n' +
+              'Tips:\n' +
+              '• Face the camera directly\n' +
+              '• Use good lighting\n' +
+              '• Remove sunglasses or masks\n' +
+              '• Only your face should be in frame'
+            );
+            return;
+          }
+
+          // Face found — save age estimate
+          if (isMountedRef.current) {
+            set('ageEstimate', ageResult.estimatedAge);
+          }
+        } catch (err) {
+          // If the detection service is completely down, log but allow
+          // the photo through — don't block the user for a service outage
+          if (__DEV__) {
+            console.warn('[ProfileSetup] Face detection failed, allowing photo:', err);
+          }
+        }
+      }
+
+      // UPPER BODY PHOTO: Use full body detection to verify at least
+      // an upper body is visible (the detector can detect partial bodies too)
+      if (type === 'upper_body') {
+        try {
+          const bodyResult = await detectFullBodyPhoto(upload.url);
+          // detectFullBodyPhoto checks for body presence —
+          // if it can't find ANY body, reject
+          if (bodyResult && !bodyResult.isFullBody && bodyResult.confidence !== undefined && bodyResult.confidence < 0.2) {
+            Alert.alert(
+              'No Person Detected',
+              'We couldn\'t detect a person in this photo.\n\n' +
+              'Please take a photo showing you from the waist up with your face visible.'
+            );
+            return;
+          }
+        } catch {
+          // Service down — allow through
+          if (__DEV__) {
+            console.warn('[ProfileSetup] Upper body detection failed, allowing photo.');
+          }
+        }
+      }
+
+      // FULL BODY PHOTO: Must show full body head to toe
+      if (type === 'full_body') {
+        try {
+          const body = await detectFullBodyPhoto(upload.url);
+          if (!body.isFullBody) {
+            // Show warning but still ask if they want to keep it
+            Alert.alert(
+              'Not Full Body',
+              'We could not detect a full body in this photo.\n\n' +
+              'Tips:\n' +
+              '• Stand further from the camera\n' +
+              '• Make sure head to toe is visible\n' +
+              '• Use the timer and prop your phone\n\n' +
+              'Would you like to keep this photo anyway?',
+              [
+                {
+                  text: 'Discard',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Keep Anyway',
+                  onPress: () => {
+                    // Add the photo despite failed detection
+                    const photo: ProfilePhoto = {
+                      uri,
+                      url: upload.url,
+                      type,
+                      order: currentPhotoCount,
+                      verified: false, // Mark as unverified since detection failed
+                      uploadedAt: new Date().toISOString(),
+                    };
+                    dispatch({ type: 'ADD_PHOTO', photo });
+                    successHaptic();
+                    Alert.alert('📸 Photo Added!', 'Consider retaking for better results.');
+                  },
+                },
+              ]
+            );
+            return; // Don't fall through to automatic add below
+          }
+        } catch {
+          if (__DEV__) {
+            console.warn('[ProfileSetup] Full body detection failed, allowing photo.');
+          }
+        }
+      }
+
+      // FREESTYLE: No body/face validation required
+      // but NSFW check from Step 2 still applies
+
+      if (isMountedRef.current) setUploadProgress(100);
+
+      // ── Step 4: All checks passed — add the photo ─────────
+
+      const photo: ProfilePhoto = {
+        uri,
+        url: upload.url,
+        type,
+        order: currentPhotoCount,
+        verified: true,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      dispatch({ type: 'ADD_PHOTO', photo });
+      successHaptic();
+
+      // ── Step 5: Show helpful next-step hints ──────────────
+
+      const hints: string[] = [];
+      if (type === 'face' && !hasUpperBody) {
+        hints.push('upper body photo (required)');
+      }
+      if (type === 'upper_body' && !hasFullBody) {
+        hints.push('full body photo (+40% more matches)');
+      }
+      if (type === 'full_body' && currentPhotoCount < 3) {
+        hints.push('freestyle photo to show personality');
+      }
+
+      Alert.alert(
+        '📸 Photo Added!',
+        hints.length > 0
+          ? `Great shot! Next up: ${hints.join(', ')}`
+          : 'Looking good! 🎉'
+      );
+    } catch (err) {
+      logger.error('processPhoto failed:', err);
+      Alert.alert(
+        'Upload Error',
+        'Something went wrong uploading your photo. Check your connection and try again.'
+      );
+    } finally {
       if (isMountedRef.current) {
-        setUploading(true);
+        setUploading(false);
         setUploadProgress(0);
       }
-
-      try {
-        const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
-        if (isMountedRef.current) setUploadProgress(50);
-
-        if (!upload.success || !upload.url) {
-          Alert.alert('Upload Failed', upload.error ?? 'Could not upload photo. Check your connection.');
-          return;
-        }
-        if (upload.moderationStatus === 'rejected') {
-          Alert.alert('Photo Rejected', 'This photo was flagged as inappropriate. Please use a different photo.');
-          return;
-        }
-
-        if (isMountedRef.current) setUploadProgress(75);
-
-        if (type === 'full_body') {
-          try {
-            const body = await detectFullBodyPhoto(upload.url);
-            if (!body.isFullBody) {
-              Alert.alert(
-                'Not Full Body',
-                'We could not detect a full body. Try standing further from the camera with head to toe visible.',
-                [{ text: 'OK' }]
-              );
-            }
-          } catch {}
-        }
-
-        if (type === 'face' && !hasFace) {
-          try {
-            const ageResult: AgeEstimationResult | null = await estimateAgeFromPhoto(upload.url);
-            if (ageResult?.estimatedAge && isMountedRef.current) {
-              set('ageEstimate', ageResult.estimatedAge);
-            }
-          } catch {}
-        }
-
-        if (isMountedRef.current) setUploadProgress(100);
-
-        const photo: ProfilePhoto = {
-          uri,
-          url: upload.url,
-          type,
-          // ✅ FIX: use passed-in count instead of stale closure value
-          order: currentPhotoCount,
-          verified: true,
-          uploadedAt: new Date().toISOString(),
-        };
-
-        dispatch({ type: 'ADD_PHOTO', photo });
-        successHaptic();
-
-        const hints: string[] = [];
-        if (type === 'face' && !hasUpperBody) hints.push('upper body photo (required)');
-        if (type === 'upper_body' && !hasFullBody) hints.push('full body photo (+40% matches)');
-
-        Alert.alert(
-          '📸 Photo Added!',
-          hints.length > 0 ? `Great shot! Next up: ${hints.join(', ')}` : 'Looking good!'
-        );
-      } catch (err) {
-        logger.error('processPhoto failed:', err);
-        Alert.alert('Upload Error', 'Check your connection and try again.');
-      } finally {
-        if (isMountedRef.current) {
-          setUploading(false);
-          setUploadProgress(0);
-        }
-      }
-    },
-    [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
-  );
+    }
+  },
+  [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
+);
 
   const doCapture = useCallback(async () => {
     if (!camSlot || capturing) return;
