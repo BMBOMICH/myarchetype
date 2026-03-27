@@ -979,9 +979,12 @@ export default function ProfileSetupScreen() {
     }
   }, [camSlot, camFacing, form.photos.length, processPhoto, closeCam]);
 
-  const handleCapture = useCallback(() => {
-    if (capturingRef.current || countdown !== null) return;
-    if (timerEnabled && camSlot?.timerAvailable) {
+const handleCapture = useCallback(() => {
+  Alert.alert('Tapped', `capturing=${capturingRef.current} countdown=${countdown} camReady=${camReady}`);
+  if (countdown !== null) return;
+  if (capturingRef.current && !capturing) capturingRef.current = false;
+  if (capturingRef.current) return;
+  if (timerEnabled && camSlot?.timerAvailable) {
       setCountdown(TIMER_SECONDS);
       let count = TIMER_SECONDS;
       countdownRef.current = setInterval(() => {
