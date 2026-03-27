@@ -1599,17 +1599,31 @@ export default function ProfileSetupScreen() {
               </TouchableOpacity>
 
               {/* FIX 2: No disabled prop — guard inside onPress */}
-              <TouchableOpacity
-                style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
-                onPress={() => {
-                  if (__DEV__) console.log('[CAPTURE] pressed', { capturing, camReady, camSlot: camSlot?.type });
-                  if (capturing || countdown !== null) return;
-                  handleCapture();
-                }}
-                activeOpacity={0.8}
-              >
-                {capturing ? (<ActivityIndicator size="small" color={C.accent} />) : (<View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />)}
-              </TouchableOpacity>
+             <TouchableOpacity
+  style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
+  onPress={() => {
+    const v = webVideoElRef.current;
+    const debugInfo = [
+      `camSlot: ${camSlot?.type ?? 'null'}`,
+      `capturing: ${capturingRef.current}`,
+      `camReady: ${camReady}`,
+      `hasVideoEl: ${!!v}`,
+      `readyState: ${v?.readyState ?? 'N/A'}`,
+      `videoW: ${v?.videoWidth ?? 'N/A'}`,
+      `videoH: ${v?.videoHeight ?? 'N/A'}`,
+      `stream: ${!!streamRef.current}`,
+      `countdown: ${countdown}`,
+    ].join('\n');
+
+    Alert.alert('DEBUG - Capture Pressed', debugInfo);
+
+    if (capturing || countdown !== null) return;
+    handleCapture();
+  }}
+  activeOpacity={0.8}
+>
+  {capturing ? (<ActivityIndicator size="small" color={C.accent} />) : (<View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />)}
+</TouchableOpacity>
 
               <View style={st.flipBtn} />
             </View>
