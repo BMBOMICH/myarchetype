@@ -50,7 +50,6 @@ import { profileStorage } from '../utils/storage';
 
 const IS_WEB = Platform.OS === 'web';
 const IS_IOS = Platform.OS === 'ios';
-// const IS_ANDROID = Platform.OS === 'android'; // removed — unused
 
 // ─── Design Tokens ────────────────────────────────────────
 
@@ -116,9 +115,8 @@ const STEP_NAMES = [
   'Preview',
 ] as const;
 
-// ─── Theme tokens (matches login/signup) ──────────────────
+// ─── Theme tokens ──────────────────────────────────────────
 
-// ✅ FIX: Use an interface so both dark/light are assignable to Theme
 interface Theme {
   bg: string;
   bgGradientStart: string;
@@ -1024,13 +1022,13 @@ function makeGuideStyles(C: Theme) {
   });
 }
 
-// ─── Web video component (isolates web-only JSX) ──────────
+// ─── Web video component ───────────────────────────────────
 
 const WebVideoPreview = React.memo(function WebVideoPreview({
   facing,
   onReady,
 }: {
-  streamReady?: boolean; // kept for API compat but not used
+  streamReady?: boolean;
   facing: 'front' | 'back';
   onReady: (el: any) => void;
 }) {
@@ -1113,11 +1111,12 @@ export default function ProfileSetupScreen() {
   const isMountedRef = useRef(true);
   const scrollRef = useRef<ScrollView>(null);
   const cameraRef = useRef<CameraView>(null);
-  // ✅ FIX: Use `any` for web-only refs so we don't need DOM lib
   const streamRef = useRef<any>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isDirtyRef = useRef(false);
   const webVideoElRef = useRef<any>(null);
+  // ── FIX: ref-based capture guard to avoid stale closure issues ──
+  const capturingRef = useRef(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -1389,7 +1388,6 @@ export default function ProfileSetupScreen() {
     if (isMountedRef.current) setCamReady(false);
   }, []);
 
-  // ✅ FIX: All web DOM APIs use `any` casts to avoid needing "dom" in lib
   const attachStreamToVideo = useCallback(() => {
     const video = webVideoElRef.current;
     const stream = streamRef.current;
@@ -1406,22 +1404,22 @@ export default function ProfileSetupScreen() {
 
     video.srcObject = stream;
 
-    // Check if metadata already loaded
+    // Already ready after attaching
     if (video.readyState >= 2) {
       video.play().catch(() => {});
       if (isMountedRef.current) setCamReady(true);
       return;
     }
 
-video.onloadedmetadata = () => {
-  video.play().catch(() => {});
-  if (isMountedRef.current) setCamReady(true); // same, this one is fine
-};
+    video.onloadedmetadata = () => {
+      video.play().catch(() => {});
+      if (isMountedRef.current) setCamReady(true);
+    };
 
-video.oncanplay = () => {
-  if (isMountedRef.current) setCamReady(true); // always set ready
-  if (video.paused) video.play().catch(() => {}); // only play if paused
-};
+    video.oncanplay = () => {
+      if (isMountedRef.current) setCamReady(true);
+      if (video.paused) video.play().catch(() => {});
+    };
 
     video.onerror = () => {
       if (isMountedRef.current) {
@@ -1493,22 +1491,23 @@ video.oncanplay = () => {
         streamRef.current = stream;
         attachStreamToVideo();
 
-setTimeout(() => {
-  if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) {
-    attachStreamToVideo();
-  }
-}, 600);
+        // Retry attaching if video element wasn't ready yet
+        setTimeout(() => {
+          if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) {
+            attachStreamToVideo();
+          }
+        }, 600);
 
-setTimeout(() => {
-  if (isMountedRef.current && streamRef.current) {
-    attachStreamToVideo();
-    // Force camReady if video is playing but state wasn't updated
-    const v = webVideoElRef.current;
-    if (v && v.readyState >= 2 && isMountedRef.current) {
-      setCamReady(true);
-    }
-  }
-}, 1200);
+        // Final fallback — force camReady if video is playing but state wasn't updated
+        setTimeout(() => {
+          if (isMountedRef.current && streamRef.current) {
+            attachStreamToVideo();
+            const v = webVideoElRef.current;
+            if (v && v.readyState >= 2 && isMountedRef.current) {
+              setCamReady(true);
+            }
+          }
+        }, 1200);
       } catch (err: unknown) {
         const name = err instanceof Error ? (err as any).name : '';
         let msg: string;
@@ -1564,6 +1563,7 @@ setTimeout(() => {
       setCountdown(null);
       setTimerEnabled(false);
       setCapturing(false);
+      capturingRef.current = false;
     }
   }, [stopWebStream]);
 
@@ -1612,6 +1612,7 @@ setTimeout(() => {
         setCamErr(null);
         setCamReady(false);
         setCapturing(false);
+        capturingRef.current = false;
       }
 
       if (IS_WEB) {
@@ -1668,7 +1669,6 @@ setTimeout(() => {
 
         if (isMountedRef.current) setUploadProgress(60);
 
-        // ✅ FIX: Capture the URL here so TS knows it's defined
         const photoUrl: string = upload.url;
 
         // FACE PHOTO validation
@@ -1811,25 +1811,67 @@ setTimeout(() => {
     [hasFace, hasUpperBody, hasFullBody, set, successHaptic]
   );
 
+  // ── FIX: doCapture uses capturingRef to avoid stale closure,
+  //         checks video.readyState directly with polling fallback,
+  //         and alerts on every early-exit path so nothing is silent.
   const doCapture = useCallback(async () => {
-    if (!camSlot || capturing) return;
+    if (!camSlot) return;
+    if (capturingRef.current) return;
+
+    capturingRef.current = true;
     setCapturing(true);
 
     let uri: string | null = null;
     try {
       if (IS_WEB) {
-        if (!camReady) return;
         const v = webVideoElRef.current;
-        if (!v || v.readyState < 2) return;
 
-        // ✅ FIX: cast document to any for web-only usage
+        if (!v) {
+          Alert.alert('Camera Error', 'Video element not found. Please close and reopen the camera.');
+          return;
+        }
+
+        // If not ready yet, poll up to 2 seconds before giving up
+        if (v.readyState < 2) {
+          await new Promise<void>((resolve) => {
+            const deadline = Date.now() + 2000;
+            const poll = () => {
+              if (v.readyState >= 2) { resolve(); return; }
+              if (Date.now() >= deadline) { resolve(); return; }
+              setTimeout(poll, 100);
+            };
+            poll();
+          });
+        }
+
+        if (v.readyState < 2) {
+          Alert.alert('Camera Not Ready', 'The camera is still loading. Please wait a moment and try again.');
+          return;
+        }
+
         const doc2 = (globalThis as any).document;
-        if (!doc2) return;
+        if (!doc2) {
+          Alert.alert('Browser Error', 'Cannot access document. Try refreshing the page.');
+          return;
+        }
+
+        const vw = v.videoWidth;
+        const vh = v.videoHeight;
+
+        if (!vw || !vh) {
+          Alert.alert('Camera Not Ready', 'Video dimensions not available yet. Please try again.');
+          return;
+        }
+
         const canvas = doc2.createElement('canvas');
-        canvas.width = v.videoWidth || 1280;
-        canvas.height = v.videoHeight || 960;
+        canvas.width = vw;
+        canvas.height = vh;
+
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (!ctx) {
+          Alert.alert('Browser Error', 'Cannot create canvas context. Try a different browser.');
+          return;
+        }
 
         if (camFacing === 'front') {
           ctx.save();
@@ -1847,7 +1889,10 @@ setTimeout(() => {
 
         uri = canvas.toDataURL('image/jpeg', 0.88);
       } else {
-        if (!cameraRef.current) return;
+        if (!cameraRef.current) {
+          Alert.alert('Camera Error', 'Camera not available. Please close and reopen.');
+          return;
+        }
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.88,
           skipProcessing: false,
@@ -1867,12 +1912,14 @@ setTimeout(() => {
       logger.error('doCapture failed:', err);
       Alert.alert('Error', 'Something went wrong capturing the photo.');
     } finally {
+      capturingRef.current = false;
       if (isMountedRef.current) setCapturing(false);
     }
-  }, [camSlot, capturing, camReady, camFacing, form.photos.length, closeCam, processPhoto]);
+  }, [camSlot, camFacing, form.photos.length, closeCam, processPhoto]);
 
+  // ── FIX: handleCapture uses capturingRef instead of state
   const handleCapture = useCallback(() => {
-    if (capturing || countdown !== null) return;
+    if (capturingRef.current || countdown !== null) return;
 
     if (timerEnabled && camSlot?.timerAvailable) {
       setCountdown(TIMER_SECONDS);
@@ -1891,12 +1938,12 @@ setTimeout(() => {
     } else {
       void doCapture();
     }
-  }, [capturing, countdown, timerEnabled, camSlot, doCapture]);
+  }, [countdown, timerEnabled, camSlot, doCapture]);
 
   const removePhoto = useCallback(
     (index: number) => {
       const photo = form.photos[index];
-      if (!photo) return; // ✅ FIX: guard against undefined
+      if (!photo) return;
       const isRequired = photo.type === 'face' || photo.type === 'upper_body';
       Alert.alert(
         'Remove Photo',
@@ -3173,7 +3220,8 @@ setTimeout(() => {
                 <Text style={st.flipBtnText}>🔄</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              {/* ── FIX: Pressable instead of TouchableOpacity for reliable web clicks ── */}
+              <Pressable
                 style={[
                   st.captureBtn,
                   { borderColor: C.accent },
@@ -3181,14 +3229,13 @@ setTimeout(() => {
                 ]}
                 onPress={handleCapture}
                 disabled={(IS_WEB && !camReady) || capturing || countdown !== null}
-                activeOpacity={0.8}
               >
                 {capturing ? (
                   <ActivityIndicator size="small" color={C.accent} />
                 ) : (
                   <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />
                 )}
-              </TouchableOpacity>
+              </Pressable>
 
               <View style={st.flipBtn} />
             </View>
