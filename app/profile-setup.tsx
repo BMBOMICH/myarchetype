@@ -465,43 +465,171 @@ export default function ProfileSetupScreen() {
 
   const flipCamera = useCallback(() => { const n = camFacing === 'front' ? 'back' : 'front'; setCamFacing(n); if (IS_WEB) { setCamReady(false); startWebStream(n); } }, [camFacing, startWebStream]);
 
-  const processPhoto = useCallback(async (uri: string, type: PhotoType, count: number): Promise<boolean> => {
-    if (isMountedRef.current) { setUploading(true); setUploadProgress(0); }
+const processPhoto = useCallback(
+  async (uri: string, type: PhotoType, count: number): Promise<boolean> => {
+    if (isMountedRef.current) {
+      setUploading(true);
+      setUploadProgress(0);
+    }
+
     try {
+      // ── Upload + request face detection in one call ──
       const upload = await uploadToCloudinary(uri, 'profile_photo');
       if (isMountedRef.current) setUploadProgress(40);
-      if (!upload.success || !upload.url) { showAlert('Upload Failed', upload.error ?? 'Could not upload photo.'); return false; }
-      if (upload.moderationStatus === 'rejected') { showAlert('Photo Rejected', 'This photo was flagged. Use a different photo.'); return false; }
-      if (isMountedRef.current) setUploadProgress(60);
-      const photoUrl = upload.url;
 
-      if (type === 'face') { try { const ar = await estimateAgeFromPhoto(photoUrl); if (!ar || !ar.estimatedAge || ar.confidence < 0.1) { showAlert('No Face Detected', 'Could not detect a clear face.\n\nTips: Face camera directly, good lighting, remove sunglasses.'); return false; } if (isMountedRef.current) set('ageEstimate', ar.estimatedAge); } catch { } }
-      if (type === 'upper_body') { try { const br = await detectFullBodyPhoto(photoUrl); if (br && !br.isFullBody && br.confidence !== undefined && br.confidence < 0.2) { showAlert('No Person Detected', 'Please take a photo showing you from the waist up.'); return false; } } catch { } }
+      if (!upload.success || !upload.url) {
+        showAlert('Upload Failed', upload.error ?? 'Could not upload photo.');
+        return false;
+      }
+
+      // ── Hard block: Cloudinary moderation add-on rejected it ──
+      // (only fires if you enable a moderation add-on on the preset)
+      if (upload.moderationStatus === 'rejected') {
+        showAlert(
+          'Photo Rejected',
+          'This photo was flagged as inappropriate. Please use a different photo.',
+        );
+        return false;
+      }
+
+      if (isMountedRef.current) setUploadProgress(60);
+
+      const photoUrl = upload.url;
+      const detectedFaces = upload.faces ?? [];
+
+      // ── Face photo: must have exactly one face ──
+      if (type === 'face') {
+        if (detectedFaces.length === 0) {
+          showAlert(
+            'No Face Detected',
+            'Could not detect a clear face in this photo.\n\n' +
+              'Tips:\n• Look directly at the camera\n' +
+              '• Ensure good lighting\n• Remove sunglasses or hats',
+          );
+          return false;
+        }
+        if (detectedFaces.length > 1) {
+          showAlert(
+            'Multiple Faces',
+            `Detected ${detectedFaces.length} faces. Your profile photo must show only you.`,
+          );
+          return false;
+        }
+        // Store age estimate if available (keep existing logic)
+        try {
+          const ar = await estimateAgeFromPhoto(photoUrl);
+          if (ar?.estimatedAge && ar.confidence >= 0.1) {
+            if (isMountedRef.current) set('ageEstimate', ar.estimatedAge);
+          }
+        } catch {
+          // age estimation is optional — don't block on failure
+        }
+      }
+
+      // ── Upper body: run existing body detection ──
+      if (type === 'upper_body') {
+        try {
+          const br = await detectFullBodyPhoto(photoUrl);
+          if (br && !br.isFullBody && (br.confidence ?? 1) < 0.2) {
+            showAlert(
+              'No Person Detected',
+              'Please take a photo showing you from the waist up.',
+            );
+            return false;
+          }
+        } catch {
+          // body detection is optional
+        }
+      }
+
+      // ── Full body: offer to keep if detection is uncertain ──
       if (type === 'full_body') {
-        try { const body = await detectFullBodyPhoto(photoUrl);
+        try {
+          const body = await detectFullBodyPhoto(photoUrl);
           if (!body.isFullBody) {
             const keep = await new Promise<boolean>((resolve) => {
-              showAlert('Not Full Body', 'Could not detect a full body. Keep this photo anyway?',
-                [{ text: 'Discard', style: 'cancel', onPress: () => resolve(false) },
-                 { text: 'Keep Anyway', onPress: () => { dispatch({ type: 'ADD_PHOTO', photo: { uri, url: photoUrl, type, order: count, verified: false, uploadedAt: new Date().toISOString() } }); successHaptic(); resolve(true); } }]);
+              showAlert(
+                'Not Full Body',
+                'Could not detect a full body. Keep this photo anyway?',
+                [
+                  {
+                    text: 'Discard',
+                    style: 'cancel',
+                    onPress: () => resolve(false),
+                  },
+                  {
+                    text: 'Keep Anyway',
+                    onPress: () => {
+                      dispatch({
+                        type: 'ADD_PHOTO',
+                        photo: {
+                          uri,
+                          url: photoUrl,
+                          type,
+                          order: count,
+                          verified: false,
+                          uploadedAt: new Date().toISOString(),
+                        },
+                      });
+                      successHaptic();
+                      resolve(true);
+                    },
+                  },
+                ],
+              );
             });
             return keep;
           }
-        } catch { }
+        } catch {
+          // body detection is optional
+        }
       }
 
       if (isMountedRef.current) setUploadProgress(100);
-      dispatch({ type: 'ADD_PHOTO', photo: { uri, url: photoUrl, type, order: count, verified: true, uploadedAt: new Date().toISOString() } });
+
+      dispatch({
+        type: 'ADD_PHOTO',
+        photo: {
+          uri,
+          url: photoUrl,
+          type,
+          order: count,
+          // verified = true only when Cloudinary confirmed one face
+          verified: type === 'face' ? detectedFaces.length === 1 : true,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+
       successHaptic();
+
       const hints: string[] = [];
-      if (type === 'face' && !hasUpperBody) hints.push('upper body photo (required)');
-      if (type === 'upper_body' && !hasFullBody) hints.push('full body photo (+40% more matches)');
-      if (type === 'full_body' && count < 3) hints.push('freestyle photo to show personality');
-      showAlert('📸 Photo Added!', hints.length > 0 ? `Great shot! Next: ${hints.join(', ')}` : 'Looking good! 🎉');
+      if (type === 'face' && !hasUpperBody)
+        hints.push('upper body photo (required)');
+      if (type === 'upper_body' && !hasFullBody)
+        hints.push('full body photo (+40% more matches)');
+      if (type === 'full_body' && count < 3)
+        hints.push('freestyle photo to show your personality');
+
+      showAlert(
+        '📸 Photo Added!',
+        hints.length > 0
+          ? `Great shot! Next: ${hints.join(', ')}`
+          : 'Looking good! 🎉',
+      );
       return true;
-    } catch (err) { logger.error('processPhoto failed:', err); showAlert('Upload Error', 'Something went wrong. Check your connection.'); return false; }
-    finally { if (isMountedRef.current) { setUploading(false); setUploadProgress(0); } }
-  }, [hasUpperBody, hasFullBody, set, successHaptic]);
+    } catch (err) {
+      logger.error('processPhoto failed:', err);
+      showAlert('Upload Error', 'Something went wrong. Check your connection.');
+      return false;
+    } finally {
+      if (isMountedRef.current) {
+        setUploading(false);
+        setUploadProgress(0);
+      }
+    }
+  },
+  [hasUpperBody, hasFullBody, set, successHaptic],
+);
 
   const doCapture = useCallback(async () => {
     if (!camSlot || capturingRef.current) return;
