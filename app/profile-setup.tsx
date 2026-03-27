@@ -1591,8 +1591,11 @@ export default function ProfileSetupScreen() {
                 {capturing && (<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text></View>)}
               </View>
             )}
-            {countdown !== null && (<View style={st.countdownOverlay}><Text style={[st.countdownText, { color: C.white }]}>{countdown}</Text></View>)}
-          </View>
+{countdown !== null && (
+  <View style={st.countdownOverlay} pointerEvents="none">
+    <Text style={[st.countdownText, { color: C.white }]}>{countdown}</Text>
+  </View>
+)}
 
           <View style={[st.camControls, { backgroundColor: C.card, borderTopColor: C.cardBorder }]}>
             {camSlot?.timerAvailable && (
@@ -1854,7 +1857,14 @@ const st = StyleSheet.create({
   retryBtnText: { fontSize: FONT.base, fontWeight: '600' },
   camProcessingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 30 },
   camProcessingText: { marginTop: SPACING.lg, fontSize: FONT.base, fontWeight: '600' },
-  countdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 80, justifyContent: 'center', alignItems: 'center', zIndex: 20 },
+countdownOverlay: {
+  position: 'absolute',
+  top: 0, left: 0, right: 0, bottom: 80,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 20,
+  pointerEvents: 'none',
+},
   countdownText: { fontSize: 120, fontWeight: 'bold', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 10 },
   camControls: { alignItems: 'center', paddingBottom: IS_IOS ? 44 : SPACING.lg, paddingTop: SPACING.lg, borderTopWidth: 1 },
   timerBtn: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.xxl, marginBottom: SPACING.lg, borderWidth: 1.5 },
