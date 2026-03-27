@@ -1509,7 +1509,7 @@ const handleCapture = useCallback(() => {
               >
                 {capturing
                   ? <ActivityIndicator size="small" color={C.accent} />
-                  : <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />}
+                 : <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} pointerEvents="none" />}
               </TouchableOpacity>
 
               <View style={st.flipBtn} />
