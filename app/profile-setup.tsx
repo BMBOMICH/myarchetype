@@ -521,21 +521,22 @@ const WebVideoPreview = React.memo(function WebVideoPreview({
 }: { streamReady?: boolean; facing: 'front' | 'back'; onReady: (el: any) => void }) {
   if (!IS_WEB) return null;
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} pointerEvents="none">
       {/* @ts-ignore web only */}
-<video
-  ref={(node: any) => { if (node) onReady(node); }}
-  autoPlay playsInline muted
-  style={{
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover' as any,
-    display: 'block',
-    transform: facing === 'front' ? 'scaleX(-1)' : 'none',
-    pointerEvents: 'none',
-    touchAction: 'none',
-  }}
-/>
+      <video
+        ref={(node: any) => { if (node) onReady(node); }}
+        autoPlay playsInline muted
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover' as any,
+          display: 'block',
+          transform: facing === 'front' ? 'scaleX(-1)' : 'none',
+          pointerEvents: 'none',
+          WebkitUserSelect: 'none',
+          touchAction: 'none',
+        } as any}
+      />
     </View>
   );
 });
