@@ -1608,31 +1608,56 @@ export default function ProfileSetupScreen() {
               </TouchableOpacity>
 
               {/* FIX 2: No disabled prop — guard inside onPress */}
-             <TouchableOpacity
-  style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
-  onPress={() => {
-    const v = webVideoElRef.current;
-    const debugInfo = [
-      `camSlot: ${camSlot?.type ?? 'null'}`,
-      `capturing: ${capturingRef.current}`,
-      `camReady: ${camReady}`,
-      `hasVideoEl: ${!!v}`,
-      `readyState: ${v?.readyState ?? 'N/A'}`,
-      `videoW: ${v?.videoWidth ?? 'N/A'}`,
-      `videoH: ${v?.videoHeight ?? 'N/A'}`,
-      `stream: ${!!streamRef.current}`,
-      `countdown: ${countdown}`,
-    ].join('\n');
-
-    Alert.alert('DEBUG - Capture Pressed', debugInfo);
-
-    if (capturing || countdown !== null) return;
-    handleCapture();
-  }}
-  activeOpacity={0.8}
->
-  {capturing ? (<ActivityIndicator size="small" color={C.accent} />) : (<View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />)}
-</TouchableOpacity>
+{IS_WEB ? (
+  <div
+    onClick={() => {
+      if (capturing || countdown !== null) return;
+      handleCapture();
+    }}
+    style={{
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      backgroundColor: '#fff',
+      border: `4px solid ${C.accent}`,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      cursor: 'pointer',
+      opacity: (capturing || countdown !== null) ? 0.4 : 1,
+      WebkitTapHighlightColor: 'transparent',
+      touchAction: 'manipulation',
+      zIndex: 999,
+      position: 'relative',
+    } as any}
+  >
+    {capturing ? (
+      <ActivityIndicator size="small" color={C.accent} />
+    ) : (
+      <div style={{
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: C.accent,
+      } as any} />
+    )}
+  </div>
+) : (
+  <TouchableOpacity
+    style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
+    onPress={() => {
+      if (capturing || countdown !== null) return;
+      handleCapture();
+    }}
+    activeOpacity={0.8}
+  >
+    {capturing ? (
+      <ActivityIndicator size="small" color={C.accent} />
+    ) : (
+      <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />
+    )}
+  </TouchableOpacity>
+)}
 
               <View style={st.flipBtn} />
             </View>
