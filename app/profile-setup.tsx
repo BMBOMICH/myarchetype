@@ -497,7 +497,7 @@ const CameraGuide = React.memo(function CameraGuide({ type, C }: { type: PhotoTy
 
 function makeGuideStyles(C: Theme) {
   return StyleSheet.create({
-    container: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+    container: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 10, pointerEvents: 'none' } as any,
     faceOval: { width: 160, height: 200, borderRadius: 100, borderWidth: 2, borderColor: C.guideStroke, borderStyle: 'dashed', backgroundColor: C.guideFill, marginTop: -60 },
     shoulderLine: { width: 220, height: 40, borderTopLeftRadius: 60, borderTopRightRadius: 60, borderWidth: 2, borderBottomWidth: 0, borderColor: C.guideStroke, borderStyle: 'dashed', marginTop: -8 },
     guideText: { color: C.guideStroke, fontSize: FONT.base, textAlign: 'center', marginTop: SPACING.xl, fontWeight: '600', lineHeight: 20 },
@@ -533,7 +533,6 @@ const WebVideoPreview = React.memo(function WebVideoPreview({
           display: 'block',
           transform: facing === 'front' ? 'scaleX(-1)' : 'none',
           pointerEvents: 'none',
-          WebkitUserSelect: 'none',
           touchAction: 'none',
         } as any}
       />
@@ -612,7 +611,7 @@ export default function ProfileSetupScreen() {
         const rawDraft = profileStorage.getString(draftKey) ?? null;
         if (rawDraft) { const parsed = JSON.parse(rawDraft) as Partial<FormState>; delete parsed.photos; if (isMountedRef.current) dispatch({ type: 'LOAD', state: parsed }); }
         if (isMountedRef.current) setStep(1);
-      } catch { /* ignore */ }
+      } catch { }
     })();
   }, [draftKey, stepKey]);
 
@@ -625,8 +624,8 @@ export default function ProfileSetupScreen() {
       if (!isDirtyRef.current) return;
       isDirtyRef.current = false;
       const { photos: _photos, ...rest } = form;
-      try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch {}
-      try { profileStorage.set(stepKey, String(step)); } catch {}
+      try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch { }
+      try { profileStorage.set(stepKey, String(step)); } catch { }
     }, 2000);
     return () => clearTimeout(t);
   }, [form, step, draftKey, stepKey]);
@@ -636,12 +635,12 @@ export default function ProfileSetupScreen() {
 
   useEffect(() => {
     if (!IS_WEB && !permission?.granted && permission?.canAskAgain !== false) {
-      Alert.alert('Camera Required', 'This app uses your camera to take profile photos. No gallery uploads are allowed to keep profiles authentic.',
+      Alert.alert('Camera Required', 'This app uses your camera to take profile photos.',
         [{ text: 'Not Now', style: 'cancel' }, { text: 'Grant Access', onPress: () => requestPermission() }]);
     }
   }, [permission?.granted, permission?.canAskAgain, requestPermission]);
 
-  useEffect(() => { const name = STEP_NAMES[step - 1]; AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}: ${name}`); }, [step]);
+  useEffect(() => { AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}: ${STEP_NAMES[step - 1]}`); }, [step]);
 
   const birthday = useMemo<Date | null>(() => {
     const m = parseInt(form.bdayMonth); const d = parseInt(form.bdayDay); const y = parseInt(form.bdayYear);
@@ -697,8 +696,8 @@ export default function ProfileSetupScreen() {
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
   }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
 
-  const haptic = useCallback((style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => { if (!IS_WEB) Haptics.impactAsync(style).catch(() => {}); }, []);
-  const successHaptic = useCallback(() => { if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }, []);
+  const haptic = useCallback((style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => { if (!IS_WEB) Haptics.impactAsync(style).catch(() => { }); }, []);
+  const successHaptic = useCallback(() => { if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { }); }, []);
 
   const animate = useCallback((dir: 'fwd' | 'back') => {
     const toVal = dir === 'fwd' ? -screenWidth : screenWidth;
@@ -718,8 +717,8 @@ export default function ProfileSetupScreen() {
     if (!stepOk) { Alert.alert('Incomplete', getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm)); return; }
     if (step >= TOTAL_STEPS) return;
     if (step === 7) {
-      if (form.bio.trim()) { const bioBlock = checkBlocked(form.bio); if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; } }
-      for (const p of form.prompts) { if (p.a.trim()) { const promptBlock = checkBlocked(p.a); if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; } } }
+      if (form.bio.trim()) { const b = checkBlocked(form.bio); if (b) { Alert.alert('Bio Issue', b); return; } }
+      for (const p of form.prompts) { if (p.a.trim()) { const b = checkBlocked(p.a); if (b) { Alert.alert('Prompt Issue', b); return; } } }
     }
     if (step === 6) {
       const minA = parseInt(form.ageMin) || MIN_AGE; const maxA = parseInt(form.ageMax) || 50;
@@ -738,92 +737,55 @@ export default function ProfileSetupScreen() {
     requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); });
   }, [step, haptic, animate, router]);
 
-  // ─── Camera: web stream management ────────────────────────
-
   const stopWebStream = useCallback(() => {
     if (readyPollRef.current) { clearInterval(readyPollRef.current); readyPollRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t: any) => t.stop()); streamRef.current = null; }
     if (isMountedRef.current) setCamReady(false);
   }, []);
 
-  // *** FIX 1: attachStreamToVideo with polling fallback ***
   const attachStreamToVideo = useCallback(() => {
     const video = webVideoElRef.current;
     const stream = streamRef.current;
-
     if (!video || !stream) return;
 
     if (video.srcObject === stream) {
-      if (video.readyState >= 2 && isMountedRef.current) {
-        setCamReady(true);
-      }
+      if (video.readyState >= 2 && isMountedRef.current) setCamReady(true);
       return;
     }
 
     video.srcObject = stream;
 
     if (video.readyState >= 2) {
-      video.play().catch(() => {});
+      video.play().catch(() => { });
       if (isMountedRef.current) setCamReady(true);
       return;
     }
 
-    video.onloadedmetadata = () => {
-      video.play().catch(() => {});
-      if (isMountedRef.current) setCamReady(true);
-    };
+    video.onloadedmetadata = () => { video.play().catch(() => { }); if (isMountedRef.current) setCamReady(true); };
+    video.oncanplay = () => { if (isMountedRef.current) setCamReady(true); if (video.paused) video.play().catch(() => { }); };
+    video.onerror = () => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera stream error. Please try again.'); } };
 
-    video.oncanplay = () => {
-      if (isMountedRef.current) setCamReady(true);
-      if (video.paused) video.play().catch(() => {});
-    };
-
-    video.onerror = () => {
-      if (isMountedRef.current) {
-        setCamReady(false);
-        setCamErr('Camera stream error. Please try again.');
-      }
-    };
-
-    const tracks = stream.getTracks();
-    tracks.forEach((track: any) => {
-      track.onended = () => {
-        if (isMountedRef.current) {
-          setCamReady(false);
-          setCamErr('Camera disconnected. Please try again.');
-        }
-      };
+    stream.getTracks().forEach((track: any) => {
+      track.onended = () => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera disconnected. Please try again.'); } };
     });
 
-    // POLLING FALLBACK — browser events sometimes don't fire
     if (readyPollRef.current) clearInterval(readyPollRef.current);
     let pollCount = 0;
     readyPollRef.current = setInterval(() => {
       pollCount++;
-      if (!isMountedRef.current || pollCount > 30) {
-        if (readyPollRef.current) clearInterval(readyPollRef.current);
-        readyPollRef.current = null;
-        return;
-      }
+      if (!isMountedRef.current || pollCount > 30) { if (readyPollRef.current) { clearInterval(readyPollRef.current); readyPollRef.current = null; } return; }
       const v = webVideoElRef.current;
       if (v && v.readyState >= 2) {
-        if (readyPollRef.current) clearInterval(readyPollRef.current);
-        readyPollRef.current = null;
-        if (v.paused) v.play().catch(() => {});
+        if (readyPollRef.current) { clearInterval(readyPollRef.current); readyPollRef.current = null; }
+        if (v.paused) v.play().catch(() => { });
         if (isMountedRef.current) setCamReady(true);
-        if (__DEV__) console.log('[Camera] Ready via polling fallback, readyState:', v.readyState);
       }
     }, 200);
   }, []);
 
   const handleVideoRef = useCallback((el: any) => {
     if (!el) {
-      if (webVideoElRef.current) {
-        webVideoElRef.current.onloadedmetadata = null;
-        webVideoElRef.current.oncanplay = null;
-        webVideoElRef.current.onerror = null;
-        webVideoElRef.current.srcObject = null;
-      }
+      if (webVideoElRef.current) { webVideoElRef.current.onloadedmetadata = null; webVideoElRef.current.oncanplay = null; webVideoElRef.current.onerror = null; webVideoElRef.current.srcObject = null; }
       webVideoElRef.current = null;
       return;
     }
@@ -837,46 +799,28 @@ export default function ProfileSetupScreen() {
       if (!IS_WEB) return;
       const nav = navigator as any;
       if (!nav.mediaDevices?.getUserMedia) { if (isMountedRef.current) setCamErr('Camera not supported in this browser.'); return; }
-
       const devices = await nav.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter((d: any) => d.kind === 'videoinput');
       const facingMode = facing === 'front' ? 'user' : 'environment';
-
       const stream = await nav.mediaDevices.getUserMedia({
         video: { facingMode: videoDevices.length > 1 ? facingMode : undefined, width: { ideal: 1280 }, height: { ideal: 960 } },
         audio: false,
       });
-
       if (!isMountedRef.current) { stream.getTracks().forEach((t: any) => t.stop()); return; }
-
       streamRef.current = stream;
       attachStreamToVideo();
-
-      setTimeout(() => { if (isMountedRef.current && streamRef.current && !webVideoElRef.current?.srcObject) attachStreamToVideo(); }, 600);
-      setTimeout(() => {
-        if (isMountedRef.current && streamRef.current) {
-          attachStreamToVideo();
-          const v = webVideoElRef.current;
-          if (v && v.readyState >= 2 && isMountedRef.current) setCamReady(true);
-        }
-      }, 1200);
+      setTimeout(() => { if (isMountedRef.current && streamRef.current) attachStreamToVideo(); }, 600);
+      setTimeout(() => { if (isMountedRef.current && streamRef.current) { attachStreamToVideo(); const v = webVideoElRef.current; if (v && v.readyState >= 2 && isMountedRef.current) setCamReady(true); } }, 1200);
     } catch (err: unknown) {
       const name = err instanceof Error ? (err as any).name : '';
       let msg: string;
       switch (name) {
         case 'NotAllowedError': msg = 'Camera access blocked. Allow it in your browser settings.'; break;
         case 'NotFoundError': msg = 'No camera found on this device.'; break;
-        case 'NotReadableError': msg = 'Camera is in use by another app. Close other tabs using the camera.'; break;
+        case 'NotReadableError': msg = 'Camera is in use by another app.'; break;
         case 'OverconstrainedError':
-          msg = 'Camera does not support the requested settings. Trying again...';
-          try {
-            const nav2 = navigator as any;
-            const fallbackStream = await nav2.mediaDevices.getUserMedia({ video: true, audio: false });
-            if (!isMountedRef.current) { fallbackStream.getTracks().forEach((t: any) => t.stop()); return; }
-            streamRef.current = fallbackStream;
-            attachStreamToVideo();
-            return;
-          } catch { msg = 'Could not start camera. Try a different browser.'; }
+          try { const s = await (navigator as any).mediaDevices.getUserMedia({ video: true, audio: false }); if (!isMountedRef.current) { s.getTracks().forEach((t: any) => t.stop()); return; } streamRef.current = s; attachStreamToVideo(); return; }
+          catch { msg = 'Could not start camera. Try a different browser.'; }
           break;
         default: msg = 'Could not start camera. Try refreshing the page.';
       }
@@ -904,7 +848,7 @@ export default function ProfileSetupScreen() {
       if (!permission?.granted) {
         const res = await requestPermission();
         if (!res.granted) {
-          Alert.alert('Camera Required', 'Camera access is needed. Enable it in your device settings.',
+          Alert.alert('Camera Required', 'Enable camera access in your device settings.',
             [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]);
           return;
         }
@@ -924,146 +868,107 @@ export default function ProfileSetupScreen() {
     if (IS_WEB) { setCamReady(false); startWebStream(newFacing); }
   }, [camFacing, startWebStream]);
 
-  // *** processPhoto — camera stays open until accepted ***
-  const processPhoto = useCallback(
-    async (uri: string, type: PhotoType, currentPhotoCount: number): Promise<boolean> => {
-      if (isMountedRef.current) { setUploading(true); setUploadProgress(0); }
-      try {
-        const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
-        if (isMountedRef.current) setUploadProgress(40);
-        if (!upload.success || !upload.url) { Alert.alert('Upload Failed', upload.error ?? 'Could not upload photo. Check your connection.'); return false; }
-        if (upload.moderationStatus === 'rejected') { Alert.alert('Photo Rejected', 'This photo was flagged as inappropriate. Please use a different photo.'); return false; }
-        if (upload.moderationStatus === 'pending' && __DEV__) console.warn('[ProfileSetup] Photo moderation is pending.');
-        if (isMountedRef.current) setUploadProgress(60);
-        const photoUrl: string = upload.url;
+  const processPhoto = useCallback(async (uri: string, type: PhotoType, currentPhotoCount: number): Promise<boolean> => {
+    if (isMountedRef.current) { setUploading(true); setUploadProgress(0); }
+    try {
+      const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
+      if (isMountedRef.current) setUploadProgress(40);
+      if (!upload.success || !upload.url) { Alert.alert('Upload Failed', upload.error ?? 'Could not upload photo.'); return false; }
+      if (upload.moderationStatus === 'rejected') { Alert.alert('Photo Rejected', 'This photo was flagged. Please use a different photo.'); return false; }
+      if (isMountedRef.current) setUploadProgress(60);
+      const photoUrl = upload.url;
 
-        if (type === 'face') {
-          try {
-            const ageResult: AgeEstimationResult | null = await estimateAgeFromPhoto(photoUrl);
-            if (!ageResult || !ageResult.estimatedAge || ageResult.confidence < 0.1) {
-              Alert.alert('No Face Detected', 'We couldn\'t detect a clear human face in this photo.\n\nTips:\n• Face the camera directly\n• Use good lighting\n• Remove sunglasses or masks\n• Only your face should be in frame');
-              return false;
-            }
-            if (isMountedRef.current) set('ageEstimate', ageResult.estimatedAge);
-          } catch (err) { if (__DEV__) console.warn('[ProfileSetup] Face detection failed, allowing photo:', err); }
-        }
-
-        if (type === 'upper_body') {
-          try {
-            const bodyResult = await detectFullBodyPhoto(photoUrl);
-            if (bodyResult && !bodyResult.isFullBody && bodyResult.confidence !== undefined && bodyResult.confidence < 0.2) {
-              Alert.alert('No Person Detected', 'We couldn\'t detect a person in this photo.\n\nPlease take a photo showing you from the waist up with your face visible.');
-              return false;
-            }
-          } catch { if (__DEV__) console.warn('[ProfileSetup] Upper body detection failed, allowing photo.'); }
-        }
-
-        if (type === 'full_body') {
-          try {
-            const body = await detectFullBodyPhoto(photoUrl);
-            if (!body.isFullBody) {
-              const keepAnyway = await new Promise<boolean>((resolve) => {
-                Alert.alert('Not Full Body', 'We could not detect a full body in this photo.\n\nTips:\n• Stand further from the camera\n• Make sure head to toe is visible\n• Use the timer and prop your phone\n\nWould you like to keep this photo anyway?',
-                  [{ text: 'Discard', style: 'cancel', onPress: () => resolve(false) },
-                   { text: 'Keep Anyway', onPress: () => {
-                     const photo: ProfilePhoto = { uri, url: photoUrl, type, order: currentPhotoCount, verified: false, uploadedAt: new Date().toISOString() };
-                     dispatch({ type: 'ADD_PHOTO', photo }); successHaptic();
-                     Alert.alert('📸 Photo Added!', 'Consider retaking for better results.');
-                     resolve(true);
-                   }}],
-                  { cancelable: false });
-              });
-              return keepAnyway;
-            }
-          } catch { if (__DEV__) console.warn('[ProfileSetup] Full body detection failed, allowing photo.'); }
-        }
-
-        if (isMountedRef.current) setUploadProgress(100);
-        const photo: ProfilePhoto = { uri, url: photoUrl, type, order: currentPhotoCount, verified: true, uploadedAt: new Date().toISOString() };
-        dispatch({ type: 'ADD_PHOTO', photo }); successHaptic();
-
-        const hints: string[] = [];
-        if (type === 'face' && !hasUpperBody) hints.push('upper body photo (required)');
-        if (type === 'upper_body' && !hasFullBody) hints.push('full body photo (+40% more matches)');
-        if (type === 'full_body' && currentPhotoCount < 3) hints.push('freestyle photo to show personality');
-        Alert.alert('📸 Photo Added!', hints.length > 0 ? `Great shot! Next up: ${hints.join(', ')}` : 'Looking good! 🎉');
-        return true;
-      } catch (err) {
-        logger.error('processPhoto failed:', err);
-        Alert.alert('Upload Error', 'Something went wrong uploading your photo. Check your connection and try again.');
-        return false;
-      } finally {
-        if (isMountedRef.current) { setUploading(false); setUploadProgress(0); }
+      if (type === 'face') {
+        try {
+          const ageResult = await estimateAgeFromPhoto(photoUrl);
+          if (!ageResult || !ageResult.estimatedAge || ageResult.confidence < 0.1) {
+            Alert.alert('No Face Detected', 'We couldn\'t detect a clear face.\n\nTips:\n• Face camera directly\n• Good lighting\n• Remove sunglasses');
+            return false;
+          }
+          if (isMountedRef.current) set('ageEstimate', ageResult.estimatedAge);
+        } catch (err) { if (__DEV__) console.warn('Face detection failed, allowing photo:', err); }
       }
-    },
-    [hasUpperBody, hasFullBody, set, successHaptic]
-  );
 
-  // *** FIX 4: doCapture with debug logging, closes cam only on success ***
+      if (type === 'upper_body') {
+        try {
+          const bodyResult = await detectFullBodyPhoto(photoUrl);
+          if (bodyResult && !bodyResult.isFullBody && bodyResult.confidence !== undefined && bodyResult.confidence < 0.2) {
+            Alert.alert('No Person Detected', 'Please take a photo showing you from the waist up.');
+            return false;
+          }
+        } catch { if (__DEV__) console.warn('Upper body detection failed, allowing photo.'); }
+      }
+
+      if (type === 'full_body') {
+        try {
+          const body = await detectFullBodyPhoto(photoUrl);
+          if (!body.isFullBody) {
+            const keepAnyway = await new Promise<boolean>((resolve) => {
+              Alert.alert('Not Full Body', 'Could not detect a full body.\n\nKeep this photo anyway?',
+                [{ text: 'Discard', style: 'cancel', onPress: () => resolve(false) },
+                 { text: 'Keep Anyway', onPress: () => { dispatch({ type: 'ADD_PHOTO', photo: { uri, url: photoUrl, type, order: currentPhotoCount, verified: false, uploadedAt: new Date().toISOString() } }); successHaptic(); Alert.alert('📸 Photo Added!', 'Consider retaking for better results.'); resolve(true); } }],
+                { cancelable: false });
+            });
+            return keepAnyway;
+          }
+        } catch { if (__DEV__) console.warn('Full body detection failed, allowing photo.'); }
+      }
+
+      if (isMountedRef.current) setUploadProgress(100);
+      dispatch({ type: 'ADD_PHOTO', photo: { uri, url: photoUrl, type, order: currentPhotoCount, verified: true, uploadedAt: new Date().toISOString() } });
+      successHaptic();
+      const hints: string[] = [];
+      if (type === 'face' && !hasUpperBody) hints.push('upper body photo (required)');
+      if (type === 'upper_body' && !hasFullBody) hints.push('full body photo (+40% more matches)');
+      if (type === 'full_body' && currentPhotoCount < 3) hints.push('freestyle photo to show personality');
+      Alert.alert('📸 Photo Added!', hints.length > 0 ? `Great shot! Next up: ${hints.join(', ')}` : 'Looking good! 🎉');
+      return true;
+    } catch (err) {
+      logger.error('processPhoto failed:', err);
+      Alert.alert('Upload Error', 'Something went wrong. Check your connection and try again.');
+      return false;
+    } finally {
+      if (isMountedRef.current) { setUploading(false); setUploadProgress(0); }
+    }
+  }, [hasUpperBody, hasFullBody, set, successHaptic]);
+
   const doCapture = useCallback(async () => {
     if (!camSlot) return;
     if (capturingRef.current) return;
-
-    if (__DEV__) {
-      const v = webVideoElRef.current;
-      console.log('[doCapture] starting', {
-        IS_WEB, camSlot: camSlot?.type, hasVideoEl: !!v,
-        readyState: v?.readyState, camReady,
-        videoWidth: v?.videoWidth, videoHeight: v?.videoHeight,
-      });
-    }
-
     capturingRef.current = true;
     setCapturing(true);
-
     let uri: string | null = null;
     try {
       if (IS_WEB) {
         const v = webVideoElRef.current;
-        if (!v) { Alert.alert('Camera Error', 'Video element not found. Please close and reopen the camera.'); return; }
-
+        if (!v) { Alert.alert('Camera Error', 'Video element not found. Please close and reopen.'); return; }
         if (v.readyState < 2) {
           await new Promise<void>((resolve) => {
-            const deadline = Date.now() + 2000;
-            const poll = () => {
-              if (v.readyState >= 2) { resolve(); return; }
-              if (Date.now() >= deadline) { resolve(); return; }
-              setTimeout(poll, 100);
-            };
+            const deadline = Date.now() + 3000;
+            const poll = () => { if (v.readyState >= 2) { resolve(); return; } if (Date.now() >= deadline) { resolve(); return; } setTimeout(poll, 100); };
             poll();
           });
         }
-
-        if (v.readyState < 2) { Alert.alert('Camera Not Ready', 'The camera is still loading. Please wait a moment and try again.'); return; }
-
+        if (v.readyState < 2) { Alert.alert('Camera Not Ready', 'Please wait a moment and try again.'); return; }
         const doc2 = (globalThis as any).document;
-        if (!doc2) { Alert.alert('Browser Error', 'Cannot access document. Try refreshing the page.'); return; }
-
+        if (!doc2) { Alert.alert('Browser Error', 'Cannot access document. Try refreshing.'); return; }
         const vw = v.videoWidth; const vh = v.videoHeight;
-        if (!vw || !vh) { Alert.alert('Camera Not Ready', 'Video dimensions not available yet. Please try again.'); return; }
-
+        if (!vw || !vh) { Alert.alert('Camera Not Ready', 'Video dimensions not available. Please try again.'); return; }
         const canvas = doc2.createElement('canvas');
         canvas.width = vw; canvas.height = vh;
         const ctx = canvas.getContext('2d');
-        if (!ctx) { Alert.alert('Browser Error', 'Cannot create canvas context. Try a different browser.'); return; }
-
+        if (!ctx) { Alert.alert('Browser Error', 'Cannot create canvas. Try a different browser.'); return; }
         if (camFacing === 'front') { ctx.save(); ctx.scale(-1, 1); ctx.drawImage(v, -canvas.width, 0, canvas.width, canvas.height); ctx.restore(); }
         else { ctx.drawImage(v, 0, 0, canvas.width, canvas.height); }
-
-        if (canvas.width < 400 || canvas.height < 400) { Alert.alert('Photo Too Small', 'Please use a higher quality camera or move to better lighting.'); return; }
-
+        if (canvas.width < 100 || canvas.height < 100) { Alert.alert('Photo Too Small', 'Please use a higher quality camera.'); return; }
         uri = canvas.toDataURL('image/jpeg', 0.88);
       } else {
         if (!cameraRef.current) { Alert.alert('Camera Error', 'Camera not available. Please close and reopen.'); return; }
         const photo = await cameraRef.current.takePictureAsync({ quality: 0.88, skipProcessing: false });
         uri = photo?.uri ?? null;
       }
-
       if (!uri) { Alert.alert('Capture Failed', 'Could not capture photo. Try again.'); return; }
-
-      const currentCount = form.photos.length;
-      const photoType = camSlot.type;
-      const accepted = await processPhoto(uri, photoType, currentCount);
+      const accepted = await processPhoto(uri, camSlot.type, form.photos.length);
       if (accepted) closeCam();
     } catch (err) {
       logger.error('doCapture failed:', err);
@@ -1072,34 +977,25 @@ export default function ProfileSetupScreen() {
       capturingRef.current = false;
       if (isMountedRef.current) setCapturing(false);
     }
-  }, [camSlot, camFacing, camReady, form.photos.length, processPhoto, closeCam]);
+  }, [camSlot, camFacing, form.photos.length, processPhoto, closeCam]);
 
   const handleCapture = useCallback(() => {
     if (capturingRef.current || countdown !== null) return;
-    if (__DEV__) console.log('[handleCapture] called', { timerEnabled, camSlotType: camSlot?.type });
-
     if (timerEnabled && camSlot?.timerAvailable) {
       setCountdown(TIMER_SECONDS);
       let count = TIMER_SECONDS;
       countdownRef.current = setInterval(() => {
         count--;
-        if (count <= 0) {
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          countdownRef.current = null;
-          if (isMountedRef.current) setCountdown(null);
-          void doCapture();
-        } else { if (isMountedRef.current) setCountdown(count); }
+        if (count <= 0) { if (countdownRef.current) clearInterval(countdownRef.current); countdownRef.current = null; if (isMountedRef.current) setCountdown(null); void doCapture(); }
+        else { if (isMountedRef.current) setCountdown(count); }
       }, 1000);
-    } else {
-      void doCapture();
-    }
+    } else { void doCapture(); }
   }, [countdown, timerEnabled, camSlot, doCapture]);
 
   const removePhoto = useCallback((index: number) => {
     const photo = form.photos[index]; if (!photo) return;
     const isRequired = photo.type === 'face' || photo.type === 'upper_body';
-    Alert.alert('Remove Photo',
-      isRequired ? `Removing your ${getPhotoLabel(photo.type)} photo will make Step 1 incomplete. You will need to retake it before continuing.` : 'Remove this photo from your profile?',
+    Alert.alert('Remove Photo', isRequired ? `Removing your ${getPhotoLabel(photo.type)} photo will make Step 1 incomplete.` : 'Remove this photo?',
       [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => { dispatch({ type: 'REMOVE_PHOTO', index }); haptic(); } }]);
   }, [form.photos, haptic]);
 
@@ -1109,17 +1005,13 @@ export default function ProfileSetupScreen() {
   }, [form.photos.length, haptic]);
 
   const getLoc = useCallback(async () => {
-    Alert.alert('Location Access', 'We use your location to show you matches nearby. Your exact location is never shown to other users — only your city.',
+    Alert.alert('Location Access', 'Only your city is shown to other users.',
       [{ text: 'Not Now', style: 'cancel' }, { text: 'Enable', onPress: async () => {
         if (isMountedRef.current) setGettingLoc(true);
         try {
           const loc = await requestLocationPermission();
-          if (loc) {
-            const display = loc.city ? `${loc.city}, ${loc.country}` : 'Location found';
-            if (isMountedRef.current) { set('locCity', display); set('locData', loc); }
-            await saveUserLocation(loc);
-            Alert.alert('📍 Location Set', display);
-          } else { Alert.alert('Location Error', 'Enable location services in your settings and try again.'); }
+          if (loc) { const display = loc.city ? `${loc.city}, ${loc.country}` : 'Location found'; if (isMountedRef.current) { set('locCity', display); set('locData', loc); } await saveUserLocation(loc); Alert.alert('📍 Location Set', display); }
+          else { Alert.alert('Location Error', 'Enable location services in settings.'); }
         } catch { Alert.alert('Location Error', 'Something went wrong.'); }
         finally { if (isMountedRef.current) setGettingLoc(false); }
       }}]);
@@ -1140,7 +1032,6 @@ export default function ProfileSetupScreen() {
     try {
       const e2eeIdentity = await ensureMyE2EEIdentity();
       if (!e2eeIdentity.success || !e2eeIdentity.publicKey) throw new Error(e2eeIdentity.error ?? 'Unable to create encryption identity');
-
       const baseProfileData = {
         uid: userId, email: userEmail, name: formatName(form.name), age,
         birthday: birthday.toISOString(), zodiacSign: zodiac?.sign ?? null, zodiacEmoji: zodiac?.emoji ?? null,
@@ -1154,12 +1045,7 @@ export default function ProfileSetupScreen() {
         interests: form.interests, loveLanguage: form.loveLang || null,
         communicationStyle: form.commStyle || null, preferredFirstDate: form.firstDate || null,
         vibes: form.vibes,
-        preferences: {
-          ageRange: { min: parseInt(form.ageMin) || MIN_AGE, max: parseInt(form.ageMax) || 50 },
-          maxDistanceKm: parseInt(form.distKm) || 50,
-          heightRangeCm: { min: parseInt(form.heightPrefMinCm) || null, max: parseInt(form.heightPrefMaxCm) || null },
-          dealbreakers: form.dealbreakers, importantFields: form.importantFields,
-        },
+        preferences: { ageRange: { min: parseInt(form.ageMin) || MIN_AGE, max: parseInt(form.ageMax) || 50 }, maxDistanceKm: parseInt(form.distKm) || 50, heightRangeCm: { min: parseInt(form.heightPrefMinCm) || null, max: parseInt(form.heightPrefMaxCm) || null }, dealbreakers: form.dealbreakers, importantFields: form.importantFields },
         bio: form.bio.trim(),
         promptAnswers: form.prompts.filter((p) => p.a.trim()).map((p) => ({ question: p.q, answer: p.a.trim() })),
         photos: form.photos.map((p) => p.url),
@@ -1170,7 +1056,6 @@ export default function ProfileSetupScreen() {
         personalityType: null, icebreakers: [], profileComplete: true, isVisible: true,
         encryptionPublicKey: e2eeIdentity.publicKey, encryptionKeyVersion: 1,
       };
-
       const userDocRef = doc(db, 'users', userId);
       const existingDoc = await getDoc(userDocRef);
       if (existingDoc.exists()) {
@@ -1179,12 +1064,10 @@ export default function ProfileSetupScreen() {
       } else {
         await setDoc(userDocRef, { ...baseProfileData, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), termsAcceptedAt: serverTimestamp(), encryptionCreatedAt: serverTimestamp() });
       }
-
-      if (draftKey) { try { profileStorage.delete(draftKey); } catch {} }
-      if (stepKey) { try { profileStorage.delete(stepKey); } catch {} }
+      if (draftKey) { try { profileStorage.delete(draftKey); } catch { } }
+      if (stepKey) { try { profileStorage.delete(stepKey); } catch { } }
       dispatch({ type: 'RESET' });
-      Alert.alert('🎉 Profile Created!', 'Next up: discover your personality type to improve your matches!',
-        [{ text: 'Continue', onPress: () => router.replace('/personality-quiz' as any) }]);
+      Alert.alert('🎉 Profile Created!', 'Next up: discover your personality type!', [{ text: 'Continue', onPress: () => router.replace('/personality-quiz' as any) }]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       logger.error('doSave failed:', msg);
@@ -1196,16 +1079,15 @@ export default function ProfileSetupScreen() {
     if (!userId) { router.replace('/login' as any); return; }
     if (!form.termsAccepted) { Alert.alert('Terms Required', 'Please accept the Terms of Service.'); return; }
     if (!birthday || !age) { Alert.alert('Invalid Birthday', 'Please enter a valid date of birth.'); return; }
-    if (form.bio.trim()) { const bioBlock = checkBlocked(form.bio); if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; } }
-    for (const p of form.prompts) { if (p.a.trim()) { const promptBlock = checkBlocked(p.a); if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; } } }
-
+    if (form.bio.trim()) { const b = checkBlocked(form.bio); if (b) { Alert.alert('Bio Issue', b); return; } }
+    for (const p of form.prompts) { if (p.a.trim()) { const b = checkBlocked(p.a); if (b) { Alert.alert('Prompt Issue', b); return; } } }
     if (form.ageEstimate && Math.abs(age - form.ageEstimate) > AGE_TOL) {
-      Alert.alert('Age Verification', `Your photos suggest you may be around ${form.ageEstimate} years old, but your birthday says ${age}. Would you like to continue?`,
+      Alert.alert('Age Verification', `Your photos suggest ~${form.ageEstimate} years old but birthday says ${age}. Continue?`,
         [{ text: 'Go Back', style: 'cancel' }, { text: 'Continue', onPress: () => void doSave() }]);
       return;
     }
     if (!hasFullBody && form.photos.length > 0) {
-      Alert.alert('No Full-Body Photo', 'Profiles with a full-body photo get significantly more matches. Add one now?',
+      Alert.alert('No Full-Body Photo', 'Profiles with a full-body photo get more matches. Add one now?',
         [{ text: 'Add Photo', style: 'cancel', onPress: () => { setStep(1); void openCamera(PHOTO_SLOTS[2]); } },
          { text: 'Continue Anyway', onPress: () => void doSave() }]);
       return;
@@ -1213,9 +1095,7 @@ export default function ProfileSetupScreen() {
     await doSave();
   }, [userId, form, birthday, age, hasFullBody, router, doSave, openCamera]);
 
-    // ─── Shared render helpers ─────────────────────────────────
-
-  const renderChip = useCallback(
+    const renderChip = useCallback(
     (value: string, selected: boolean, onPress: () => void, icon?: string, disabled?: boolean) => (
       <TouchableOpacity key={value}
         style={[st.chip, { borderColor: selected ? C.accent : C.inputBorder, backgroundColor: selected ? C.accentGlow : C.input }, disabled && st.chipOff]}
@@ -1236,16 +1116,14 @@ export default function ProfileSetupScreen() {
           <Text style={[st.optText, { color: sel === opt.value ? C.accent : C.text }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.value}</Text>
           {sel === opt.value && <Text style={[st.optCheck, { color: C.accent }]}>✓</Text>}
         </View>
-        {opt.desc != null && opt.desc !== '' && (
-          <Text style={[st.optDesc, { color: C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.desc}</Text>
-        )}
+        {opt.desc != null && opt.desc !== '' && <Text style={[st.optDesc, { color: C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.desc}</Text>}
       </TouchableOpacity>
     ), [haptic, loading, uploading, C]);
 
   const renderStep1 = useCallback(() => (
     <View>
       <Text style={[st.title, { color: C.accent }]}>📸 Your Photos</Text>
-      <Text style={[st.sub, { color: C.muted }]}>Camera only — real photos, real you. No filters, no imports.</Text>
+      <Text style={[st.sub, { color: C.muted }]}>Camera only — real photos, real you.</Text>
       <View style={st.slotStatus}>
         {PHOTO_SLOTS.filter((s) => s.required).map((slot) => {
           const done = form.photos.some((p) => p.type === slot.type);
@@ -1273,19 +1151,17 @@ export default function ProfileSetupScreen() {
         {nextSlot && (
           <TouchableOpacity style={[st.addBtn, { borderColor: C.accent, backgroundColor: C.accentGlow }, (uploading || loading) && st.addBtnOff]} onPress={() => void openCamera()} disabled={uploading || loading} activeOpacity={0.7}>
             <Text style={st.addBtnIcon}>{nextSlot.icon}</Text><Text style={[st.addBtnLabel, { color: C.accent }]}>{nextSlot.label}</Text>
-            {nextSlot.required && (<Text style={[st.addBtnReq, { color: C.warning }]}>Required</Text>)}
+            {nextSlot.required && <Text style={[st.addBtnReq, { color: C.warning }]}>Required</Text>}
           </TouchableOpacity>
         )}
       </View>
       {!hasFullBody && hasFace && hasUpperBody && (
         <TouchableOpacity style={[st.tipBox, { backgroundColor: C.accentGlow, borderColor: C.accent }]} onPress={() => void openCamera(PHOTO_SLOTS[2])} activeOpacity={0.7}>
-          <Text style={[st.tipText, { color: C.accent }]}>💡 Add a full-body photo for 40% more matches! Tap here.</Text>
+          <Text style={[st.tipText, { color: C.accent }]}>💡 Add a full-body photo for 40% more matches!</Text>
         </TouchableOpacity>
       )}
-      {form.photos.length === 0 && (
-        <View style={[st.socialProof, { backgroundColor: C.card, borderColor: C.cardBorder }]}><Text style={[st.socialProofText, { color: C.sub }]}>📊 Profiles with 4+ photos receive 2× more matches on average.</Text></View>
-      )}
-      <Text style={[st.photoHint, { color: C.muted }]}>📌 First photo = profile photo shown in discover feed.{'\n'}All photos are shown when someone views your full profile.{'\n'}Tips: Good lighting · Face visible · Show variety.</Text>
+      {form.photos.length === 0 && (<View style={[st.socialProof, { backgroundColor: C.card, borderColor: C.cardBorder }]}><Text style={[st.socialProofText, { color: C.sub }]}>📊 Profiles with 4+ photos receive 2× more matches.</Text></View>)}
+      <Text style={[st.photoHint, { color: C.muted }]}>📌 First photo = profile photo shown in discover feed.</Text>
     </View>
   ), [C, form.photos, hasFullBody, hasFace, hasUpperBody, nextSlot, uploading, loading, uploadProgress, movePhoto, removePhoto, openCamera]);
 
@@ -1294,17 +1170,15 @@ export default function ProfileSetupScreen() {
       <Text style={[st.title, { color: C.accent }]}>👤 Basic Info</Text>
       <View style={st.fg}>
         <Text style={[st.label, { color: C.text }]}>First Name <Text style={{ color: C.danger }}>*</Text></Text>
-        <Text style={[st.hint, { color: C.muted }]}>Shown publicly as "Sarah, 28"</Text>
         <TextInput style={[st.input, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }, form.name.length > 0 && !validateName(form.name).valid && { borderColor: C.danger }, validateName(form.name).valid && { borderColor: C.success }]}
           placeholder="Sarah" placeholderTextColor={C.muted} value={form.name}
           onChangeText={(t) => set('name', t.replace(/[^a-zA-Z\s\-']/g, ''))}
           onBlur={() => { if (form.name) set('name', formatName(form.name)); }}
           editable={!loading} maxLength={MAX_NAME} autoCapitalize="words" autoCorrect={false} />
-        {form.name.length > 0 && !validateName(form.name).valid && (<Text style={[st.err, { color: C.danger }]}>{validateName(form.name).reason}</Text>)}
+        {form.name.length > 0 && !validateName(form.name).valid && <Text style={[st.err, { color: C.danger }]}>{validateName(form.name).reason}</Text>}
       </View>
       <View style={st.fg}>
         <Text style={[st.label, { color: C.text }]}>Date of Birth <Text style={{ color: C.danger }}>*</Text></Text>
-        <Text style={[st.hint, { color: C.muted }]}>We calculate your age and zodiac automatically</Text>
         <View style={st.bdayRow}>
           <TextInput style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="MM" placeholderTextColor={C.muted} value={form.bdayMonth} onChangeText={(t) => set('bdayMonth', t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" maxLength={2} editable={!loading} />
           <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
@@ -1318,12 +1192,10 @@ export default function ProfileSetupScreen() {
             {zodiac && <Text style={[st.zodiac, { color: C.accent }]}>{zodiac.emoji} {zodiac.sign}</Text>}
           </View>
         )}
-        {form.ageEstimate != null && age != null && Math.abs(age - form.ageEstimate) > AGE_TOL && (
-          <Text style={[st.warn, { color: C.warning }]}>⚠️ Your photos suggest approximately {form.ageEstimate} years old</Text>
-        )}
+        {form.ageEstimate != null && age != null && Math.abs(age - form.ageEstimate) > AGE_TOL && <Text style={[st.warn, { color: C.warning }]}>⚠️ Your photos suggest approximately {form.ageEstimate} years old</Text>}
       </View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Gender <Text style={{ color: C.danger }}>*</Text></Text><View style={st.chipWrap}>{GENDER_OPTIONS.map((g) => renderChip(g.value, form.gender === g.value, () => set('gender', g.value), g.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Interested In <Text style={{ color: C.danger }}>*</Text></Text><Text style={[st.hint, { color: C.muted }]}>Used for matching — not shown publicly</Text><View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map((o) => renderChip(o.value, form.interestedIn === o.value, () => set('interestedIn', o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Interested In <Text style={{ color: C.danger }}>*</Text></Text><View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map((o) => renderChip(o.value, form.interestedIn === o.value, () => set('interestedIn', o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Pronouns</Text><View style={st.chipWrap}>{PRONOUN_OPTIONS.map((p) => renderChip(p.value, form.pronouns === p.value, () => set('pronouns', form.pronouns === p.value ? '' : p.value)))}</View></View>
       <View style={st.fg}>
         <View style={st.labelRow}><Text style={[st.label, { color: C.text }]}>Height <Text style={{ color: C.danger }}>*</Text></Text><TouchableOpacity style={[st.unitBtn, { backgroundColor: C.input, borderColor: C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7}><Text style={[st.unitBtnText, { color: C.accent }]}>{form.heightUnit === 'cm' ? 'Switch to ft/in' : 'Switch to cm'}</Text></TouchableOpacity></View>
@@ -1334,7 +1206,7 @@ export default function ProfileSetupScreen() {
             <TextInput style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="5" placeholderTextColor={C.muted} value={form.heightFt} onChangeText={(t) => set('heightFt', t.replace(/\D/g, '').slice(0, 1))} keyboardType="number-pad" maxLength={1} editable={!loading} />
             <Text style={[st.ftLbl, { color: C.muted }]}>ft</Text>
             <TextInput style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="8" placeholderTextColor={C.muted} value={form.heightIn}
-              onChangeText={(t) => { const cleaned = t.replace(/\D/g, ''); if (cleaned === '') { set('heightIn', ''); return; } const val = parseInt(cleaned); if (val > 11) { Alert.alert('Invalid', 'Inches must be 0–11.'); return; } set('heightIn', cleaned); }}
+              onChangeText={(t) => { const c = t.replace(/\D/g, ''); if (c === '') { set('heightIn', ''); return; } if (parseInt(c) > 11) { Alert.alert('Invalid', 'Inches must be 0–11.'); return; } set('heightIn', c); }}
               keyboardType="number-pad" maxLength={2} editable={!loading} />
             <Text style={[st.ftLbl, { color: C.muted }]}>in</Text>
           </View>
@@ -1355,11 +1227,7 @@ export default function ProfileSetupScreen() {
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Lifestyle <Text style={{ color: C.danger }}>*</Text></Text><View style={st.chipWrap}>{LIFESTYLE_OPTIONS.map((o) => renderChip(o.value, form.lifestyle === o.value, () => set('lifestyle', o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Relationship Goal <Text style={{ color: C.danger }}>*</Text></Text>{RELATIONSHIP_OPTIONS.map((o) => renderOpt(o, form.relationship, (v) => set('relationship', v)))}</View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Education</Text><View style={st.chipWrap}>{EDUCATION_OPTIONS.map((o) => renderChip(o.value, form.education === o.value, () => set('education', form.education === o.value ? '' : o.value), o.icon))}</View></View>
-      <View style={st.fg}>
-        <Text style={[st.label, { color: C.text }]}>Occupation</Text>
-        <TextInput style={[st.input, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="Software Engineer, Teacher…" placeholderTextColor={C.muted} value={form.occupation} onChangeText={(t) => set('occupation', t)} editable={!loading} maxLength={50} autoCapitalize="words" returnKeyType="done" onSubmitEditing={() => { if (!IS_WEB) Keyboard.dismiss(); }} />
-        <Text style={[st.charCt, { color: form.occupation.length >= 45 ? C.warning : C.muted }]}>{form.occupation.length}/50</Text>
-      </View>
+      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Occupation</Text><TextInput style={[st.input, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="Software Engineer, Teacher…" placeholderTextColor={C.muted} value={form.occupation} onChangeText={(t) => set('occupation', t)} editable={!loading} maxLength={50} autoCapitalize="words" /><Text style={[st.charCt, { color: form.occupation.length >= 45 ? C.warning : C.muted }]}>{form.occupation.length}/50</Text></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Smoking</Text><View style={st.chipWrap}>{SMOKING_OPTIONS.map((o) => renderChip(o.value, form.smoking === o.value, () => set('smoking', form.smoking === o.value ? '' : o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Drinking</Text><View style={st.chipWrap}>{DRINKING_OPTIONS.map((o) => renderChip(o.value, form.drinking === o.value, () => set('drinking', form.drinking === o.value ? '' : o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Children</Text><View style={st.chipWrap}>{CHILDREN_OPTIONS.map((o) => renderChip(o.value, form.children === o.value, () => set('children', form.children === o.value ? '' : o.value), o.icon))}</View></View>
@@ -1372,17 +1240,14 @@ export default function ProfileSetupScreen() {
   const renderStep5 = useCallback(() => (
     <View>
       <Text style={[st.title, { color: C.accent }]}>✨ Interests & Personality</Text>
-      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Interests <Text style={{ color: C.danger }}>*</Text></Text><Text style={[st.hint, { color: C.muted }]}>Pick 3–10 · {form.interests.length}/10 selected</Text><View style={st.chipWrap}>{INTEREST_TAGS.map((t) => renderChip(t, form.interests.includes(t), () => dispatch({ type: 'TOGGLE_LIST', field: 'interests', value: t, max: 10 }), undefined, !form.interests.includes(t) && form.interests.length >= 10))}</View></View>
+      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Interests <Text style={{ color: C.danger }}>*</Text></Text><Text style={[st.hint, { color: C.muted }]}>Pick 3–10 · {form.interests.length}/10</Text><View style={st.chipWrap}>{INTEREST_TAGS.map((t) => renderChip(t, form.interests.includes(t), () => dispatch({ type: 'TOGGLE_LIST', field: 'interests', value: t, max: 10 }), undefined, !form.interests.includes(t) && form.interests.length >= 10))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Love Language</Text>{LOVE_LANGUAGE_OPTIONS.map((o) => renderOpt(o, form.loveLang, (v) => set('loveLang', form.loveLang === v ? '' : v)))}</View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Communication Style</Text><View style={st.chipWrap}>{COMMUNICATION_OPTIONS.map((o) => renderChip(o.value, form.commStyle === o.value, () => set('commStyle', form.commStyle === o.value ? '' : o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Preferred First Date</Text><View style={st.chipWrap}>{FIRST_DATE_OPTIONS.map((o) => renderChip(o.value, form.firstDate === o.value, () => set('firstDate', form.firstDate === o.value ? '' : o.value), o.icon))}</View></View>
       <View style={st.fg}>
-        <Text style={[st.label, { color: C.text }]}>Your Vibes</Text><Text style={[st.hint, { color: C.muted }]}>Pick up to 3 emojis that describe your energy</Text>
+        <Text style={[st.label, { color: C.text }]}>Your Vibes</Text><Text style={[st.hint, { color: C.muted }]}>Pick up to 3</Text>
         <View style={st.vibeGrid}>
-          {VIBE_EMOJIS.map((e, idx) => {
-            const selected = form.vibes.includes(e); const maxed = !selected && form.vibes.length >= 3;
-            return (<TouchableOpacity key={`vibe_${idx}`} style={[st.vibeItem, { backgroundColor: C.input, borderColor: selected ? C.accent : C.inputBorder }, selected && { backgroundColor: C.accentGlow }, maxed && st.chipOff]} onPress={() => { haptic(); dispatch({ type: 'TOGGLE_LIST', field: 'vibes', value: e, max: 3 }); }} disabled={maxed} activeOpacity={0.7}><Text style={st.vibeEmoji}>{e}</Text></TouchableOpacity>);
-          })}
+          {VIBE_EMOJIS.map((e, idx) => { const selected = form.vibes.includes(e); const maxed = !selected && form.vibes.length >= 3; return (<TouchableOpacity key={`vibe_${idx}`} style={[st.vibeItem, { backgroundColor: C.input, borderColor: selected ? C.accent : C.inputBorder }, selected && { backgroundColor: C.accentGlow }, maxed && st.chipOff]} onPress={() => { haptic(); dispatch({ type: 'TOGGLE_LIST', field: 'vibes', value: e, max: 3 }); }} disabled={maxed} activeOpacity={0.7}><Text style={st.vibeEmoji}>{e}</Text></TouchableOpacity>); })}
         </View>
       </View>
     </View>
@@ -1393,9 +1258,9 @@ export default function ProfileSetupScreen() {
       <Text style={[st.title, { color: C.accent }]}>🎯 Preferences & Deal-breakers</Text>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Age Range</Text><View style={st.rangeRow}><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="18" placeholderTextColor={C.muted} value={form.ageMin} onChangeText={(t) => set('ageMin', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={2} editable={!loading} /><Text style={[st.rangeDash, { color: C.muted }]}>—</Text><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.ageMax} onChangeText={(t) => set('ageMax', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={2} editable={!loading} /><Text style={[st.rangeU, { color: C.muted }]}>years</Text></View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Maximum Distance</Text><View style={st.rangeRow}><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.distKm} onChangeText={(t) => set('distKm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={4} editable={!loading} /><Text style={[st.rangeU, { color: C.muted }]}>km</Text></View></View>
-      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Height Preference (cm)</Text><Text style={[st.hint, { color: C.muted }]}>Optional — leave blank to see all heights</Text><View style={st.rangeRow}><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="150" placeholderTextColor={C.muted} value={form.heightPrefMinCm} onChangeText={(t) => set('heightPrefMinCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} /><Text style={[st.rangeDash, { color: C.muted }]}>—</Text><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="200" placeholderTextColor={C.muted} value={form.heightPrefMaxCm} onChangeText={(t) => set('heightPrefMaxCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} /><Text style={[st.rangeU, { color: C.muted }]}>cm</Text></View></View>
+      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Height Preference (cm)</Text><View style={st.rangeRow}><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="150" placeholderTextColor={C.muted} value={form.heightPrefMinCm} onChangeText={(t) => set('heightPrefMinCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} /><Text style={[st.rangeDash, { color: C.muted }]}>—</Text><TextInput style={[st.input, st.rangeIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="200" placeholderTextColor={C.muted} value={form.heightPrefMaxCm} onChangeText={(t) => set('heightPrefMaxCm', t.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={3} editable={!loading} /><Text style={[st.rangeU, { color: C.muted }]}>cm</Text></View></View>
       <View style={st.fg}><Text style={[st.label, { color: C.text }]}>Deal-breakers</Text><Text style={[st.hint, { color: C.muted }]}>Up to 5 · {form.dealbreakers.length}/5</Text><View style={st.chipWrap}>{DEALBREAKER_TAGS.map((t) => renderChip(t, form.dealbreakers.includes(t), () => dispatch({ type: 'TOGGLE_LIST', field: 'dealbreakers', value: t, max: 5 }), undefined, !form.dealbreakers.includes(t) && form.dealbreakers.length >= 5))}</View></View>
-      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>What matters most to you?</Text><Text style={[st.hint, { color: C.muted }]}>Helps our matching algorithm prioritise your preferences</Text><View style={st.chipWrap}>{IMPORTANT_FIELD_OPTIONS.map((f) => renderChip(f, form.importantFields.includes(f), () => dispatch({ type: 'TOGGLE_LIST', field: 'importantFields', value: f })))}</View></View>
+      <View style={st.fg}><Text style={[st.label, { color: C.text }]}>What matters most?</Text><View style={st.chipWrap}>{IMPORTANT_FIELD_OPTIONS.map((f) => renderChip(f, form.importantFields.includes(f), () => dispatch({ type: 'TOGGLE_LIST', field: 'importantFields', value: f })))}</View></View>
     </View>
   ), [C, form.ageMin, form.ageMax, form.distKm, form.heightPrefMinCm, form.heightPrefMaxCm, form.dealbreakers, form.importantFields, loading, set, renderChip]);
 
@@ -1403,34 +1268,32 @@ export default function ProfileSetupScreen() {
     <View>
       <Text style={[st.title, { color: C.accent }]}>💬 About You</Text>
       <View style={st.fg}>
-        <Text style={[st.label, { color: C.text }]}>Bio</Text><Text style={[st.hint, { color: C.muted }]}>No contact info or social handles allowed</Text>
-        {form.bio.length === 0 && (<TouchableOpacity onPress={() => set('bio', "I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7}><Text style={[st.bioSuggestion, { color: C.accent }]}>💡 Tap to see an example bio</Text></TouchableOpacity>)}
+        <Text style={[st.label, { color: C.text }]}>Bio</Text>
+        {form.bio.length === 0 && <TouchableOpacity onPress={() => set('bio', "I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7}><Text style={[st.bioSuggestion, { color: C.accent }]}>💡 Tap to see an example bio</Text></TouchableOpacity>}
         <TextInput style={[st.bioIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]} placeholder="What makes you unique…" placeholderTextColor={C.muted} value={form.bio}
-          onChangeText={(t) => { const cropped = t.slice(0, MAX_BIO); const blocked = checkBlocked(cropped); if (blocked) { Alert.alert('Not Allowed', blocked); return; } set('bio', cropped); }}
+          onChangeText={(t) => { const c = t.slice(0, MAX_BIO); const b = checkBlocked(c); if (b) { Alert.alert('Not Allowed', b); return; } set('bio', c); }}
           multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top" />
         <Text style={[st.charCt, { color: form.bio.length >= MAX_BIO * 0.9 ? C.warning : C.muted }]}>{form.bio.length}/{MAX_BIO}</Text>
       </View>
       <View style={st.fg}>
-        <Text style={[st.label, { color: C.text }]}>Profile Prompts</Text><Text style={[st.hint, { color: C.muted }]}>Up to 3 conversation starters shown on your profile</Text>
+        <Text style={[st.label, { color: C.text }]}>Profile Prompts</Text>
         {form.prompts.map((p, i) => (
           <View key={`pr_${i}`} style={[st.promptCard, { backgroundColor: C.input, borderColor: C.inputBorder }]}>
             <TouchableOpacity style={st.promptQ} onPress={() => setPromptPicker(i)} activeOpacity={0.7}><Text style={[st.promptQText, { color: C.accent }]}>{p.q || 'Tap to pick a question…'}</Text><Text style={[st.promptArr, { color: C.accent }]}>▼</Text></TouchableOpacity>
-            {p.q !== '' && (<TextInput style={[st.promptIn, { backgroundColor: C.card, color: C.text, borderColor: C.inputBorder }]} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a}
-              onChangeText={(t) => { const cropped = t.slice(0, MAX_PROMPT); const blocked = checkBlocked(cropped); if (blocked) { Alert.alert('Not Allowed', blocked); return; } dispatch({ type: 'SET_PROMPT', index: i, q: p.q, a: cropped }); }}
-              multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" />)}
-            {p.q !== '' && (<Text style={[st.charCt, { color: p.a.length >= MAX_PROMPT * 0.9 ? C.warning : C.muted }]}>{p.a.length}/{MAX_PROMPT}</Text>)}
+            {p.q !== '' && <TextInput style={[st.promptIn, { backgroundColor: C.card, color: C.text, borderColor: C.inputBorder }]} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a} onChangeText={(t) => { const c = t.slice(0, MAX_PROMPT); const b = checkBlocked(c); if (b) { Alert.alert('Not Allowed', b); return; } dispatch({ type: 'SET_PROMPT', index: i, q: p.q, a: c }); }} multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" />}
+            {p.q !== '' && <Text style={[st.charCt, { color: p.a.length >= MAX_PROMPT * 0.9 ? C.warning : C.muted }]}>{p.a.length}/{MAX_PROMPT}</Text>}
             <TouchableOpacity style={st.promptRm} onPress={() => dispatch({ type: 'DEL_PROMPT', index: i })}><Text style={[st.promptRmText, { color: C.danger }]}>✕ Remove</Text></TouchableOpacity>
           </View>
         ))}
-        {form.prompts.length < 3 && (<TouchableOpacity style={[st.addPrompt, { borderColor: C.accent }]} onPress={() => dispatch({ type: 'ADD_PROMPT' })} activeOpacity={0.7}><Text style={[st.addPromptText, { color: C.accent }]}>+ Add Prompt</Text></TouchableOpacity>)}
+        {form.prompts.length < 3 && <TouchableOpacity style={[st.addPrompt, { borderColor: C.accent }]} onPress={() => dispatch({ type: 'ADD_PROMPT' })} activeOpacity={0.7}><Text style={[st.addPromptText, { color: C.accent }]}>+ Add Prompt</Text></TouchableOpacity>}
       </View>
       <View style={st.fg}>
-        <Text style={[st.label, { color: C.text }]}>📍 Location</Text><Text style={[st.hint, { color: C.muted }]}>Only your city is shown — never your exact location</Text>
+        <Text style={[st.label, { color: C.text }]}>📍 Location</Text>
         <TouchableOpacity style={[st.locBtn, { backgroundColor: C.input, borderColor: form.locCity !== '' ? C.success : C.inputBorder }, (gettingLoc || loading) && st.btnOff]} onPress={() => void getLoc()} disabled={gettingLoc || loading} activeOpacity={0.7}>
-          {gettingLoc ? (<View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={[st.locBtnText, { color: C.accent }]}>Getting Location…</Text></View>)
-           : (<View style={st.locRow}><Text>{form.locCity ? '✓' : '📍'}</Text><Text style={[st.locBtnText, { color: C.accent }]}>{form.locCity || 'Enable Location'}</Text></View>)}
+          {gettingLoc ? <View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={[st.locBtnText, { color: C.accent }]}>Getting Location…</Text></View>
+            : <View style={st.locRow}><Text>{form.locCity ? '✓' : '📍'}</Text><Text style={[st.locBtnText, { color: C.accent }]}>{form.locCity || 'Enable Location'}</Text></View>}
         </TouchableOpacity>
-        {form.locCity !== '' && (<Text style={[st.locConf, { color: C.success }]}>📍 {form.locCity}</Text>)}
+        {form.locCity !== '' && <Text style={[st.locConf, { color: C.success }]}>📍 {form.locCity}</Text>}
       </View>
     </View>
   ), [C, form.bio, form.prompts, form.locCity, loading, gettingLoc, set, getLoc]);
@@ -1439,11 +1302,11 @@ export default function ProfileSetupScreen() {
     <View>
       <Text style={[st.title, { color: C.accent }]}>👀 Preview & Privacy</Text>
       <View style={[st.privacyCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
-        <Text style={[st.privacyTitle, { color: C.text }]}>🔒 Privacy Settings</Text><Text style={[st.hint, { color: C.muted }]}>Control who sees your profile</Text>
+        <Text style={[st.privacyTitle, { color: C.text }]}>🔒 Privacy Settings</Text>
         {([
-          { key: 'blurUntilMatch' as const, label: '🔵 Blur photos until match', desc: 'Your photos are blurred in discover. They unlock when you match.', val: form.blurUntilMatch },
-          { key: 'incognito' as const, label: '👻 Incognito mode', desc: 'Only people you like first can see your profile.', val: form.incognito },
-          { key: 'verifiedOnly' as const, label: '✅ Verified users only', desc: 'Only selfie-verified users can discover you.', val: form.verifiedOnly },
+          { key: 'blurUntilMatch' as const, label: '🔵 Blur photos until match', desc: 'Photos blur in discover until you match.', val: form.blurUntilMatch },
+          { key: 'incognito' as const, label: '👻 Incognito mode', desc: 'Only people you like first can see you.', val: form.incognito },
+          { key: 'verifiedOnly' as const, label: '✅ Verified users only', desc: 'Only verified users can discover you.', val: form.verifiedOnly },
         ] as const).map((privItem) => (
           <View key={privItem.key} style={[st.privRow, { borderBottomColor: C.inputBorder }]}><View style={st.privInfo}><Text style={[st.privLabel, { color: C.text }]}>{privItem.label}</Text><Text style={[st.privDesc, { color: C.muted }]}>{privItem.desc}</Text></View>
             <Switch value={privItem.val} onValueChange={(v) => set(privItem.key, v)} trackColor={{ false: C.inputBorder, true: C.accent }} thumbColor={privItem.val ? C.success : C.dim} /></View>
@@ -1451,30 +1314,37 @@ export default function ProfileSetupScreen() {
       </View>
       <Text style={[st.previewLabel, { color: C.sub }]}>How others see you:</Text>
       <View style={[st.preview, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
-        {form.photos.length > 0 && (<View><ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>{form.photos.map((p, i) => (<Image key={`prev_${i}`} source={{ uri: p.uri }} style={[st.previewThumb, i === 0 && st.previewThumbMain, form.blurUntilMatch && { opacity: 0.15 }]} contentFit="cover" transition={150} />))}</ScrollView>{form.blurUntilMatch && (<View style={st.blurOverlay}><Text style={[st.blurText, { color: C.accent }]}>🔒 Blurred until match</Text></View>)}</View>)}
+        {form.photos.length > 0 && (
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>
+              {form.photos.map((p, i) => <Image key={`prev_${i}`} source={{ uri: p.uri }} style={[st.previewThumb, i === 0 && st.previewThumbMain, form.blurUntilMatch && { opacity: 0.15 }]} contentFit="cover" transition={150} />)}
+            </ScrollView>
+            {form.blurUntilMatch && <View style={st.blurOverlay}><Text style={[st.blurText, { color: C.accent }]}>🔒 Blurred until match</Text></View>}
+          </View>
+        )}
         <View style={st.previewInfo}>
           <Text style={[st.previewName, { color: C.text }]}>{formatName(form.name) || 'Your Name'}, {age ?? '??'}{zodiac ? ` ${zodiac.emoji}` : ''}</Text>
           {form.pronouns !== '' && <Text style={[st.previewSub, { color: C.muted }]}>{form.pronouns}</Text>}
           {hDisplay !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>📏 {hDisplay}</Text>}
           {form.occupation.trim() !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>💼 {form.occupation}</Text>}
-          {form.education !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>🎓 {form.education}</Text>}
           {form.locCity !== '' && <Text style={[st.previewDetail, { color: C.sub }]}>📍 {form.locCity}</Text>}
           {form.vibes.length > 0 && <Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>}
           {form.bio.trim() !== '' && <Text style={[st.previewBio, { color: C.text }]}>{form.bio.trim()}</Text>}
-          {form.interests.length > 0 && (<View style={st.previewTags}>{form.interests.slice(0, 5).map((t) => (<View key={t} style={[st.previewTag, { backgroundColor: C.input }]}><Text style={[st.previewTagText, { color: C.accent }]}>{t}</Text></View>))}{form.interests.length > 5 && (<Text style={[st.previewMore, { color: C.muted }]}>+{form.interests.length - 5} more</Text>)}</View>)}
-          <Text style={[st.previewPhotoCt, { color: C.muted }]}>📸 {form.photos.length} photo{form.photos.length !== 1 ? 's' : ''} ({form.photos.map((p) => getPhotoLabel(p.type)).join(', ')})</Text>
+          {form.interests.length > 0 && <View style={st.previewTags}>{form.interests.slice(0, 5).map((t) => <View key={t} style={[st.previewTag, { backgroundColor: C.input }]}><Text style={[st.previewTagText, { color: C.accent }]}>{t}</Text></View>)}{form.interests.length > 5 && <Text style={[st.previewMore, { color: C.muted }]}>+{form.interests.length - 5} more</Text>}</View>}
+          <Text style={[st.previewPhotoCt, { color: C.muted }]}>📸 {form.photos.length} photo{form.photos.length !== 1 ? 's' : ''}</Text>
         </View>
       </View>
       <View style={[st.pctCard, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
-        <Text style={[st.pctTitle, { color: C.text }]}>Profile Completion: {pct}%</Text><View style={[st.pctBarBg, { backgroundColor: C.inputBorder }]}><View style={[st.pctBarFill, { width: `${pct}%` as any, backgroundColor: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger }]} /></View>
-        {pct < 100 && (<Text style={[st.pctHint, { color: C.muted }]}>Complete more fields to increase your visibility in search results!</Text>)}
+        <Text style={[st.pctTitle, { color: C.text }]}>Profile Completion: {pct}%</Text>
+        <View style={[st.pctBarBg, { backgroundColor: C.inputBorder }]}><View style={[st.pctBarFill, { width: `${pct}%` as any, backgroundColor: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger }]} /></View>
+        {pct < 100 && <Text style={[st.pctHint, { color: C.muted }]}>Complete more fields to increase visibility!</Text>}
       </View>
       <View style={[st.termsRow, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
         <Switch value={form.termsAccepted} onValueChange={(v) => set('termsAccepted', v)} trackColor={{ false: C.inputBorder, true: C.accent }} thumbColor={form.termsAccepted ? C.success : C.dim} />
-        <View style={{ flex: 1 }}><Text style={[st.termsText, { color: C.sub }]}>I agree to the{' '}<Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/terms').catch(() => {})}>Terms of Service</Text>{' '}and{' '}<Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/privacy').catch(() => {})}>Privacy Policy</Text></Text></View>
+        <View style={{ flex: 1 }}><Text style={[st.termsText, { color: C.sub }]}>I agree to the{' '}<Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/terms').catch(() => { })}>Terms of Service</Text>{' '}and{' '}<Text style={[st.termsLink, { color: C.accent }]} onPress={() => Linking.openURL('https://myarchetype.vercel.app/privacy').catch(() => { })}>Privacy Policy</Text></Text></View>
       </View>
     </View>
-  ), [C, form.blurUntilMatch, form.incognito, form.verifiedOnly, form.photos, form.name, form.pronouns, form.occupation, form.education, form.locCity, form.vibes, form.bio, form.interests, form.termsAccepted, age, zodiac, hDisplay, pct, set]);
+  ), [C, form.blurUntilMatch, form.incognito, form.verifiedOnly, form.photos, form.name, form.pronouns, form.occupation, form.locCity, form.vibes, form.bio, form.interests, form.termsAccepted, age, zodiac, hDisplay, pct, set]);
 
   const renderCurrent = useCallback(() => {
     switch (step) {
@@ -1483,6 +1353,7 @@ export default function ProfileSetupScreen() {
       case 7: return renderStep7(); case 8: return renderStep8(); default: return null;
     }
   }, [step, renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6, renderStep7, renderStep8]);
+
     return (
     <KeyboardAvoidingView style={[st.root, { backgroundColor: C.bg }]} behavior={IS_IOS ? 'padding' : 'height'}>
       <LinearGradient colors={[C.bgGradientStart, C.bgGradientMid, C.bgGradientEnd]} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} />
@@ -1501,7 +1372,6 @@ export default function ProfileSetupScreen() {
         <Animated.View style={[st.progFill, { backgroundColor: C.accent, width: progAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
       </View>
 
-      {/* FIX 3: No full-page Pressable on web */}
       {IS_WEB ? (
         <View style={{ flex: 1 }}>
           <ScrollView ref={scrollRef} style={st.sv} contentContainerStyle={st.svContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -1539,15 +1409,14 @@ export default function ProfileSetupScreen() {
           ) : (
             <View style={[st.nextBtnWrap, { opacity: loading ? 0.8 : 0.5 }]}>
               <View style={[st.nextBtn, { backgroundColor: loading ? C.accent : C.disabledBg }]}>
-                {loading ? (<View style={st.saveBtnRow}><ActivityIndicator size="small" color={C.white} /><Text style={[st.nextBtnText, { color: C.white, marginLeft: SPACING.sm }]}> Creating…</Text></View>)
-                 : (<Text style={[st.nextBtnText, { color: C.disabledText }]}>Accept Terms to Continue</Text>)}
+                {loading ? <View style={st.saveBtnRow}><ActivityIndicator size="small" color={C.white} /><Text style={[st.nextBtnText, { color: C.white, marginLeft: SPACING.sm }]}> Creating…</Text></View>
+                  : <Text style={[st.nextBtnText, { color: C.disabledText }]}>Accept Terms to Continue</Text>}
               </View>
             </View>
           )
         )}
       </View>
 
-      {/* Camera modal */}
       <Modal visible={camOpen} animationType="slide" onRequestClose={closeCam} statusBarTranslucent>
         <View style={[st.camModal, { backgroundColor: C.bg }]}>
           <LinearGradient colors={[C.bgGradientStart, C.bgGradientEnd] as [string, string]} style={StyleSheet.absoluteFill} />
@@ -1565,20 +1434,34 @@ export default function ProfileSetupScreen() {
               <View style={[st.camBox, { borderColor: C.accent }]}>
                 {camErr ? (
                   <View style={st.camErrWrap}>
-                    <Text style={st.camErrIcon}>📷</Text><Text style={[st.camErrText, { color: C.danger }]}>{camErr}</Text>
+                    <Text style={st.camErrIcon}>📷</Text>
+                    <Text style={[st.camErrText, { color: C.danger }]}>{camErr}</Text>
                     <TouchableOpacity style={[st.retryBtn, { backgroundColor: C.accent }]} onPress={() => { if (isMountedRef.current) { setCamErr(null); setCamReady(false); } if (camSlot) startWebStream(camSlot.cameraSide); }} activeOpacity={0.7}>
                       <Text style={[st.retryBtnText, { color: C.white }]}>Try Again</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <>
-                    {!camReady && (<View style={[StyleSheet.absoluteFillObject, st.camLoadWrap]}><ActivityIndicator size="large" color={C.accent} /><Text style={[st.camLoadText, { color: C.muted }]}>Starting camera…</Text></View>)}
-                    {/* FIX 3: Video always visible — no opacity:0 */}
-<View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' } as any]}>
-  <WebVideoPreview streamReady={!!streamRef.current} facing={camFacing} onReady={handleVideoRef} />
-</View>
-                    {camReady && camSlot && <CameraGuide type={camSlot.type} C={C} />}
-                    {capturing && (<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text></View>)}
+                    {!camReady && (
+                      <View style={[StyleSheet.absoluteFillObject, st.camLoadWrap]} pointerEvents="none">
+                        <ActivityIndicator size="large" color={C.accent} />
+                        <Text style={[st.camLoadText, { color: C.muted }]}>Starting camera…</Text>
+                      </View>
+                    )}
+                    <View style={[StyleSheet.absoluteFillObject, { zIndex: 1 }]} pointerEvents="none">
+                      <WebVideoPreview streamReady={!!streamRef.current} facing={camFacing} onReady={handleVideoRef} />
+                    </View>
+                    {camReady && camSlot && (
+                      <View style={[StyleSheet.absoluteFillObject, { zIndex: 2 }]} pointerEvents="none">
+                        <CameraGuide type={camSlot.type} C={C} />
+                      </View>
+                    )}
+                    {capturing && (
+                      <View style={[st.camProcessingOverlay, { zIndex: 3 }]} pointerEvents="none">
+                        <ActivityIndicator size="large" color={C.white} />
+                        <Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text>
+                      </View>
+                    )}
                   </>
                 )}
               </View>
@@ -1588,14 +1471,21 @@ export default function ProfileSetupScreen() {
                   onCameraReady={() => { if (isMountedRef.current) setCamReady(true); }}
                   onMountError={(err) => { if (isMountedRef.current) setCamErr(err.message ?? 'Camera failed to start.'); }} />
                 {camSlot && <CameraGuide type={camSlot.type} C={C} />}
-                {capturing && (<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text></View>)}
+                {capturing && (
+                  <View style={st.camProcessingOverlay} pointerEvents="none">
+                    <ActivityIndicator size="large" color={C.white} />
+                    <Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text>
+                  </View>
+                )}
               </View>
             )}
-{countdown !== null && (
-  <View style={st.countdownOverlay} pointerEvents="none">
-    <Text style={[st.countdownText, { color: C.white }]}>{countdown}</Text>
-  </View>
-)}
+
+            {countdown !== null && (
+              <View style={st.countdownOverlay} pointerEvents="none">
+                <Text style={[st.countdownText, { color: C.white }]}>{countdown}</Text>
+              </View>
+            )}
+          </View>
 
           <View style={[st.camControls, { backgroundColor: C.card, borderTopColor: C.cardBorder }]}>
             {camSlot?.timerAvailable && (
@@ -1604,63 +1494,20 @@ export default function ProfileSetupScreen() {
                 <Text style={[st.timerBtnText, { color: timerEnabled ? C.accent : C.text }]}>{timerEnabled ? `⏱ ${TIMER_SECONDS}s ON` : '⏱ Timer'}</Text>
               </TouchableOpacity>
             )}
-
             <View style={st.camBtnRow}>
               <TouchableOpacity style={[st.flipBtn, { backgroundColor: C.input, borderColor: C.inputBorder }, capturing && st.btnOff]} onPress={flipCamera} disabled={capturing} activeOpacity={0.7}>
                 <Text style={st.flipBtnText}>🔄</Text>
               </TouchableOpacity>
 
-              {/* FIX 2: No disabled prop — guard inside onPress */}
-{IS_WEB ? (
-  <div
-    onClick={() => {
-      if (capturing || countdown !== null) return;
-      handleCapture();
-    }}
-    style={{
-      width: 84,
-      height: 84,
-      borderRadius: 42,
-      backgroundColor: '#fff',
-      border: `4px solid ${C.accent}`,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      cursor: 'pointer',
-      opacity: (capturing || countdown !== null) ? 0.4 : 1,
-      WebkitTapHighlightColor: 'transparent',
-      touchAction: 'manipulation',
-      zIndex: 999,
-      position: 'relative',
-    } as any}
-  >
-    {capturing ? (
-      <ActivityIndicator size="small" color={C.accent} />
-    ) : (
-      <div style={{
-        width: 68,
-        height: 68,
-        borderRadius: 34,
-        backgroundColor: C.accent,
-      } as any} />
-    )}
-  </div>
-) : (
-  <TouchableOpacity
-    style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
-    onPress={() => {
-      if (capturing || countdown !== null) return;
-      handleCapture();
-    }}
-    activeOpacity={0.8}
-  >
-    {capturing ? (
-      <ActivityIndicator size="small" color={C.accent} />
-    ) : (
-      <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />
-    )}
-  </TouchableOpacity>
-)}
+              <TouchableOpacity
+                style={[st.captureBtn, { borderColor: C.accent }, (capturing || countdown !== null) && st.captureBtnOff]}
+                onPress={handleCapture}
+                activeOpacity={0.8}
+              >
+                {capturing
+                  ? <ActivityIndicator size="small" color={C.accent} />
+                  : <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />}
+              </TouchableOpacity>
 
               <View style={st.flipBtn} />
             </View>
@@ -1668,7 +1515,6 @@ export default function ProfileSetupScreen() {
         </View>
       </Modal>
 
-      {/* Prompt picker modal */}
       <Modal visible={promptPicker !== null} animationType="slide" transparent onRequestClose={() => setPromptPicker(null)}>
         <View style={st.pickerOverlay}>
           <View style={[st.pickerContent, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
@@ -1694,8 +1540,6 @@ export default function ProfileSetupScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────
 
 const st = StyleSheet.create({
   root: { flex: 1 },
@@ -1857,14 +1701,7 @@ const st = StyleSheet.create({
   retryBtnText: { fontSize: FONT.base, fontWeight: '600' },
   camProcessingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 30 },
   camProcessingText: { marginTop: SPACING.lg, fontSize: FONT.base, fontWeight: '600' },
-countdownOverlay: {
-  position: 'absolute',
-  top: 0, left: 0, right: 0, bottom: 80,
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 20,
-  pointerEvents: 'none',
-},
+  countdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 80, justifyContent: 'center', alignItems: 'center', zIndex: 20, pointerEvents: 'none' } as any,
   countdownText: { fontSize: 120, fontWeight: 'bold', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 10 },
   camControls: { alignItems: 'center', paddingBottom: IS_IOS ? 44 : SPACING.lg, paddingTop: SPACING.lg, borderTopWidth: 1 },
   timerBtn: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.xxl, marginBottom: SPACING.lg, borderWidth: 1.5 },
