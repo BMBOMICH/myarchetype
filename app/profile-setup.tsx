@@ -523,11 +523,19 @@ const WebVideoPreview = React.memo(function WebVideoPreview({
   return (
     <View style={{ flex: 1 }}>
       {/* @ts-ignore web only */}
-      <video
-        ref={(node: any) => { if (node) onReady(node); }}
-        autoPlay playsInline muted
-        style={{ width: '100%', height: '100%', objectFit: 'cover' as any, display: 'block', transform: facing === 'front' ? 'scaleX(-1)' : 'none' }}
-      />
+<video
+  ref={(node: any) => { if (node) onReady(node); }}
+  autoPlay playsInline muted
+  style={{
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as any,
+    display: 'block',
+    transform: facing === 'front' ? 'scaleX(-1)' : 'none',
+    pointerEvents: 'none',
+    touchAction: 'none',
+  }}
+/>
     </View>
   );
 });
@@ -1565,9 +1573,9 @@ export default function ProfileSetupScreen() {
                   <>
                     {!camReady && (<View style={[StyleSheet.absoluteFillObject, st.camLoadWrap]}><ActivityIndicator size="large" color={C.accent} /><Text style={[st.camLoadText, { color: C.muted }]}>Starting camera…</Text></View>)}
                     {/* FIX 3: Video always visible — no opacity:0 */}
-                    <View style={StyleSheet.absoluteFillObject}>
-                      <WebVideoPreview streamReady={!!streamRef.current} facing={camFacing} onReady={handleVideoRef} />
-                    </View>
+<View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' } as any]}>
+  <WebVideoPreview streamReady={!!streamRef.current} facing={camFacing} onReady={handleVideoRef} />
+</View>
                     {camReady && camSlot && <CameraGuide type={camSlot.type} C={C} />}
                     {capturing && (<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText, { color: C.white }]}>Processing photo…</Text></View>)}
                   </>
