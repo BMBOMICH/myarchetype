@@ -676,9 +676,8 @@ const BLOCKED_RE: RegExp[] = [
 function checkBlocked(text: string): string | null {
   for (const r of BLOCKED_RE) {
     if (r.test(text)) {
-      if (r.source.includes('@') || r.source.includes('\\d')) {
+      if (r.source.includes('@') || r.source.includes('\\d'))
         return 'Contact information is not allowed.';
-      }
       if (r.source.includes('snap')) return 'Social media handles are not allowed.';
       return 'This contains inappropriate language.';
     }
@@ -704,9 +703,8 @@ function getMissingFieldsMessage(
         : 'Complete required fields';
     }
     case 2: {
-      if (!validateName(form.name).valid) {
+      if (!validateName(form.name).valid)
         return validateName(form.name).reason ?? 'Enter a valid name';
-      }
       if (age === null) return 'Enter your date of birth';
       if (age < MIN_AGE) return `Must be ${MIN_AGE}+`;
       if (age > MAX_AGE) return 'Invalid age';
@@ -715,16 +713,11 @@ function getMissingFieldsMessage(
       if (hCm < MIN_H || hCm > MAX_H) return 'Enter a valid height';
       return 'Complete required fields';
     }
-    case 3:
-      return 'Select your body type and preference';
-    case 4:
-      return 'Select religion, lifestyle and relationship goal';
-    case 5:
-      return 'Pick at least 3 interests';
-    case 8:
-      return 'Accept the Terms of Service to continue';
-    default:
-      return 'Complete required fields';
+    case 3: return 'Select your body type and preference';
+    case 4: return 'Select religion, lifestyle and relationship goal';
+    case 5: return 'Pick at least 3 interests';
+    case 8: return 'Accept the Terms of Service to continue';
+    default: return 'Complete required fields';
   }
 }
 
@@ -1264,8 +1257,7 @@ export default function ProfileSetupScreen() {
 
   const stepOk = useMemo<boolean>(() => {
     switch (step) {
-      case 1:
-        return hasFace && hasUpperBody;
+      case 1: return hasFace && hasUpperBody;
       case 2:
         return (
           validateName(form.name).valid &&
@@ -1273,20 +1265,13 @@ export default function ProfileSetupScreen() {
           form.gender !== '' && form.interestedIn !== '' &&
           hCm >= MIN_H && hCm <= MAX_H
         );
-      case 3:
-        return form.bodyType !== '' && form.lookingForBody !== '';
-      case 4:
-        return form.religion !== '' && form.lifestyle !== '' && form.relationship !== '';
-      case 5:
-        return form.interests.length >= 3;
-      case 6:
-        return true;
-      case 7:
-        return true;
-      case 8:
-        return form.termsAccepted;
-      default:
-        return false;
+      case 3: return form.bodyType !== '' && form.lookingForBody !== '';
+      case 4: return form.religion !== '' && form.lifestyle !== '' && form.relationship !== '';
+      case 5: return form.interests.length >= 3;
+      case 6: return true;
+      case 7: return true;
+      case 8: return form.termsAccepted;
+      default: return false;
     }
   }, [step, form, hasFace, hasUpperBody, age, hCm]);
 
@@ -1346,18 +1331,12 @@ export default function ProfileSetupScreen() {
     if (step === 7) {
       if (form.bio.trim()) {
         const bioBlock = checkBlocked(form.bio);
-        if (bioBlock) {
-          Alert.alert('Bio Issue', bioBlock);
-          return;
-        }
+        if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; }
       }
       for (const p of form.prompts) {
         if (p.a.trim()) {
           const promptBlock = checkBlocked(p.a);
-          if (promptBlock) {
-            Alert.alert('Prompt Issue', promptBlock);
-            return;
-          }
+          if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; }
         }
       }
     }
@@ -1381,9 +1360,7 @@ export default function ProfileSetupScreen() {
     successHaptic();
     animate('fwd');
     setStep((s) => s + 1);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    });
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); });
   }, [step, stepOk, form, hasFace, hasUpperBody, age, hCm, haptic, successHaptic, animate]);
 
   const goBack = useCallback(() => {
@@ -1397,9 +1374,7 @@ export default function ProfileSetupScreen() {
     haptic();
     animate('back');
     setStep((s) => s - 1);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    });
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); });
   }, [step, haptic, animate, router]);
 
   // ─── Camera: web stream management ────────────────────────
@@ -1863,14 +1838,8 @@ export default function ProfileSetupScreen() {
           await new Promise<void>((resolve) => {
             const deadline = Date.now() + 2000;
             const poll = () => {
-              if (v.readyState >= 2) {
-                resolve();
-                return;
-              }
-              if (Date.now() >= deadline) {
-                resolve();
-                return;
-              }
+              if (v.readyState >= 2) { resolve(); return; }
+              if (Date.now() >= deadline) { resolve(); return; }
               setTimeout(poll, 100);
             };
             poll();
@@ -1992,10 +1961,7 @@ export default function ProfileSetupScreen() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: () => {
-              dispatch({ type: 'REMOVE_PHOTO', index });
-              haptic();
-            },
+            onPress: () => { dispatch({ type: 'REMOVE_PHOTO', index }); haptic(); },
           },
         ]
       );
@@ -2121,11 +2087,8 @@ export default function ProfileSetupScreen() {
           .map((p) => ({ question: p.q, answer: p.a.trim() })),
         photos: form.photos.map((p) => p.url),
         photoData: form.photos.map((p) => ({
-          url: p.url,
-          type: p.type,
-          order: p.order,
-          verified: p.verified,
-          uploadedAt: p.uploadedAt,
+          url: p.url, type: p.type, order: p.order,
+          verified: p.verified, uploadedAt: p.uploadedAt,
         })),
         hasFullBodyPhoto: hasFullBody,
         privacy: {
@@ -2178,33 +2141,18 @@ export default function ProfileSetupScreen() {
   }, [userId, userEmail, birthday, age, zodiac, form, hCm, hDisplay, hasFullBody, draftKey, stepKey, router]);
 
   const handleSave = useCallback(async () => {
-    if (!userId) {
-      router.replace('/login' as any);
-      return;
-    }
-    if (!form.termsAccepted) {
-      Alert.alert('Terms Required', 'Please accept the Terms of Service.');
-      return;
-    }
-    if (!birthday || !age) {
-      Alert.alert('Invalid Birthday', 'Please enter a valid date of birth.');
-      return;
-    }
+    if (!userId) { router.replace('/login' as any); return; }
+    if (!form.termsAccepted) { Alert.alert('Terms Required', 'Please accept the Terms of Service.'); return; }
+    if (!birthday || !age) { Alert.alert('Invalid Birthday', 'Please enter a valid date of birth.'); return; }
 
     if (form.bio.trim()) {
       const bioBlock = checkBlocked(form.bio);
-      if (bioBlock) {
-        Alert.alert('Bio Issue', bioBlock);
-        return;
-      }
+      if (bioBlock) { Alert.alert('Bio Issue', bioBlock); return; }
     }
     for (const p of form.prompts) {
       if (p.a.trim()) {
         const promptBlock = checkBlocked(p.a);
-        if (promptBlock) {
-          Alert.alert('Prompt Issue', promptBlock);
-          return;
-        }
+        if (promptBlock) { Alert.alert('Prompt Issue', promptBlock); return; }
       }
     }
 
@@ -2228,10 +2176,7 @@ export default function ProfileSetupScreen() {
           {
             text: 'Add Photo',
             style: 'cancel',
-            onPress: () => {
-              setStep(1);
-              void openCamera(PHOTO_SLOTS[2]);
-            },
+            onPress: () => { setStep(1); void openCamera(PHOTO_SLOTS[2]); },
           },
           { text: 'Continue Anyway', onPress: () => void doSave() },
         ]
@@ -2250,16 +2195,10 @@ export default function ProfileSetupScreen() {
         key={value}
         style={[
           st.chip,
-          {
-            borderColor: selected ? C.accent : C.inputBorder,
-            backgroundColor: selected ? C.accentGlow : C.input,
-          },
+          { borderColor: selected ? C.accent : C.inputBorder, backgroundColor: selected ? C.accentGlow : C.input },
           disabled && st.chipOff,
         ]}
-        onPress={() => {
-          haptic();
-          onPress();
-        }}
+        onPress={() => { haptic(); onPress(); }}
         disabled={disabled || loading || uploading}
         activeOpacity={0.7}
       >
@@ -2284,10 +2223,7 @@ export default function ProfileSetupScreen() {
           st.optRow,
           { backgroundColor: C.input, borderColor: sel === opt.value ? C.accent : C.inputBorder },
         ]}
-        onPress={() => {
-          haptic();
-          onSel(opt.value);
-        }}
+        onPress={() => { haptic(); onSel(opt.value); }}
         disabled={loading || uploading}
         activeOpacity={0.7}
       >
@@ -2338,12 +2274,7 @@ export default function ProfileSetupScreen() {
             </View>
           );
         })}
-        <View
-          style={[
-            st.statusItem,
-            { backgroundColor: C.input, borderColor: hasFullBody ? C.success : C.inputBorder },
-          ]}
-        >
+        <View style={[st.statusItem, { backgroundColor: C.input, borderColor: hasFullBody ? C.success : C.inputBorder }]}>
           <Text style={st.statusIcon}>{hasFullBody ? '✓' : '🧍'}</Text>
           <Text style={[st.statusText, { color: hasFullBody ? C.success : C.muted }]}>Full Body</Text>
         </View>
@@ -2498,35 +2429,26 @@ export default function ProfileSetupScreen() {
         <View style={st.bdayRow}>
           <TextInput
             style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-            placeholder="MM"
-            placeholderTextColor={C.muted}
+            placeholder="MM" placeholderTextColor={C.muted}
             value={form.bdayMonth}
             onChangeText={(t) => set('bdayMonth', t.replace(/\D/g, '').slice(0, 2))}
-            keyboardType="number-pad"
-            maxLength={2}
-            editable={!loading}
+            keyboardType="number-pad" maxLength={2} editable={!loading}
           />
           <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
           <TextInput
             style={[st.input, st.bdayIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-            placeholder="DD"
-            placeholderTextColor={C.muted}
+            placeholder="DD" placeholderTextColor={C.muted}
             value={form.bdayDay}
             onChangeText={(t) => set('bdayDay', t.replace(/\D/g, '').slice(0, 2))}
-            keyboardType="number-pad"
-            maxLength={2}
-            editable={!loading}
+            keyboardType="number-pad" maxLength={2} editable={!loading}
           />
           <Text style={[st.bdaySep, { color: C.muted }]}>/</Text>
           <TextInput
             style={[st.input, st.bdayInY, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-            placeholder="YYYY"
-            placeholderTextColor={C.muted}
+            placeholder="YYYY" placeholderTextColor={C.muted}
             value={form.bdayYear}
             onChangeText={(t) => set('bdayYear', t.replace(/\D/g, '').slice(0, 4))}
-            keyboardType="number-pad"
-            maxLength={4}
-            editable={!loading}
+            keyboardType="number-pad" maxLength={4} editable={!loading}
           />
         </View>
         {birthday && age !== null && (
@@ -2569,11 +2491,7 @@ export default function ProfileSetupScreen() {
       <View style={st.fg}>
         <View style={st.labelRow}>
           <Text style={[st.label, { color: C.text }]}>Height <Text style={{ color: C.danger }}>*</Text></Text>
-          <TouchableOpacity
-            style={[st.unitBtn, { backgroundColor: C.input, borderColor: C.accent }]}
-            onPress={switchHeightUnit}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={[st.unitBtn, { backgroundColor: C.input, borderColor: C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7}>
             <Text style={[st.unitBtnText, { color: C.accent }]}>
               {form.heightUnit === 'cm' ? 'Switch to ft/in' : 'Switch to cm'}
             </Text>
@@ -2587,48 +2505,33 @@ export default function ProfileSetupScreen() {
               form.heightCm.length > 0 && (hCm < MIN_H || hCm > MAX_H) && { borderColor: C.danger },
               hCm >= MIN_H && hCm <= MAX_H && { borderColor: C.success },
             ]}
-            placeholder="170"
-            placeholderTextColor={C.muted}
+            placeholder="170" placeholderTextColor={C.muted}
             value={form.heightCm}
             onChangeText={(t) => set('heightCm', t.replace(/\D/g, ''))}
-            keyboardType="number-pad"
-            maxLength={3}
-            editable={!loading}
+            keyboardType="number-pad" maxLength={3} editable={!loading}
           />
         ) : (
           <View style={st.ftRow}>
             <TextInput
               style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-              placeholder="5"
-              placeholderTextColor={C.muted}
+              placeholder="5" placeholderTextColor={C.muted}
               value={form.heightFt}
               onChangeText={(t) => set('heightFt', t.replace(/\D/g, '').slice(0, 1))}
-              keyboardType="number-pad"
-              maxLength={1}
-              editable={!loading}
+              keyboardType="number-pad" maxLength={1} editable={!loading}
             />
             <Text style={[st.ftLbl, { color: C.muted }]}>ft</Text>
             <TextInput
               style={[st.input, st.ftIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-              placeholder="8"
-              placeholderTextColor={C.muted}
+              placeholder="8" placeholderTextColor={C.muted}
               value={form.heightIn}
               onChangeText={(t) => {
                 const cleaned = t.replace(/\D/g, '');
-                if (cleaned === '') {
-                  set('heightIn', '');
-                  return;
-                }
+                if (cleaned === '') { set('heightIn', ''); return; }
                 const val = parseInt(cleaned);
-                if (val > 11) {
-                  Alert.alert('Invalid', 'Inches must be 0–11.');
-                  return;
-                }
+                if (val > 11) { Alert.alert('Invalid', 'Inches must be 0–11.'); return; }
                 set('heightIn', cleaned);
               }}
-              keyboardType="number-pad"
-              maxLength={2}
-              editable={!loading}
+              keyboardType="number-pad" maxLength={2} editable={!loading}
             />
             <Text style={[st.ftLbl, { color: C.muted }]}>in</Text>
           </View>
@@ -2685,14 +2588,10 @@ export default function ProfileSetupScreen() {
         <Text style={[st.label, { color: C.text }]}>Occupation</Text>
         <TextInput
           style={[st.input, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-          placeholder="Software Engineer, Teacher…"
-          placeholderTextColor={C.muted}
+          placeholder="Software Engineer, Teacher…" placeholderTextColor={C.muted}
           value={form.occupation}
           onChangeText={(t) => set('occupation', t)}
-          editable={!loading}
-          maxLength={50}
-          autoCapitalize="words"
-          returnKeyType="done"
+          editable={!loading} maxLength={50} autoCapitalize="words" returnKeyType="done"
           onSubmitEditing={() => { if (!IS_WEB) Keyboard.dismiss(); }}
         />
         <Text style={[st.charCt, { color: form.occupation.length >= 45 ? C.warning : C.muted }]}>
@@ -2747,8 +2646,7 @@ export default function ProfileSetupScreen() {
         <View style={st.chipWrap}>
           {INTEREST_TAGS.map((t) =>
             renderChip(
-              t,
-              form.interests.includes(t),
+              t, form.interests.includes(t),
               () => dispatch({ type: 'TOGGLE_LIST', field: 'interests', value: t, max: 10 }),
               undefined,
               !form.interests.includes(t) && form.interests.length >= 10
@@ -2788,10 +2686,7 @@ export default function ProfileSetupScreen() {
                   selected && { backgroundColor: C.accentGlow },
                   maxed && st.chipOff,
                 ]}
-                onPress={() => {
-                  haptic();
-                  dispatch({ type: 'TOGGLE_LIST', field: 'vibes', value: e, max: 3 });
-                }}
+                onPress={() => { haptic(); dispatch({ type: 'TOGGLE_LIST', field: 'vibes', value: e, max: 3 }); }}
                 disabled={maxed}
                 activeOpacity={0.7}
               >
@@ -2839,8 +2734,7 @@ export default function ProfileSetupScreen() {
         <View style={st.chipWrap}>
           {DEALBREAKER_TAGS.map((t) =>
             renderChip(
-              t,
-              form.dealbreakers.includes(t),
+              t, form.dealbreakers.includes(t),
               () => dispatch({ type: 'TOGGLE_LIST', field: 'dealbreakers', value: t, max: 5 }),
               undefined,
               !form.dealbreakers.includes(t) && form.dealbreakers.length >= 5
@@ -2877,22 +2771,15 @@ export default function ProfileSetupScreen() {
         )}
         <TextInput
           style={[st.bioIn, { backgroundColor: C.input, color: C.text, borderColor: C.inputBorder }]}
-          placeholder="What makes you unique…"
-          placeholderTextColor={C.muted}
+          placeholder="What makes you unique…" placeholderTextColor={C.muted}
           value={form.bio}
           onChangeText={(t) => {
             const cropped = t.slice(0, MAX_BIO);
             const blocked = checkBlocked(cropped);
-            if (blocked) {
-              Alert.alert('Not Allowed', blocked);
-              return;
-            }
+            if (blocked) { Alert.alert('Not Allowed', blocked); return; }
             set('bio', cropped);
           }}
-          multiline
-          maxLength={MAX_BIO}
-          editable={!loading}
-          textAlignVertical="top"
+          multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top"
         />
         <Text style={[st.charCt, { color: form.bio.length >= MAX_BIO * 0.9 ? C.warning : C.muted }]}>
           {form.bio.length}/{MAX_BIO}
@@ -2912,22 +2799,15 @@ export default function ProfileSetupScreen() {
             {p.q !== '' && (
               <TextInput
                 style={[st.promptIn, { backgroundColor: C.card, color: C.text, borderColor: C.inputBorder }]}
-                placeholder="Your answer…"
-                placeholderTextColor={C.muted}
+                placeholder="Your answer…" placeholderTextColor={C.muted}
                 value={p.a}
                 onChangeText={(t) => {
                   const cropped = t.slice(0, MAX_PROMPT);
                   const blocked = checkBlocked(cropped);
-                  if (blocked) {
-                    Alert.alert('Not Allowed', blocked);
-                    return;
-                  }
+                  if (blocked) { Alert.alert('Not Allowed', blocked); return; }
                   dispatch({ type: 'SET_PROMPT', index: i, q: p.q, a: cropped });
                 }}
-                multiline
-                maxLength={MAX_PROMPT}
-                editable={!loading}
-                textAlignVertical="top"
+                multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top"
               />
             )}
             {p.q !== '' && (
@@ -3391,7 +3271,7 @@ export default function ProfileSetupScreen() {
                 <Text style={st.flipBtnText}>🔄</Text>
               </TouchableOpacity>
 
-              <Pressable
+              <TouchableOpacity
                 style={[
                   st.captureBtn,
                   { borderColor: C.accent },
@@ -3399,13 +3279,14 @@ export default function ProfileSetupScreen() {
                 ]}
                 onPress={handleCapture}
                 disabled={(IS_WEB && !camReady) || capturing || countdown !== null}
+                activeOpacity={0.8}
               >
                 {capturing ? (
                   <ActivityIndicator size="small" color={C.accent} />
                 ) : (
                   <View style={[st.captureBtnInner, { backgroundColor: C.accent }]} />
                 )}
-              </Pressable>
+              </TouchableOpacity>
 
               <View style={st.flipBtn} />
             </View>
@@ -3437,12 +3318,7 @@ export default function ProfileSetupScreen() {
                     style={[st.pickerItem, { borderBottomColor: C.inputBorder }, used && st.pickerItemOff]}
                     onPress={() => {
                       if (used || promptPicker === null || promptPicker >= form.prompts.length) return;
-                      dispatch({
-                        type: 'SET_PROMPT',
-                        index: promptPicker,
-                        q: question,
-                        a: form.prompts[promptPicker]?.a ?? '',
-                      });
+                      dispatch({ type: 'SET_PROMPT', index: promptPicker, q: question, a: form.prompts[promptPicker]?.a ?? '' });
                       setPromptPicker(null);
                     }}
                     disabled={used}
