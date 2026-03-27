@@ -1431,18 +1431,20 @@ const handleCapture = useCallback(() => {
             <View style={st.camHeadCenter}><Text style={[st.camTitle, { color: C.text }]}>{camSlot?.icon} {camSlot?.label}</Text><Text style={[st.camInstr, { color: C.muted }]}>{camSlot?.instruction}</Text></View>
 <TouchableOpacity
   onPress={() => {
-    Alert.alert('TEST', 'Button works!');
+    try {
+      (globalThis as any).alert('TEST - Button tapped!');
+    } catch (e) {}
   }}
   activeOpacity={0.7}
   style={{
-    backgroundColor: C.accent,
+    backgroundColor: 'red',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
   }}
 >
-  <Text style={{ color: C.white, fontWeight: '700', fontSize: 14 }}>
-    📸 Capture
+  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+    TAP ME
   </Text>
 </TouchableOpacity>
           </View>
