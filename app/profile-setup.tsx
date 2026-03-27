@@ -1429,7 +1429,7 @@ export default function ProfileSetupScreen() {
             <View style={st.camSpacer} />
           </View>
 
-          <View style={st.camContent}>
+          <View style={st.camContent} pointerEvents="none">
             {IS_WEB ? (
               <View style={[st.camBox, { borderColor: C.accent }]}>
                 {camErr ? (
@@ -1689,7 +1689,7 @@ const st = StyleSheet.create({
   camTitle: { fontSize: FONT.xl, fontWeight: '800' },
   camInstr: { fontSize: FONT.sm, textAlign: 'center', marginTop: SPACING.xxs + 2, lineHeight: 18 },
   camSpacer: { width: 70 },
-  camContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+camContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl, pointerEvents: 'none' } as any,
   camBox: { width: 300, height: 400, borderRadius: RADIUS.xl, overflow: 'hidden', backgroundColor: '#000', borderWidth: 2, position: 'relative' },
   camNative: { width: '100%', height: '100%' },
   camErrWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
