@@ -1429,7 +1429,23 @@ const handleCapture = useCallback(() => {
               <Text style={[st.camCancel, { color: C.danger }]}>✕ Cancel</Text>
             </TouchableOpacity>
             <View style={st.camHeadCenter}><Text style={[st.camTitle, { color: C.text }]}>{camSlot?.icon} {camSlot?.label}</Text><Text style={[st.camInstr, { color: C.muted }]}>{camSlot?.instruction}</Text></View>
-            <View style={st.camSpacer} />
+            <TouchableOpacity
+  onPress={() => {
+    if (capturing || countdown !== null) return;
+    handleCapture();
+  }}
+  activeOpacity={0.7}
+  style={{
+    backgroundColor: C.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  }}
+>
+  <Text style={{ color: C.white, fontWeight: '700', fontSize: 14 }}>
+    {capturing ? '⏳ Wait...' : '📸 Capture'}
+  </Text>
+</TouchableOpacity>
           </View>
 
           <View style={st.camContent} pointerEvents="none">
