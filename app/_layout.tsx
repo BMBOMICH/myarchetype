@@ -25,10 +25,8 @@ import { LanguageProvider } from '../utils/languageContext';
 import { logger } from '../utils/logger';
 import { registerForPushNotifications } from '../utils/notifications';
 
-// ─── Keep splash visible until ready ─────────────────────
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// ─── Constants ───────────────────────────────────────────
 const AUTH_TIMEOUT_MS = 10_000;
 const FIRESTORE_TIMEOUT_MS = 8_000;
 
@@ -45,10 +43,8 @@ const COLORS = {
   },
 } as const;
 
-// ─── Public routes (no auth required) ────────────────────
 const PUBLIC_SCREENS = new Set(['login', 'signup', 'index', 'terms', 'privacy']);
 
-// ─── Types ───────────────────────────────────────────────
 interface UserProfile {
   name?: string;
   age?: number;
@@ -77,7 +73,6 @@ interface NotificationData {
   matchName?: string;
 }
 
-// ─── Notification handler (module level, runs once) ──────
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -90,7 +85,6 @@ if (Platform.OS !== 'web') {
   });
 }
 
-// ─── Pure helpers ────────────────────────────────────────
 function isProfileComplete(data: UserProfile | null): boolean {
   if (!data) return false;
   if (data.profileComplete === true) return true;
@@ -184,7 +178,7 @@ const LoadingScreen = React.memo(function LoadingScreen({
   );
 });
 
-// ─── Screen Options (memoized) ───────────────────────────
+// ─── Screen Options ───────────────────────────────────────
 const useScreenOptions = (colorScheme: 'light' | 'dark') => {
   return useMemo(
     () => ({
@@ -197,7 +191,7 @@ const useScreenOptions = (colorScheme: 'light' | 'dark') => {
   );
 };
 
-// ─── Root Layout Content ─────────────────────────────────
+// ─── Root Layout Content ──────────────────────────────────
 function RootLayoutContent() {
   const router = useRouter();
   const segments = useSegments();
@@ -215,21 +209,19 @@ function RootLayoutContent() {
   const pushRegistered = useRef(false);
   const authTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // ── Derived values ──
   const currentSegment = useMemo(() => segments[0] ?? '', [segments]);
-
   const isPublicScreen = useMemo(() => PUBLIC_SCREENS.has(currentSegment), [currentSegment]);
-
   const isProfileSetupScreen = useMemo(() => currentSegment === 'profile-setup', [currentSegment]);
 
+  // Fix TS2367: don't compare segment string union to literal 'index'
+  // instead check against known auth screen names explicitly
   const isAuthScreen = useMemo(
-    () => currentSegment === 'login' || currentSegment === 'signup' || currentSegment === 'index',
+    () => ['login', 'signup', 'index'].includes(currentSegment),
     [currentSegment]
   );
 
   const screenOptions = useScreenOptions(colorScheme);
 
-  // ── Process authenticated user ──
   const processAuthenticatedUser = useCallback(async (user: User) => {
     if (!user.emailVerified) {
       if (__DEV__) logger.info('[Layout] Email not verified');
@@ -308,14 +300,12 @@ function RootLayoutContent() {
     };
   }, [processAuthenticatedUser]);
 
-  // ── Hide splash when ready ──
   useEffect(() => {
     if (isReady) {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [isReady]);
 
-  // ── Notification routing ──
   const handleNotificationRoute = useCallback(
     (data: NotificationData) => {
       if (!data.screen) return;
@@ -347,7 +337,6 @@ function RootLayoutContent() {
     [router]
   );
 
-  // ── Notification listeners ──
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
@@ -421,12 +410,9 @@ function RootLayoutContent() {
   return (
     <>
       <Stack screenOptions={screenOptions}>
-        {/* Auth */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'Log In' }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
-
-        {/* Main */}
         <Stack.Screen
           name="profile-setup"
           options={{ title: 'Create Profile', headerBackVisible: false, gestureEnabled: false }}
@@ -435,17 +421,11 @@ function RootLayoutContent() {
         <Stack.Screen name="matches" options={{ title: 'Find Matches' }} />
         <Stack.Screen name="my-matches" options={{ title: 'My Matches' }} />
         <Stack.Screen name="chat" options={{ headerShown: false }} />
-
-        {/* Profile */}
         <Stack.Screen name="personality-quiz" options={{ title: 'Personality Quiz', headerBackVisible: false }} />
         <Stack.Screen name="edit-profile" options={{ title: 'Edit Profile' }} />
         <Stack.Screen name="video-profile-recorder" options={{ headerShown: false }} />
-
-        {/* Verification */}
         <Stack.Screen name="height-verification" options={{ title: 'Verify Height' }} />
         <Stack.Screen name="selfie-verification" options={{ title: 'Verify Identity' }} />
-
-        {/* Features */}
         <Stack.Screen name="daily-question" options={{ headerShown: false }} />
         <Stack.Screen name="second-look" options={{ headerShown: false }} />
         <Stack.Screen name="dating-stats" options={{ headerShown: false }} />
@@ -460,26 +440,18 @@ function RootLayoutContent() {
         <Stack.Screen name="stories" options={{ headerShown: false }} />
         <Stack.Screen name="super-likes" options={{ headerShown: false }} />
         <Stack.Screen name="shared-playlist" options={{ headerShown: false }} />
-
-        {/* Safety */}
         <Stack.Screen name="date-safety" options={{ headerShown: false }} />
         <Stack.Screen name="date-checkin" options={{ headerShown: false }} />
         <Stack.Screen name="post-date-rating" options={{ title: 'Rate Experience' }} />
         <Stack.Screen name="blocked-users" options={{ title: 'Blocked Users' }} />
-
-        {/* Social & Referral */}
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="referral" options={{ title: 'Invite Friends' }} />
         <Stack.Screen name="referral-leaderboard" options={{ title: 'Leaderboard' }} />
         <Stack.Screen name="profile-views" options={{ title: 'Profile Views' }} />
         <Stack.Screen name="social-verification" options={{ headerShown: false }} />
         <Stack.Screen name="date-spot-reviews" options={{ headerShown: false }} />
-
-        {/* Legal — publicly accessible */}
         <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
         <Stack.Screen name="terms" options={{ title: 'Terms of Service' }} />
-
-        {/* Admin */}
         <Stack.Screen name="admin/index" options={{ title: 'Admin Dashboard' }} />
         <Stack.Screen name="admin/reports" options={{ title: 'User Reports' }} />
         <Stack.Screen name="admin/users" options={{ title: 'Manage Users' }} />
@@ -491,7 +463,6 @@ function RootLayoutContent() {
   );
 }
 
-// ─── Root Layout ─────────────────────────────────────────
 export default function RootLayout() {
   return (
     <LayoutErrorBoundary>
@@ -502,7 +473,6 @@ export default function RootLayout() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,

@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { collection, getDocs } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -22,7 +21,6 @@ interface Stats {
 }
 
 export default function AdminStatsScreen() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
@@ -48,7 +46,7 @@ export default function AdminStatsScreen() {
   const loadStats = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
-      
+
       let totalUsers = 0;
       let selfieVerified = 0;
       let heightVerified = 0;
@@ -64,8 +62,8 @@ export default function AdminStatsScreen() {
       let totalTrustScore = 0;
       let usersWithRatings = 0;
 
-      usersSnapshot.forEach((doc) => {
-        const data = doc.data();
+      usersSnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
         totalUsers++;
 
         if (data.selfieVerified) selfieVerified++;
@@ -83,7 +81,8 @@ export default function AdminStatsScreen() {
 
         if (data.ratings && data.ratings.totalRatings > 0) {
           usersWithRatings++;
-          const trustScore = (data.ratings.averagePhotosMatch / 5) * 100 * 0.4 +
+          const trustScore =
+            (data.ratings.averagePhotosMatch / 5) * 100 * 0.4 +
             data.ratings.heightAccuracyRate * 0.3 +
             data.ratings.bodyTypeAccuracyRate * 0.3;
           totalTrustScore += trustScore;
@@ -109,7 +108,8 @@ export default function AdminStatsScreen() {
         hasFullBodyPhoto,
         trustedUsers,
         totalRatings,
-        averageTrustScore: usersWithRatings > 0 ? Math.round(totalTrustScore / usersWithRatings) : 0,
+        averageTrustScore:
+          usersWithRatings > 0 ? Math.round(totalTrustScore / usersWithRatings) : 0,
         lowRatedUsers,
         usersWithWarnings,
         bannedUsers,
@@ -117,7 +117,6 @@ export default function AdminStatsScreen() {
         femaleUsers,
         averageAge: totalUsers > 0 ? Math.round(totalAge / totalUsers) : 0,
       });
-
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -168,7 +167,7 @@ export default function AdminStatsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Verification Rates</Text>
-        
+
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>Selfie Verified</Text>
@@ -177,10 +176,9 @@ export default function AdminStatsScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFillBlue,
-              { width: getPercent(stats.selfieVerified) as any }
-            ]} />
+            <View
+              style={[styles.progressFillBlue, { width: `${getPercent(stats.selfieVerified)}%` as any }]}
+            />
           </View>
         </View>
 
@@ -192,10 +190,9 @@ export default function AdminStatsScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFillPurple,
-              { width: getPercent(stats.heightVerified) as any }
-            ]} />
+            <View
+              style={[styles.progressFillPurple, { width: `${getPercent(stats.heightVerified)}%` as any }]}
+            />
           </View>
         </View>
 
@@ -207,10 +204,9 @@ export default function AdminStatsScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFillOrange,
-              { width: getPercent(stats.ageVerified) as any }
-            ]} />
+            <View
+              style={[styles.progressFillOrange, { width: `${getPercent(stats.ageVerified)}%` as any }]}
+            />
           </View>
         </View>
 
@@ -222,10 +218,9 @@ export default function AdminStatsScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFillTeal,
-              { width: getPercent(stats.hasFullBodyPhoto) as any }
-            ]} />
+            <View
+              style={[styles.progressFillTeal, { width: `${getPercent(stats.hasFullBodyPhoto)}%` as any }]}
+            />
           </View>
         </View>
       </View>
@@ -271,9 +266,9 @@ export default function AdminStatsScreen() {
         <View style={styles.summaryContent}>
           <Text style={styles.summaryScore}>
             {Math.round(
-              (getPercent(stats.selfieVerified) * 0.4) +
-              (getPercent(stats.trustedUsers) * 0.3) +
-              ((100 - getPercent(stats.bannedUsers)) * 0.3)
+              getPercent(stats.selfieVerified) * 0.4 +
+              getPercent(stats.trustedUsers) * 0.3 +
+              (100 - getPercent(stats.bannedUsers)) * 0.3
             )}%
           </Text>
           <Text style={styles.summaryDesc}>

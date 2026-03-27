@@ -1,7 +1,16 @@
 import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { auth, db } from '../firebaseConfig';
 
 interface BlockedUser {
@@ -28,7 +37,7 @@ export default function BlockedUsersScreen() {
 
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
+
       if (!userDoc.exists()) {
         setLoading(false);
         return;
@@ -48,7 +57,6 @@ export default function BlockedUsersScreen() {
               photos: data.photos || [],
             });
           } else {
-            // User was deleted
             blockedList.push({
               uid: blockedId,
               name: 'Deleted User',
@@ -68,34 +76,41 @@ export default function BlockedUsersScreen() {
     }
   };
 
-  const handleUnblock = async (blockedUser: BlockedUser) => {
-    const user = auth.currentUser;
-    if (!user) return;
+  const handleUnblock = (blockedUser: BlockedUser) => {
+    Alert.alert(
+      'Unblock User',
+      'Unblock ' +
+        blockedUser.name +
+        '?\n\nThey will be able to see your profile and send you messages again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unblock',
+          onPress: async () => {
+            const user = auth.currentUser;
+            if (!user) return;
 
-    const confirmed = window.confirm(
-      'Unblock ' + blockedUser.name + '?\n\n' +
-      'They will be able to see your profile and send you messages again.'
+            try {
+              const userDoc = await getDoc(doc(db, 'users', user.uid));
+              const currentBlocked = userDoc.data()?.blockedUsers || [];
+              const newBlocked = currentBlocked.filter(
+                (id: string) => id !== blockedUser.uid
+              );
+
+              await updateDoc(doc(db, 'users', user.uid), {
+                blockedUsers: newBlocked,
+              });
+
+              setBlockedUsers((prev) => prev.filter((u) => u.uid !== blockedUser.uid));
+              Alert.alert('Done', blockedUser.name + ' has been unblocked');
+            } catch (error) {
+              console.error('Error unblocking:', error);
+              Alert.alert('Error', 'Error unblocking user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const currentBlocked = userDoc.data()?.blockedUsers || [];
-      
-      const newBlocked = currentBlocked.filter((id: string) => id !== blockedUser.uid);
-
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: newBlocked,
-      });
-
-      setBlockedUsers(blockedUsers.filter((u) => u.uid !== blockedUser.uid));
-      window.alert(blockedUser.name + ' has been unblocked');
-
-    } catch (error) {
-      console.error('Error unblocking:', error);
-      window.alert('Error unblocking user');
-    }
   };
 
   if (loading) {
@@ -112,9 +127,7 @@ export default function BlockedUsersScreen() {
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyIcon}>✓</Text>
         <Text style={styles.emptyTitle}>No Blocked Users</Text>
-        <Text style={styles.emptyText}>
-          You haven't blocked anyone yet.
-        </Text>
+        <Text style={styles.emptyText}>You haven't blocked anyone yet.</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>

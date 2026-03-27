@@ -1,7 +1,17 @@
-import { useRouter } from 'expo-router';
 import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { db } from '../../firebaseConfig';
 
 interface User {
@@ -19,7 +29,6 @@ interface User {
 }
 
 export default function AdminUsersScreen() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -57,8 +66,9 @@ export default function AdminUsersScreen() {
         });
       });
 
-      // Sort by created date (newest first)
-      usersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      usersList.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
       setUsers(usersList);
     } catch (error) {
@@ -72,17 +82,15 @@ export default function AdminUsersScreen() {
   const applyFilters = () => {
     let filtered = [...users];
 
-    // Apply search
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (u) =>
-          u.name.toLowerCase().includes(query) ||
-          u.email.toLowerCase().includes(query)
+          u.name.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
       );
     }
 
-    // Apply filter
     switch (filter) {
       case 'verified':
         filtered = filtered.filter((u) => u.selfieVerified);
@@ -98,70 +106,94 @@ export default function AdminUsersScreen() {
     setFilteredUsers(filtered);
   };
 
-  const handleBan = async (user: User) => {
-    const action = user.isBanned ? 'unban' : 'ban';
-    const confirmed = window.confirm(
-      (user.isBanned ? 'Unban ' : 'Ban ') + user.name + '?'
+  const handleBan = (user: User) => {
+    Alert.alert(
+      user.isBanned ? 'Unban User' : 'Ban User',
+      (user.isBanned ? 'Unban ' : 'Ban ') + user.name + '?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: user.isBanned ? 'Unban' : 'Ban',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', user.uid), {
+                isBanned: !user.isBanned,
+                bannedAt: user.isBanned ? null : new Date().toISOString(),
+              });
+              Alert.alert(
+                'Done',
+                user.name + ' has been ' + (user.isBanned ? 'unbanned' : 'banned')
+              );
+              loadUsers();
+            } catch (error) {
+              console.error('Error:', error);
+              Alert.alert('Error', 'Error updating user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        isBanned: !user.isBanned,
-        bannedAt: user.isBanned ? null : new Date().toISOString(),
-      });
-
-      window.alert(user.name + ' has been ' + (user.isBanned ? 'unbanned' : 'banned'));
-      loadUsers();
-    } catch (error) {
-      console.error('Error:', error);
-      window.alert('Error updating user');
-    }
   };
 
-  const handleVerify = async (user: User) => {
-    const confirmed = window.confirm(
-      'Manually verify ' + user.name + '?\n\n' +
-      'This will give them a verified badge without selfie verification.'
+  const handleVerify = (user: User) => {
+    Alert.alert(
+      'Verify User',
+      'Manually verify ' +
+        user.name +
+        '?\n\nThis will give them a verified badge without selfie verification.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Verify',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', user.uid), {
+                selfieVerified: true,
+                selfieVerifiedAt: new Date().toISOString(),
+                manuallyVerified: true,
+              });
+              Alert.alert('Done', user.name + ' has been verified');
+              loadUsers();
+            } catch (error) {
+              console.error('Error:', error);
+              Alert.alert('Error', 'Error verifying user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        selfieVerified: true,
-        selfieVerifiedAt: new Date().toISOString(),
-        manuallyVerified: true,
-      });
-
-      window.alert(user.name + ' has been verified');
-      loadUsers();
-    } catch (error) {
-      console.error('Error:', error);
-      window.alert('Error verifying user');
-    }
   };
 
-  const handleMakeAdmin = async (user: User) => {
-    const action = user.isAdmin ? 'remove admin' : 'make admin';
-    const confirmed = window.confirm(
-      (user.isAdmin ? 'Remove admin from ' : 'Make ' + user.name + ' an admin?')
+  const handleMakeAdmin = (user: User) => {
+    Alert.alert(
+      user.isAdmin ? 'Remove Admin' : 'Make Admin',
+      user.isAdmin
+        ? 'Remove admin from ' + user.name + '?'
+        : 'Make ' + user.name + ' an admin?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: user.isAdmin ? 'Remove' : 'Make Admin',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', user.uid), {
+                isAdmin: !user.isAdmin,
+              });
+              Alert.alert(
+                'Done',
+                user.name +
+                  (user.isAdmin ? ' is no longer an admin' : ' is now an admin')
+              );
+              loadUsers();
+            } catch (error) {
+              console.error('Error:', error);
+              Alert.alert('Error', 'Error updating user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        isAdmin: !user.isAdmin,
-      });
-
-      window.alert(user.name + (user.isAdmin ? ' is no longer an admin' : ' is now an admin'));
-      loadUsers();
-    } catch (error) {
-      console.error('Error:', error);
-      window.alert('Error updating user');
-    }
   };
 
   if (loading) {
@@ -178,7 +210,6 @@ export default function AdminUsersScreen() {
       <Text style={styles.title}>Manage Users</Text>
       <Text style={styles.subtitle}>{users.length} total users</Text>
 
-      {/* Search */}
       <TextInput
         style={styles.searchInput}
         placeholder="Search by name or email..."
@@ -187,7 +218,6 @@ export default function AdminUsersScreen() {
         onChangeText={setSearchQuery}
       />
 
-      {/* Filter Tabs */}
       <View style={styles.filterTabs}>
         {(['all', 'verified', 'unverified', 'banned'] as const).map((f) => (
           <TouchableOpacity
