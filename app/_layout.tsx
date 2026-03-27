@@ -46,10 +46,7 @@ const COLORS = {
 } as const;
 
 // ─── Public routes (no auth required) ────────────────────
-// ✅ CHANGED: renamed from AUTH_SCREENS, added 'terms' and 'privacy'
 const PUBLIC_SCREENS = new Set(['login', 'signup', 'index', 'terms', 'privacy']);
-
-const PROTECTED_SCREENS_ALLOW_UNVERIFIED = new Set(['login', 'signup', 'index']);
 
 // ─── Types ───────────────────────────────────────────────
 interface UserProfile {
@@ -142,17 +139,17 @@ class LayoutErrorBoundary extends React.Component<
 > {
   state = { hasError: false };
 
-  static getDerivedStateFromError() {
+  static override getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
+  override componentDidCatch(error: Error, info: React.ErrorInfo) {
     if (__DEV__) {
       console.error('[LayoutErrorBoundary]', error, info);
     }
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <View style={styles.errorContainer}>
@@ -204,7 +201,8 @@ const useScreenOptions = (colorScheme: 'light' | 'dark') => {
 function RootLayoutContent() {
   const router = useRouter();
   const segments = useSegments();
-  const colorScheme = useColorScheme() ?? 'dark';
+  const rawScheme = useColorScheme();
+  const colorScheme: 'light' | 'dark' = rawScheme === 'light' ? 'light' : 'dark';
 
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -215,17 +213,15 @@ function RootLayoutContent() {
   const notificationListener = useRef<Notifications.EventSubscription>();
   const responseListener = useRef<Notifications.EventSubscription>();
   const pushRegistered = useRef(false);
-  const authTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const authTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // ── Derived values ──
   const currentSegment = useMemo(() => segments[0] ?? '', [segments]);
 
-  // ✅ CHANGED: uses PUBLIC_SCREENS instead of AUTH_SCREENS
   const isPublicScreen = useMemo(() => PUBLIC_SCREENS.has(currentSegment), [currentSegment]);
 
   const isProfileSetupScreen = useMemo(() => currentSegment === 'profile-setup', [currentSegment]);
 
-  // ✅ ADDED: distinguish auth screens from all public screens
   const isAuthScreen = useMemo(
     () => currentSegment === 'login' || currentSegment === 'signup' || currentSegment === 'index',
     [currentSegment]
@@ -375,7 +371,6 @@ function RootLayoutContent() {
   }, [handleNotificationRoute]);
 
   // ── Auth redirect logic ──
-  // ✅ CHANGED: uses isPublicScreen so terms/privacy don't redirect to login
   useEffect(() => {
     if (!isReady) return;
 
@@ -391,17 +386,13 @@ function RootLayoutContent() {
       }
 
       if (isLoggedIn) {
-        // Logged-in user routing
         if (profileComplete === false && !isProfileSetupScreen) {
           router.replace('/profile-setup' as AppRoute);
         } else if (profileComplete === true && (isAuthScreen || isProfileSetupScreen)) {
-          // Only redirect away from auth screens, NOT from terms/privacy
           router.replace('/home' as AppRoute);
         }
       } else {
-        // Not logged in — only redirect if on a PROTECTED screen
-        // Public screens (login, signup, index, terms, privacy) stay accessible
-        if (!isPublicScreen && currentSegment !== '') {
+        if (!isPublicScreen && currentSegment.length > 0) {
           router.replace('/login' as AppRoute);
         }
       }

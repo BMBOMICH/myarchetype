@@ -1,7 +1,16 @@
-import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { auth, db } from '../../firebaseConfig';
 
 interface Report {
@@ -17,7 +26,6 @@ interface Report {
 }
 
 export default function AdminReportsScreen() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
@@ -41,24 +49,22 @@ export default function AdminReportsScreen() {
 
       for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
-        
-        // Get reporter name
+
         let reporterName = 'Unknown';
         try {
           const reporterDoc = await getDoc(doc(db, 'users', data.reporterId));
           if (reporterDoc.exists()) {
             reporterName = reporterDoc.data().name;
           }
-        } catch (e) {}
+        } catch {}
 
-        // Get reported user photo
         let reportedUserPhoto = '';
         try {
           const reportedDoc = await getDoc(doc(db, 'users', data.reportedUserId));
           if (reportedDoc.exists()) {
             reportedUserPhoto = reportedDoc.data().photos?.[0] || '';
           }
-        } catch (e) {}
+        } catch {}
 
         reportsList.push({
           id: docSnap.id,
@@ -73,8 +79,9 @@ export default function AdminReportsScreen() {
         });
       }
 
-      // Sort by date (newest first)
-      reportsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      reportsList.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
       setReports(reportsList);
     } catch (error) {
@@ -85,105 +92,117 @@ export default function AdminReportsScreen() {
     }
   };
 
-  const handleDismiss = async (report: Report) => {
-    const confirmed = window.confirm(
-      'Dismiss this report?\n\n' +
-      'The report will be marked as resolved with no action taken.'
+  const handleDismiss = (report: Report) => {
+    Alert.alert(
+      'Dismiss Report',
+      'The report will be marked as resolved with no action taken.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Dismiss',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'reports', report.id), {
+                status: 'resolved',
+                resolvedAt: new Date().toISOString(),
+                resolution: 'dismissed',
+                resolvedBy: auth.currentUser?.uid,
+              });
+              Alert.alert('Done', 'Report dismissed');
+              loadReports();
+            } catch (error) {
+              console.error('Error dismissing report:', error);
+              Alert.alert('Error', 'Error dismissing report');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      await updateDoc(doc(db, 'reports', report.id), {
-        status: 'resolved',
-        resolvedAt: new Date().toISOString(),
-        resolution: 'dismissed',
-        resolvedBy: auth.currentUser?.uid,
-      });
-
-      window.alert('Report dismissed');
-      loadReports();
-    } catch (error) {
-      console.error('Error dismissing report:', error);
-      window.alert('Error dismissing report');
-    }
   };
 
-  const handleBan = async (report: Report) => {
-    const confirmed = window.confirm(
-      'BAN ' + report.reportedUserName + '?\n\n' +
-      'This will:\n' +
-      '- Prevent them from logging in\n' +
-      '- Hide their profile from all users\n' +
-      '- Mark this report as resolved\n\n' +
-      'Are you sure?'
+  const handleBan = (report: Report) => {
+    Alert.alert(
+      'Ban User',
+      `BAN ${report.reportedUserName}?\n\nThis will:\n- Prevent them from logging in\n- Hide their profile from all users\n- Mark this report as resolved`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Ban',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', report.reportedUserId), {
+                isBanned: true,
+                bannedAt: new Date().toISOString(),
+                bannedBy: auth.currentUser?.uid,
+                banReason: report.reason,
+              });
+
+              await updateDoc(doc(db, 'reports', report.id), {
+                status: 'resolved',
+                resolvedAt: new Date().toISOString(),
+                resolution: 'banned',
+                resolvedBy: auth.currentUser?.uid,
+              });
+
+              Alert.alert('Done', `${report.reportedUserName} has been banned`);
+              loadReports();
+            } catch (error) {
+              console.error('Error banning user:', error);
+              Alert.alert('Error', 'Error banning user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      // Ban the user
-      await updateDoc(doc(db, 'users', report.reportedUserId), {
-        isBanned: true,
-        bannedAt: new Date().toISOString(),
-        bannedBy: auth.currentUser?.uid,
-        banReason: report.reason,
-      });
-
-      // Update the report
-      await updateDoc(doc(db, 'reports', report.id), {
-        status: 'resolved',
-        resolvedAt: new Date().toISOString(),
-        resolution: 'banned',
-        resolvedBy: auth.currentUser?.uid,
-      });
-
-      window.alert(report.reportedUserName + ' has been banned');
-      loadReports();
-    } catch (error) {
-      console.error('Error banning user:', error);
-      window.alert('Error banning user');
-    }
   };
 
-  const handleWarn = async (report: Report) => {
-    const confirmed = window.confirm(
-      'Send warning to ' + report.reportedUserName + '?\n\n' +
-      'This will mark the report as resolved with a warning.'
+  const handleWarn = (report: Report) => {
+    Alert.alert(
+      'Warn User',
+      `Send warning to ${report.reportedUserName}?\n\nThis will mark the report as resolved with a warning.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Warn',
+          onPress: async () => {
+            try {
+              const userDoc = await getDoc(doc(db, 'users', report.reportedUserId));
+              const currentWarnings = userDoc.data()?.warnings || 0;
+
+              await updateDoc(doc(db, 'users', report.reportedUserId), {
+                warnings: currentWarnings + 1,
+                lastWarningAt: new Date().toISOString(),
+                lastWarningReason: report.reason,
+              });
+
+              await updateDoc(doc(db, 'reports', report.id), {
+                status: 'resolved',
+                resolvedAt: new Date().toISOString(),
+                resolution: 'warned',
+                resolvedBy: auth.currentUser?.uid,
+              });
+
+              Alert.alert('Done', `Warning sent to ${report.reportedUserName}`);
+              loadReports();
+            } catch (error) {
+              console.error('Error warning user:', error);
+              Alert.alert('Error', 'Error warning user');
+            }
+          },
+        },
+      ]
     );
-
-    if (!confirmed) return;
-
-    try {
-      // Add warning to user
-      const userDoc = await getDoc(doc(db, 'users', report.reportedUserId));
-      const currentWarnings = userDoc.data()?.warnings || 0;
-
-      await updateDoc(doc(db, 'users', report.reportedUserId), {
-        warnings: currentWarnings + 1,
-        lastWarningAt: new Date().toISOString(),
-        lastWarningReason: report.reason,
-      });
-
-      // Update the report
-      await updateDoc(doc(db, 'reports', report.id), {
-        status: 'resolved',
-        resolvedAt: new Date().toISOString(),
-        resolution: 'warned',
-        resolvedBy: auth.currentUser?.uid,
-      });
-
-      window.alert('Warning sent to ' + report.reportedUserName);
-      loadReports();
-    } catch (error) {
-      console.error('Error warning user:', error);
-      window.alert('Error warning user');
-    }
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
   };
 
   if (loading) {
@@ -199,7 +218,6 @@ export default function AdminReportsScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>User Reports</Text>
 
-      {/* Filter Tabs */}
       <View style={styles.filterTabs}>
         <TouchableOpacity
           style={[styles.filterTab, filter === 'pending' && styles.filterTabActive]}
@@ -249,10 +267,18 @@ export default function AdminReportsScreen() {
             />
           }
           renderItem={({ item }) => (
-            <View style={[styles.reportCard, item.status === 'pending' && styles.reportCardPending]}>
+            <View
+              style={[
+                styles.reportCard,
+                item.status === 'pending' && styles.reportCardPending,
+              ]}
+            >
               <View style={styles.reportHeader}>
                 {item.reportedUserPhoto ? (
-                  <Image source={{ uri: item.reportedUserPhoto }} style={styles.reportPhoto} />
+                  <Image
+                    source={{ uri: item.reportedUserPhoto }}
+                    style={styles.reportPhoto}
+                  />
                 ) : (
                   <View style={styles.reportPhotoPlaceholder}>
                     <Text style={styles.reportPhotoText}>?</Text>
@@ -263,10 +289,12 @@ export default function AdminReportsScreen() {
                   <Text style={styles.reporterText}>Reported by: {item.reporterName}</Text>
                   <Text style={styles.reportDate}>{formatDate(item.createdAt)}</Text>
                 </View>
-                <View style={[
-                  styles.statusBadge,
-                  item.status === 'pending' ? styles.statusPending : styles.statusResolved
-                ]}>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    item.status === 'pending' ? styles.statusPending : styles.statusResolved,
+                  ]}
+                >
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
               </View>
@@ -310,10 +338,27 @@ export default function AdminReportsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a2e', padding: 20 },
-  loadingContainer: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: { color: '#aaa', marginTop: 15, fontSize: 16 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 20, textAlign: 'center' },
-  filterTabs: { flexDirection: 'row', marginBottom: 20, backgroundColor: '#16213e', borderRadius: 10, padding: 5 },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#eee',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    backgroundColor: '#16213e',
+    borderRadius: 10,
+    padding: 5,
+  },
   filterTab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   filterTabActive: { backgroundColor: '#53a8b6' },
   filterTabText: { color: '#888', fontSize: 14, fontWeight: '600' },
@@ -325,7 +370,15 @@ const styles = StyleSheet.create({
   reportCardPending: { borderWidth: 2, borderColor: '#e74c3c' },
   reportHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   reportPhoto: { width: 50, height: 50, borderRadius: 25, marginRight: 12 },
-  reportPhotoPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#0f3460', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  reportPhotoPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#0f3460',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   reportPhotoText: { fontSize: 20, color: '#666' },
   reportInfo: { flex: 1 },
   reportedName: { fontSize: 16, fontWeight: 'bold', color: '#eee' },
@@ -334,15 +387,43 @@ const styles = StyleSheet.create({
   statusBadge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10 },
   statusPending: { backgroundColor: '#e74c3c' },
   statusResolved: { backgroundColor: '#5cb85c' },
-  statusText: { color: '#fff', fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  reasonContainer: { backgroundColor: '#0f3460', borderRadius: 10, padding: 12, marginBottom: 12 },
+  statusText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  reasonContainer: {
+    backgroundColor: '#0f3460',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
   reasonLabel: { fontSize: 12, color: '#888', marginBottom: 5 },
   reasonText: { fontSize: 14, color: '#eee', lineHeight: 20 },
   reportActions: { flexDirection: 'row', gap: 10 },
-  dismissButton: { flex: 1, backgroundColor: '#0f3460', paddingVertical: 10, borderRadius: 20, alignItems: 'center' },
+  dismissButton: {
+    flex: 1,
+    backgroundColor: '#0f3460',
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   dismissButtonText: { color: '#888', fontSize: 14, fontWeight: '600' },
-  warnButton: { flex: 1, backgroundColor: '#e67e22', paddingVertical: 10, borderRadius: 20, alignItems: 'center' },
+  warnButton: {
+    flex: 1,
+    backgroundColor: '#e67e22',
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   warnButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  banButton: { flex: 1, backgroundColor: '#e74c3c', paddingVertical: 10, borderRadius: 20, alignItems: 'center' },
+  banButton: {
+    flex: 1,
+    backgroundColor: '#e74c3c',
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   banButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });
