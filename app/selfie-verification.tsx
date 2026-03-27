@@ -30,45 +30,73 @@ interface CheckResult {
   reason: string;
 }
 
+// ─── Helpers ─────────────────────────────────────────────
+
+const isRemoteUrl = (value: string) => /^https?:\/\//i.test(value);
+const isDataUrl = (value: string) => /^data:/i.test(value);
+
 // ─── Cloudinary helpers ───────────────────────────────────
 
 /**
- * Upload a photo URI / data-URI to Cloudinary.
- * Requests free face-detection at upload time (detection=faces).
- * Returns the secure URL with a `_fc` query param containing the
- * face count, so checkFace() needs zero extra network calls.
+ * Upload a local URI, data-URI, or remote URL to Cloudinary.
+ * Requests built-in face coordinates with `faces=true`.
+ * Returns the secure URL with a `_fc` query param containing the face count.
  */
 async function uploadSelfie(uri: string): Promise<string | null> {
   try {
     const form = new FormData();
+    const fileName = `selfie_${Date.now()}.jpg`;
 
-    // Both data-URIs (web canvas) and blob URLs work via fetch→blob
-    const res = await fetch(uri);
-    const blob = await res.blob();
-    (form as any).append('file', blob, `selfie_${Date.now()}.jpg`);
+    // Web data-URIs and remote URLs can be sent directly as strings.
+    // Native local files should be appended as { uri, type, name }.
+    if (isDataUrl(uri) || isRemoteUrl(uri)) {
+      form.append('file', uri);
+    } else {
+      (form as any).append('file', {
+        uri,
+        type: 'image/jpeg',
+        name: fileName,
+      });
+    }
 
     form.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     form.append('folder', 'selfie_verification');
-    // Free Cloudinary feature — returns faces[] bounding-box array
-    form.append('detection', 'faces');
+
+    // Correct Cloudinary parameter for built-in face detection response
+    form.append('faces', 'true');
 
     const up = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`,
-      { method: 'POST', body: form }
+      {
+        method: 'POST',
+        body: form,
+      }
     );
 
+    const raw = await up.text();
+    let data: any = null;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = raw;
+    }
+
     if (!up.ok) {
-      console.error('[selfie] upload HTTP error', up.status);
+      console.error('[selfie] upload HTTP error', up.status, data);
       return null;
     }
 
-    const data = await up.json();
-    const url: string = data.secure_url ?? '';
-    if (!url) return null;
+    const url: string = data?.secure_url ?? '';
+    if (!url) {
+      console.error('[selfie] upload missing secure_url', data);
+      return null;
+    }
 
-    // Encode face count so checkFace() can validate without an extra fetch
-    const faceCount: number = Array.isArray(data.faces) ? data.faces.length : 0;
-    return `${url}?_fc=${faceCount}`;
+    const faceCount: number = Array.isArray(data?.faces) ? data.faces.length : 0;
+    const sep = url.includes('?') ? '&' : '?';
+
+    return `${url}${sep}_fc=${faceCount}`;
   } catch (err) {
     console.error('[selfie] uploadSelfie error:', err);
     return null;
@@ -76,52 +104,59 @@ async function uploadSelfie(uri: string): Promise<string | null> {
 }
 
 /**
- * Validate that a Cloudinary selfie URL contains exactly one face.
+ * Validate that a selfie URL contains exactly one face.
  *
- * Fast path  — reads the `_fc` param injected by uploadSelfie().
- * Fallback   — calls Cloudinary's fl_getinfo endpoint (still free,
- *              no add-on needed) if the param is absent.
- * Fail mode  — CLOSED: if we cannot confirm a face, we reject.
+ * Fast path:
+ *   Reads the `_fc` param injected by uploadSelfie().
+ *
+ * Fallback:
+ *   Re-uploads the image/URL through Cloudinary with `faces=true`
+ *   so we can get a face count even for older profile photos.
+ *
+ * Fail mode:
+ *   CLOSED: if we cannot confirm exactly one face, we reject.
  */
 async function checkFace(url: string): Promise<CheckResult> {
   try {
-    let faceCount: number;
+    let faceCount: number | null = null;
 
-    const urlObj = new URL(url);
-    const fcParam = urlObj.searchParams.get('_fc');
+    try {
+      const urlObj = new URL(url);
+      const fcParam = urlObj.searchParams.get('_fc');
 
-    if (fcParam !== null) {
-      // ── Fast path: face count baked in by uploadSelfie() ──
-      faceCount = parseInt(fcParam, 10);
-    } else {
-      // ── Fallback: ask Cloudinary for face metadata ──
-      const cleanUrl = url.split('?')[0] ?? url;
-      const infoUrl = cleanUrl.replace('/upload/', '/upload/fl_getinfo/');
+      if (fcParam !== null) {
+        const parsed = parseInt(fcParam, 10);
+        if (!Number.isNaN(parsed)) {
+          faceCount = parsed;
+        }
+      }
+    } catch {
+      // ignore URL parse error and fall back below
+    }
 
-      const infoRes = await fetch(infoUrl, {
-        headers: { Accept: 'application/json' },
-      });
+    if (faceCount === null) {
+      const reprobeUrl = await uploadSelfie(url);
 
-      if (!infoRes.ok) {
+      if (!reprobeUrl) {
         return {
           ok: false,
           reason: 'Could not verify photo. Please check your connection and try again.',
         };
       }
 
-      const info = await infoRes.json();
+      const reprobeParsed = new URL(reprobeUrl).searchParams.get('_fc');
+      const parsed = reprobeParsed ? parseInt(reprobeParsed, 10) : NaN;
 
-      // Cloudinary puts face data in different shapes depending on
-      // whether detection was requested at upload or fetched via fl_getinfo
-      const faces: unknown[] =
-        info?.info?.detection?.faces?.data ??
-        info?.faces ??
-        [];
+      if (Number.isNaN(parsed)) {
+        return {
+          ok: false,
+          reason: 'Could not verify photo. Please try again.',
+        };
+      }
 
-      faceCount = faces.length;
+      faceCount = parsed;
     }
 
-    // ── Decision ──
     if (faceCount === 0) {
       return {
         ok: false,
@@ -139,7 +174,6 @@ async function checkFace(url: string): Promise<CheckResult> {
     return { ok: true, reason: 'OK' };
   } catch (err) {
     console.error('[selfie] checkFace error:', err);
-    // Fail closed — never approve if we cannot check
     return {
       ok: false,
       reason: 'Verification error. Please check your connection and try again.',
@@ -346,7 +380,7 @@ export default function SelfieVerificationScreen() {
       for (const pic of pics) {
         setStatusText(`Uploading photo ${urls.length + 1} of ${pics.length}…`);
         const url = await uploadSelfie(pic);
-        if (!url) throw new Error('Upload failed. Check your connection.');
+        if (!url) throw new Error('Upload failed. Check your Cloudinary preset/config.');
         urls.push(url);
       }
 
@@ -479,9 +513,8 @@ export default function SelfieVerificationScreen() {
               </View>
             ) : null}
 
-            {/* Video element is always mounted so the ref is stable */}
             <View style={webReady ? styles.videoBox : styles.hidden}>
-              {/* @ts-ignore — web-only element */}
+              {/* @ts-ignore web-only element */}
               <video
                 id="selfie-cam"
                 autoPlay
