@@ -585,9 +585,11 @@ exports.cleanupDeletedUser = functions
     const userId = user.uid;
     let totalDeleted = 0;
 
+    // 1. Delete main user document
     await db.collection("users").doc(userId).delete().catch(() => {});
     totalDeleted += 1;
 
+    // 2. Delete documents where userId appears in a field
     const fieldQueries = [
       db.collection("likes").where("fromUserId", "==", userId),
       db.collection("likes").where("toUserId", "==", userId),
@@ -605,12 +607,12 @@ exports.cleanupDeletedUser = functions
       db.collection("matchNotes").where("userId", "==", userId),
     ];
 
-    for (const query of fieldQueries) {
-      totalDeleted += await deleteQueryBatched(query);
+    for (const q of fieldQueries) {
+      totalDeleted += await deleteQueryBatched(q);
     }
 
-    const deterministicCollections = [
-      "rateLimits",
+    // 3. Delete simple doc-per-user collections (no subcollections)
+    const simpleDocCollections = [
       "pushTokens",
       "presence",
       "streaks",
@@ -620,10 +622,36 @@ exports.cleanupDeletedUser = functions
       "userSettings",
     ];
 
-    for (const collectionName of deterministicCollections) {
+    for (const collectionName of simpleDocCollections) {
       await db.collection(collectionName).doc(userId).delete().catch(() => {});
     }
 
+    // 4. Delete rateLimits (has subcollections: rateLimits/{userId}/actions/*)
+    try {
+      const rateLimitRef = db.collection("rateLimits").doc(userId);
+      const rateLimitDoc = await rateLimitRef.get().catch(() => null);
+
+      if (rateLimitDoc && rateLimitDoc.exists) {
+        await db.recursiveDelete(rateLimitRef).catch(() => {});
+        totalDeleted += 1;
+      } else {
+        // Parent doc may not exist but subcollection might
+        const actionsSnap = await rateLimitRef
+          .collection("actions")
+          .limit(1)
+          .get()
+          .catch(() => null);
+
+        if (actionsSnap && !actionsSnap.empty) {
+          await db.recursiveDelete(rateLimitRef).catch(() => {});
+          totalDeleted += 1;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to cleanup rateLimits for user:", userId, err);
+    }
+
+    // 5. Delete all chats where user is a participant (including subcollections)
     const chatSnapshots = await db
       .collection("chats")
       .where("participants", "array-contains", userId)
@@ -637,5 +665,7 @@ exports.cleanupDeletedUser = functions
       }
     }
 
-    console.log(`Cleaned up ${totalDeleted} document group(s) for deleted user ${userId}.`);
+    console.log(
+      `Cleaned up ${totalDeleted} document group(s) for deleted user ${userId}.`
+    );
   });

@@ -1,0 +1,5744 @@
+{
+  "_meta": {
+    "scannerVersion": "4.0.0",
+    "timestamp": "2026-03-31T11:41:33.058Z",
+    "scannedAt": "C:\\Users\\Elxan\\Desktop\\MyArchetype",
+    "nodeVersion": "v20.20.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "scanDuration": "14.88s",
+  "project": {
+    "name": "myarchetype",
+    "version": "1.0.0",
+    "description": "",
+    "license": "unknown",
+    "private": true,
+    "author": "",
+    "homepage": "",
+    "bugs": "",
+    "repository": "",
+    "main": "expo-router/entry",
+    "type": "commonjs",
+    "packageManager": "npm",
+    "isMonorepo": false,
+    "workspaces": [],
+    "engines": {},
+    "os": [],
+    "cpu": [],
+    "browserslist": null,
+    "sideEffects": null,
+    "runtime": {
+      "node": "v20.20.2",
+      "npm": "10.8.2",
+      "yarn": null,
+      "pnpm": null,
+      "bun": null
+    },
+    "expo": {
+      "name": "MyArchetype",
+      "slug": "myarchetype",
+      "version": "1.0.0",
+      "orientation": "portrait",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "scheme": "myarchetype",
+      "userInterfaceStyle": "dark",
+      "newArchEnabled": false,
+      "experiments": {
+        "typedRoutes": true
+      },
+      "plugins": [
+        {
+          "name": "expo-router"
+        },
+        {
+          "name": "expo-camera"
+        },
+        {
+          "name": "expo-location"
+        },
+        {
+          "name": "expo-notifications",
+          "config": {
+            "icon": "./assets/images/android-icon-monochrome.png",
+            "color": "#53a8b6"
+          }
+        },
+        {
+          "name": "expo-secure-store"
+        },
+        {
+          "name": "@sentry/react-native"
+        }
+      ],
+      "extra": [],
+      "ios": {
+        "bundleIdentifier": "com.bmbomich.myarchetype",
+        "supportsTablet": true,
+        "associatedDomains": [],
+        "entitlements": [],
+        "infoPlistKeys": [
+          "NSCameraUsageDescription",
+          "NSLocationWhenInUseUsageDescription"
+        ],
+        "privacyManifests": null,
+        "config": []
+      },
+      "android": {
+        "package": "com.bmbomich.myarchetype",
+        "permissions": [
+          "CAMERA",
+          "ACCESS_FINE_LOCATION",
+          "ACCESS_COARSE_LOCATION"
+        ],
+        "blockedPermissions": [],
+        "intentFilters": [],
+        "adaptiveIcon": true,
+        "googleServicesFile": null,
+        "config": []
+      },
+      "web": {
+        "output": "static",
+        "bundler": "metro",
+        "favicon": "./assets/images/favicon.png"
+      },
+      "splash": {
+        "backgroundColor": "#1a1a2e",
+        "resizeMode": "contain",
+        "image": "./assets/images/splash-icon.png"
+      },
+      "notification": null
+    },
+    "eas": {
+      "cli": {
+        "version": ">= 18.4.0",
+        "appVersionSource": "remote"
+      },
+      "build": [
+        {
+          "name": "development",
+          "distribution": "internal",
+          "env": [],
+          "ios": [],
+          "android": []
+        },
+        {
+          "name": "preview",
+          "distribution": "internal",
+          "env": [],
+          "ios": [],
+          "android": []
+        },
+        {
+          "name": "production",
+          "env": [],
+          "ios": [],
+          "android": []
+        }
+      ],
+      "submit": [
+        "production"
+      ]
+    },
+    "hasAppConfig": false
+  },
+  "techStack": {
+    "mobileFramework": {
+      "name": "Expo",
+      "version": "55.0.8",
+      "reactVersion": "19.2.0",
+      "reactNativeVersion": "0.83.2",
+      "newArchitecture": false,
+      "workflow": "bare",
+      "hermes": true
+    },
+    "language": {
+      "typescript": true,
+      "typescriptVersion": "5.9.3",
+      "strictMode": true,
+      "noImplicitAny": false,
+      "strictNullChecks": false,
+      "noUncheckedIndexedAccess": true,
+      "exactOptionalPropertyTypes": false,
+      "jsxRuntime": "react-native",
+      "moduleResolution": "bundler",
+      "target": "esnext",
+      "lib": [
+        "esnext"
+      ],
+      "paths": [
+        "@/*"
+      ],
+      "include": [
+        "**/*.ts",
+        "**/*.tsx",
+        ".expo/types/**/*.ts",
+        "expo-env.d.ts"
+      ],
+      "exclude": [
+        "node_modules",
+        "dist",
+        "web-build",
+        ".expo/metro",
+        ".expo/web",
+        "coverage",
+        "android",
+        "ios",
+        "functions",
+        "scripts",
+        "e2e",
+        ".cache",
+        "tmp",
+        "temp",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.test.js",
+        "**/*.test.jsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.spec.js",
+        "**/*.spec.jsx",
+        "*.config.js",
+        "*.config.ts"
+      ],
+      "extends": "expo/tsconfig.base",
+      "references": [],
+      "skipLibCheck": true,
+      "esModuleInterop": true,
+      "resolveJsonModule": true,
+      "isolatedModules": true
+    },
+    "navigation": {
+      "expoRouter": true,
+      "expoRouterVersion": "55.0.7",
+      "reactNavigation": false,
+      "reactNavigationVersion": "7.2.1",
+      "reactNavigationStack": false,
+      "reactNavigationTabs": false,
+      "reactNavigationDrawer": false,
+      "wouter": false,
+      "reactRouter": false
+    },
+    "backend": {
+      "firebase": {
+        "used": true,
+        "version": "12.11.0",
+        "rnFirebase": false,
+        "services": {
+          "auth": true,
+          "firestore": true,
+          "realtimeDatabase": false,
+          "storage": true,
+          "functions": true,
+          "appCheck": false,
+          "analytics": false,
+          "messaging": false,
+          "remoteConfig": false,
+          "performance": false,
+          "crashlytics": false,
+          "dynamicLinks": false,
+          "inAppMessaging": false
+        },
+        "usedIn": [
+          "app\\achievements.tsx",
+          "app\\admin\\index.tsx",
+          "app\\admin\\reports.tsx",
+          "app\\admin\\stats.tsx",
+          "app\\admin\\users.tsx"
+        ],
+        "securityRules": {
+          "firestore": true,
+          "storage": false,
+          "database": false
+        },
+        "indexes": true,
+        "firebaseJson": true
+      },
+      "supabase": {
+        "used": false,
+        "version": null
+      },
+      "mongodb": {
+        "used": false,
+        "version": null
+      },
+      "redis": {
+        "used": false,
+        "version": null
+      },
+      "prisma": {
+        "used": false,
+        "version": null,
+        "hasSchema": false
+      },
+      "drizzle": {
+        "used": false,
+        "version": null
+      },
+      "typeorm": {
+        "used": false,
+        "version": null
+      },
+      "graphql": {
+        "used": false,
+        "version": null
+      },
+      "trpc": {
+        "used": false,
+        "version": null
+      },
+      "convex": {
+        "used": false,
+        "version": null
+      },
+      "appwrite": {
+        "used": false,
+        "version": null
+      },
+      "pocketbase": {
+        "used": false,
+        "version": null
+      }
+    },
+    "media": {
+      "cloudinary": {
+        "used": true,
+        "version": null,
+        "usedFor": [
+          "Image Upload",
+          "Video Upload",
+          "Face Detection",
+          "EXIF Metadata",
+          "Content Moderation",
+          "Quality Analysis"
+        ]
+      },
+      "aws": {
+        "used": false,
+        "version": null
+      },
+      "expo": {
+        "imageManipulator": false,
+        "imagePicker": true,
+        "mediaLibrary": false,
+        "camera": true,
+        "video": true,
+        "audio": true,
+        "fileSystem": false,
+        "documentPicker": false,
+        "print": false,
+        "sharing": false,
+        "brightness": false,
+        "barCodeScanner": false
+      },
+      "expoImage": true,
+      "fastImage": false,
+      "sharp": false
+    },
+    "server": {
+      "hasServer": true,
+      "framework": "Express.js",
+      "language": "TypeScript",
+      "fileCount": 4,
+      "security": {
+        "helmet": true,
+        "cors": true,
+        "rateLimit": true,
+        "compression": false,
+        "hmac": true,
+        "appCheck": false,
+        "validateOrigin": true,
+        "requireAuth": true,
+        "csrf": false,
+        "hpp": false,
+        "contentSecurityPolicy": true,
+        "xssFilter": false,
+        "noSniff": false,
+        "hsts": false,
+        "inputValidation": true,
+        "sqlInjection": false,
+        "requestSizeLimit": true
+      },
+      "hosting": "Firebase Cloud Functions",
+      "endpoints": 30
+    },
+    "payments": {
+      "stripe": {
+        "used": false,
+        "version": null
+      },
+      "revenueCat": {
+        "used": false,
+        "version": null
+      },
+      "inAppPurchases": false,
+      "paypal": false,
+      "lemonsqueezy": false
+    },
+    "authentication": {
+      "firebaseAuth": true,
+      "googleSignIn": true,
+      "appleSignIn": false,
+      "facebookAuth": false,
+      "biometric": false,
+      "passkeys": false,
+      "oauth": true,
+      "jwt": false,
+      "e2ee": true,
+      "e2eeMethod": "TweetNaCl (X25519 + XSalsa20-Poly1305)",
+      "mfa": false,
+      "sso": false
+    },
+    "notifications": {
+      "expo": true,
+      "version": "55.0.13",
+      "firebase": false,
+      "oneSignal": false,
+      "webPush": true,
+      "notifee": false
+    },
+    "analyticsMonitoring": {
+      "sentry": {
+        "used": false,
+        "version": "7.11.0"
+      },
+      "amplitude": {
+        "used": false
+      },
+      "mixpanel": {
+        "used": false
+      },
+      "segment": {
+        "used": false
+      },
+      "firebaseAnalytics": false,
+      "posthog": {
+        "used": false
+      },
+      "datadog": {
+        "used": false
+      },
+      "bugsnag": {
+        "used": false
+      },
+      "crashlytics": {
+        "used": false
+      },
+      "plausible": {
+        "used": false
+      },
+      "umami": {
+        "used": false
+      }
+    },
+    "aiMl": {
+      "faceApi": {
+        "used": false,
+        "version": null,
+        "usedIn": []
+      },
+      "tensorflow": {
+        "used": true,
+        "version": null
+      },
+      "nsfwjs": {
+        "used": true,
+        "version": null
+      },
+      "openai": {
+        "used": false,
+        "version": null
+      },
+      "langchain": {
+        "used": false,
+        "version": null
+      },
+      "anthropic": {
+        "used": false,
+        "version": null
+      },
+      "replicate": {
+        "used": false,
+        "version": null
+      },
+      "huggingface": {
+        "used": false,
+        "version": null
+      },
+      "cloudinaryAI": true,
+      "externalEndpoints": [
+        "Google Safe Browsing"
+      ]
+    },
+    "location": {
+      "expoLocation": true,
+      "version": "55.1.4",
+      "mapbox": false,
+      "googleMaps": false,
+      "mapView": false,
+      "geofencing": false,
+      "backgroundLocation": false,
+      "ipGeolocation": [
+        "ip-api.com"
+      ]
+    },
+    "stateManagement": {
+      "redux": false,
+      "zustand": false,
+      "jotai": false,
+      "recoil": false,
+      "valtio": false,
+      "mobx": false,
+      "xstate": false,
+      "legendState": false,
+      "asyncStorage": false,
+      "mmkv": true,
+      "secureStore": true,
+      "watermelonDB": false,
+      "realm": false,
+      "sqlite": false,
+      "contextCount": 2,
+      "useReducerCount": 10
+    },
+    "ui": {
+      "nativeWind": false,
+      "nativeWindVersion": null,
+      "tailwindcss": false,
+      "tamagui": false,
+      "gluestack": false,
+      "nativebase": false,
+      "paper": false,
+      "elements": false,
+      "shopifyFlash": false,
+      "reanimated": {
+        "used": true,
+        "version": "4.2.1"
+      },
+      "gesture": {
+        "used": false,
+        "version": "2.30.0"
+      },
+      "skia": false,
+      "svg": false,
+      "lottie": false,
+      "rive": false,
+      "moti": false,
+      "haptics": true,
+      "linearGradient": true,
+      "blurView": false,
+      "bottomSheet": false,
+      "actionSheet": false,
+      "toast": false,
+      "modal": false,
+      "dropdown": false,
+      "calendar": false,
+      "webview": false,
+      "icons": {
+        "expo": true,
+        "lucide": false,
+        "phosphor": false,
+        "heroicons": false,
+        "materialIcons": false
+      },
+      "carousel": false,
+      "pager": false,
+      "charts": false
+    },
+    "securityLibraries": {
+      "tweetnacl": true,
+      "tweetnaclVersion": "1.0.3",
+      "sodium": false,
+      "expoSecureStore": true,
+      "expoCrypto": true,
+      "webCrypto": false,
+      "nodeCrypto": true,
+      "hmacSigning": true,
+      "bcrypt": false,
+      "argon2": false,
+      "helmet": true,
+      "csp": true,
+      "certificatePinning": true,
+      "jailbreakDetection": false,
+      "rootDetection": true,
+      "obfuscation": false,
+      "secureRandom": true
+    },
+    "testing": {
+      "jest": false,
+      "jestVersion": "30.3.0",
+      "vitest": false,
+      "testingLibrary": false,
+      "detox": false,
+      "maestro": false,
+      "appium": false,
+      "cypress": false,
+      "playwright": false,
+      "msw": false,
+      "nock": false,
+      "supertest": false,
+      "testFiles": 0,
+      "coverageConfig": false,
+      "snapshotFiles": 0
+    },
+    "buildDeployment": {
+      "eas": true,
+      "cicd": {
+        "githubActions": true,
+        "githubActionsFiles": [
+          "ci.yml"
+        ],
+        "circleci": false,
+        "bitrise": false,
+        "fastlane": false,
+        "travisci": false,
+        "jenkinsfile": false,
+        "gitlab": false,
+        "codemagic": false,
+        "appcenter": false
+      },
+      "docker": {
+        "dockerfile": false,
+        "dockerCompose": false,
+        "dockerIgnore": false
+      },
+      "metro": {
+        "hasConfig": false,
+        "version": "0.83.3"
+      },
+      "babel": {
+        "hasConfig": false,
+        "version": "7.29.0"
+      },
+      "bundleAnalyzer": false,
+      "codePush": false,
+      "otaUpdates": false
+    },
+    "externalAPIs": [
+      {
+        "name": "Cloudinary Upload",
+        "url": "api.cloudinary.com",
+        "category": "Media",
+        "usedIn": [
+          "app\\edit-profile.tsx",
+          "app\\height-verification.tsx",
+          "app\\selfie-verification.tsx",
+          "functions\\index.js",
+          "utils\\bodyTypeDetection.ts"
+        ]
+      },
+      {
+        "name": "Cloudinary CDN",
+        "url": "res.cloudinary.com",
+        "category": "Media",
+        "usedIn": [
+          "server\\src\\index.ts"
+        ]
+      },
+      {
+        "name": "Google Safe Browsing",
+        "url": "safebrowsing.googleapis.com",
+        "category": "Safety",
+        "usedIn": [
+          "server\\src\\index.ts",
+          "utils\\socialVerification.ts"
+        ]
+      },
+      {
+        "name": "HaveIBeenPwned",
+        "url": "api.pwnedpasswords.com",
+        "category": "Security",
+        "usedIn": [
+          "app\\signup.tsx",
+          "server\\src\\index.ts"
+        ]
+      },
+      {
+        "name": "Spotify",
+        "url": "api.spotify.com",
+        "category": "Music",
+        "usedIn": [
+          "utils\\sharedPlaylist.ts",
+          "utils\\spotifyIntegration.ts"
+        ]
+      },
+      {
+        "name": "OpenStreetMap",
+        "url": "overpass-api.de",
+        "category": "Location",
+        "usedIn": [
+          "app\\chat.tsx",
+          "utils\\location.ts"
+        ]
+      },
+      {
+        "name": "ip-api",
+        "url": "ip-api.com",
+        "category": "Location",
+        "usedIn": [
+          "server\\src\\index.ts"
+        ]
+      },
+      {
+        "name": "Expo Push",
+        "url": "exp.host/--/api",
+        "category": "Notifications",
+        "usedIn": [
+          "app\\second-look.tsx",
+          "server\\src\\index.ts"
+        ]
+      }
+    ],
+    "permissions": {
+      "camera": true,
+      "microphone": true,
+      "location": true,
+      "backgroundLocation": false,
+      "notifications": true,
+      "mediaLibrary": false,
+      "contacts": false,
+      "calendar": false,
+      "faceId": false,
+      "bluetooth": false,
+      "motion": false,
+      "tracking": false,
+      "speechRecognition": true,
+      "healthKit": false
+    }
+  },
+  "packages": {
+    "counts": {
+      "production": 46,
+      "development": 10,
+      "peer": 0,
+      "optional": 0,
+      "total": 56,
+      "actuallyImported": 49,
+      "notInstalled": 0,
+      "categories": 13
+    },
+    "all": [
+      {
+        "name": "@expo/vector-icons",
+        "specifiedVersion": "^15.1.1",
+        "installedVersion": "15.1.1",
+        "type": "production",
+        "category": "🎨 UI Assets",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@react-navigation/bottom-tabs",
+        "specifiedVersion": "^7.15.5",
+        "installedVersion": "7.15.8",
+        "type": "production",
+        "category": "🧭 Navigation",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": true
+      },
+      {
+        "name": "@react-navigation/elements",
+        "specifiedVersion": "^2.9.13",
+        "installedVersion": "2.9.13",
+        "type": "production",
+        "category": "🧭 Navigation",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@react-navigation/native",
+        "specifiedVersion": "^7.1.33",
+        "installedVersion": "7.2.1",
+        "type": "production",
+        "category": "🧭 Navigation",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": true
+      },
+      {
+        "name": "@sentry/react-native",
+        "specifiedVersion": "~7.11.0",
+        "installedVersion": "7.11.0",
+        "type": "production",
+        "category": "🐛 Monitoring",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "axios",
+        "specifiedVersion": "^1.13.6",
+        "installedVersion": "1.13.6",
+        "type": "production",
+        "category": "🌐 Networking",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo",
+        "specifiedVersion": "~55.0.8",
+        "installedVersion": "55.0.8",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-apple-authentication",
+        "specifiedVersion": "^55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-asset",
+        "specifiedVersion": "~55.0.10",
+        "installedVersion": "55.0.10",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-audio",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-auth-session",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-camera",
+        "specifiedVersion": "~55.0.11",
+        "installedVersion": "55.0.11",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-clipboard",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-constants",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-crypto",
+        "specifiedVersion": "~55.0.10",
+        "installedVersion": "55.0.10",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-device",
+        "specifiedVersion": "~55.0.10",
+        "installedVersion": "55.0.10",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-font",
+        "specifiedVersion": "~55.0.4",
+        "installedVersion": "55.0.4",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-haptics",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-image",
+        "specifiedVersion": "~55.0.6",
+        "installedVersion": "55.0.6",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-image-picker",
+        "specifiedVersion": "~55.0.13",
+        "installedVersion": "55.0.13",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-linear-gradient",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-linking",
+        "specifiedVersion": "~55.0.8",
+        "installedVersion": "55.0.8",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-location",
+        "specifiedVersion": "~55.1.4",
+        "installedVersion": "55.1.4",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-notifications",
+        "specifiedVersion": "~55.0.13",
+        "installedVersion": "55.0.13",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-router",
+        "specifiedVersion": "~55.0.7",
+        "installedVersion": "55.0.7",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-secure-store",
+        "specifiedVersion": "~55.0.9",
+        "installedVersion": "55.0.9",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-splash-screen",
+        "specifiedVersion": "~55.0.12",
+        "installedVersion": "55.0.12",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-status-bar",
+        "specifiedVersion": "~55.0.4",
+        "installedVersion": "55.0.4",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-symbols",
+        "specifiedVersion": "~55.0.5",
+        "installedVersion": "55.0.5",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-system-ui",
+        "specifiedVersion": "~55.0.10",
+        "installedVersion": "55.0.10",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-video",
+        "specifiedVersion": "~55.0.11",
+        "installedVersion": "55.0.11",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "expo-web-browser",
+        "specifiedVersion": "~55.0.10",
+        "installedVersion": "55.0.10",
+        "type": "production",
+        "category": "📱 Expo",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "firebase",
+        "specifiedVersion": "^12.11.0",
+        "installedVersion": "12.11.0",
+        "type": "production",
+        "category": "🔥 Firebase",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react",
+        "specifiedVersion": "19.2.0",
+        "installedVersion": "19.2.0",
+        "type": "production",
+        "category": "⚛️ React",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-dom",
+        "specifiedVersion": "19.2.0",
+        "installedVersion": "19.2.0",
+        "type": "production",
+        "category": "⚛️ React",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native",
+        "specifiedVersion": "0.83.2",
+        "installedVersion": "0.83.2",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-gesture-handler",
+        "specifiedVersion": "~2.30.0",
+        "installedVersion": "2.30.0",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-mmkv",
+        "specifiedVersion": "^4.3.0",
+        "installedVersion": "4.3.0",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-reanimated",
+        "specifiedVersion": "4.2.1",
+        "installedVersion": "4.2.1",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-reanimated-carousel",
+        "specifiedVersion": "^4.0.3",
+        "installedVersion": "4.0.3",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-safe-area-context",
+        "specifiedVersion": "~5.6.2",
+        "installedVersion": "5.6.2",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-screens",
+        "specifiedVersion": "~4.23.0",
+        "installedVersion": "4.23.0",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-web",
+        "specifiedVersion": "~0.21.2",
+        "installedVersion": "0.21.2",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "react-native-worklets",
+        "specifiedVersion": "0.7.2",
+        "installedVersion": "0.7.2",
+        "type": "production",
+        "category": "📱 React Native",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "tweetnacl",
+        "specifiedVersion": "^1.0.3",
+        "installedVersion": "1.0.3",
+        "type": "production",
+        "category": "🔒 Security",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "tweetnacl-util",
+        "specifiedVersion": "^0.15.1",
+        "installedVersion": "0.15.1",
+        "type": "production",
+        "category": "🔒 Security",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@babel/core",
+        "specifiedVersion": "^7.29.0",
+        "installedVersion": "7.29.0",
+        "type": "development",
+        "category": "🔧 Build Tools",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@types/jest",
+        "specifiedVersion": "^30.0.0",
+        "installedVersion": "30.0.0",
+        "type": "development",
+        "category": "🧪 Testing",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@types/node",
+        "specifiedVersion": "^25.5.0",
+        "installedVersion": "25.5.0",
+        "type": "development",
+        "category": "📘 TypeScript",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@types/react",
+        "specifiedVersion": "~19.2.14",
+        "installedVersion": "19.2.14",
+        "type": "development",
+        "category": "📘 TypeScript",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "eslint",
+        "specifiedVersion": "^10.1.0",
+        "installedVersion": "10.1.0",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "eslint-config-expo",
+        "specifiedVersion": "~55.0.0",
+        "installedVersion": "55.0.0",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "jest",
+        "specifiedVersion": "^30.3.0",
+        "installedVersion": "30.3.0",
+        "type": "development",
+        "category": "🧪 Testing",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "prettier",
+        "specifiedVersion": "^3.8.1",
+        "installedVersion": "3.8.1",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "ts-jest",
+        "specifiedVersion": "^29.4.6",
+        "installedVersion": "29.4.6",
+        "type": "development",
+        "category": "🧪 Testing",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "typescript",
+        "specifiedVersion": "~5.9.2",
+        "installedVersion": "5.9.3",
+        "type": "development",
+        "category": "📘 TypeScript",
+        "actuallyImported": true,
+        "isFrameworkInternal": true,
+        "installed": true,
+        "versionMismatch": true
+      }
+    ],
+    "byCategory": {
+      "🎨 UI Assets": [
+        {
+          "name": "@expo/vector-icons",
+          "specifiedVersion": "^15.1.1",
+          "installedVersion": "15.1.1",
+          "type": "production",
+          "category": "🎨 UI Assets",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🧭 Navigation": [
+        {
+          "name": "@react-navigation/bottom-tabs",
+          "specifiedVersion": "^7.15.5",
+          "installedVersion": "7.15.8",
+          "type": "production",
+          "category": "🧭 Navigation",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": true
+        },
+        {
+          "name": "@react-navigation/elements",
+          "specifiedVersion": "^2.9.13",
+          "installedVersion": "2.9.13",
+          "type": "production",
+          "category": "🧭 Navigation",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "@react-navigation/native",
+          "specifiedVersion": "^7.1.33",
+          "installedVersion": "7.2.1",
+          "type": "production",
+          "category": "🧭 Navigation",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": true
+        }
+      ],
+      "🐛 Monitoring": [
+        {
+          "name": "@sentry/react-native",
+          "specifiedVersion": "~7.11.0",
+          "installedVersion": "7.11.0",
+          "type": "production",
+          "category": "🐛 Monitoring",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🌐 Networking": [
+        {
+          "name": "axios",
+          "specifiedVersion": "^1.13.6",
+          "installedVersion": "1.13.6",
+          "type": "production",
+          "category": "🌐 Networking",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "📱 Expo": [
+        {
+          "name": "expo",
+          "specifiedVersion": "~55.0.8",
+          "installedVersion": "55.0.8",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-apple-authentication",
+          "specifiedVersion": "^55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-asset",
+          "specifiedVersion": "~55.0.10",
+          "installedVersion": "55.0.10",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-audio",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-auth-session",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-camera",
+          "specifiedVersion": "~55.0.11",
+          "installedVersion": "55.0.11",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-clipboard",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-constants",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-crypto",
+          "specifiedVersion": "~55.0.10",
+          "installedVersion": "55.0.10",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-device",
+          "specifiedVersion": "~55.0.10",
+          "installedVersion": "55.0.10",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-font",
+          "specifiedVersion": "~55.0.4",
+          "installedVersion": "55.0.4",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-haptics",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-image",
+          "specifiedVersion": "~55.0.6",
+          "installedVersion": "55.0.6",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-image-picker",
+          "specifiedVersion": "~55.0.13",
+          "installedVersion": "55.0.13",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-linear-gradient",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-linking",
+          "specifiedVersion": "~55.0.8",
+          "installedVersion": "55.0.8",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-location",
+          "specifiedVersion": "~55.1.4",
+          "installedVersion": "55.1.4",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-notifications",
+          "specifiedVersion": "~55.0.13",
+          "installedVersion": "55.0.13",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-router",
+          "specifiedVersion": "~55.0.7",
+          "installedVersion": "55.0.7",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-secure-store",
+          "specifiedVersion": "~55.0.9",
+          "installedVersion": "55.0.9",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-splash-screen",
+          "specifiedVersion": "~55.0.12",
+          "installedVersion": "55.0.12",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-status-bar",
+          "specifiedVersion": "~55.0.4",
+          "installedVersion": "55.0.4",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-symbols",
+          "specifiedVersion": "~55.0.5",
+          "installedVersion": "55.0.5",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-system-ui",
+          "specifiedVersion": "~55.0.10",
+          "installedVersion": "55.0.10",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-video",
+          "specifiedVersion": "~55.0.11",
+          "installedVersion": "55.0.11",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "expo-web-browser",
+          "specifiedVersion": "~55.0.10",
+          "installedVersion": "55.0.10",
+          "type": "production",
+          "category": "📱 Expo",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🔥 Firebase": [
+        {
+          "name": "firebase",
+          "specifiedVersion": "^12.11.0",
+          "installedVersion": "12.11.0",
+          "type": "production",
+          "category": "🔥 Firebase",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "⚛️ React": [
+        {
+          "name": "react",
+          "specifiedVersion": "19.2.0",
+          "installedVersion": "19.2.0",
+          "type": "production",
+          "category": "⚛️ React",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-dom",
+          "specifiedVersion": "19.2.0",
+          "installedVersion": "19.2.0",
+          "type": "production",
+          "category": "⚛️ React",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "📱 React Native": [
+        {
+          "name": "react-native",
+          "specifiedVersion": "0.83.2",
+          "installedVersion": "0.83.2",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-gesture-handler",
+          "specifiedVersion": "~2.30.0",
+          "installedVersion": "2.30.0",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-mmkv",
+          "specifiedVersion": "^4.3.0",
+          "installedVersion": "4.3.0",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-reanimated",
+          "specifiedVersion": "4.2.1",
+          "installedVersion": "4.2.1",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-reanimated-carousel",
+          "specifiedVersion": "^4.0.3",
+          "installedVersion": "4.0.3",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-safe-area-context",
+          "specifiedVersion": "~5.6.2",
+          "installedVersion": "5.6.2",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-screens",
+          "specifiedVersion": "~4.23.0",
+          "installedVersion": "4.23.0",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-web",
+          "specifiedVersion": "~0.21.2",
+          "installedVersion": "0.21.2",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "react-native-worklets",
+          "specifiedVersion": "0.7.2",
+          "installedVersion": "0.7.2",
+          "type": "production",
+          "category": "📱 React Native",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🔒 Security": [
+        {
+          "name": "tweetnacl",
+          "specifiedVersion": "^1.0.3",
+          "installedVersion": "1.0.3",
+          "type": "production",
+          "category": "🔒 Security",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "tweetnacl-util",
+          "specifiedVersion": "^0.15.1",
+          "installedVersion": "0.15.1",
+          "type": "production",
+          "category": "🔒 Security",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🔧 Build Tools": [
+        {
+          "name": "@babel/core",
+          "specifiedVersion": "^7.29.0",
+          "installedVersion": "7.29.0",
+          "type": "development",
+          "category": "🔧 Build Tools",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "🧪 Testing": [
+        {
+          "name": "@types/jest",
+          "specifiedVersion": "^30.0.0",
+          "installedVersion": "30.0.0",
+          "type": "development",
+          "category": "🧪 Testing",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "jest",
+          "specifiedVersion": "^30.3.0",
+          "installedVersion": "30.3.0",
+          "type": "development",
+          "category": "🧪 Testing",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "ts-jest",
+          "specifiedVersion": "^29.4.6",
+          "installedVersion": "29.4.6",
+          "type": "development",
+          "category": "🧪 Testing",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "📘 TypeScript": [
+        {
+          "name": "@types/node",
+          "specifiedVersion": "^25.5.0",
+          "installedVersion": "25.5.0",
+          "type": "development",
+          "category": "📘 TypeScript",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "@types/react",
+          "specifiedVersion": "~19.2.14",
+          "installedVersion": "19.2.14",
+          "type": "development",
+          "category": "📘 TypeScript",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "typescript",
+          "specifiedVersion": "~5.9.2",
+          "installedVersion": "5.9.3",
+          "type": "development",
+          "category": "📘 TypeScript",
+          "actuallyImported": true,
+          "isFrameworkInternal": true,
+          "installed": true,
+          "versionMismatch": true
+        }
+      ],
+      "✨ Linting": [
+        {
+          "name": "eslint",
+          "specifiedVersion": "^10.1.0",
+          "installedVersion": "10.1.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "eslint-config-expo",
+          "specifiedVersion": "~55.0.0",
+          "installedVersion": "55.0.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "prettier",
+          "specifiedVersion": "^3.8.1",
+          "installedVersion": "3.8.1",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ]
+    },
+    "possiblyUnused": [
+      "@sentry/react-native",
+      "expo-apple-authentication",
+      "react-native-reanimated-carousel"
+    ],
+    "undeclaredImports": [
+      "firebase-functions",
+      "firebase-admin",
+      "web-push",
+      "cors",
+      "express",
+      "express-rate-limit",
+      "helmet",
+      "@tensorflow/tfjs",
+      "nsfwjs"
+    ],
+    "notInstalled": [],
+    "potentialDuplicates": [],
+    "resolutions": null,
+    "scripts": {
+      "start": "expo start",
+      "android": "expo run:android",
+      "ios": "expo run:ios",
+      "web": "expo start --web",
+      "build:web": "expo export --platform web",
+      "export": "expo export --platform web",
+      "lint": "eslint .",
+      "typecheck": "tsc --noEmit",
+      "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json}\"",
+      "save": "git add . && git commit -m \"Update\" && git push"
+    },
+    "engines": {}
+  },
+  "environmentVariables": {
+    "files": {
+      ".env": [
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_API_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "AIza********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "myar********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "myar********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "myar********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "4609********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_APP_ID",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "1:46********"
+        },
+        {
+          "key": "EXPO_PUBLIC_VAPID_PUBLIC_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "BLAm********"
+        },
+        {
+          "key": "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "dryu********"
+        },
+        {
+          "key": "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "myar********"
+        },
+        {
+          "key": "VAPID_PUBLIC_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "BLAm********"
+        },
+        {
+          "key": "VAPID_PRIVATE_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "ZM8C********"
+        },
+        {
+          "key": "VAPID_EMAIL",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "mail********"
+        },
+        {
+          "key": "EXPO_PUBLIC_FUNCTIONS_URL",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "http********"
+        },
+        {
+          "key": "EXPO_PUBLIC_SERVER_URL",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "http********"
+        },
+        {
+          "key": "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "FIREBASE_PROJECT_ID",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "myar********"
+        },
+        {
+          "key": "NODE_ENV",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "prod********"
+        },
+        {
+          "key": "PORT",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "****"
+        },
+        {
+          "key": "HMAC_SECRET",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "XfIx********"
+        },
+        {
+          "key": "ANALYTICS_HMAC_SECRET",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "rbXe********"
+        },
+        {
+          "key": "GOOGLE_SAFE_BROWSING_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "get_********"
+        },
+        {
+          "key": "NCMEC_API_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "get_********"
+        },
+        {
+          "key": "EXPO_PUBLIC_SAFE_BROWSING_API_KEY",
+          "hasValue": true,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "same********"
+        }
+      ]
+    },
+    "referencedInCode": [
+      "ANALYTICS_HMAC_SECRET",
+      "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
+      "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+      "EXPO_PUBLIC_FUNCTIONS_URL",
+      "EXPO_PUBLIC_SAFE_BROWSING_API_KEY",
+      "EXPO_PUBLIC_SERVER_URL",
+      "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
+      "EXPO_PUBLIC_VAPID_PUBLIC_KEY",
+      "FIREBASE_PROJECT_ID",
+      "GOOGLE_SAFE_BROWSING_KEY",
+      "HMAC_SECRET",
+      "NCMEC_API_KEY",
+      "NODE_ENV",
+      "PORT"
+    ],
+    "expoPublicVars": [
+      "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
+      "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+      "EXPO_PUBLIC_FUNCTIONS_URL",
+      "EXPO_PUBLIC_SAFE_BROWSING_API_KEY",
+      "EXPO_PUBLIC_SERVER_URL",
+      "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
+      "EXPO_PUBLIC_VAPID_PUBLIC_KEY"
+    ],
+    "missingFromEnvFiles": [],
+    "missingFromMainEnv": [],
+    "emptyOrPlaceholder": [
+      "EXPO_PUBLIC_SPOTIFY_CLIENT_ID"
+    ],
+    "envInGitignore": true,
+    "hasExample": false,
+    "summary": {
+      "totalFiles": 1,
+      "totalVars": 23,
+      "uniqueVars": 23,
+      "emptyVars": 1,
+      "placeholderVars": 0,
+      "secretVars": 11,
+      "expoPublicVars": 13
+    }
+  },
+  "security": {
+    "issueCount": 145,
+    "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 69,
+      "info": 75
+    },
+    "issues": [
+      {
+        "file": "firebaseConfig.ts",
+        "severity": "high",
+        "message": "Firebase API key ref — ensure env var not hardcoded",
+        "count": 1,
+        "pattern": "FIREBASE_API_KEY"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 9,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 9,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\chat.tsx",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 4,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "app\\chat.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 46,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 2,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 4,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\date-safety.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\date-safety.tsx",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 5,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 1,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 4,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 27,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 22,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\home.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\interests.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 6,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\login.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 1,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\matches.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 9,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\matches.tsx",
+        "severity": "low",
+        "message": "confirm() in code",
+        "count": 1,
+        "pattern": "confirm("
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 7,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 9,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 1,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\profile-views.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\referral.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 2,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\relationship-mode.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 9,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 3,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 2,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\settings.tsx",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "app\\settings.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 18,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 7,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\signup.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 1,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\smart-photos.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 2,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\social-verification.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 13,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\stories.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 7,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\super-likes.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 6,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\video-profile-recorder.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 4,
+        "pattern": "alert("
+      },
+      {
+        "file": "app\\voice-intro-recorder.tsx",
+        "severity": "low",
+        "message": "alert() in code",
+        "count": 6,
+        "pattern": "alert("
+      },
+      {
+        "file": "functions\\index.js",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "functions\\index.js",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "functions\\lib\\sendWebPush.js",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 2,
+        "pattern": "console.log("
+      },
+      {
+        "file": "functions\\src\\sendWebPush.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 2,
+        "pattern": "console.log("
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 2,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\bodyTypeDetection.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 2,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\dateSafety.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\datingStats.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\giphyApi.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\heightEstimation.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 4,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\location.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 4,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\location.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 2,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\logger.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 3,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\logger.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 2,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\matchExpiration.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\notifications.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 3,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\notifications.web.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 5,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\profileViews.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\ratingSystem.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\socialVerification.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\stories.ts",
+        "severity": "low",
+        "message": "console.log() in code",
+        "count": 1,
+        "pattern": "console.log("
+      },
+      {
+        "file": "utils\\stories.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 1,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\videoProfiles.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 2,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "utils\\voiceIntro.ts",
+        "severity": "low",
+        "message": "console.warn() in code",
+        "count": 2,
+        "pattern": "console.warn("
+      },
+      {
+        "file": "app\\admin\\stats.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 4,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 3,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 2,
+        "pattern": "<any>"
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\home.tsx",
+        "severity": "info",
+        "message": "Dev-only code block",
+        "count": 1,
+        "pattern": "__DEV__"
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 1,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" array",
+        "count": 1,
+        "pattern": "any[]"
+      },
+      {
+        "file": "app\\login.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 10,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 1,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 2,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 1,
+        "pattern": "<any>"
+      },
+      {
+        "file": "app\\profile-views.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 3,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\settings.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 5,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\signup.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 16,
+        "pattern": "as any"
+      },
+      {
+        "file": "app\\stories.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\voice-intro-recorder.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "app\\voice-intro-recorder.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 1,
+        "pattern": "<any>"
+      },
+      {
+        "file": "app\\_layout.tsx",
+        "severity": "info",
+        "message": "Dev-only code block",
+        "count": 8,
+        "pattern": "__DEV__"
+      },
+      {
+        "file": "app\\_layout.tsx",
+        "severity": "info",
+        "message": "ESLint rule disabled",
+        "count": 1,
+        "pattern": "eslint-disable"
+      },
+      {
+        "file": "components\\HeightBadge.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "components\\ProfileCompletionCard.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "components\\TrustScoreDisplay.tsx",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 5,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\achievements.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\ageEstimation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 8,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\ageEstimation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\ageEstimation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 1,
+        "pattern": "<any>"
+      },
+      {
+        "file": "utils\\chatSettings.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\cloudinaryUpload.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 3,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\cloudinaryUpload.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\compatibilityQuiz.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\dateCheckin.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 3,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\dealBreakers.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\disappearingMessages.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 2,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 1,
+        "pattern": "<any>"
+      },
+      {
+        "file": "utils\\faceDetection.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\faceDetection.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" array",
+        "count": 1,
+        "pattern": "any[]"
+      },
+      {
+        "file": "utils\\giphyApi.ts",
+        "severity": "info",
+        "message": "Dev-only code block",
+        "count": 1,
+        "pattern": "__DEV__"
+      },
+      {
+        "file": "utils\\icebreakerGames.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 10,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\icebreakerGames.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" array",
+        "count": 3,
+        "pattern": "any[]"
+      },
+      {
+        "file": "utils\\location.ts",
+        "severity": "info",
+        "message": "Dev-only code block",
+        "count": 6,
+        "pattern": "__DEV__"
+      },
+      {
+        "file": "utils\\location.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 1,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\logger.ts",
+        "severity": "info",
+        "message": "Dev-only code block",
+        "count": 2,
+        "pattern": "__DEV__"
+      },
+      {
+        "file": "utils\\logger.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\matchExpiration.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\messageReactions.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\messageTranslation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 2,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 3,
+        "pattern": "<any>"
+      },
+      {
+        "file": "utils\\onlineStatus.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 4,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\pinnedMessages.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\profileCompletion.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 3,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\profileStrength.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\ratingSystem.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 3,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\relationshipMode.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\smartPhotos.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 1,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\socialVerification.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 4,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\spotifyIntegration.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 4,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\stories.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\streakTracker.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\superLike.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\videoProfiles.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 2,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\videoProfiles.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 2,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\voiceIntro.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" cast",
+        "count": 2,
+        "pattern": "as any"
+      },
+      {
+        "file": "utils\\voiceIntro.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" type",
+        "count": 1,
+        "pattern": ": any"
+      },
+      {
+        "file": "utils\\voiceIntro.ts",
+        "severity": "info",
+        "message": "TypeScript \"any\" generic",
+        "count": 1,
+        "pattern": "<any>"
+      }
+    ],
+    "mostProblematicFiles": [
+      {
+        "file": "app\\chat.tsx",
+        "issueCount": 50
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "issueCount": 27
+      },
+      {
+        "file": "app\\settings.tsx",
+        "issueCount": 24
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "issueCount": 22
+      },
+      {
+        "file": "app\\signup.tsx",
+        "issueCount": 17
+      },
+      {
+        "file": "app\\matches.tsx",
+        "issueCount": 13
+      },
+      {
+        "file": "app\\social-verification.tsx",
+        "issueCount": 13
+      },
+      {
+        "file": "utils\\icebreakerGames.ts",
+        "issueCount": 13
+      },
+      {
+        "file": "utils\\location.ts",
+        "issueCount": 13
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "issueCount": 12
+      },
+      {
+        "file": "app\\login.tsx",
+        "issueCount": 11
+      },
+      {
+        "file": "utils\\ageEstimation.ts",
+        "issueCount": 10
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issueCount": 9
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "issueCount": 9
+      },
+      {
+        "file": "app\\relationship-mode.tsx",
+        "issueCount": 9
+      }
+    ],
+    "gitignoreChecks": {
+      "envFiles": true,
+      "nodeModules": true,
+      "buildDirs": true,
+      "osFiles": true,
+      "ideFiles": true,
+      "coverage": true,
+      "logs": true,
+      "keystores": true,
+      "certificates": true
+    },
+    "securityHeaders": {
+      "hasHelmet": true,
+      "hasCsp": true,
+      "hasHsts": false,
+      "hasXFrame": true,
+      "hasXContent": true
+    }
+  },
+  "fileStructure": {
+    "totalFiles": 166,
+    "totalCodeFiles": 126,
+    "byExtension": {
+      "(none)": 8,
+      ".yml": 1,
+      ".json": 19,
+      ".tsx": 54,
+      ".png": 6,
+      ".md": 3,
+      ".ts": 67,
+      ".js": 5,
+      ".rules": 1,
+      ".map": 2
+    },
+    "byDirectory": {
+      "app": 45,
+      "cloudinaryConfig.ts": 1,
+      "components": 8,
+      "eslint.config.js": 1,
+      "expo-env.d.ts": 1,
+      "firebaseConfig.ts": 1,
+      "functions": 3,
+      "public": 1,
+      "server": 1,
+      "services": 1,
+      "utils": 61,
+      "web-push": 2
+    },
+    "largestFiles": [
+      {
+        "file": "app\\chat.tsx",
+        "lines": 1709,
+        "bytes": 109937
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "lines": 1481,
+        "bytes": 123651
+      },
+      {
+        "file": "app\\signup.tsx",
+        "lines": 1269,
+        "bytes": 68392
+      },
+      {
+        "file": "app\\settings.tsx",
+        "lines": 1092,
+        "bytes": 34190
+      },
+      {
+        "file": "app\\login.tsx",
+        "lines": 1073,
+        "bytes": 60352
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "lines": 946,
+        "bytes": 77179
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "lines": 912,
+        "bytes": 29466
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "lines": 902,
+        "bytes": 50593
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "lines": 799,
+        "bytes": 21679
+      },
+      {
+        "file": "app\\stories.tsx",
+        "lines": 793,
+        "bytes": 22444
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "lines": 788,
+        "bytes": 33577
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "lines": 784,
+        "bytes": 55133
+      },
+      {
+        "file": "app\\matches.tsx",
+        "lines": 722,
+        "bytes": 40190
+      },
+      {
+        "file": "utils\\i18n.ts",
+        "lines": 719,
+        "bytes": 25790
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "lines": 718,
+        "bytes": 51665
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "lines": 713,
+        "bytes": 21844
+      },
+      {
+        "file": "app\\home.tsx",
+        "lines": 691,
+        "bytes": 43499
+      },
+      {
+        "file": "components\\BodyTypeSelector.tsx",
+        "lines": 672,
+        "bytes": 18572
+      },
+      {
+        "file": "functions\\index.js",
+        "lines": 671,
+        "bytes": 20719
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "lines": 650,
+        "bytes": 29944
+      },
+      {
+        "file": "app\\referral.tsx",
+        "lines": 537,
+        "bytes": 14512
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "lines": 520,
+        "bytes": 15965
+      },
+      {
+        "file": "utils\\dateCheckin.ts",
+        "lines": 520,
+        "bytes": 15965
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "lines": 513,
+        "bytes": 24503
+      },
+      {
+        "file": "utils\\ratingSystem.ts",
+        "lines": 513,
+        "bytes": 14134
+      }
+    ],
+    "totalLinesOfCode": 39354,
+    "maxDirectoryDepth": 3,
+    "emptyFiles": 0,
+    "averageLinesPerFile": 312,
+    "medianLinesPerFile": 197,
+    "longFiles": 43,
+    "configFilesPresent": [
+      "tsconfig.json",
+      "eslint.config.js",
+      ".prettierrc",
+      "app.json",
+      "eas.json",
+      "firebase.json",
+      "firestore.rules",
+      "firestore.indexes.json",
+      ".gitignore",
+      ".nvmrc",
+      "README.md",
+      "CHANGELOG.md",
+      "LICENSE",
+      "SECURITY.md",
+      ".github/workflows",
+      "vercel.json"
+    ],
+    "configFilesMissing": [
+      "babel.config.js",
+      "babel.config.ts",
+      "metro.config.js",
+      "metro.config.ts",
+      "jest.config.js",
+      "jest.config.ts",
+      "jest.config.mjs",
+      "eslint.config.mjs",
+      ".eslintrc.js",
+      ".eslintrc.json",
+      ".eslintrc.yml",
+      ".prettierrc.json",
+      ".prettierrc.js",
+      "prettier.config.js",
+      "prettier.config.mjs",
+      ".prettierignore",
+      ".eslintignore",
+      "app.config.js",
+      "app.config.ts",
+      "storage.rules",
+      "Dockerfile",
+      "docker-compose.yml",
+      "docker-compose.yaml",
+      ".dockerignore",
+      ".gitattributes",
+      ".node-version",
+      ".tool-versions",
+      "LICENSE.md",
+      "CONTRIBUTING.md",
+      "CODE_OF_CONDUCT.md",
+      ".editorconfig",
+      ".browserslistrc",
+      "tailwind.config.js",
+      "tailwind.config.ts",
+      "postcss.config.js",
+      "nativewind-env.d.ts",
+      "global.css",
+      "Procfile",
+      "fly.toml",
+      "render.yaml",
+      "railway.json",
+      "netlify.toml",
+      ".husky",
+      "commitlint.config.js",
+      ".commitlintrc",
+      "lint-staged.config.js",
+      ".lintstagedrc",
+      "turbo.json",
+      "lerna.json",
+      "nx.json",
+      "pnpm-workspace.yaml",
+      ".env.example",
+      ".env.template",
+      "renovate.json",
+      ".renovaterc",
+      "dependabot.yml",
+      ".github/dependabot.yml"
+    ],
+    "namingIssues": [
+      {
+        "file": "utils\\languageContext.tsx",
+        "issue": "Component file not PascalCase"
+      }
+    ],
+    "topLevelDirs": [
+      "app",
+      "assets",
+      "components",
+      "functions",
+      "public",
+      "scripts",
+      "server",
+      "services",
+      "utils",
+      "web-push"
+    ]
+  },
+  "git": {
+    "isGitRepo": true,
+    "currentBranch": "main",
+    "lastCommitHash": "60eb0dd2420442f55890074ac7a90567aa72481d",
+    "lastCommitAuthor": "Elxan",
+    "lastCommitDate": "2026-03-27 18:07:44 +0400",
+    "lastCommitMessage": "Update",
+    "totalCommits": "44",
+    "firstCommitDate": null,
+    "remoteUrl": "https://github.com/MrBMRBLX/MyArchetype.git",
+    "uncommittedFiles": 88,
+    "stagedFiles": 0,
+    "untrackedFiles": 14,
+    "stashCount": 0,
+    "hasGitHubActions": true,
+    "hasGitIgnore": true,
+    "hasGitAttributes": false,
+    "topContributors": [
+      "44\tElxan"
+    ],
+    "tags": [],
+    "branches": [
+      "main",
+      "remotes/origin/main"
+    ],
+    "recentCommits": [
+      "60eb0dd Update",
+      "8c45f58 Update",
+      "3210c08 Update",
+      "6ad63d5 Update",
+      "b1c3453 Update",
+      "131d83b Update",
+      "6624833 Update",
+      "77e61a3 Update",
+      "3f213ad Update",
+      "1d6cd54 Update",
+      "698e265 Update",
+      "9ab85dd Update",
+      "2326c1f Update",
+      "9f649aa Update",
+      "10f6164 Update",
+      "8cce0e2 Update",
+      "3fb3ba6 Update",
+      "f3049da Update",
+      "62762cd Update",
+      "08be6c3 Update"
+    ],
+    "mergeConflicts": [],
+    "largeFiles": 0,
+    "gitHooks": {},
+    "commitConventions": {
+      "total": 44,
+      "conventional": 0,
+      "ratio": "0%"
+    },
+    "lfs": true,
+    "submodules": false
+  },
+  "codeQuality": {
+    "totalLines": 39354,
+    "codeLines": 33967,
+    "commentLines": 1394,
+    "blankLines": 3993,
+    "commentRatio": "4%",
+    "blankRatio": "10%",
+    "files": {
+      "total": 126,
+      "test": 0,
+      "component": 54,
+      "util": 61,
+      "hook": 1,
+      "type": 1,
+      "constant": 1
+    },
+    "issues": {
+      "todos": 0,
+      "fixmes": 0,
+      "anyTypes": 150,
+      "tsIgnores": 0,
+      "consoleLogs": 333
+    },
+    "complexity": {
+      "longestFunction": {
+        "file": "app\\personality-quiz.tsx",
+        "length": 387,
+        "name": "PersonalityQuizInner"
+      },
+      "maxComplexityFile": {
+        "file": "app\\profile-setup.tsx",
+        "complexity": 262
+      }
+    },
+    "hasLinter": true,
+    "hasFormatter": true,
+    "hasEditorConfig": false,
+    "hasLintStaged": false,
+    "hasCommitLint": false,
+    "hasHusky": false
+  },
+  "apiEndpoints": {
+    "total": 30,
+    "byMethod": {
+      "GET": 1,
+      "POST": 28,
+      "PUT": 0,
+      "PATCH": 0,
+      "DELETE": 0,
+      "OPTIONS": 1,
+      "HEAD": 0
+    },
+    "withoutAuth": 1,
+    "withoutRateLimit": 1,
+    "withoutValidation": 0,
+    "withoutErrorHandler": 26,
+    "endpoints": [
+      {
+        "method": "OPTIONS",
+        "path": "*",
+        "file": "server\\src\\index.ts",
+        "line": 45,
+        "hasAuth": false,
+        "hasRateLimit": false,
+        "hasValidation": false,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/send-notification",
+        "file": "server\\src\\index.ts",
+        "line": 643,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": true
+      },
+      {
+        "method": "POST",
+        "path": "/send-expo-notification",
+        "file": "server\\src\\index.ts",
+        "line": 658,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-email",
+        "file": "server\\src\\index.ts",
+        "line": 672,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-password-breach",
+        "file": "server\\src\\index.ts",
+        "line": 679,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/register-device",
+        "file": "server\\src\\index.ts",
+        "line": 685,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/login-track",
+        "file": "server\\src\\index.ts",
+        "line": 695,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-device-integrity",
+        "file": "server\\src\\index.ts",
+        "line": 705,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/validate-location",
+        "file": "server\\src\\index.ts",
+        "line": 713,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/moderate-text",
+        "file": "server\\src\\index.ts",
+        "line": 736,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/scan-csam",
+        "file": "server\\src\\index.ts",
+        "line": 744,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/age-gate-check",
+        "file": "server\\src\\index.ts",
+        "line": 757,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/dmca-takedown",
+        "file": "server\\src\\index.ts",
+        "line": 762,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": true
+      },
+      {
+        "method": "POST",
+        "path": "/log-screenshot",
+        "file": "server\\src\\index.ts",
+        "line": 773,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/share-meeting-location",
+        "file": "server\\src\\index.ts",
+        "line": 778,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/enforce-trust",
+        "file": "server\\src\\index.ts",
+        "line": 784,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-url",
+        "file": "server\\src\\index.ts",
+        "line": 790,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/screen-name",
+        "file": "server\\src\\index.ts",
+        "line": 796,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/pdq-cross-account",
+        "file": "server\\src\\index.ts",
+        "line": 804,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-cib",
+        "file": "server\\src\\index.ts",
+        "line": 813,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/ab-test",
+        "file": "server\\src\\index.ts",
+        "line": 821,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/admin/rotate-key",
+        "file": "server\\src\\index.ts",
+        "line": 830,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": true
+      },
+      {
+        "method": "POST",
+        "path": "/wcag-audit",
+        "file": "server\\src\\index.ts",
+        "line": 843,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-contrast",
+        "file": "server\\src\\index.ts",
+        "line": 849,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/validate-event",
+        "file": "server\\src\\index.ts",
+        "line": 855,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-engagement",
+        "file": "server\\src\\index.ts",
+        "line": 862,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/check-bot",
+        "file": "server\\src\\index.ts",
+        "line": 870,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/track-conversion",
+        "file": "server\\src\\index.ts",
+        "line": 876,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": false
+      },
+      {
+        "method": "POST",
+        "path": "/admin/action",
+        "file": "server\\src\\index.ts",
+        "line": 885,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
+        "hasErrorHandler": true
+      },
+      {
+        "method": "GET",
+        "path": "/health",
+        "file": "server\\src\\index.ts",
+        "line": 897,
+        "hasAuth": false,
+        "hasRateLimit": false,
+        "hasValidation": false,
+        "hasErrorHandler": false
+      }
+    ],
+    "middlewares": [],
+    "serverFileCount": 4
+  },
+  "dependencyHealth": {
+    "lockfile": {
+      "packageLock": true,
+      "yarnLock": false,
+      "pnpmLock": false,
+      "bunLock": false,
+      "hasAny": true,
+      "multipleLockfiles": false
+    },
+    "vulnerabilities": null,
+    "outdatedPackages": null,
+    "outdatedCount": null,
+    "majorUpdatesAvailable": null,
+    "nativeModules": [
+      "@sentry/react-native",
+      "axios",
+      "expo",
+      "expo-apple-authentication",
+      "expo-asset",
+      "expo-audio",
+      "expo-camera",
+      "expo-clipboard",
+      "expo-constants",
+      "expo-crypto",
+      "expo-device",
+      "expo-font",
+      "expo-haptics",
+      "expo-image",
+      "expo-image-picker",
+      "expo-linear-gradient",
+      "expo-linking",
+      "expo-location",
+      "expo-notifications",
+      "expo-router",
+      "expo-secure-store",
+      "expo-splash-screen",
+      "expo-symbols",
+      "expo-system-ui",
+      "expo-video",
+      "expo-web-browser",
+      "react-native-gesture-handler",
+      "react-native-mmkv",
+      "react-native-reanimated",
+      "react-native-reanimated-carousel",
+      "react-native-safe-area-context",
+      "react-native-screens",
+      "react-native-worklets"
+    ],
+    "nativeModuleCount": 33,
+    "autoUpdate": {
+      "renovate": false,
+      "dependabot": false,
+      "hasAny": false
+    }
+  },
+  "routes": {
+    "type": "expo-router",
+    "totalRoutes": 44,
+    "dynamicRoutes": 0,
+    "staticRoutes": 44,
+    "layouts": [
+      {
+        "file": "app\\_layout.tsx",
+        "hasTabBar": false,
+        "hasStack": true,
+        "hasDrawer": false
+      }
+    ],
+    "groups": [],
+    "modals": 0,
+    "apiRoutes": [],
+    "errorBoundaries": [],
+    "routes": [
+      {
+        "file": "app\\achievements.tsx",
+        "route": "app/achievements",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "route": "app/admin/index",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "route": "app/admin/reports",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\admin\\stats.tsx",
+        "route": "app/admin/stats",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "route": "app/admin/users",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "route": "app/blocked-users",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\chat.tsx",
+        "route": "app/chat",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "route": "app/compatibility-quiz",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "route": "app/daily-question",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "route": "app/date-checkin",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\date-safety.tsx",
+        "route": "app/date-safety",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "route": "app/date-spot-reviews",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "route": "app/dating-stats",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "route": "app/deal-breakers",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "route": "app/edit-profile",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "route": "app/height-verification",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\home.tsx",
+        "route": "app/home",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "route": "app/icebreaker-game",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\index.tsx",
+        "route": "app/index",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\interests.tsx",
+        "route": "app/interests",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\login.tsx",
+        "route": "app/login",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\matches.tsx",
+        "route": "app/matches",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "route": "app/my-matches",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "route": "app/personality-quiz",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "route": "app/post-date-rating",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\privacy.tsx",
+        "route": "app/privacy",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "route": "app/profile-preview",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "route": "app/profile-setup",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\profile-views.tsx",
+        "route": "app/profile-views",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\referral-leaderboard.tsx",
+        "route": "app/referral-leaderboard",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\referral.tsx",
+        "route": "app/referral",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\relationship-mode.tsx",
+        "route": "app/relationship-mode",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "route": "app/second-look",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "route": "app/selfie-verification",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\settings.tsx",
+        "route": "app/settings",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "route": "app/shared-playlist",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\signup.tsx",
+        "route": "app/signup",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\smart-photos.tsx",
+        "route": "app/smart-photos",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\social-verification.tsx",
+        "route": "app/social-verification",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\stories.tsx",
+        "route": "app/stories",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\super-likes.tsx",
+        "route": "app/super-likes",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\terms.tsx",
+        "route": "app/terms",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\video-profile-recorder.tsx",
+        "route": "app/video-profile-recorder",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      },
+      {
+        "file": "app\\voice-intro-recorder.tsx",
+        "route": "app/voice-intro-recorder",
+        "isDynamic": false,
+        "isModal": false,
+        "params": []
+      }
+    ],
+    "navigations": [
+      {
+        "file": "app\\achievements.tsx",
+        "line": 67,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 37,
+        "target": "/login"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 45,
+        "target": "/home"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 156,
+        "target": "/admin/reports"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 172,
+        "target": "/admin/users"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 184,
+        "target": "/admin/stats"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "line": 196,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "line": 34,
+        "target": "/login"
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "line": 131,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "line": 826,
+        "target": "/my-matches"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "line": 857,
+        "target": "/my-matches"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "line": 966,
+        "target": "/my-matches"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "line": 980,
+        "target": "/my-matches"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "line": 1028,
+        "target": "/post-date-rating"
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "line": 106,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "line": 116,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "line": 123,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 36,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 54,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 72,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "line": 212,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "line": 350,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "line": 398,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-safety.tsx",
+        "line": 219,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-safety.tsx",
+        "line": 273,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "line": 107,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "line": 34,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "line": 45,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "line": 36,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "line": 56,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 116,
+        "target": "/login"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 119,
+        "target": "/profile-setup"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 328,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 357,
+        "target": "/"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 417,
+        "target": "/selfie-verification"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 421,
+        "target": "/profile-preview"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 430,
+        "target": "/social-verification"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 431,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 492,
+        "target": "/video-profile-recorder"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 497,
+        "target": "/video-profile-recorder"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 548,
+        "target": "/height-verification"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 599,
+        "target": "/personality-quiz"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 613,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 618,
+        "target": "/privacy"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 620,
+        "target": "/terms"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "line": 304,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "line": 502,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 418,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 420,
+        "target": "/login"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 460,
+        "target": "/profile-setup"
+      }
+    ],
+    "deepLinks": [
+      {
+        "type": "scheme",
+        "value": "myarchetype"
+      }
+    ],
+    "hasNotFound": false,
+    "hasTabNavigation": false,
+    "hasStackNavigation": true,
+    "hasDrawerNavigation": false
+  },
+  "components": {
+    "totalComponents": 53,
+    "classComponents": 4,
+    "functionalComponents": 49,
+    "memoizedComponents": 9,
+    "forwardRefComponents": 0,
+    "averageComponentLines": 475,
+    "largestComponents": [
+      {
+        "file": "app\\chat.tsx",
+        "lines": 1709
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "lines": 1481
+      },
+      {
+        "file": "app\\signup.tsx",
+        "lines": 1269
+      },
+      {
+        "file": "app\\settings.tsx",
+        "lines": 1092
+      },
+      {
+        "file": "app\\login.tsx",
+        "lines": 1073
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "lines": 946
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "lines": 912
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "lines": 799
+      },
+      {
+        "file": "app\\stories.tsx",
+        "lines": 793
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "lines": 788
+      }
+    ],
+    "componentsWith5PlusState": [
+      {
+        "file": "app\\chat.tsx",
+        "stateCount": 52
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "stateCount": 17
+      },
+      {
+        "file": "app\\signup.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\settings.tsx",
+        "stateCount": 22
+      },
+      {
+        "file": "app\\login.tsx",
+        "stateCount": 6
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "stateCount": 10
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "stateCount": 14
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "stateCount": 7
+      },
+      {
+        "file": "app\\stories.tsx",
+        "stateCount": 7
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "stateCount": 16
+      },
+      {
+        "file": "app\\matches.tsx",
+        "stateCount": 10
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "stateCount": 37
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "stateCount": 11
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "stateCount": 13
+      },
+      {
+        "file": "app\\referral.tsx",
+        "stateCount": 6
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "stateCount": 10
+      },
+      {
+        "file": "app\\referral-leaderboard.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\video-profile-recorder.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\voice-intro-recorder.tsx",
+        "stateCount": 11
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\profile-views.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\index.tsx",
+        "stateCount": 6
+      },
+      {
+        "file": "app\\_layout.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "stateCount": 7
+      },
+      {
+        "file": "app\\social-verification.tsx",
+        "stateCount": 6
+      },
+      {
+        "file": "app\\relationship-mode.tsx",
+        "stateCount": 9
+      },
+      {
+        "file": "app\\smart-photos.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "stateCount": 10
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "stateCount": 6
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "stateCount": 8
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "stateCount": 15
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "stateCount": 6
+      }
+    ],
+    "componentsWithInlineStyles": [
+      {
+        "file": "app\\profile-setup.tsx",
+        "count": 20
+      },
+      {
+        "file": "app\\signup.tsx",
+        "count": 5
+      },
+      {
+        "file": "app\\login.tsx",
+        "count": 4
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\matches.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\home.tsx",
+        "count": 16
+      },
+      {
+        "file": "components\\BodyTypeSelector.tsx",
+        "count": 4
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\social-verification.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\relationship-mode.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\smart-photos.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\super-likes.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\interests.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "count": 2
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "count": 1
+      }
+    ],
+    "customHooks": [],
+    "hookCount": 0,
+    "hooksWithoutCleanup": [],
+    "contexts": [
+      {
+        "file": "utils\\languageContext.tsx",
+        "name": "LanguageContext"
+      }
+    ],
+    "contextCount": 1,
+    "providers": 2,
+    "hocs": 4,
+    "propDrilling": [],
+    "errorBoundaries": 4
+  },
+  "errorHandling": {
+    "tryCatchBlocks": 455,
+    "catchBlocks": 358,
+    "throwStatements": 49,
+    "emptyTryCatch": 0,
+    "promiseWithCatch": 49,
+    "errorBoundaries": 4,
+    "consoleErrorCount": 273,
+    "sentryCapture": 0,
+    "asyncWithoutTryCatch": [],
+    "emptyHandlers": [],
+    "globalHandlers": {
+      "unhandledRejection": false,
+      "uncaughtException": true,
+      "errorBoundaryWrapper": true,
+      "globalCatch": true,
+      "sentryInit": false,
+      "crashlytics": false
+    },
+    "errorLogging": "console.error only",
+    "score": 70
+  },
+  "networkCalls": {
+    "fetchCalls": 61,
+    "axiosCalls": 2,
+    "totalNetworkCalls": 63,
+    "uniqueUrls": [
+      "https://overpass-api.de/api/interpreter",
+      "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload",
+      "${SERVER}/send-expo-notification",
+      "https://exp.host/--/api/v2/push/send",
+      "https://api.pwnedpasswords.com/range/${prefix}",
+      "https://ip-api.com/json/${ip}?fields=countryCode,lat,lon,status",
+      "https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${key}",
+      "https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}",
+      "https://api.missingkids.org/cybertipline/report",
+      "${SERVER_URL}${path}",
+      "${BASE_URL}/${resType}/upload",
+      "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload",
+      "${SERVER_URL}/checkPhotoHash",
+      "${SERVER_URL}/catfish-signals",
+      "${SERVER_URL}/getBannedEmbeddings",
+      "${SERVER_URL}/checkCelebrityEmbedding",
+      "${BASE_URL}/${endpoint}?${searchParams}",
+      "${SERVER_URL}/validate-location",
+      "${SERVER_URL}/verify-photo-nsfw",
+      "${SERVER_URL}/verify-video-nsfw",
+      "${SERVER_URL}/detect-nude-parts",
+      "${SERVER_URL}/verify-all-photos-same-person",
+      "${SERVER_URL}/pdq-cross-account",
+      "${SERVER_URL}/${endpoint}",
+      "${SERVER_URL}/ocr-extract",
+      "${SERVER_URL}/watermark-embed",
+      "${SERVER_URL}/watermark-detect",
+      "${SERVER_URL}/moderate-text",
+      "https://www.instagram.com/${username}/",
+      "https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${API_KEY}"
+    ],
+    "hasTimeout": true,
+    "hasRetry": true,
+    "hasAbortController": true,
+    "hasInterceptor": false,
+    "hasGraphQL": false,
+    "hasWebSocket": false,
+    "hasSSE": false,
+    "dataFetchingLibraries": [
+      "axios"
+    ],
+    "apiServiceFiles": [
+      "public\\service-worker.js",
+      "services\\notifications.ts",
+      "utils\\giphyApi.ts"
+    ],
+    "fetchDetails": [
+      {
+        "file": "app\\chat.tsx",
+        "line": 753,
+        "url": "https://overpass-api.de/api/interpreter"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 238,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 243,
+        "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "line": 89,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "line": 97,
+        "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "line": 89,
+        "url": "${SERVER}/send-expo-notification"
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "line": 163,
+        "url": "https://exp.host/--/api/v2/push/send"
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "line": 188,
+        "url": "https://exp.host/--/api/v2/push/send"
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "line": 130,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "line": 136,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "app\\signup.tsx",
+        "line": 256,
+        "url": "https://api.pwnedpasswords.com/range/${prefix}"
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "line": 308,
+        "url": "https://ip-api.com/json/${ip}?fields=countryCode,lat,lon,status"
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "line": 343,
+        "url": "https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${key}"
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "line": 384,
+        "url": "https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}"
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "line": 437,
+        "url": "https://api.missingkids.org/cybertipline/report"
+      },
+      {
+        "file": "server\\src\\index.ts",
+        "line": 663,
+        "url": "https://exp.host/--/api/v2/push/send"
+      },
+      {
+        "file": "services\\notifications.ts",
+        "line": 62,
+        "url": "${SERVER_URL}${path}"
+      },
+      {
+        "file": "utils\\bodyTypeDetection.ts",
+        "line": 126,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\cloudinaryUpload.ts",
+        "line": 86,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\cloudinaryUpload.ts",
+        "line": 95,
+        "url": "${BASE_URL}/${resType}/upload"
+      },
+      {
+        "file": "utils\\e2eeMedia.ts",
+        "line": 42,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\e2eeMedia.ts",
+        "line": 73,
+        "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload"
+      },
+      {
+        "file": "utils\\e2eeMedia.ts",
+        "line": 109,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "line": 123,
+        "url": "${SERVER_URL}/checkPhotoHash"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "line": 132,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "line": 135,
+        "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
+      },
+      {
+        "file": "utils\\faceComparison.ts",
+        "line": 465,
+        "url": "${SERVER_URL}/catfish-signals"
+      },
+      {
+        "file": "utils\\faceDetection.ts",
+        "line": 52,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "utils\\faceVerification.ts",
+        "line": 277,
+        "url": "${SERVER_URL}/getBannedEmbeddings"
+      },
+      {
+        "file": "utils\\faceVerification.ts",
+        "line": 297,
+        "url": "${SERVER_URL}/checkCelebrityEmbedding"
+      }
+    ],
+    "axiosDetails": [
+      {
+        "file": "functions\\index.js",
+        "line": 117,
+        "url": "(dynamic)"
+      },
+      {
+        "file": "functions\\index.js",
+        "line": 168,
+        "url": "(dynamic)"
+      }
+    ],
+    "resilience": {
+      "hasTimeout": true,
+      "hasRetry": true,
+      "hasAbortController": true,
+      "hasCircuitBreaker": false,
+      "hasBackoff": false
+    }
+  },
+  "accessibility": {
+    "labels": 255,
+    "roles": 196,
+    "hints": 28,
+    "states": 29,
+    "accessibleProps": 6,
+    "ariaAttributes": 15,
+    "touchableWithoutLabel": 338,
+    "imageWithoutAlt": 21,
+    "hasScreenReaderSupport": true,
+    "hasDynamicFontSize": true,
+    "hasReducedMotion": true,
+    "hasVoiceOver": true,
+    "issues": [
+      {
+        "file": "app\\achievements.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\index.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\profile-views.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\referral-leaderboard.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      },
+      {
+        "file": "app\\referral-leaderboard.tsx",
+        "issue": "Image without accessibilityLabel/alt"
+      }
+    ],
+    "score": 65
+  },
+  "performance": {
+    "issues": [
+      {
+        "file": "app\\admin\\reports.tsx",
+        "issue": "7 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\admin\\stats.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "issue": "63 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\chat.tsx",
+        "issue": "Component file is 1709 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\date-checkin.tsx",
+        "issue": "Component file is 520 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "issue": "11 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\dating-stats.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\deal-breakers.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "issue": "26 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "issue": "Component file is 718 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "issue": "8 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\height-verification.tsx",
+        "issue": "Component file is 650 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\home.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\home.tsx",
+        "issue": "Component file is 691 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\home.tsx",
+        "issue": "16 inline style objects — potential re-render cause",
+        "severity": "low"
+      },
+      {
+        "file": "app\\login.tsx",
+        "issue": "Component file is 1073 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "issue": "16 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\matches.tsx",
+        "issue": "Component file is 722 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "issue": "15 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\my-matches.tsx",
+        "issue": "Component file is 912 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\personality-quiz.tsx",
+        "issue": "Component file is 946 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "issue": "20 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "issue": "Component file is 506 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\profile-preview.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "issue": "25 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "issue": "Component file is 1481 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\profile-setup.tsx",
+        "issue": "20 inline style objects — potential re-render cause",
+        "severity": "low"
+      }
+    ],
+    "inlineFunctionsInJSX": 335,
+    "possiblyMissingKeys": 0,
+    "heavyImports": 0,
+    "optimizations": {
+      "usesFlashList": false,
+      "usesFlatList": true,
+      "usesSectionList": false,
+      "usesVirtualizedList": false,
+      "usesMemo": 58,
+      "usesCallback": 246,
+      "usesReactMemo": 30,
+      "usesLazy": false,
+      "usesSuspense": false,
+      "usesInteractionManager": true,
+      "usesRequestAnimationFrame": true,
+      "usesPureComponent": false,
+      "hasImageOptimization": true,
+      "hasListOptimization": true,
+      "hermes": false,
+      "proguard": true
+    },
+    "score": 55
+  },
+  "assets": {
+    "summary": {
+      "totalAssets": 13,
+      "totalSize": "501.5 KB",
+      "totalSizeBytes": 513494,
+      "images": 6,
+      "svgs": 0,
+      "fonts": 0,
+      "videos": 0,
+      "audios": 0
+    },
+    "imageFormats": {
+      "png": 6,
+      "jpg": 0,
+      "webp": 0,
+      "gif": 0
+    },
+    "retina": {
+      "baseImages": 6,
+      "@2x": 0,
+      "@3x": 0
+    },
+    "largeAssets": [],
+    "possiblyUnusedAssets": [
+      "assets\\images\\android-icon-background.png",
+      "assets\\images\\android-icon-foreground.png",
+      "assets\\images\\android-icon-monochrome.png",
+      "assets\\images\\favicon.png",
+      "assets\\images\\splash-icon.png"
+    ],
+    "appAssets": {
+      "icon": "./assets/images/icon.png",
+      "splash": "./assets/images/splash-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#1a1a2e"
+      },
+      "favicon": "./assets/images/favicon.png"
+    },
+    "fonts": [],
+    "recommendations": [
+      "No @2x/@3x image variants detected — may look blurry on high-DPI screens"
+    ]
+  },
+  "i18n": {
+    "hasI18n": true,
+    "library": null,
+    "translationFiles": [],
+    "detectedLanguages": [],
+    "languageCount": 0,
+    "hardcodedStringsEstimate": 603,
+    "hasRtlSupport": true,
+    "hasLocaleDetection": true,
+    "hasPluralization": true,
+    "hasDateFormatting": true,
+    "hasNumberFormatting": true,
+    "hasCurrencyFormatting": true
+  },
+  "documentation": {
+    "readme": {
+      "exists": true,
+      "lines": 51,
+      "sections": 5,
+      "hasInstallInstructions": true,
+      "hasUsageInstructions": true,
+      "hasBadges": false,
+      "hasScreenshots": false,
+      "hasTOC": false,
+      "hasApiReference": false
+    },
+    "comments": {
+      "jsdoc": 76,
+      "inline": 1085,
+      "block": 235
+    },
+    "documentedExports": 39,
+    "undocumentedExports": 591,
+    "documentationRatio": "6%",
+    "docsDirectory": false,
+    "files": {
+      "changelog": true,
+      "contributing": false,
+      "codeOfConduct": false,
+      "security": true,
+      "license": true,
+      "apiDocs": false
+    },
+    "storybook": {
+      "hasStorybook": false,
+      "storyCount": 0
+    },
+    "score": 75
+  },
+  "bundleSize": {
+    "sourceCode": {
+      "files": 126,
+      "totalSize": "1.8 MB",
+      "bytes": 1836702
+    },
+    "assets": {
+      "images": "500.6 KB",
+      "fonts": "0 B",
+      "imagesBytes": 512654,
+      "fontsBytes": 0
+    },
+    "heavyDependencies": [
+      {
+        "name": "firebase",
+        "size": 29168278,
+        "formattedSize": "27.8 MB"
+      }
+    ],
+    "treeShaking": {
+      "esModules": true,
+      "sideEffects": false,
+      "barrelFiles": 6,
+      "namedExports": 456,
+      "defaultExports": 51,
+      "wildcardReExports": 0
+    },
+    "estimatedBundleSize": "2.2 MB",
+    "recommendations": []
+  },
+  "typeSafety": {
+    "tsFiles": 121,
+    "jsFiles": 5,
+    "dtsFiles": 0,
+    "typescriptCoverage": "96%",
+    "anyUsage": 156,
+    "unknownUsage": 60,
+    "neverUsage": 0,
+    "typeAssertions": 367,
+    "nonNullAssertions": 60,
+    "genericUsage": 141,
+    "typeGuards": 367,
+    "definitions": {
+      "interfaces": 222,
+      "typeAliases": 60,
+      "enums": 0
+    },
+    "suppressions": {
+      "tsIgnore": 0,
+      "tsNoCheck": 0,
+      "tsExpectError": 0,
+      "total": 0
+    },
+    "worstFiles": [
+      {
+        "file": "app\\signup.tsx",
+        "anyCount": 16
+      },
+      {
+        "file": "app\\login.tsx",
+        "anyCount": 10
+      },
+      {
+        "file": "utils\\ageEstimation.ts",
+        "anyCount": 10
+      },
+      {
+        "file": "utils\\icebreakerGames.ts",
+        "anyCount": 10
+      },
+      {
+        "file": "utils\\moderation.ts",
+        "anyCount": 6
+      }
+    ],
+    "runtimeValidation": [],
+    "score": 55
+  },
+  "dependencyGraph": {
+    "totalModules": 126,
+    "totalImports": 225,
+    "circularDependencies": [],
+    "circularCount": 0,
+    "mostImportedFiles": [
+      {
+        "file": "firebaseConfig",
+        "importedBy": 73
+      },
+      {
+        "file": "utils\\moderation",
+        "importedBy": 20
+      },
+      {
+        "file": "utils\\logger",
+        "importedBy": 13
+      },
+      {
+        "file": "utils\\ageVerification",
+        "importedBy": 8
+      },
+      {
+        "file": "cloudinaryConfig",
+        "importedBy": 8
+      },
+      {
+        "file": "components\\TrustScoreDisplay",
+        "importedBy": 5
+      },
+      {
+        "file": "utils\\location",
+        "importedBy": 5
+      },
+      {
+        "file": "utils\\storage",
+        "importedBy": 5
+      },
+      {
+        "file": "utils\\rateLimiter",
+        "importedBy": 5
+      },
+      {
+        "file": "utils\\e2ee",
+        "importedBy": 4
+      },
+      {
+        "file": "utils\\onlineStatus",
+        "importedBy": 4
+      },
+      {
+        "file": "components\\HeightBadge",
+        "importedBy": 4
+      },
+      {
+        "file": "utils\\notifications",
+        "importedBy": 3
+      },
+      {
+        "file": "utils\\ratingSystem",
+        "importedBy": 3
+      },
+      {
+        "file": "utils\\datingStats",
+        "importedBy": 3
+      }
+    ],
+    "orphanFiles": [
+      "app\\icebreaker-game.tsx",
+      "app\\privacy.tsx",
+      "app\\relationship-mode.tsx",
+      "app\\social-verification.tsx",
+      "app\\terms.tsx",
+      "app\\voice-intro-recorder.tsx",
+      "cloudinaryConfig.ts",
+      "components\\AdvancedFilters.tsx",
+      "components\\BodyTypeSelector.tsx",
+      "components\\HeightBadge.tsx",
+      "components\\LegalDocument.tsx",
+      "components\\ProfileCompletionCard.tsx",
+      "components\\VerificationBadge.tsx",
+      "eslint.config.js",
+      "expo-env.d.ts",
+      "firebaseConfig.ts",
+      "functions\\lib\\sendWebPush.js",
+      "functions\\src\\sendWebPush.ts",
+      "public\\service-worker.js",
+      "utils\\accessibility.ts"
+    ],
+    "averageImportsPerFile": 1.8
+  },
+  "healthScore": {
+    "overall": 65,
+    "breakdown": {
+      "security": 90,
+      "codeQuality": 65,
+      "testing": 0,
+      "documentation": 75,
+      "accessibility": 65,
+      "performance": 55,
+      "typeSafety": 55,
+      "errorHandling": 70,
+      "dependencies": 90,
+      "architecture": 90
+    }
+  }
+}

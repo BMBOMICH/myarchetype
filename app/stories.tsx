@@ -3,30 +3,32 @@ import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    BackHandler,
-    Dimensions,
-    FlatList,
-    Image,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  BackHandler,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { auth } from '../firebaseConfig';
+// ✅ FIX: Import NSFW check for story uploads
+import { checkImageSafety } from '../utils/moderation';
 import {
-    type Story,
-    type StoryGroup,
-    createStory,
-    deleteStory,
-    getActiveStories,
-    getStoryTimeRemaining,
-    groupStoriesByUser,
-    markStoryViewed,
+  type Story,
+  type StoryGroup,
+  createStory,
+  deleteStory,
+  getActiveStories,
+  getStoryTimeRemaining,
+  groupStoriesByUser,
+  markStoryViewed,
 } from '../utils/stories';
 
 // ─── Constants ────────────────────────────────────────────
@@ -60,9 +62,6 @@ const C = {
 const TOP_INSET = Platform.OS === 'ios' ? 60 : 50;
 
 // ─── Video sub-component ──────────────────────────────────
-// Hooks MUST be at the top level of a component — not inside
-// conditionals or ternaries. So we wrap VideoView in its own
-// component that always calls useVideoPlayer.
 
 const StoryVideo = React.memo(function StoryVideo({
   uri,
@@ -270,6 +269,16 @@ export default function StoriesScreen() {
           asset.type === 'video' ? 'video' : 'photo';
 
         setCreateOpen(false);
+
+        // ✅ FIX: NSFW check before story upload (photos only)
+        if (type === 'photo') {
+          const safety = await checkImageSafety(asset.uri);
+          if (!safety.safe) {
+            Alert.alert('Content Not Allowed', safety.reason);
+            return;
+          }
+        }
+
         setUploading(true);
 
         const res = await createStory(asset.uri, type);
@@ -424,9 +433,7 @@ export default function StoriesScreen() {
         </View>
       )}
 
-      {/* ══════════════════════════════════════════════
-          ══  VIEWER MODAL  ═══════════════════════════
-          ══════════════════════════════════════════════ */}
+      {/* ══  VIEWER MODAL  ═══ */}
       <Modal
         visible={viewerOpen && currentStory != null}
         animationType="fade"
@@ -530,9 +537,7 @@ export default function StoriesScreen() {
         )}
       </Modal>
 
-      {/* ══════════════════════════════════════════════
-          ══  CREATE MODAL  ═══════════════════════════
-          ══════════════════════════════════════════════ */}
+      {/* ══  CREATE MODAL  ═══ */}
       <Modal
         visible={createOpen}
         animationType="slide"
@@ -586,7 +591,6 @@ export default function StoriesScreen() {
 // ─── Styles ───────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  /* layout */
   root: { flex: 1, backgroundColor: C.bg },
   centered: {
     flex: 1,
@@ -595,8 +599,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingTxt: { color: C.sub, marginTop: 12, fontSize: 14 },
-
-  /* header */
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -608,8 +610,6 @@ const styles = StyleSheet.create({
   headerBack: { color: C.primary, fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: C.text },
   headerAdd: { color: C.accent, fontSize: 16, fontWeight: 'bold' },
-
-  /* circles */
   circlesWrap: { maxHeight: 130 },
   circlesRow: { paddingHorizontal: 15, paddingVertical: 15, gap: 15 },
   circle: { alignItems: 'center', width: 80 },
@@ -631,15 +631,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   circleMeta: { color: C.sub, fontSize: 10 },
-
   placeholder: {
     backgroundColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderEmoji: { fontSize: 24 },
-
-  /* empty */
   empty: {
     flex: 1,
     alignItems: 'center',
@@ -666,8 +663,6 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   emptyBtnTxt: { color: C.white, fontSize: 16, fontWeight: 'bold' },
-
-  /* viewer */
   viewer: { flex: 1, backgroundColor: C.black },
   progRow: {
     position: 'absolute',
@@ -697,7 +692,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 2,
   },
-
   vHead: {
     position: 'absolute',
     top: TOP_INSET + 10,
@@ -719,10 +713,8 @@ const styles = StyleSheet.create({
   vHeadName: { color: C.white, fontSize: 16, fontWeight: 'bold' },
   vHeadTime: { color: '#ddd', fontSize: 12 },
   closeBtn: { color: C.white, fontSize: 28, fontWeight: 'bold' },
-
   mediaWrap: { flex: 1 },
   media: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
-
   vFoot: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 50 : 30,
@@ -745,8 +737,6 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   delBtnTxt: { color: C.white, fontSize: 16, fontWeight: 'bold' },
-
-  /* create modal */
   cModal: {
     flex: 1,
     backgroundColor: C.overlay,
@@ -789,8 +779,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-
-  /* uploading */
   uploadOverlay: {
     position: 'absolute',
     top: 0,

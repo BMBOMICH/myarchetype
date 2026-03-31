@@ -1,137 +1,95 @@
-import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, updateDoc } from 'firebase/firestore';
+// utils/dateSpotReviews.ts
+import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { detectRatingManipulation, wilsonScoreLowerBound } from './datingStats';
+import { writeAuditLog } from './logger';
+import { checkDateReview } from './moderation';
 
 export interface DateSpotReview {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhoto: string;
-  placeName: string;
-  placeAddress: string;
+  id: string; userId: string; userName: string; userPhoto: string;
+  placeName: string; placeAddress: string;
   placeType: 'restaurant' | 'cafe' | 'bar' | 'park' | 'museum' | 'cinema' | 'other';
-  rating: number; // 1-5
-  review: string;
-  atmosphere: number; // 1-5
-  priceRange: '€' | '€€' | '€€€' | '€€€€';
-  goodFor: string[]; // ['first_date', 'casual', 'romantic', 'group', 'coffee_chat']
-  photos?: string[];
-  latitude?: number;
-  longitude?: number;
-  createdAt: string;
-  likes: number;
-  likedBy: string[];
+  rating: number; review: string; atmosphere: number;
+  priceRange: '€' | '€€' | '€€€' | '€€€€'; goodFor: string[];
+  photos?: string[]; latitude?: number; longitude?: number;
+  createdAt: string; likes: number; likedBy: string[];
+  wilsonScore?: number; flagged?: boolean;
 }
 
-export async function submitDateSpotReview(
-  review: Omit<DateSpotReview, 'id' | 'userId' | 'userName' | 'userPhoto' | 'createdAt' | 'likes' | 'likedBy'>
-): Promise<{ success: boolean; reviewId?: string }> {
+export async function submitDateSpotReview(review: Omit<DateSpotReview, 'id' | 'userId' | 'userName' | 'userPhoto' | 'createdAt' | 'likes' | 'likedBy'>): Promise<{ success: boolean; reviewId?: string; error?: string }> {
   const user = auth.currentUser;
-  if (!user) return { success: false };
-
+  if (!user) return { success: false, error: 'Not authenticated' };
+  if (review.review.trim().length > 0) { const m = checkDateReview(review.review); if (!m.safe) return { success: false, error: m.reason }; }
+  if (review.review.length > 1000) return { success: false, error: 'Review must be under 1000 characters.' };
+  if (review.rating < 1 || review.rating > 5) return { success: false, error: 'Rating must be between 1 and 5.' };
+  const existing = await getDocs(query(collection(db, 'dateSpotReviews'), where('userId', '==', user.uid), where('placeName', '==', review.placeName)));
+  if (!existing.empty) return { success: false, error: 'You have already reviewed this place.' };
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    if (!userDoc.exists()) return { success: false };
-
-    const userData = userDoc.data();
-
-    const fullReview: Omit<DateSpotReview, 'id'> = {
-      ...review,
-      userId: user.uid,
-      userName: userData.name || 'Anonymous',
-      userPhoto: userData.photos?.[0] || '',
-      createdAt: new Date().toISOString(),
-      likes: 0,
-      likedBy: [],
-    };
-
-    const reviewRef = await addDoc(collection(db, 'dateSpotReviews'), fullReview);
-
-    return { success: true, reviewId: reviewRef.id };
-  } catch (error) {
-    console.error('Error submitting review:', error);
-    return { success: false };
-  }
+    if (!userDoc.exists()) return { success: false, error: 'User not found' };
+    const ud = userDoc.data();
+    const ws = Math.round(wilsonScoreLowerBound(review.rating >= 3 ? 1 : 0, 1) * 100);
+    const ref = await addDoc(collection(db, 'dateSpotReviews'), { ...review, userId: user.uid, userName: ud.name ?? 'Anonymous', userPhoto: ud.photos?.[0] ?? '', createdAt: new Date().toISOString(), likes: 0, likedBy: [], wilsonScore: ws, flagged: false });
+    return { success: true, reviewId: ref.id };
+  } catch (e) { console.error('[dateSpotReviews] submitReview error:', e); return { success: false, error: 'Failed to submit review' }; }
 }
 
-export async function getDateSpotReviews(
-  filters?: {
-    placeType?: string;
-    priceRange?: string;
-    goodFor?: string;
-    minRating?: number;
-  }
-): Promise<DateSpotReview[]> {
+export async function getDateSpotReviews(filters?: { placeType?: string; priceRange?: string; goodFor?: string; minRating?: number }): Promise<DateSpotReview[]> {
   try {
-    let q = query(collection(db, 'dateSpotReviews'), orderBy('createdAt', 'desc'), limit(50));
-
-    const snapshot = await getDocs(q);
-
-    let reviews: DateSpotReview[] = [];
-    snapshot.forEach(doc => {
-      reviews.push({ id: doc.id, ...doc.data() } as DateSpotReview);
-    });
-
-    // Client-side filtering
+    const snap = await getDocs(query(collection(db, 'dateSpotReviews'), where('flagged', '==', false), orderBy('createdAt', 'desc'), limit(50)));
+    let reviews: DateSpotReview[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as DateSpotReview));
     if (filters) {
-      if (filters.placeType) {
-        reviews = reviews.filter(r => r.placeType === filters.placeType);
-      }
-      if (filters.priceRange) {
-        reviews = reviews.filter(r => r.priceRange === filters.priceRange);
-      }
-      if (filters.goodFor) {
-        reviews = reviews.filter(r => r.goodFor.includes(filters.goodFor!));
-      }
-      if (filters.minRating) {
-        reviews = reviews.filter(r => r.rating >= filters.minRating!);
-      }
+      if (filters.placeType) reviews = reviews.filter(r => r.placeType === filters.placeType);
+      if (filters.priceRange) reviews = reviews.filter(r => r.priceRange === filters.priceRange);
+      if (filters.goodFor) reviews = reviews.filter(r => r.goodFor.includes(filters.goodFor!));
+      if (filters.minRating) reviews = reviews.filter(r => r.rating >= filters.minRating!);
     }
-
-    return reviews;
-  } catch (error) {
-    console.error('Error getting reviews:', error);
-    return [];
-  }
+    return reviews.sort((a, b) => (b.wilsonScore ?? 0) - (a.wilsonScore ?? 0));
+  } catch (e) { console.error('[dateSpotReviews] getReviews error:', e); return []; }
 }
 
 export async function likeReview(reviewId: string): Promise<{ success: boolean; liked: boolean }> {
   const user = auth.currentUser;
   if (!user) return { success: false, liked: false };
-
   try {
-    const reviewRef = doc(db, 'dateSpotReviews', reviewId);
-    const reviewDoc = await getDoc(reviewRef);
-    
-    if (!reviewDoc.exists()) return { success: false, liked: false };
+    const ref = doc(db, 'dateSpotReviews', reviewId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { success: false, liked: false };
+    const r = snap.data() as DateSpotReview;
+    const already = r.likedBy.includes(user.uid);
+    const newLikes = already ? Math.max(0, r.likes - 1) : r.likes + 1;
+    const newLikedBy = already ? r.likedBy.filter(id => id !== user.uid) : [...r.likedBy, user.uid];
+    const ws = Math.round(wilsonScoreLowerBound(Math.round((r.rating / 5) * newLikes), Math.max(newLikes, 1)) * 100);
+    await updateDoc(ref, { likes: newLikes, likedBy: newLikedBy, wilsonScore: ws });
+    return { success: true, liked: !already };
+  } catch (e) { console.error('[dateSpotReviews] likeReview error:', e); return { success: false, liked: false }; }
+}
 
-    const review = reviewDoc.data() as DateSpotReview;
-    const alreadyLiked = review.likedBy.includes(user.uid);
-
-    if (alreadyLiked) {
-      // Unlike
-      await updateDoc(reviewRef, {
-        likes: Math.max(0, review.likes - 1),
-        likedBy: review.likedBy.filter(id => id !== user.uid),
-      });
-      return { success: true, liked: false };
-    } else {
-      // Like
-      await updateDoc(reviewRef, {
-        likes: review.likes + 1,
-        likedBy: [...review.likedBy, user.uid],
-      });
-      return { success: true, liked: true };
+// ── #172: Fake review network detection ──────────────────
+export async function detectFakeReviewNetwork(placeName: string): Promise<{ suspicious: boolean; reason?: string; reviewsToFlag: string[] }> {
+  try {
+    const snap = await getDocs(query(collection(db, 'dateSpotReviews'), where('placeName', '==', placeName), orderBy('createdAt', 'desc'), limit(20)));
+    const reviews: DateSpotReview[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as DateSpotReview));
+    if (reviews.length < 3) return { suspicious: false, reviewsToFlag: [] };
+    const toFlag: string[] = [], reasons: string[] = [];
+    const sorted = [...reviews].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    for (let i = 2; i < sorted.length; i++) {
+      const w = sorted.slice(i - 2, i + 1);
+      if ((new Date(w[w.length - 1]!.createdAt).getTime() - new Date(w[0]!.createdAt).getTime()) / 60_000 < 60) {
+        reasons.push('3+ reviews in 1 hour');
+        w.forEach(r => { if (!toFlag.includes(r.id)) toFlag.push(r.id); });
+      }
     }
-  } catch (error) {
-    console.error('Error liking review:', error);
-    return { success: false, liked: false };
-  }
+    if (reviews.length >= 5 && (reviews.every(r => r.rating === 5) || reviews.every(r => r.rating === 1))) reasons.push('Suspiciously uniform ratings');
+    const manip = detectRatingManipulation(reviews.map(r => ({ score: r.rating, timestamp: new Date(r.createdAt).getTime(), raterUserId: r.userId })));
+    if (manip.manipulated) { reasons.push(manip.reason ?? 'Rating manipulation detected'); reviews.forEach(r => { if (!toFlag.includes(r.id)) toFlag.push(r.id); }); }
+    if (toFlag.length > 0) await writeAuditLog('safety.content_flagged', { type: 'fake_review_network', placeName, reviewCount: toFlag.length, reasons });
+    return { suspicious: reasons.length > 0, reason: reasons.join('; '), reviewsToFlag: toFlag };
+  } catch (e) { console.error('[dateSpotReviews] detectFakeReviews error:', e); return { suspicious: false, reviewsToFlag: [] }; }
 }
 
 export function getAverageRatingForPlace(reviews: DateSpotReview[], placeName: string): number {
-  const placeReviews = reviews.filter(r => r.placeName.toLowerCase() === placeName.toLowerCase());
-  if (placeReviews.length === 0) return 0;
-
-  const sum = placeReviews.reduce((acc, r) => acc + r.rating, 0);
-  return Math.round((sum / placeReviews.length) * 10) / 10;
+  const pr = reviews.filter(r => r.placeName.toLowerCase() === placeName.toLowerCase());
+  if (!pr.length) return 0;
+  return Math.round((pr.reduce((s, r) => s + r.rating, 0) / pr.length) * 10) / 10;
 }

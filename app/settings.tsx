@@ -1,13 +1,26 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { deleteUser, EmailAuthProvider, reauthenticateWithCredential, signOut } from 'firebase/auth';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  signOut,
+} from 'firebase/auth';
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -19,7 +32,11 @@ import {
 import { auth, db } from '../firebaseConfig';
 import { Language, languageNames, SUPPORTED_LANGUAGES } from '../utils/i18n';
 import { useLanguage } from '../utils/languageContext';
-import { settingsStorage } from '../utils/storage';
+import { checkTextSafety } from '../utils/moderation';
+import { profileStorage as storage } from '../utils/storage';
+
+// ─── Component ───────────────────────────────────────────
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
@@ -60,6 +77,7 @@ export default function SettingsScreen() {
   const [referralCount, setReferralCount] = useState(0);
 
   // ── Load settings ──────────────────────────────────────
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -97,12 +115,13 @@ export default function SettingsScreen() {
         setShowLastSeen(data.showLastSeen !== false);
         setShowProfileViews(data.showProfileViews !== false);
 
-        setReferralCode(data.referralCode || generateReferralCode(user.uid));
+        setReferralCode(
+          data.referralCode || generateReferralCode(user.uid)
+        );
         setReferralCount(data.referralCount || 0);
       }
 
-      // ✅ MMKV is synchronous — no await needed
-      const savedLang = settingsStorage.getString('app_language');
+      const savedLang = storage.getString('app_language');
       if (savedLang) {
         setLanguage(savedLang as Language);
       }
@@ -115,6 +134,7 @@ export default function SettingsScreen() {
   }, [user, router, generateReferralCode, setLanguage]);
 
   // ── Save settings ──────────────────────────────────────
+
   const saveSettings = useCallback(async () => {
     if (!user) return;
 
@@ -157,6 +177,7 @@ export default function SettingsScreen() {
   ]);
 
   // ── Delete account ─────────────────────────────────────
+
   const handleDeleteAccount = useCallback(() => {
     const currentUser = auth.currentUser;
 
@@ -218,7 +239,10 @@ export default function SettingsScreen() {
       await deleteDoc(doc(db, 'users', currentUser.uid)).catch(() => {});
       await deleteUser(currentUser);
 
-      Alert.alert('✅ Account Deleted', 'Your account has been permanently deleted.');
+      Alert.alert(
+        '✅ Account Deleted',
+        'Your account has been permanently deleted.'
+      );
       router.replace('/login');
     } catch (error: any) {
       console.error('[Settings] deleteAccount error:', error.code);
@@ -228,9 +252,15 @@ export default function SettingsScreen() {
         error.code === 'auth/wrong-password' ||
         error.code === 'auth/invalid-credential'
       ) {
-        Alert.alert('❌ Wrong Password', 'Incorrect password. Please try again.');
+        Alert.alert(
+          '❌ Wrong Password',
+          'Incorrect password. Please try again.'
+        );
       } else if (error.code === 'auth/too-many-requests') {
-        Alert.alert('⏳ Too Many Attempts', 'Please wait a moment and try again.');
+        Alert.alert(
+          '⏳ Too Many Attempts',
+          'Please wait a moment and try again.'
+        );
       } else if (error.code === 'auth/requires-recent-login') {
         Alert.alert(
           '🔐 Session Expired',
@@ -253,14 +283,18 @@ export default function SettingsScreen() {
   }, [deletePassword, router]);
 
   // ── Language ───────────────────────────────────────────
-  const handleLanguageChange = useCallback(async (lang: Language) => {
-    // ✅ Save to MMKV synchronously
-    settingsStorage.set('app_language', lang);
-    await setLanguage(lang);
-    setShowLanguageModal(false);
-  }, [setLanguage]);
+
+  const handleLanguageChange = useCallback(
+    async (lang: Language) => {
+      storage.set('app_language', lang);
+      await setLanguage(lang);
+      setShowLanguageModal(false);
+    },
+    [setLanguage]
+  );
 
   // ── Referral ───────────────────────────────────────────
+
   const handleCopyReferralCode = useCallback(async () => {
     await Clipboard.setStringAsync(referralCode);
     Alert.alert(t.success, 'Referral code copied!');
@@ -274,7 +308,8 @@ export default function SettingsScreen() {
     Alert.alert(t.success, 'Share message copied to clipboard!');
   }, [referralCode, t]);
 
-  // ── Bug report ─────────────────────────────────────────
+  // ── Bug report — with text moderation ──────────────────
+
   const handleSubmitBugReport = useCallback(async () => {
     if (!bugTitle.trim() || !bugDescription.trim()) {
       Alert.alert(t.error, 'Please fill in all fields');
@@ -283,20 +318,35 @@ export default function SettingsScreen() {
 
     if (!user) return;
 
+    // ✅ DETECTOR: Text moderation on bug report content
+    const titleCheck = checkTextSafety(bugTitle);
+    if (!titleCheck.safe) {
+      Alert.alert('Not Allowed', titleCheck.reason);
+      return;
+    }
+
+    const descCheck = checkTextSafety(bugDescription);
+    if (!descCheck.safe) {
+      Alert.alert('Not Allowed', descCheck.reason);
+      return;
+    }
+
     setSubmittingBug(true);
     try {
       await setDoc(doc(db, 'bugReports', `${user.uid}_${Date.now()}`), {
-        userId: user.uid,
-        userEmail: user.email,
+        reporterId: user.uid,
         title: bugTitle.trim(),
         description: bugDescription.trim(),
-        platform: typeof window !== 'undefined' ? 'web' : 'mobile',
+        createdAt: serverTimestamp(),
+        severity: 'medium',
+        deviceInfo: Platform.OS,
         appVersion: '1.0.0',
-        createdAt: new Date().toISOString(),
-        status: 'new',
       });
 
-      Alert.alert(t.success, 'Bug report submitted. Thank you for helping improve MyArchetype!');
+      Alert.alert(
+        t.success,
+        'Bug report submitted. Thank you for helping improve MyArchetype!'
+      );
       setBugTitle('');
       setBugDescription('');
       setShowBugReportModal(false);
@@ -309,6 +359,7 @@ export default function SettingsScreen() {
   }, [bugTitle, bugDescription, user, t]);
 
   // ── Donations ──────────────────────────────────────────
+
   const openDonationLink = useCallback((platform: string) => {
     const links: Record<string, string> = {
       kofi: 'https://ko-fi.com/myarchetype',
@@ -320,6 +371,7 @@ export default function SettingsScreen() {
   }, []);
 
   // ── Loading ────────────────────────────────────────────
+
   if (loading || deleting) {
     return (
       <View style={styles.loadingContainer}>
@@ -332,6 +384,7 @@ export default function SettingsScreen() {
   }
 
   // ── Render ─────────────────────────────────────────────
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>⚙️ {t.settings}</Text>
@@ -345,7 +398,9 @@ export default function SettingsScreen() {
         >
           <Text style={styles.settingLabel}>{t.language}</Text>
           <View style={styles.settingValue}>
-            <Text style={styles.settingValueText}>{languageNames[language]}</Text>
+            <Text style={styles.settingValueText}>
+              {languageNames[language]}
+            </Text>
             <Text style={styles.arrow}>▶</Text>
           </View>
         </TouchableOpacity>
@@ -355,10 +410,26 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.notifications}</Text>
         {[
-          { label: 'New matches', value: notifyMatches, setter: setNotifyMatches },
-          { label: 'New messages', value: notifyMessages, setter: setNotifyMessages },
-          { label: 'Someone liked you', value: notifyLikes, setter: setNotifyLikes },
-          { label: 'Profile views', value: notifyProfileViews, setter: setNotifyProfileViews },
+          {
+            label: 'New matches',
+            value: notifyMatches,
+            setter: setNotifyMatches,
+          },
+          {
+            label: 'New messages',
+            value: notifyMessages,
+            setter: setNotifyMessages,
+          },
+          {
+            label: 'Someone liked you',
+            value: notifyLikes,
+            setter: setNotifyLikes,
+          },
+          {
+            label: 'Profile views',
+            value: notifyProfileViews,
+            setter: setNotifyProfileViews,
+          },
         ].map((item) => (
           <View key={item.label} style={styles.settingRow}>
             <Text style={styles.settingLabel}>{item.label}</Text>
@@ -376,9 +447,21 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.privacy}</Text>
         {[
-          { label: 'Show online status', value: showOnlineStatus, setter: setShowOnlineStatus },
-          { label: 'Show last seen', value: showLastSeen, setter: setShowLastSeen },
-          { label: 'Show profile views', value: showProfileViews, setter: setShowProfileViews },
+          {
+            label: 'Show online status',
+            value: showOnlineStatus,
+            setter: setShowOnlineStatus,
+          },
+          {
+            label: 'Show last seen',
+            value: showLastSeen,
+            setter: setShowLastSeen,
+          },
+          {
+            label: 'Show profile views',
+            value: showProfileViews,
+            setter: setShowProfileViews,
+          },
         ].map((item) => (
           <View key={item.label} style={styles.settingRow}>
             <Text style={styles.settingLabel}>{item.label}</Text>
@@ -402,11 +485,15 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.referralStats}>
             <Text style={styles.referralCount}>{referralCount}</Text>
-            <Text style={styles.referralCountLabel}>{t.referralsCount}</Text>
+            <Text style={styles.referralCountLabel}>
+              {t.referralsCount}
+            </Text>
           </View>
           {referralCount >= 10 && (
             <View style={styles.championBadge}>
-              <Text style={styles.championBadgeText}>{t.communityChampion}</Text>
+              <Text style={styles.championBadgeText}>
+                {t.communityChampion}
+              </Text>
             </View>
           )}
           <View style={styles.referralButtons}>
@@ -414,20 +501,29 @@ export default function SettingsScreen() {
               style={styles.referralButton}
               onPress={handleCopyReferralCode}
             >
-              <Text style={styles.referralButtonText}>📋 {t.copyCode}</Text>
+              <Text style={styles.referralButtonText}>
+                📋 {t.copyCode}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.referralButton, styles.referralButtonPrimary]}
+              style={[
+                styles.referralButton,
+                styles.referralButtonPrimary,
+              ]}
               onPress={handleShareReferralCode}
             >
-              <Text style={styles.referralButtonTextPrimary}>📤 {t.shareCode}</Text>
+              <Text style={styles.referralButtonTextPrimary}>
+                📤 {t.shareCode}
+              </Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
             style={styles.leaderboardLink}
             onPress={() => router.push('/referral-leaderboard')}
           >
-            <Text style={styles.leaderboardLinkText}>🏆 View {t.leaderboard}</Text>
+            <Text style={styles.leaderboardLinkText}>
+              🏆 View {t.leaderboard}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -535,7 +631,8 @@ export default function SettingsScreen() {
                   <Text
                     style={[
                       styles.languageOptionText,
-                      language === lang && styles.languageOptionTextActive,
+                      language === lang &&
+                        styles.languageOptionTextActive,
                     ]}
                   >
                     {languageNames[lang]}
@@ -586,7 +683,9 @@ export default function SettingsScreen() {
               numberOfLines={5}
               maxLength={500}
             />
-            <Text style={styles.charCount}>{bugDescription.length}/500</Text>
+            <Text style={styles.charCount}>
+              {bugDescription.length}/500
+            </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButtonCancel}
@@ -596,7 +695,9 @@ export default function SettingsScreen() {
                   setBugDescription('');
                 }}
               >
-                <Text style={styles.modalButtonCancelText}>{t.cancel}</Text>
+                <Text style={styles.modalButtonCancelText}>
+                  {t.cancel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -609,7 +710,9 @@ export default function SettingsScreen() {
                 {submittingBug ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.modalButtonSubmitText}>Submit</Text>
+                  <Text style={styles.modalButtonSubmitText}>
+                    Submit
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -627,11 +730,17 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>☕ {t.supportUs}</Text>
-            <Text style={styles.donationMessage}>{t.donationMessage}</Text>
+            <Text style={styles.donationMessage}>
+              {t.donationMessage}
+            </Text>
             <View style={styles.donationButtons}>
               {[
                 { platform: 'kofi', icon: '☕', label: 'Ko-fi' },
-                { platform: 'buymeacoffee', icon: '🍵', label: 'Buy Me a Coffee' },
+                {
+                  platform: 'buymeacoffee',
+                  icon: '🍵',
+                  label: 'Buy Me a Coffee',
+                },
                 { platform: 'paypal', icon: '💳', label: 'PayPal' },
                 { platform: 'patreon', icon: '🎨', label: 'Patreon' },
               ].map((item) => (
@@ -640,13 +749,18 @@ export default function SettingsScreen() {
                   style={styles.donationButton}
                   onPress={() => openDonationLink(item.platform)}
                 >
-                  <Text style={styles.donationButtonIcon}>{item.icon}</Text>
-                  <Text style={styles.donationButtonText}>{item.label}</Text>
+                  <Text style={styles.donationButtonIcon}>
+                    {item.icon}
+                  </Text>
+                  <Text style={styles.donationButtonText}>
+                    {item.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
             <Text style={styles.donationNote}>
-              100% of donations go towards server costs and app development.
+              100% of donations go towards server costs and app
+              development.
               {'\n'}Thank you for your support! ❤️
             </Text>
             <TouchableOpacity
@@ -675,7 +789,10 @@ export default function SettingsScreen() {
             </Text>
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
-              style={[styles.input, deleteError ? styles.inputError : null]}
+              style={[
+                styles.input,
+                deleteError ? styles.inputError : null,
+              ]}
               placeholder="Enter your password"
               placeholderTextColor="#666"
               value={deletePassword}
@@ -701,17 +818,24 @@ export default function SettingsScreen() {
                   setDeleteError('');
                 }}
               >
-                <Text style={styles.modalButtonCancelText}>{t.cancel}</Text>
+                <Text style={styles.modalButtonCancelText}>
+                  {t.cancel}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonSubmit, styles.deleteButton]}
+                style={[
+                  styles.modalButtonSubmit,
+                  styles.deleteButton,
+                ]}
                 onPress={executeDeleteAccount}
                 disabled={deleting}
               >
                 {deleting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.modalButtonSubmitText}>Delete Forever</Text>
+                  <Text style={styles.modalButtonSubmitText}>
+                    Delete Forever
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -722,70 +846,247 @@ export default function SettingsScreen() {
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a2e' },
   content: { padding: 20, paddingBottom: 50 },
-  loadingContainer: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: { color: '#aaa', marginTop: 15, fontSize: 16 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#eee', marginTop: 20, marginBottom: 25, textAlign: 'center' },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#eee',
+    marginTop: 20,
+    marginBottom: 25,
+    textAlign: 'center',
+  },
   section: { marginBottom: 25 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#53a8b6', marginBottom: 12, paddingLeft: 5 },
-  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#53a8b6',
+    marginBottom: 12,
+    paddingLeft: 5,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#16213e',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
   settingLabel: { color: '#eee', fontSize: 15 },
   settingValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   settingValueText: { color: '#888', fontSize: 14 },
   arrow: { color: '#53a8b6', fontSize: 12 },
   dangerRow: { borderWidth: 1, borderColor: '#d9534f' },
   dangerLabel: { color: '#d9534f', fontSize: 15 },
-  referralCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, borderColor: '#e67e22' },
-  referralLabel: { color: '#888', fontSize: 12, marginBottom: 8, textAlign: 'center' },
-  referralCodeBox: { backgroundColor: '#0f3460', padding: 15, borderRadius: 10, marginBottom: 15 },
-  referralCode: { color: '#e67e22', fontSize: 24, fontWeight: 'bold', textAlign: 'center', letterSpacing: 3 },
+  referralCard: {
+    backgroundColor: '#16213e',
+    borderRadius: 15,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#e67e22',
+  },
+  referralLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  referralCodeBox: {
+    backgroundColor: '#0f3460',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  referralCode: {
+    color: '#e67e22',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    letterSpacing: 3,
+  },
   referralStats: { alignItems: 'center', marginBottom: 15 },
   referralCount: { color: '#5cb85c', fontSize: 36, fontWeight: 'bold' },
   referralCountLabel: { color: '#888', fontSize: 12 },
-  championBadge: { backgroundColor: '#f1c40f', paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, alignSelf: 'center', marginBottom: 15 },
-  championBadgeText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
-  referralButtons: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  referralButton: { flex: 1, backgroundColor: '#0f3460', paddingVertical: 12, borderRadius: 20, alignItems: 'center' },
+  championBadge: {
+    backgroundColor: '#f1c40f',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  championBadgeText: {
+    color: '#1a1a2e',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  referralButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  referralButton: {
+    flex: 1,
+    backgroundColor: '#0f3460',
+    paddingVertical: 12,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   referralButtonPrimary: { backgroundColor: '#e67e22' },
-  referralButtonText: { color: '#53a8b6', fontSize: 13, fontWeight: '600' },
-  referralButtonTextPrimary: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  referralButtonText: {
+    color: '#53a8b6',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  referralButtonTextPrimary: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   leaderboardLink: { paddingVertical: 10, alignItems: 'center' },
   leaderboardLinkText: { color: '#53a8b6', fontSize: 14 },
-  saveButton: { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 10 },
+  saveButton: {
+    backgroundColor: '#5cb85c',
+    paddingVertical: 16,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 10,
+  },
   saveButtonDisabled: { backgroundColor: '#555' },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  version: { color: '#555', fontSize: 12, textAlign: 'center', marginTop: 20 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.8)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
-  modalTitle: { color: '#eee', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  version: {
+    color: '#555',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    color: '#eee',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
   modalClose: { paddingVertical: 15, alignItems: 'center', marginTop: 10 },
   modalCloseText: { color: '#d9534f', fontSize: 16 },
   languageList: { maxHeight: 400 },
-  languageOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 8 },
-  languageOptionActive: { backgroundColor: '#0f3460', borderWidth: 2, borderColor: '#53a8b6' },
+  languageOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#16213e',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  languageOptionActive: {
+    backgroundColor: '#0f3460',
+    borderWidth: 2,
+    borderColor: '#53a8b6',
+  },
   languageOptionText: { color: '#aaa', fontSize: 16 },
   languageOptionTextActive: { color: '#53a8b6', fontWeight: '600' },
   checkmark: { color: '#5cb85c', fontSize: 18, fontWeight: 'bold' },
-  inputLabel: { color: '#888', fontSize: 12, marginBottom: 6, marginTop: 10 },
-  input: { backgroundColor: '#16213e', color: '#fff', padding: 15, borderRadius: 10, fontSize: 16, borderWidth: 2, borderColor: 'transparent' },
+  inputLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: '#16213e',
+    color: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    fontSize: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
   inputError: { borderColor: '#d9534f' },
   errorText: { color: '#d9534f', fontSize: 12, marginTop: 5 },
   textArea: { height: 120, textAlignVertical: 'top' },
-  charCount: { color: '#666', fontSize: 12, textAlign: 'right', marginTop: 5 },
+  charCount: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 5,
+  },
   modalButtons: { flexDirection: 'row', gap: 10, marginTop: 20 },
-  modalButtonCancel: { flex: 1, backgroundColor: '#16213e', paddingVertical: 14, borderRadius: 20, alignItems: 'center' },
+  modalButtonCancel: {
+    flex: 1,
+    backgroundColor: '#16213e',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   modalButtonCancelText: { color: '#888', fontSize: 16 },
-  modalButtonSubmit: { flex: 1, backgroundColor: '#5cb85c', paddingVertical: 14, borderRadius: 20, alignItems: 'center' },
+  modalButtonSubmit: {
+    flex: 1,
+    backgroundColor: '#5cb85c',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
   modalButtonDisabled: { backgroundColor: '#555' },
-  modalButtonSubmitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  modalButtonSubmitText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   deleteButton: { backgroundColor: '#d9534f' },
-  deleteWarning: { color: '#aaa', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 10 },
-  donationMessage: { color: '#aaa', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  deleteWarning: {
+    color: '#aaa',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 10,
+  },
+  donationMessage: {
+    color: '#aaa',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
   donationButtons: { gap: 10 },
-  donationButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16213e', padding: 16, borderRadius: 12, gap: 12 },
+  donationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16213e',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
   donationButtonIcon: { fontSize: 24 },
   donationButtonText: { color: '#eee', fontSize: 16 },
-  donationNote: { color: '#666', fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
+  donationNote: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 20,
+    lineHeight: 18,
+  },
 });

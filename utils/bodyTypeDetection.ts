@@ -1,7 +1,21 @@
 /**
  * Body Type Detection
- * Checks if photos show full body and estimates body type
+ *
+ * Uses Cloudinary face bounding box data to determine if a photo
+ * shows a full body or just a face/headshot.
+ *
+ * Face-to-image ratio logic:
+ *   Face > 40% of image height  →  headshot / close-up
+ *   Face 25–40%                 →  upper body
+ *   Face 15–25%                 →  half body
+ *   Face < 15% (upper portion)  →  full body
+ *
+ * IMPORTANT: Use detectBodyTypeFromCloudinaryFaces() when you already
+ * have face data from the upload. Only call detectFullBodyPhoto() for
+ * legacy photos uploaded without face data.
  */
+
+import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 
 export interface BodyTypeDetectionResult {
   isFullBody: boolean;
@@ -10,93 +24,148 @@ export interface BodyTypeDetectionResult {
   feedback?: string;
 }
 
+// ─── Face ratio analysis (pure logic, no network) ────────
+
+function analyzeFaceRatio(
+  imageWidth: number,
+  imageHeight: number,
+  faces: Array<[number, number, number, number]>,
+): BodyTypeDetectionResult {
+  if (!imageWidth || !imageHeight || faces.length === 0) {
+    return {
+      isFullBody: false,
+      confidence: 30,
+      feedback: 'Could not detect a face in this photo. Make sure you are visible.',
+    };
+  }
+
+  // Use the largest detected face
+  let largestFace = faces[0]!;
+  for (const face of faces) {
+    if (face[2]! * face[3]! > largestFace[2]! * largestFace[3]!) {
+      largestFace = face;
+    }
+  }
+
+  const [, faceY, , faceH] = largestFace;
+  const faceHeightRatio = faceH! / imageHeight;
+  const faceCenterY = ((faceY ?? 0) + (faceH ?? 0) / 2) / imageHeight;
+
+  console.log(
+    `[bodyType] faceHeightRatio: ${faceHeightRatio.toFixed(2)}, ` +
+    `faceCenterY: ${faceCenterY.toFixed(2)}`
+  );
+
+  if (faceHeightRatio < 0.15 && faceCenterY < 0.3) {
+    return {
+      isFullBody: true,
+      confidence: 90,
+      feedback: 'Great! This appears to show your full body.',
+    };
+  }
+
+  if (faceHeightRatio < 0.25 && faceCenterY < 0.4) {
+    return {
+      isFullBody: true,
+      confidence: 75,
+      feedback: 'This looks like a full or near-full body photo.',
+    };
+  }
+
+  if (faceHeightRatio < 0.40) {
+    return {
+      isFullBody: false,
+      confidence: 65,
+      feedback: 'This appears to show your upper body. Consider adding a full-body photo.',
+    };
+  }
+
+  return {
+    isFullBody: false,
+    confidence: 85,
+    feedback: 'This appears to be a close-up or headshot. Please upload a full-body photo.',
+  };
+}
+
+// ─── Public API ──────────────────────────────────────────
+
 /**
- * Detect if photo shows full body
+ * Use this when you already have Cloudinary face data from the upload.
+ * Zero extra network calls — instant, free.
+ *
+ * Pass the faces array directly from your Cloudinary upload response.
+ * Cloudinary faces format: [[x, y, width, height], ...]
  */
-export async function detectFullBodyPhoto(photoUrl: string): Promise<BodyTypeDetectionResult> {
+export function detectBodyTypeFromCloudinaryFaces(
+  imageWidth: number,
+  imageHeight: number,
+  faces: Array<[number, number, number, number]>,
+): BodyTypeDetectionResult {
+  return analyzeFaceRatio(imageWidth, imageHeight, faces);
+}
+
+/**
+ * Use this ONLY for legacy photos that were uploaded without face data.
+ * Re-uploads the photo to Cloudinary to get face bounding boxes.
+ *
+ * For new uploads: pass faces=true at upload time and use
+ * detectBodyTypeFromCloudinaryFaces() instead — it is instant and free.
+ */
+export async function detectFullBodyPhoto(
+  photoUrl: string
+): Promise<BodyTypeDetectionResult> {
   try {
-    console.log('Analyzing photo for full body...');
+    console.log('[bodyType] Re-uploading photo to get face data...');
 
-    // Use object detection to find person in photo
-    const response = await fetch('https://api.deepai.org/api/densecap', {
-      method: 'POST',
-      headers: {
-        'api-key': 'quickstart-QUdJIGlzIGNvbWluZy4uLi4K',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ image: photoUrl }),
-    });
+    const form = new FormData();
+    form.append('file', photoUrl);
+    form.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    form.append('faces', 'true');
 
-    const data = await response.json();
-    console.log('Body detection result:', data);
+    const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`;
+    const res = await fetch(endpoint, { method: 'POST', body: form });
 
-    // Analyze captions to determine if full body is visible
-    if (data.output && data.output.captions) {
-      const captions = data.output.captions.map((c: any) => c.caption.toLowerCase());
-      const fullBodyKeywords = ['person standing', 'full body', 'legs', 'feet', 'shoes', 'pants', 'dress'];
-      const faceOnlyKeywords = ['face', 'head', 'portrait', 'close up', 'selfie'];
-
-      const hasFullBodyIndicators = fullBodyKeywords.some(kw => 
-        captions.some((cap: string) => cap.includes(kw))
-      );
-
-      const hasFaceOnlyIndicators = faceOnlyKeywords.some(kw =>
-        captions.some((cap: string) => cap.includes(kw))
-      ) && !hasFullBodyIndicators;
-
-      if (hasFullBodyIndicators) {
-        return {
-          isFullBody: true,
-          confidence: 85,
-          feedback: 'Great! This shows your full body.',
-        };
-      }
-
-      if (hasFaceOnlyIndicators) {
-        return {
-          isFullBody: false,
-          confidence: 80,
-          feedback: 'This appears to be a face-only photo. Please upload a full-body photo.',
-        };
-      }
+    if (!res.ok) {
+      return {
+        isFullBody: false,
+        confidence: 30,
+        feedback: 'Could not analyze photo. Please try again.',
+      };
     }
 
-    // Fallback: use simulated detection
-    return simulateBodyDetection();
+    const data = await res.json();
+    const faces: Array<[number, number, number, number]> =
+      Array.isArray(data.faces) ? data.faces : [];
 
+    return analyzeFaceRatio(
+      data.width ?? 0,
+      data.height ?? 0,
+      faces,
+    );
   } catch (error) {
-    console.warn('Body detection API unavailable, using simulation');
-    return simulateBodyDetection();
+    console.error('[bodyType] Detection error:', error);
+    return {
+      isFullBody: false,
+      confidence: 30,
+      feedback: 'Photo analysis failed. Please try again.',
+    };
   }
 }
 
 /**
- * Simulate body detection for demo
+ * Check if user has at least one full-body photo.
+ * Pass Cloudinary face data when available to avoid re-uploading.
  */
-function simulateBodyDetection(): BodyTypeDetectionResult {
-  // 70% chance it's detected as full body
-  const isFullBody = Math.random() > 0.3;
-
-  return {
-    isFullBody: isFullBody,
-    confidence: 70 + Math.floor(Math.random() * 20),
-    feedback: isFullBody
-      ? 'Photo analysis complete.'
-      : 'Consider adding a full-body photo for better matches.',
-  };
-}
-
-/**
- * Check if user has at least one full-body photo
- */
-export async function validateFullBodyPhotos(photoUrls: string[]): Promise<{
+export async function validateFullBodyPhotos(
+  photoUrls: string[]
+): Promise<{
   hasFullBody: boolean;
   fullBodyIndex: number;
   feedback: string;
 }> {
   for (let i = 0; i < photoUrls.length; i++) {
-    const result = await detectFullBodyPhoto(photoUrls[i]);
-    
+    const result = await detectFullBodyPhoto(photoUrls[i]!);
+
     if (result.isFullBody && result.confidence >= 70) {
       return {
         hasFullBody: true,
@@ -114,21 +183,17 @@ export async function validateFullBodyPhotos(photoUrls: string[]): Promise<{
 }
 
 /**
- * Estimate body type from full-body photo
- * Note: This is very difficult to do accurately with AI
- * In production, this would require specialized models
+ * Body type is self-reported by the user — we do not estimate it from photos.
+ * This function exists for API compatibility but always returns confidence 0.
  */
-export async function estimateBodyType(photoUrl: string): Promise<{
+export async function estimateBodyType(
+  _photoUrl: string
+): Promise<{
   estimatedType: 'Slim' | 'Average' | 'Athletic' | 'Curvy';
   confidence: number;
 }> {
-  // For privacy and accuracy reasons, we don't actually estimate body type
-  // Instead, we just verify that a full-body photo exists
-  // The user's self-reported body type is what matters
-
-  // Return placeholder result
   return {
     estimatedType: 'Average',
-    confidence: 50, // Low confidence = we don't actually determine this
+    confidence: 0,
   };
 }

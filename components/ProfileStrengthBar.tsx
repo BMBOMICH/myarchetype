@@ -1,40 +1,45 @@
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import {
-    calculateProfileStrength,
-    getStrengthMessage,
-    ProfileStrengthResult,
-} from '../utils/profileStrength';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
 
-interface ProfileStrengthBarProps {
-  onPress?: () => void;
-  compact?: boolean;
-}
+interface ProfileStrengthBarProps { onPress?: () => void; compact?: boolean; }
 
 export default function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
   const [loading, setLoading] = useState(true);
   const [strength, setStrength] = useState<ProfileStrengthResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadStrength();
+  const loadStrength = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await calculateProfileStrength();
+      setStrength(result);
+    } catch (err) {
+      console.error('[ProfileStrengthBar] Failed to load profile strength:', err);
+      setError('Could not load profile strength');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const loadStrength = async () => {
-    const result = await calculateProfileStrength();
-    setStrength(result);
-    setLoading(false);
-  };
+  useEffect(() => { void loadStrength(); }, [loadStrength]);
 
   if (loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="small" color="#53a8b6" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={() => void loadStrength()} accessibilityLabel="Retry loading profile strength" accessibilityRole="button">
+          <Text style={styles.retryText}>Tap to retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -45,21 +50,18 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
 
   if (compact) {
     return (
-      <Container style={styles.compactContainer} onPress={onPress}>
+      <Container
+        style={styles.compactContainer}
+        onPress={onPress}
+        accessibilityLabel={`Profile strength: ${strength.percentage}%`}
+        accessibilityRole={onPress ? 'button' : 'none'}>
         <View style={styles.compactHeader}>
           <Text style={styles.compactLabel}>Profile Strength</Text>
-          <Text style={[styles.compactPercentage, { color: strength.color }]}>
-            {strength.percentage}%
-          </Text>
+          <Text style={[styles.compactPercentage, { color: strength.color }]}>{strength.percentage}%</Text>
         </View>
         <View style={styles.barContainer}>
           <View style={styles.barBackground}>
-            <View 
-              style={[
-                styles.barFill, 
-                { width: `${strength.percentage}%`, backgroundColor: strength.color }
-              ]} 
-            />
+            <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
           </View>
         </View>
       </Container>
@@ -67,43 +69,32 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
   }
 
   return (
-    <Container style={styles.container} onPress={onPress}>
+    <Container
+      style={styles.container}
+      onPress={onPress}
+      accessibilityLabel={`Profile strength: ${strength.level}, ${strength.percentage}%`}
+      accessibilityRole={onPress ? 'button' : 'none'}>
       <View style={styles.header}>
         <Text style={styles.title}>Profile Strength</Text>
         <View style={[styles.levelBadge, { backgroundColor: strength.color }]}>
           <Text style={styles.levelText}>{strength.level}</Text>
         </View>
       </View>
-
       <View style={styles.scoreRow}>
-        <Text style={styles.scoreText}>
-          {strength.score} / {strength.maxScore} points
-        </Text>
-        <Text style={[styles.percentage, { color: strength.color }]}>
-          {strength.percentage}%
-        </Text>
+        <Text style={styles.scoreText}>{strength.score} / {strength.maxScore} points</Text>
+        <Text style={[styles.percentage, { color: strength.color }]}>{strength.percentage}%</Text>
       </View>
-
       <View style={styles.barContainer}>
         <View style={styles.barBackground}>
-          <View 
-            style={[
-              styles.barFill, 
-              { width: `${strength.percentage}%`, backgroundColor: strength.color }
-            ]} 
-          />
+          <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
         </View>
       </View>
-
       <Text style={styles.message}>{getStrengthMessage(strength.level)}</Text>
-
       {strength.recommendations.length > 0 && (
         <View style={styles.recommendations}>
           <Text style={styles.recommendationsTitle}>Quick wins:</Text>
           {strength.recommendations.map((rec, index) => (
-            <Text key={index} style={styles.recommendationText}>
-              • {rec}
-            </Text>
+            <Text key={index} style={styles.recommendationText}>• {rec}</Text>
           ))}
         </View>
       )}
@@ -131,4 +122,6 @@ const styles = StyleSheet.create({
   recommendations: { backgroundColor: '#0f3460', borderRadius: 10, padding: 12 },
   recommendationsTitle: { color: '#53a8b6', fontSize: 13, fontWeight: '600', marginBottom: 6 },
   recommendationText: { color: '#888', fontSize: 12, marginBottom: 4, lineHeight: 18 },
+  errorText: { color: '#d9534f', fontSize: 13, textAlign: 'center', marginBottom: 8 },
+  retryText: { color: '#53a8b6', fontSize: 13, textAlign: 'center', fontWeight: '600' },
 });

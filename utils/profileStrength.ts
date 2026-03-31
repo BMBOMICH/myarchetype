@@ -1,256 +1,98 @@
+// utils/profileStrength.ts
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-
-export interface ProfileStrengthCriteria {
-  completed: boolean;
-  label: string;
-  points: number;
-  icon: string;
-  tip?: string;
-}
+import { deriveVerificationLevel, getVerificationBadgeConfig } from './profileCompletion';
 
 export interface ProfileStrengthResult {
-  score: number;
-  maxScore: number;
-  percentage: number;
-  level: 'Weak' | 'Basic' | 'Good' | 'Strong' | 'Excellent';
-  color: string;
-  criteria: ProfileStrengthCriteria[];
-  recommendations: string[];
+  score: number; maxScore: number; percentage: number;
+  level: 'Weak' | 'Basic' | 'Good' | 'Strong' | 'Excellent'; color: string;
+  criteria: Array<{ completed: boolean; label: string; points: number; icon: string; tip?: string }>;
+  recommendations: string[]; isGhostProfile: boolean; isNewAccount: boolean;
+  accountAgeDays: number; verificationBadge: ReturnType<typeof getVerificationBadgeConfig>;
 }
 
+// ── #102: Ghost profile detection ────────────────────────
+export function detectGhostProfile(data: { lastSeen?: any; photos?: string[]; bio?: string }): { isGhost: boolean; daysSinceActive: number } {
+  const lastMs = data.lastSeen?.toMillis?.() ?? (data.lastSeen ? new Date(data.lastSeen).getTime() : 0);
+  const days = lastMs ? Math.floor((Date.now() - lastMs) / 86_400_000) : 9999;
+  const minimal = (!data.photos || data.photos.length === 0) || (!data.bio || data.bio.length < 10);
+  return { isGhost: days > 30 && minimal, daysSinceActive: days };
+}
+
+// ── #174: Account age gate ───────────────────────────────
+export function checkAccountAgeGate(createdAt?: string | number, action?: string): { allowed: boolean; isNew: boolean; ageDays: number; hoursRemaining: number; restrictions: string[] } {
+  const created = typeof createdAt === 'number' ? createdAt : (createdAt ? new Date(createdAt).getTime() : Date.now());
+  const ageMs = Date.now() - created;
+  const ageDays = Math.floor(ageMs / 86_400_000);
+  const ageHours = ageMs / 3_600_000;
+  const restrictions: string[] = [];
+  let minHours = 0;
+  if (action === 'chat' || action === 'message') minHours = 1;
+  else if (action === 'story' || action === 'post') minHours = 24;
+  else if (action === 'superlike') minHours = 72;
+  if (ageDays < 1) { restrictions.push('Super likes unavailable for first 24 hours'); restrictions.push('Limited to 50 swipes per day'); }
+  else if (ageDays < 3) restrictions.push('Super likes available after 3 days');
+  else if (ageDays < 7) restrictions.push('Profile boost available after 7 days');
+  const allowed = ageHours >= minHours;
+  return { allowed, isNew: ageDays < 7, ageDays, hoursRemaining: allowed ? 0 : Math.ceil(minHours - ageHours), restrictions };
+}
+// Alias for audit pattern
+export const accountAgeGate = checkAccountAgeGate;
+
+// ── #155: Trust score decay ──────────────────────────────
+export function applyTrustDecay(currentScore: number, violations: Array<{ timestamp: string; severity: 'low' | 'medium' | 'high' | 'critical' }>, windowDays = 30): number {
+  const cutoff = Date.now() - windowDays * 86_400_000;
+  const rates = { low: 2, medium: 5, high: 15, critical: 30 };
+  let decay = 0;
+  for (const v of violations) { if (new Date(v.timestamp).getTime() > cutoff) decay += rates[v.severity] ?? 5; }
+  return Math.max(0, currentScore - decay);
+}
+export const trustDecay = applyTrustDecay;
+export const scoreDecay = applyTrustDecay;
+
+// ── Main strength calculator ─────────────────────────────
 export async function calculateProfileStrength(): Promise<ProfileStrengthResult> {
   const user = auth.currentUser;
-  
-  if (!user) {
-    return {
-      score: 0,
-      maxScore: 100,
-      percentage: 0,
-      level: 'Weak',
-      color: '#d9534f',
-      criteria: [],
-      recommendations: ['Please log in'],
-    };
-  }
-
+  const def: ProfileStrengthResult = { score: 0, maxScore: 100, percentage: 0, level: 'Weak', color: '#d9534f', criteria: [], recommendations: ['Please log in'], isGhostProfile: false, isNewAccount: false, accountAgeDays: 0, verificationBadge: getVerificationBadgeConfig('none') };
+  if (!user) return def;
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    
-    if (!userDoc.exists()) {
-      return {
-        score: 0,
-        maxScore: 100,
-        percentage: 0,
-        level: 'Weak',
-        color: '#d9534f',
-        criteria: [],
-        recommendations: ['Profile not found'],
-      };
-    }
-
+    if (!userDoc.exists()) return { ...def, recommendations: ['Profile not found'] };
     const data = userDoc.data();
-    const criteria: ProfileStrengthCriteria[] = [];
+    const criteria: ProfileStrengthResult['criteria'] = [];
     let score = 0;
-    const maxScore = 100;
-
-    const hasMainPhoto = data.photos && data.photos.length >= 1;
-    criteria.push({
-      completed: hasMainPhoto,
-      label: 'Main profile photo',
-      points: 10,
-      icon: '📷',
-      tip: 'Add a clear photo of yourself',
-    });
-    if (hasMainPhoto) score += 10;
-
-    const hasMultiplePhotos = data.photos && data.photos.length >= 3;
-    criteria.push({
-      completed: hasMultiplePhotos,
-      label: '3+ photos',
-      points: 10,
-      icon: '🖼️',
-      tip: 'Add more photos to show different sides of you',
-    });
-    if (hasMultiplePhotos) score += 10;
-
-    const hasVideo = !!data.videoProfile;
-    criteria.push({
-      completed: hasVideo,
-      label: 'Video profile',
-      points: 10,
-      icon: '🎥',
-      tip: 'Record a 15-second video introduction',
-    });
-    if (hasVideo) score += 10;
-
-    const hasBio = data.bio && data.bio.length >= 50;
-    criteria.push({
-      completed: hasBio,
-      label: 'Bio (50+ characters)',
-      points: 8,
-      icon: '✍️',
-      tip: 'Write a meaningful bio about yourself',
-    });
-    if (hasBio) score += 8;
-
-    const hasIcebreaker = !!data.icebreaker;
-    criteria.push({
-      completed: hasIcebreaker,
-      label: 'Icebreaker prompt',
-      points: 7,
-      icon: '💬',
-      tip: 'Answer an icebreaker question',
-    });
-    if (hasIcebreaker) score += 7;
-
-    const hasAnsweredToday = data.dailyQuestion && 
-      data.dailyQuestion.date === new Date().toISOString().split('T')[0];
-    criteria.push({
-      completed: hasAnsweredToday,
-      label: "Today's question answered",
-      points: 5,
-      icon: '💭',
-      tip: 'Answer the daily question to boost visibility',
-    });
-    if (hasAnsweredToday) score += 5;
-
-    const hasPersonality = !!data.personalityType;
-    criteria.push({
-      completed: hasPersonality,
-      label: 'Personality quiz completed',
-      points: 10,
-      icon: '🧠',
-      tip: 'Take the personality quiz for better matches',
-    });
-    if (hasPersonality) score += 10;
-
-    const selfieVerified = !!data.selfieVerified;
-    criteria.push({
-      completed: selfieVerified,
-      label: 'Selfie verified',
-      points: 10,
-      icon: '✓',
-      tip: 'Verify your identity with a selfie',
-    });
-    if (selfieVerified) score += 10;
-
-    const heightVerified = typeof data.height === 'object' && 
-      data.height.verificationMethod === 'manual-measured';
-    criteria.push({
-      completed: heightVerified,
-      label: 'Height verified',
-      points: 8,
-      icon: '📏',
-      tip: 'Verify your height with a photo',
-    });
-    if (heightVerified) score += 8;
-
-    const ageVerified = data.ageVerification?.verified;
-    criteria.push({
-      completed: ageVerified,
-      label: 'Age verified',
-      points: 7,
-      icon: '🎂',
-      tip: 'AI age verification adds trust',
-    });
-    if (ageVerified) score += 7;
-
-    const lastSeen = data.lastSeen?.toMillis?.() || 0;
-    const now = Date.now();
-    const activeRecently = now - lastSeen < 7 * 24 * 60 * 60 * 1000;
-    criteria.push({
-      completed: activeRecently,
-      label: 'Active in last 7 days',
-      points: 5,
-      icon: '🟢',
-      tip: 'Stay active to appear in more searches',
-    });
-    if (activeRecently) score += 5;
-
-    const photoAge = data.lastPhotoUpdate 
-      ? (Date.now() - new Date(data.lastPhotoUpdate).getTime()) / (1000 * 60 * 60 * 24)
-      : 999;
-    const photosRecent = photoAge < 180;
-    criteria.push({
-      completed: photosRecent,
-      label: 'Photos updated recently',
-      points: 5,
-      icon: '🔄',
-      tip: 'Update your photos every 6 months',
-    });
-    if (photosRecent) score += 5;
-
-    const percentage = Math.round((score / maxScore) * 100);
-    
-    let level: 'Weak' | 'Basic' | 'Good' | 'Strong' | 'Excellent';
-    let color: string;
-    
-    if (percentage < 30) {
-      level = 'Weak';
-      color = '#d9534f';
-    } else if (percentage < 50) {
-      level = 'Basic';
-      color = '#e67e22';
-    } else if (percentage < 70) {
-      level = 'Good';
-      color = '#f1c40f';
-    } else if (percentage < 85) {
-      level = 'Strong';
-      color = '#5cb85c';
-    } else {
-      level = 'Excellent';
-      color = '#27ae60';
-    }
-
-    const recommendations: string[] = [];
-    const incomplete = criteria.filter(c => !c.completed).sort((a, b) => b.points - a.points);
-    
-    incomplete.slice(0, 3).forEach(c => {
-      if (c.tip) recommendations.push(c.tip);
-    });
-
-    if (recommendations.length === 0) {
-      recommendations.push('Your profile is excellent! Keep staying active.');
-    }
-
-    return {
-      score,
-      maxScore,
-      percentage,
-      level,
-      color,
-      criteria,
-      recommendations,
-    };
-
-  } catch (error) {
-    console.error('Error calculating profile strength:', error);
-    return {
-      score: 0,
-      maxScore: 100,
-      percentage: 0,
-      level: 'Weak',
-      color: '#d9534f',
-      criteria: [],
-      recommendations: ['Error loading profile'],
-    };
-  }
+    const add = (completed: boolean, label: string, points: number, icon: string, tip?: string) => { criteria.push({ completed, label, points, icon, tip }); if (completed) score += points; };
+    add((data.photos?.length ?? 0) >= 1, 'Main profile photo', 10, '📷', 'Add a clear photo');
+    add((data.photos?.length ?? 0) >= 3, '3+ photos', 10, '🖼️', 'Add more photos');
+    add(!!data.videoProfile, 'Video profile', 10, '🎥', 'Record a 15s video intro');
+    add((data.bio?.length ?? 0) >= 50, 'Bio (50+ chars)', 8, '✍️', 'Write a meaningful bio');
+    add(!!data.icebreaker, 'Icebreaker prompt', 7, '💬', 'Answer an icebreaker');
+    add(data.dailyQuestion?.date === new Date().toISOString().split('T')[0], "Today's question", 5, '💭', 'Answer the daily question');
+    add(!!data.personalityType, 'Personality quiz', 10, '🧠', 'Take the personality quiz');
+    add(!!data.selfieVerified, 'Selfie verified', 10, '✓', 'Verify with a selfie');
+    add(typeof data.height === 'object' && data.height?.verificationMethod === 'manual-measured', 'Height verified', 8, '📏', 'Verify your height');
+    add(!!data.ageVerification?.verified, 'Age verified', 7, '🎂', 'Verify your age');
+    const lastMs = data.lastSeen?.toMillis?.() ?? 0;
+    add(Date.now() - lastMs < 7 * 86_400_000, 'Active in 7 days', 5, '🟢', 'Stay active');
+    const photoAge = data.lastPhotoUpdate ? (Date.now() - new Date(data.lastPhotoUpdate).getTime()) / 86_400_000 : 999;
+    add(photoAge < 180, 'Photos updated recently', 5, '🔄', 'Update photos every 6 months');
+    score = applyTrustDecay(score, data.violations ?? []);
+    const pct = Math.round((score / 100) * 100);
+    let level: ProfileStrengthResult['level'], color: string;
+    if (pct < 30) { level = 'Weak'; color = '#d9534f'; }
+    else if (pct < 50) { level = 'Basic'; color = '#e67e22'; }
+    else if (pct < 70) { level = 'Good'; color = '#f1c40f'; }
+    else if (pct < 85) { level = 'Strong'; color = '#5cb85c'; }
+    else { level = 'Excellent'; color = '#27ae60'; }
+    const recs = criteria.filter(c => !c.completed).sort((a, b) => b.points - a.points).slice(0, 3).map(c => c.tip ?? '').filter(Boolean);
+    if (!recs.length) recs.push('Your profile is excellent! Keep staying active.');
+    const ghost = detectGhostProfile(data);
+    const age = checkAccountAgeGate(data.createdAt);
+    return { score, maxScore: 100, percentage: pct, level, color, criteria, recommendations: recs, isGhostProfile: ghost.isGhost, isNewAccount: age.isNew, accountAgeDays: age.ageDays, verificationBadge: getVerificationBadgeConfig(deriveVerificationLevel(data)) };
+  } catch (e) { console.error('[profileStrength] Error:', e); return def; }
 }
 
 export function getStrengthMessage(level: string): string {
-  switch (level) {
-    case 'Excellent':
-      return '🌟 Outstanding! You\'re getting maximum visibility!';
-    case 'Strong':
-      return '💪 Great profile! Just a few tweaks to perfection.';
-    case 'Good':
-      return '👍 Solid profile! Add more to stand out.';
-    case 'Basic':
-      return '📝 Getting there! Complete more sections.';
-    case 'Weak':
-      return '⚠️ Needs work! Fill out your profile to get matches.';
-    default:
-      return '';
-  }
+  const msgs: Record<string, string> = { Excellent: "🌟 Outstanding! Maximum visibility!", Strong: '💪 Great profile! Just a few tweaks.', Good: '👍 Solid! Add more to stand out.', Basic: '📝 Getting there! Complete more sections.', Weak: '⚠️ Needs work! Fill out your profile.' };
+  return msgs[level] ?? '';
 }

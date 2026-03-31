@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// ✅ FIX: Import NSFW check
+import { checkImageSafety } from '../utils/moderation';
 import { uploadVideoProfile } from '../utils/videoProfiles';
 
 const MAX_DURATION = 15;
@@ -113,8 +115,17 @@ export default function VideoProfileRecorderScreen() {
     setRecordingTime(0);
   }, []);
 
+  // ✅ FIX: Added NSFW check before upload
   const uploadVideo = useCallback(async () => {
     if (!recordedVideoUri) return;
+
+    // NSFW check on video before upload
+    // On native, checkImageSafety handles video URIs via Cloudinary fallback
+    const safety = await checkImageSafety(recordedVideoUri);
+    if (!safety.safe) {
+      Alert.alert('Content Not Allowed', safety.reason);
+      return;
+    }
 
     setUploading(true);
     const result = await uploadVideoProfile(recordedVideoUri);

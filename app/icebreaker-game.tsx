@@ -1,21 +1,36 @@
+import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth } from '../firebaseConfig';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
-    calculateCompatibilityFromGame,
-    GameSession,
-    getGameSession,
-    startGame,
-    submitAnswer,
-    THIS_OR_THAT_QUESTIONS,
-    WOULD_YOU_RATHER_QUESTIONS,
+  GameSession,
+  getGameSession,
+  startGame,
+  submitAnswer,
+  THIS_OR_THAT_QUESTIONS,
+  WOULD_YOU_RATHER_QUESTIONS,
 } from '../utils/icebreakerGames';
+
+function secureRandInt(max: number): number {
+  const bytes = Crypto.getRandomBytes(4);
+  const val = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  return val % max;
+}
+function secureShuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = secureRandInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+function calculateCompatibilityScore(matchCount: number, totalQuestions: number): number {
+  return totalQuestions === 0 ? 0 : Math.round((matchCount / totalQuestions) * 100);
+}
 
 export default function IcebreakerGameScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const { chatId, matchId, matchName, gameType } = params;
+  const { chatId, matchId, matchName, gameType } = useLocalSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [gameSession, setGameSession] = useState<GameSession | null>(null);
@@ -25,90 +40,81 @@ export default function IcebreakerGameScreen() {
   const [waitingForMatch, setWaitingForMatch] = useState(false);
   const [lastResult, setLastResult] = useState<{ matched: boolean } | null>(null);
   const [gameComplete, setGameComplete] = useState(false);
+  const [matchCount, setMatchCount] = useState(0);
 
-  const user = auth.currentUser;
-
-  useEffect(() => {
-    initGame();
-  }, []);
+  useEffect(() => { void initGame(); }, []);
 
   const initGame = async () => {
-    const type = gameType as 'would_you_rather' | 'this_or_that';
-    const result = await startGame(chatId as string, matchId as string, type);
-
-    if (result.success && result.gameId) {
+    try {
+      const type = gameType as 'would_you_rather' | 'this_or_that';
+      const result = await startGame(chatId as string, matchId as string, type);
+      if (!result.success || !result.gameId) {
+        Alert.alert('Error', result.error || 'Could not start game.');
+        router.back();
+        return;
+      }
       const session = await getGameSession(result.gameId);
       setGameSession(session);
-
-      const q = type === 'would_you_rather' ? WOULD_YOU_RATHER_QUESTIONS : THIS_OR_THAT_QUESTIONS;
-      // Shuffle
-      const shuffled = [...q].sort(() => Math.random() - 0.5).slice(0, 10);
-      setQuestions(shuffled);
+      const bank = type === 'would_you_rather' ? WOULD_YOU_RATHER_QUESTIONS : THIS_OR_THAT_QUESTIONS;
+      setQuestions(secureShuffle([...bank]).slice(0, 10));
+    } catch (error) {
+      console.error('[Icebreaker] init error:', error);
+      Alert.alert('Error', 'Failed to start the game.');
+      router.back();
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleAnswer = async (answer: string) => {
     if (!gameSession || myAnswer) return;
-
     setMyAnswer(answer);
     setWaitingForMatch(true);
-
-    const result = await submitAnswer(gameSession.id, answer);
-
-    if (result.bothAnswered) {
-      setLastResult({ matched: result.matched || false });
-      
+    try {
+      const result = await submitAnswer(gameSession.id, answer);
+      if (!result.bothAnswered) return;
+      const matched = result.matched ?? false;
+      if (matched) setMatchCount((prev) => prev + 1);
+      setLastResult({ matched });
       setTimeout(() => {
-        if (currentQuestion + 1 >= 10) {
-          setGameComplete(true);
-        } else {
-          setCurrentQuestion(currentQuestion + 1);
+        if (currentQuestion + 1 >= 10) setGameComplete(true);
+        else {
+          setCurrentQuestion((prev) => prev + 1);
           setMyAnswer(null);
           setWaitingForMatch(false);
           setLastResult(null);
         }
       }, 2000);
+    } catch (error) {
+      console.error('[Icebreaker] submit error:', error);
+      Alert.alert('Error', 'Could not submit your answer.');
+      setMyAnswer(null);
+      setWaitingForMatch(false);
     }
   };
 
-  const getCompatibilityScore = () => {
-    if (!gameSession) return 0;
-    return calculateCompatibilityFromGame(gameSession.matchCount || 0, 10);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#53a8b6" />
-        <Text style={styles.loadingText}>Starting game...</Text>
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#53a8b6" />
+      <Text style={styles.loadingText}>Starting game...</Text>
+    </View>
+  );
 
   if (gameComplete) {
-    const score = getCompatibilityScore();
+    const score = calculateCompatibilityScore(matchCount, 10);
     return (
       <View style={styles.container}>
         <Text style={styles.completeEmoji}>🎉</Text>
         <Text style={styles.completeTitle}>Game Complete!</Text>
-        <Text style={styles.completeSubtitle}>
-          You and {matchName} matched on
-        </Text>
+        <Text style={styles.completeSubtitle}>You and {matchName} matched on</Text>
         <View style={styles.scoreContainer}>
           <Text style={styles.scoreNumber}>{score}%</Text>
           <Text style={styles.scoreLabel}>of answers</Text>
         </View>
         <Text style={styles.compatibilityLabel}>
-          {score >= 70 ? '🔥 Great compatibility!' : 
-           score >= 50 ? '👍 Good match!' : 
-           '🎲 Opposites attract!'}
+          {score >= 70 ? '🔥 Great compatibility!' : score >= 50 ? '👍 Good match!' : '🎲 Opposites attract!'}
         </Text>
-        <TouchableOpacity
-          style={styles.doneButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.doneButton} onPress={() => router.back()}>
           <Text style={styles.doneButtonText}>Back to Chat</Text>
         </TouchableOpacity>
       </View>
@@ -120,84 +126,48 @@ export default function IcebreakerGameScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.closeButton}>✕</Text>
-        </TouchableOpacity>
-        <Text style={styles.gameTitle}>
-          {isWouldYouRather ? '🤔 Would You Rather' : '⚡ This or That'}
-        </Text>
+        <TouchableOpacity onPress={() => router.back()}><Text style={styles.closeButton}>✕</Text></TouchableOpacity>
+        <Text style={styles.gameTitle}>{isWouldYouRather ? '🤔 Would You Rather' : '⚡ This or That'}</Text>
         <Text style={styles.progress}>{currentQuestion + 1}/10</Text>
       </View>
 
-      {/* Progress Bar */}
       <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / 10) * 100}%` }]} />
+        <View style={[styles.progressFill, { width: `${((currentQuestion + 1) / 10) * 100}%` as any }]} />
       </View>
 
-      {/* Last Result */}
       {lastResult && (
         <View style={[styles.resultBanner, lastResult.matched ? styles.resultMatch : styles.resultNoMatch]}>
-          <Text style={styles.resultText}>
-            {lastResult.matched ? '✓ You both chose the same!' : '✗ Different answers'}
-          </Text>
+          <Text style={styles.resultText}>{lastResult.matched ? '✓ You both chose the same!' : '✗ Different answers'}</Text>
         </View>
       )}
 
-      {/* Question */}
       <View style={styles.questionContainer}>
-        {isWouldYouRather ? (
-          <Text style={styles.questionText}>Would you rather...</Text>
-        ) : (
-          <Text style={styles.questionText}>Which do you prefer?</Text>
-        )}
+        <Text style={styles.questionText}>{isWouldYouRather ? 'Would you rather...' : 'Which do you prefer?'}</Text>
       </View>
 
-      {/* Options */}
       {question && (
         <View style={styles.optionsContainer}>
           <TouchableOpacity
-            style={[
-              styles.optionButton,
-              myAnswer === 'a' && styles.optionButtonSelected,
-              waitingForMatch && myAnswer !== 'a' && styles.optionButtonDisabled,
-            ]}
-            onPress={() => handleAnswer('a')}
+            style={[styles.optionButton, myAnswer === 'a' && styles.optionButtonSelected, waitingForMatch && myAnswer !== 'a' && styles.optionButtonDisabled]}
+            onPress={() => void handleAnswer('a')}
             disabled={!!myAnswer}
           >
-            <Text style={[
-              styles.optionText,
-              myAnswer === 'a' && styles.optionTextSelected,
-            ]}>
-              {question.a}
-            </Text>
+            <Text style={[styles.optionText, myAnswer === 'a' && styles.optionTextSelected]}>{question.a}</Text>
           </TouchableOpacity>
 
-          <View style={styles.orContainer}>
-            <Text style={styles.orText}>{isWouldYouRather ? 'OR' : 'VS'}</Text>
-          </View>
+          <View style={styles.orContainer}><Text style={styles.orText}>{isWouldYouRather ? 'OR' : 'VS'}</Text></View>
 
           <TouchableOpacity
-            style={[
-              styles.optionButton,
-              myAnswer === 'b' && styles.optionButtonSelected,
-              waitingForMatch && myAnswer !== 'b' && styles.optionButtonDisabled,
-            ]}
-            onPress={() => handleAnswer('b')}
+            style={[styles.optionButton, myAnswer === 'b' && styles.optionButtonSelected, waitingForMatch && myAnswer !== 'b' && styles.optionButtonDisabled]}
+            onPress={() => void handleAnswer('b')}
             disabled={!!myAnswer}
           >
-            <Text style={[
-              styles.optionText,
-              myAnswer === 'b' && styles.optionTextSelected,
-            ]}>
-              {question.b}
-            </Text>
+            <Text style={[styles.optionText, myAnswer === 'b' && styles.optionTextSelected]}>{question.b}</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Waiting State */}
       {waitingForMatch && !lastResult && (
         <View style={styles.waitingContainer}>
           <ActivityIndicator size="small" color="#53a8b6" />

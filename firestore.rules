@@ -535,11 +535,29 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // RATE LIMITS
+    // RATE LIMITS — ✅ FIXED: subcollection structure
+    // Old: flat docs with write:false (rate limiter was broken)
+    // New: rateLimits/{userId}/actions/{action} — user-owned
     // ═══════════════════════════════════════════
-    match /rateLimits/{limitId} {
-      allow read: if isOwner(limitId) || isAdmin();
-      allow write: if false;
+    match /rateLimits/{userId} {
+      // Parent doc — no direct reads/writes needed
+      allow read, write: if false;
+
+      match /actions/{actionId} {
+        allow read: if isOwner(userId);
+
+        allow create, update: if isOwner(userId) && isNotBanned() &&
+          hasOnlyAllowedFields([
+            'count', 'firstAction', 'lastAction'
+          ]) &&
+          request.resource.data.count is number &&
+          request.resource.data.count >= 0 &&
+          request.resource.data.count <= 1000 &&
+          request.resource.data.firstAction is number &&
+          request.resource.data.lastAction is number;
+
+        allow delete: if false;
+      }
     }
 
     // ═══════════════════════════════════════════
@@ -794,34 +812,52 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // STORIES
+    // STORIES — ✅ FIXED: added missing fields
     // ═══════════════════════════════════════════
     match /stories/{storyId} {
       allow read: if isAuthenticated();
 
       allow create: if isVerifiedUser() &&
         hasRequiredFields([
-          'userId', 'mediaUrl', 'createdAt', 'expiresAt'
+          'userId', 'userName', 'userPhoto',
+          'mediaUrl', 'mediaType',
+          'createdAt', 'expiresAt',
+          'views', 'viewCount'
         ]) &&
         hasOnlyAllowedFields([
-          'userId', 'mediaUrl', 'createdAt', 'expiresAt',
-          'caption', 'type', 'viewCount'
+          'userId', 'userName', 'userPhoto',
+          'mediaUrl', 'mediaType',
+          'createdAt', 'expiresAt',
+          'views', 'viewCount',
+          'caption', 'type'
         ]) &&
         request.resource.data.userId == request.auth.uid &&
-        isValidTimestamp(request.resource.data.createdAt) &&
-        (!('viewCount' in request.resource.data) ||
-          request.resource.data.viewCount == 0);
+        isValidString(request.resource.data.userName, 1, 50) &&
+        request.resource.data.userPhoto is string &&
+        isValidString(request.resource.data.mediaUrl, 1, 2000) &&
+        request.resource.data.mediaType in ['photo', 'video'] &&
+        request.resource.data.views is list &&
+        request.resource.data.views.size() == 0 &&
+        request.resource.data.viewCount == 0 &&
+        request.resource.data.expiresAt is string;
 
-      allow update: if isVerifiedUser() &&
-        (resource.data.userId == request.auth.uid || isAdmin()) &&
+      allow update: if isAuthenticated() && isNotBanned() &&
         fieldsUnchanged([
-          'userId', 'createdAt', 'mediaUrl', 'expiresAt',
-          'viewCount'
+          'userId', 'userName', 'userPhoto',
+          'mediaUrl', 'mediaType',
+          'createdAt', 'expiresAt'
         ]) &&
         hasOnlyAllowedFields([
-          'userId', 'mediaUrl', 'createdAt', 'expiresAt',
-          'caption', 'type', 'viewCount'
-        ]);
+          'userId', 'userName', 'userPhoto',
+          'mediaUrl', 'mediaType',
+          'createdAt', 'expiresAt',
+          'views', 'viewCount',
+          'caption', 'type'
+        ]) &&
+        (
+          resource.data.userId == request.auth.uid ||
+          onlyChangedFields(['views', 'viewCount'])
+        );
 
       allow delete: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid || isAdmin());
@@ -1088,6 +1124,55 @@ service cloud.firestore {
 
       allow update: if false;
       allow delete: if false;
+    }
+
+    // ═══════════════════════════════════════════
+    // DATE SAFETY PLANS — ✅ NEW
+    // ═══════════════════════════════════════════
+    match /dateSafetyPlans/{planId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isVerifiedUser() &&
+        hasRequiredFields(['userId', 'createdAt']) &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow update: if isVerifiedUser() &&
+        resource.data.userId == request.auth.uid &&
+        fieldsUnchanged(['userId', 'createdAt']);
+
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ═══════════════════════════════════════════
+    // EMERGENCY CONTACTS — ✅ NEW
+    // ═══════════════════════════════════════════
+    match /emergencyContacts/{contactId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isVerifiedUser() &&
+        hasRequiredFields(['userId']) &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow update: if isVerifiedUser() &&
+        resource.data.userId == request.auth.uid &&
+        fieldsUnchanged(['userId']);
+
+      allow delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ═══════════════════════════════════════════
+    // VOICE INTROS — ✅ NEW
+    // ═══════════════════════════════════════════
+    match /voiceIntros/{userId} {
+      allow read: if isAuthenticated();
+
+      allow create, update: if isOwner(userId) && isNotBanned();
+
+      allow delete: if isOwner(userId);
     }
 
     // ═══════════════════════════════════════════

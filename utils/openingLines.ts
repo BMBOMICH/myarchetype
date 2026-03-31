@@ -1,138 +1,76 @@
+import * as Crypto from 'expo-crypto';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
-export interface OpeningLine {
-  text: string;
-  category: string;
+export interface OpeningLine { text: string; category: string; }
+
+function secureRandInt(max: number): number {
+  const bytes = Crypto.getRandomBytes(4);
+  const val = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  return val % max;
+}
+
+function secureShuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = secureRandInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 export async function generateOpeningLines(matchUserId: string): Promise<OpeningLine[]> {
   try {
     const userDoc = await getDoc(doc(db, 'users', matchUserId));
-    
-    if (!userDoc.exists()) {
-      return getDefaultOpeningLines();
-    }
+    if (!userDoc.exists()) return getDefaultOpeningLines();
 
     const userData = userDoc.data();
     const lines: OpeningLine[] = [];
 
-    // Based on icebreaker answer
     if (userData.icebreaker && userData.icebreakerPrompt) {
-      lines.push({
-        text: `I saw your answer to "${userData.icebreakerPrompt}" - ${generateIcebreakerResponse(userData.icebreaker)}`,
-        category: 'icebreaker',
-      });
+      lines.push({ text: `I saw your answer to "${userData.icebreakerPrompt}" - ${generateIcebreakerResponse()}`, category: 'icebreaker' });
     }
-
-    // Based on daily question
-    if (userData.dailyQuestion && userData.dailyQuestion.answer) {
-      lines.push({
-        text: `Love your answer to today's question! ${generateDailyQuestionResponse(userData.dailyQuestion.answer)}`,
-        category: 'daily',
-      });
+    if (userData.dailyQuestion?.answer) {
+      lines.push({ text: `Love your answer to today's question! ${generateDailyQuestionResponse()}`, category: 'daily' });
     }
-
-    // Based on personality
     if (userData.personalityType) {
-      lines.push({
-        text: getPersonalityOpener(userData.personalityType),
-        category: 'personality',
-      });
+      lines.push({ text: getPersonalityOpener(userData.personalityType), category: 'personality' });
     }
-
-    // Based on interests (if we have groups in future)
     if (userData.bio) {
-      const bioWords = userData.bio.toLowerCase();
-      
-      if (bioWords.includes('anime')) {
-        lines.push({
-          text: "I saw you're into anime! What are you watching right now?",
-          category: 'interest',
-        });
-      }
-      
-      if (bioWords.includes('game') || bioWords.includes('gaming')) {
-        lines.push({
-          text: "Fellow gamer! What's your go-to game lately?",
-          category: 'interest',
-        });
-      }
-      
-      if (bioWords.includes('music')) {
-        lines.push({
-          text: "I see you love music! What's on your playlist right now?",
-          category: 'interest',
-        });
-      }
-
-      if (bioWords.includes('coffee')) {
-        lines.push({
-          text: "Coffee lover! ☕ What's your favorite spot?",
-          category: 'interest',
-        });
-      }
+      const bio = userData.bio.toLowerCase();
+      if (bio.includes('anime')) lines.push({ text: "I saw you're into anime! What are you watching right now?", category: 'interest' });
+      if (bio.includes('game') || bio.includes('gaming')) lines.push({ text: "Fellow gamer! What's your go-to game lately?", category: 'interest' });
+      if (bio.includes('music')) lines.push({ text: "I see you love music! What's on your playlist right now?", category: 'interest' });
+      if (bio.includes('coffee')) lines.push({ text: "Coffee lover! ☕ What's your favorite spot?", category: 'interest' });
     }
-
-    // Based on location
     if (userData.location?.city) {
-      lines.push({
-        text: `Hey! I'm also in ${userData.location.city}. Have you been to [popular local spot]?`,
-        category: 'location',
-      });
+      lines.push({ text: `Hey! I'm also in ${userData.location.city}. Have you been to [popular local spot]?`, category: 'location' });
     }
+    lines.push({ text: `Hi ${userData.name}! Your profile caught my eye. How's your day going?`, category: 'generic' });
 
-    // Generic but personalized
-    lines.push({
-      text: `Hi ${userData.name}! Your profile caught my eye. How's your day going?`,
-      category: 'generic',
-    });
+    if (lines.length >= 3) return secureShuffle(lines).slice(0, 3);
 
-    // If we have enough lines, return random 3
-    if (lines.length >= 3) {
-      return shuffleArray(lines).slice(0, 3);
+    const defaults = getDefaultOpeningLines();
+    const unused = defaults.filter(d => !lines.some(l => l.text === d.text));
+    for (const u of unused) {
+      if (lines.length >= 3) break;
+      lines.push(u);
     }
-
-    // Otherwise, fill with defaults
-    while (lines.length < 3) {
-      const defaults = getDefaultOpeningLines();
-      const unused = defaults.filter(d => !lines.some(l => l.text === d.text));
-      if (unused.length > 0) {
-        lines.push(unused[0]);
-      } else {
-        break;
-      }
-    }
-
     return lines.slice(0, 3);
-
   } catch (error) {
     console.error('Error generating opening lines:', error);
     return getDefaultOpeningLines().slice(0, 3);
   }
 }
 
-function generateIcebreakerResponse(answer: string): string {
-  const responses = [
-    "that's really interesting!",
-    "I can totally relate to that!",
-    "that's so cool!",
-    "love that answer!",
-    "same here actually!",
-  ];
-  
-  return responses[Math.floor(Math.random() * responses.length)];
+function generateIcebreakerResponse(): string {
+  const responses = ["that's really interesting!", "I can totally relate to that!", "that's so cool!", "love that answer!", "same here actually!"];
+  return responses[secureRandInt(responses.length)] ?? responses[0]!;
 }
 
-function generateDailyQuestionResponse(answer: string): string {
-  const responses = [
-    "What made you think of that?",
-    "That's such a cool perspective!",
-    "I'd love to hear more about that!",
-    "Great answer!",
-  ];
-  
-  return responses[Math.floor(Math.random() * responses.length)];
+function generateDailyQuestionResponse(): string {
+  const responses = ["What made you think of that?", "That's such a cool perspective!", "I'd love to hear more about that!", "Great answer!"];
+  return responses[secureRandInt(responses.length)] ?? responses[0]!;
 }
 
 function getPersonalityOpener(personalityType: string): string {
@@ -142,8 +80,7 @@ function getPersonalityOpener(personalityType: string): string {
     'Thoughtful Soul': "Thoughtful Soul here too! What's something you've been thinking about lately?",
     'Mixed': "I see we both got Mixed personality - guess we're both full of surprises! 😄",
   };
-  
-  return openers[personalityType] || "I see we have similar personalities! That's awesome.";
+  return openers[personalityType] ?? "I see we have similar personalities! That's awesome.";
 }
 
 function getDefaultOpeningLines(): OpeningLine[] {
@@ -154,13 +91,4 @@ function getDefaultOpeningLines(): OpeningLine[] {
     { text: "Hi! If you could do anything right now, what would it be?", category: 'generic' },
     { text: "Hey! What's something you're really passionate about?", category: 'generic' },
   ];
-}
-
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
 }

@@ -1,388 +1,192 @@
+// utils/stories.ts
 import {
-    addDoc,
-    arrayUnion,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    increment,
-    onSnapshot,
-    query,
-    updateDoc,
-    where,
-    writeBatch,
+  addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs,
+  increment, onSnapshot, query, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { uploadToCloudinary } from './cloudinaryUpload';
-
-// ─── Constants ────────────────────────────────────────────
+import { checkImageSafety, checkTextSafety, checkVideoFramesSafety, detectEmojiCodedLanguage, detectEmojiSpam, ocrThenModerate } from './moderation';
+import { analyzeMessageTiming } from './rateLimiter';
 
 export const STORY_DURATION_HOURS = 24;
 
-const COL_STORIES = 'stories' as const;
-const COL_LIKES = 'likes' as const;
-const COL_USERS = 'users' as const;
-
-/** Firestore writeBatch hard limit */
-const BATCH_LIMIT = 500;
-
-// ─── Types ────────────────────────────────────────────────
-
 export interface Story {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhoto: string;
-  mediaUrl: string;
-  mediaType: 'photo' | 'video';
-  createdAt: string;
-  expiresAt: string;
-  views: string[];
-  viewCount: number;
+  id: string; userId: string; userName: string; userPhoto: string;
+  mediaUrl: string; mediaType: 'photo' | 'video'; caption?: string;
+  createdAt: string; expiresAt: string; views: string[];
+  viewCount: number; viewTimestamps?: number[]; flagged?: boolean;
 }
 
-/** One circle in the Stories row — one per user. */
 export interface StoryGroup {
-  userId: string;
-  userName: string;
-  userPhoto: string;
-  stories: Story[];
-  hasUnviewed: boolean;
-  latestAt: string;
+  userId: string; userName: string; userPhoto: string;
+  stories: Story[]; hasUnviewed: boolean; latestAt: string;
 }
 
-// ─── Internal helpers ─────────────────────────────────────
+function requireAuth() { const u = auth.currentUser; if (!u) throw new Error('Not authenticated'); return u; }
+function storyRef(id: string) { return doc(db, 'stories', id); }
+function storiesCol() { return collection(db, 'stories'); }
+function computeExpiry(from = new Date()) { return new Date(from.getTime() + STORY_DURATION_HOURS * 3_600_000); }
 
-function requireAuth() {
-  const user = auth.currentUser;
-  if (!user) throw new Error('Not authenticated');
-  return user;
-}
-
-function storyRef(id: string) {
-  return doc(db, COL_STORIES, id);
-}
-
-function storiesCol() {
-  return collection(db, COL_STORIES);
-}
-
-function computeExpiry(from: Date = new Date()): Date {
-  return new Date(from.getTime() + STORY_DURATION_HOURS * 3_600_000);
-}
-
-/** Returns the set of user IDs the given user is matched with. */
 async function getMatchedUserIds(userId: string): Promise<Set<string>> {
-  const likesCol = collection(db, COL_LIKES);
-
+  const likesCol = collection(db, 'likes');
   const [fromSnap, toSnap] = await Promise.all([
-    getDocs(
-      query(
-        likesCol,
-        where('fromUserId', '==', userId),
-        where('status', '==', 'matched')
-      )
-    ),
-    getDocs(
-      query(
-        likesCol,
-        where('toUserId', '==', userId),
-        where('status', '==', 'matched')
-      )
-    ),
+    getDocs(query(likesCol, where('fromUserId', '==', userId), where('status', '==', 'matched'))),
+    getDocs(query(likesCol, where('toUserId', '==', userId), where('status', '==', 'matched'))),
   ]);
-
   const ids = new Set<string>();
-  fromSnap.forEach((d) => ids.add(d.data().toUserId));
-  toSnap.forEach((d) => ids.add(d.data().fromUserId));
+  fromSnap.forEach(d => ids.add(d.data().toUserId));
+  toSnap.forEach(d => ids.add(d.data().fromUserId));
   return ids;
 }
 
-/** Standard sort: own stories first, then newest-first. */
-function sortStories(stories: Story[], currentUserId: string): void {
+function sortStories(stories: Story[], uid: string) {
   stories.sort((a, b) => {
-    if (a.userId === currentUserId && b.userId !== currentUserId) return -1;
-    if (a.userId !== currentUserId && b.userId === currentUserId) return 1;
-    return (
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    if (a.userId === uid && b.userId !== uid) return -1;
+    if (a.userId !== uid && b.userId === uid) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 }
 
-// ─── Create ───────────────────────────────────────────────
-
-export async function createStory(
-  mediaUri: string,
-  mediaType: 'photo' | 'video'
-): Promise<{ success: boolean; storyId?: string; error?: string }> {
-  try {
-    const user = requireAuth();
-
-    // 1 - User profile
-    const userSnap = await getDoc(doc(db, COL_USERS, user.uid));
-    if (!userSnap.exists()) {
-      return { success: false, error: 'User profile not found' };
-    }
-    const userData = userSnap.data();
-
-    // 2 - Upload to Cloudinary
-    const tag = mediaType === 'video' ? 'story_video' : 'story_photo';
-    const upload = await uploadToCloudinary(mediaUri, tag);
-
-    if (!upload.success || !upload.url) {
-      return { success: false, error: upload.error ?? 'Media upload failed' };
-    }
-
-    // 3 - Write Firestore document
-    const now = new Date();
-
-    const story: Omit<Story, 'id'> = {
-      userId: user.uid,
-      userName: userData.name || 'User',
-      userPhoto: userData.photos?.[0] ?? '',
-      mediaUrl: upload.url,
-      mediaType,
-      createdAt: now.toISOString(),
-      expiresAt: computeExpiry(now).toISOString(),
-      views: [],
-      viewCount: 0,
-    };
-
-    const ref = await addDoc(storiesCol(), story);
-    return { success: true, storyId: ref.id };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Stories] create error:', message);
-    return { success: false, error: message };
-  }
+// ── Caption safety: #20, #21, #53, #168 ──────────────────
+function checkCaption(caption: string): { safe: boolean; reason?: string } {
+  if (!caption?.trim()) return { safe: true };
+  const emojiCheck = detectEmojiSpam(caption, 0.6);
+  if (emojiCheck.isSpam) return { safe: false, reason: 'Caption contains too many emojis.' };
+  const emojiCoded = detectEmojiCodedLanguage(caption);
+  if (emojiCoded.detected) return { safe: false, reason: 'Story caption contains coded language.' };
+  const textCheck = checkTextSafety(caption, 'general');
+  if (!textCheck.safe) return { safe: false, reason: textCheck.reason };
+  if (/(\+?\d[\d\s\-().]{7,}\d)/.test(caption) || /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/.test(caption))
+    return { safe: false, reason: 'Contact information is not allowed in story captions.' };
+  return { safe: true };
 }
 
-// ─── Read ─────────────────────────────────────────────────
+// ── Create: #4, #5, #20, #21, #53, #168 ─────────────────
+export async function createStory(mediaUri: string, mediaType: 'photo' | 'video', caption?: string): Promise<{ success: boolean; storyId?: string; error?: string }> {
+  try {
+    const user = requireAuth();
+    if (mediaType === 'photo') {
+      const safety = await checkImageSafety(mediaUri, 'story');
+      if (!safety.safe) return { success: false, error: safety.reason ?? 'Content rejected.' };
+      // #21: OCR hate speech scan on story photos
+      const ocrCheck = await ocrThenModerate(mediaUri);
+      if (!ocrCheck.safe) return { success: false, error: ocrCheck.reason ?? 'Image contains prohibited text.' };
+    }
+    if (mediaType === 'video') {
+      const videoSafety = await checkVideoFramesSafety(mediaUri, 6);
+      if (!videoSafety.safe) return { success: false, error: videoSafety.reason ?? 'Video contains inappropriate content.' };
+    }
+    if (caption) { const cc = checkCaption(caption); if (!cc.safe) return { success: false, error: cc.reason }; }
+    const userSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!userSnap.exists()) return { success: false, error: 'User profile not found' };
+    const userData = userSnap.data();
+    const upload = await uploadToCloudinary(mediaUri, mediaType === 'video' ? 'story_video' : 'story_photo');
+    if (!upload.success || !upload.url) return { success: false, error: upload.error ?? 'Media upload failed' };
+    const now = new Date();
+    const story: Omit<Story, 'id'> = {
+      userId: user.uid, userName: userData.name ?? 'User', userPhoto: userData.photos?.[0] ?? '',
+      mediaUrl: upload.url, mediaType, caption: caption?.trim(),
+      createdAt: now.toISOString(), expiresAt: computeExpiry(now).toISOString(),
+      views: [], viewCount: 0, viewTimestamps: [], flagged: false,
+    };
+    const ref = await addDoc(storiesCol(), story);
+    return { success: true, storyId: ref.id };
+  } catch (e: any) { console.error('[Stories] create error:', e); return { success: false, error: e.message }; }
+}
 
-/**
- * Fetch active (non-expired) stories visible to the current user.
- * Includes own stories + stories from matched users.
- */
 export async function getActiveStories(userId: string): Promise<Story[]> {
   try {
     const now = new Date().toISOString();
     const matchIds = await getMatchedUserIds(userId);
-
-    const q = query(storiesCol(), where('expiresAt', '>', now));
-    const snap = await getDocs(q);
-
+    const snap = await getDocs(query(storiesCol(), where('expiresAt', '>', now)));
     const stories: Story[] = [];
-    snap.forEach((docSnap) => {
-      const data = docSnap.data() as Omit<Story, 'id'>;
-      if (data.userId === userId || matchIds.has(data.userId)) {
-        stories.push({ id: docSnap.id, ...data });
-      }
-    });
-
+    snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
     sortStories(stories, userId);
     return stories;
-  } catch (error: unknown) {
-    console.error('[Stories] getActive error:', error);
-    return [];
-  }
+  } catch (e) { console.error('[Stories] getActive error:', e); return []; }
 }
 
-/**
- * Real-time listener for active stories.
- * Returns an unsubscribe function.
- */
-export function subscribeToActiveStories(
-  userId: string,
-  onUpdate: (stories: Story[]) => void
-): () => void {
+export function subscribeToActiveStories(userId: string, onUpdate: (s: Story[]) => void): () => void {
   const now = new Date().toISOString();
   const q = query(storiesCol(), where('expiresAt', '>', now));
-
   let matchIds = new Set<string>();
-  getMatchedUserIds(userId)
-    .then((ids) => {
-      matchIds = ids;
-    })
-    .catch(() => {});
-
-  return onSnapshot(
-    q,
-    (snap) => {
-      const stories: Story[] = [];
-      snap.forEach((docSnap) => {
-        const data = docSnap.data() as Omit<Story, 'id'>;
-        if (data.userId === userId || matchIds.has(data.userId)) {
-          stories.push({ id: docSnap.id, ...data });
-        }
-      });
-      sortStories(stories, userId);
-      onUpdate(stories);
-    },
-    (error) => {
-      console.error('[Stories] subscription error:', error);
-      onUpdate([]);
-    }
-  );
+  getMatchedUserIds(userId).then(ids => { matchIds = ids; }).catch(() => {});
+  return onSnapshot(q, snap => {
+    const stories: Story[] = [];
+    snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
+    sortStories(stories, userId);
+    onUpdate(stories);
+  }, () => onUpdate([]));
 }
 
-// ─── Grouping (for the circle UI) ─────────────────────────
-
-/** Collapses a flat story list into one group per user. */
-export function groupStoriesByUser(
-  stories: Story[],
-  currentUserId: string
-): StoryGroup[] {
+export function groupStoriesByUser(stories: Story[], currentUserId: string): StoryGroup[] {
   const map = new Map<string, StoryGroup>();
-
   for (const story of stories) {
     let group = map.get(story.userId);
-
-    if (!group) {
-      group = {
-        userId: story.userId,
-        userName:
-          story.userId === currentUserId ? 'Your Story' : story.userName,
-        userPhoto: story.userPhoto,
-        stories: [],
-        hasUnviewed: false,
-        latestAt: story.createdAt,
-      };
-      map.set(story.userId, group);
-    }
-
+    if (!group) { group = { userId: story.userId, userName: story.userId === currentUserId ? 'Your Story' : story.userName, userPhoto: story.userPhoto, stories: [], hasUnviewed: false, latestAt: story.createdAt }; map.set(story.userId, group); }
     group.stories.push(story);
-
-    if (
-      !story.views.includes(currentUserId) &&
-      story.userId !== currentUserId
-    ) {
-      group.hasUnviewed = true;
-    }
-
-    if (story.createdAt > group.latestAt) {
-      group.latestAt = story.createdAt;
-    }
+    if (!story.views.includes(currentUserId) && story.userId !== currentUserId) group.hasUnviewed = true;
+    if (story.createdAt > group.latestAt) group.latestAt = story.createdAt;
   }
-
-  return Array.from(map.values()).sort((a, b) => {
-    if (a.userId === currentUserId) return -1;
-    if (b.userId === currentUserId) return 1;
-    return (
-      new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime()
-    );
-  });
+  return Array.from(map.values()).sort((a, b) => { if (a.userId === currentUserId) return -1; if (b.userId === currentUserId) return 1; return new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime(); });
 }
 
-// ─── Update ───────────────────────────────────────────────
-
-/**
- * Atomically marks a story as viewed.
- * Uses arrayUnion + increment to avoid race conditions.
- */
+// ── Mark viewed: #178 bot story view detection ───────────
 export async function markStoryViewed(storyId: string): Promise<void> {
   try {
     const user = requireAuth();
     const ref = storyRef(storyId);
     const snap = await getDoc(ref);
-
     if (!snap.exists()) return;
-
     const data = snap.data() as Story;
-
-    // Skip own stories and already-viewed
-    if (data.userId === user.uid) return;
-    if (data.views.includes(user.uid)) return;
-
-    await updateDoc(ref, {
-      views: arrayUnion(user.uid),
-      viewCount: increment(1),
-    });
-  } catch (error: unknown) {
-    console.error('[Stories] markViewed error:', error);
-  }
+    if (data.userId === user.uid || data.views.includes(user.uid)) return;
+    const now = Date.now();
+    await updateDoc(ref, { views: arrayUnion(user.uid), viewCount: increment(1), viewTimestamps: arrayUnion(now) });
+    const timestamps: number[] = [...(data.viewTimestamps ?? []), now];
+    if (timestamps.length >= 5) {
+      const botCheck = analyzeMessageTiming(timestamps);
+      if (botCheck.isBot) { console.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`); await updateDoc(ref, { flagged: true }).catch(() => {}); }
+    }
+  } catch (e) { console.error('[Stories] markViewed error:', e); }
 }
 
-// ─── Delete ───────────────────────────────────────────────
-
-export async function deleteStory(
-  storyId: string
-): Promise<{ success: boolean; error?: string }> {
+export async function deleteStory(storyId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const user = requireAuth();
     const ref = storyRef(storyId);
     const snap = await getDoc(ref);
-
-    if (!snap.exists()) {
-      return { success: false, error: 'Story not found' };
-    }
-
-    const data = snap.data() as Story;
-    if (data.userId !== user.uid) {
-      return { success: false, error: "Cannot delete another user\u2019s story" };
-    }
-
+    if (!snap.exists()) return { success: false, error: 'Story not found' };
+    if ((snap.data() as Story).userId !== user.uid) return { success: false, error: "Cannot delete another user's story" };
     await deleteDoc(ref);
     return { success: true };
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Stories] delete error:', msg);
-    return { success: false, error: msg };
-  }
+  } catch (e: any) { console.error('[Stories] delete error:', e); return { success: false, error: e.message }; }
 }
 
-/**
- * Batch-deletes all expired stories.
- * Intended to run periodically or via a Cloud Function.
- */
 export async function cleanupExpiredStories(): Promise<number> {
   try {
-    const now = new Date().toISOString();
-    const q = query(storiesCol(), where('expiresAt', '<', now));
-    const snap = await getDocs(q);
-
+    const snap = await getDocs(query(storiesCol(), where('expiresAt', '<', new Date().toISOString())));
     if (snap.empty) return 0;
-
-    const docs = snap.docs;
     let deleted = 0;
-
-    for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+    for (let i = 0; i < snap.docs.length; i += 500) {
       const batch = writeBatch(db);
-      const chunk = docs.slice(i, i + BATCH_LIMIT);
-
-      for (const docSnap of chunk) {
-        batch.delete(doc(db, COL_STORIES, docSnap.id));
-      }
-
+      snap.docs.slice(i, i + 500).forEach(d => batch.delete(doc(db, 'stories', d.id)));
       await batch.commit();
-      deleted += chunk.length;
+      deleted += Math.min(500, snap.docs.length - i);
     }
-
-    if (deleted > 0) {
-      console.log(`[Stories] cleaned up ${deleted} expired stories`);
-    }
+    if (deleted > 0) console.log(`[Stories] cleaned up ${deleted} expired stories`);
     return deleted;
-  } catch (error: unknown) {
-    console.error('[Stories] cleanup error:', error);
-    return 0;
-  }
+  } catch (e) { console.error('[Stories] cleanup error:', e); return 0; }
 }
 
-// ─── Utility ──────────────────────────────────────────────
+export function detectGhostStories(stories: Story[]): Story[] {
+  const now = Date.now();
+  return stories.filter(s => now - new Date(s.createdAt).getTime() > 3 * 3_600_000 && s.viewCount === 0);
+}
 
-/** Human-readable remaining time, e.g. "23h 14m", "5m", "<1m". */
 export function getStoryTimeRemaining(expiresAt: string): string {
   const diff = new Date(expiresAt).getTime() - Date.now();
-
   if (diff <= 0) return 'Expired';
-
-  const hours = Math.floor(diff / 3_600_000);
-  const minutes = Math.floor((diff % 3_600_000) / 60_000);
-
-  if (hours > 0) {
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  }
-  if (minutes > 0) return `${minutes}m`;
-  return '<1m';
+  const h = Math.floor(diff / 3_600_000), m = Math.floor((diff % 3_600_000) / 60_000);
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return m > 0 ? `${m}m` : '<1m';
 }

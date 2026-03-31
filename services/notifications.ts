@@ -1,88 +1,142 @@
 import * as Notifications from 'expo-notifications';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
+import { auth, db } from '../firebaseConfig';
 
-const storage = new MMKV({ id: 'notifications' });
+type WebPushSubscriptionData = Record<string, unknown>;
 
-// ✅ Replace with your Render.com URL
-const SERVER_URL = 'https://myarchetype-api.onrender.com';
+interface SimpleStorage {
+  getString: (key: string) => string | undefined;
+  set: (key: string, value: string) => void;
+}
 
-// ─── Expo Push (iOS + Android) ────────────────────────────────────────────────
+const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? '';
+
+function createStorage(): SimpleStorage {
+  if (Platform.OS === 'web') {
+    return {
+      getString: key => (typeof window !== 'undefined' ? window.localStorage?.getItem(key) : null) ?? undefined,
+      set: (key, value) => { if (typeof window !== 'undefined') window.localStorage?.setItem(key, value); },
+    };
+  }
+
+  try {
+    const { MMKV } = require('react-native-mmkv') as { MMKV: new (opts: { id: string }) => SimpleStorage };
+    return new MMKV({ id: 'notifications' });
+  } catch {
+    const mem: Record<string, string> = {};
+    return { getString: key => mem[key], set: (key, value) => { mem[key] = value; } };
+  }
+}
+
+const storage = createStorage();
+
+function toUint8Array(base64Url: string) {
+  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = typeof atob === 'function' ? atob(base64) : '';
+  return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {}
+  return headers;
+}
+
+async function saveUserFields(fields: Record<string, unknown>) {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await updateDoc(doc(db, 'users', user.uid), fields);
+  } catch (e) {
+    console.error('[notifications] saveUserFields:', e);
+  }
+}
+
+async function post(path: string, body: Record<string, unknown>) {
+  if (!SERVER_URL) throw new Error('Missing EXPO_PUBLIC_SERVER_URL / EXPO_PUBLIC_FUNCTIONS_URL');
+  const res = await fetch(`${SERVER_URL}${path}`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+}
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    let status = current.status;
+    if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
+    if (status !== 'granted') return null;
 
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.log('Push notification permission denied');
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    storage.set('expoPushToken', token);
+    await saveUserFields({ pushToken: token, pushTokenUpdatedAt: new Date().toISOString() });
+    return token;
+  } catch (e) {
+    console.error('[notifications] registerForPushNotifications:', e);
     return null;
   }
-
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  storage.set('expoPushToken', token);
-  return token;
 }
 
 export async function sendMobilePushNotification({
-  expoPushToken,
-  title,
-  body,
-  screen,
+  expoPushToken, title, body, screen,
 }: {
   expoPushToken: string;
   title: string;
   body: string;
   screen: string;
 }): Promise<void> {
-  await fetch(`${SERVER_URL}/send-expo-notification`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ expoPushToken, title, body, screen }),
-  });
+  try {
+    await post('/send-expo-notification', { expoPushToken, title, body, screen });
+  } catch (e) {
+    console.error('[notifications] sendMobilePushNotification:', e);
+  }
 }
 
-// ─── Web Push (Browsers) ──────────────────────────────────────────────────────
-
 export async function registerWebPush(): Promise<void> {
-  if (Platform.OS !== 'web') return;
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-  const registration = await navigator.serviceWorker.ready;
+  try {
+    const vapidKey = process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapidKey || vapidKey === 'your-new-public-key') return;
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY,
-  });
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: toUint8Array(vapidKey),
+    });
 
-  // Save subscription to Firestore
-  storage.set('webPushSubscription', JSON.stringify(subscription));
+    const subscriptionJson = JSON.stringify(subscription);
+    storage.set('webPushSubscription', subscriptionJson);
+    await saveUserFields({ webPushSubscription: subscriptionJson });
+  } catch (e) {
+    console.error('[notifications] registerWebPush:', e);
+  }
 }
 
 export async function sendWebPushNotification({
-  subscription,
-  title,
-  body,
-  screen,
+  subscription, title, body, screen,
 }: {
-  subscription: PushSubscription;
+  subscription: WebPushSubscriptionData;
   title: string;
   body: string;
   screen: string;
 }): Promise<void> {
-  await fetch(`${SERVER_URL}/send-notification`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subscription, title, body, screen }),
-  });
+  try {
+    await post('/send-notification', { subscription, title, body, screen });
+  } catch (e) {
+    console.error('[notifications] sendWebPushNotification:', e);
+  }
 }
-
-// ─── Send to Any Platform ─────────────────────────────────────────────────────
 
 export async function sendPushNotification({
   title,
@@ -95,13 +149,8 @@ export async function sendPushNotification({
   body: string;
   screen: string;
   expoPushToken?: string;
-  webSubscription?: PushSubscription;
+  webSubscription?: WebPushSubscriptionData;
 }): Promise<void> {
-  if (expoPushToken) {
-    await sendMobilePushNotification({ expoPushToken, title, body, screen });
-  }
-
-  if (webSubscription) {
-    await sendWebPushNotification({ subscription: webSubscription, title, body, screen });
-  }
+  if (expoPushToken) await sendMobilePushNotification({ expoPushToken, title, body, screen });
+  if (webSubscription) await sendWebPushNotification({ subscription: webSubscription, title, body, screen });
 }

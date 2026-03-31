@@ -11,26 +11,30 @@ export default function InterestsScreen() {
   const [saving, setSaving] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadInterests();
-  }, []);
+  useEffect(() => { void loadInterests(); }, []);
 
   const loadInterests = async () => {
-    const interests = await getUserInterests();
-    setSelectedInterests(interests);
-    setLoading(false);
+    try {
+      const interests = await getUserInterests();
+      setSelectedInterests(interests);
+    } catch (error) {
+      console.error('[Interests] load error:', error);
+      Alert.alert('Error', 'Failed to load interests.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleInterest = (interest: string) => {
     if (selectedInterests.includes(interest)) {
-      setSelectedInterests(selectedInterests.filter(i => i !== interest));
-    } else {
-      if (selectedInterests.length >= MAX_INTERESTS) {
-        Alert.alert('Limit Reached', `You can select up to ${MAX_INTERESTS} interests.`);
-        return;
-      }
-      setSelectedInterests([...selectedInterests, interest]);
+      setSelectedInterests(selectedInterests.filter((i) => i !== interest));
+      return;
     }
+    if (selectedInterests.length >= MAX_INTERESTS) {
+      Alert.alert('Limit Reached', `You can select up to ${MAX_INTERESTS} interests.`);
+      return;
+    }
+    setSelectedInterests([...selectedInterests, interest]);
   };
 
   const handleSave = async () => {
@@ -38,44 +42,40 @@ export default function InterestsScreen() {
       Alert.alert('Too Few', 'Please select at least 3 interests.');
       return;
     }
-
     setSaving(true);
-    const result = await saveUserInterests(selectedInterests);
-    setSaving(false);
-
-    if (result.success) {
-      Alert.alert('Saved!', 'Your interests have been updated.');
-      router.back();
-    } else {
-      Alert.alert('Error', 'Failed to save interests.');
+    try {
+      const result = await saveUserInterests(selectedInterests);
+      if (result.success) {
+        Alert.alert('Saved!', 'Your interests have been updated.');
+        router.back();
+      } else {
+        Alert.alert('Error', 'Failed to save interests.');
+      }
+    } catch (error) {
+      console.error('[Interests] save error:', error);
+      Alert.alert('Error', 'Something went wrong while saving.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#53a8b6" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#53a8b6" />
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Back</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}><Text style={styles.backButton}>← Back</Text></TouchableOpacity>
         <Text style={styles.title}>Your Interests</Text>
         <View style={{ width: 50 }} />
       </View>
 
       <View style={styles.counterBar}>
-        <Text style={styles.counterText}>
-          {selectedInterests.length} / {MAX_INTERESTS} selected
-        </Text>
-        {selectedInterests.length < 3 && (
-          <Text style={styles.minText}>Min 3 required</Text>
-        )}
+        <Text style={styles.counterText}>{selectedInterests.length} / {MAX_INTERESTS} selected</Text>
+        {selectedInterests.length < 3 && <Text style={styles.minText}>Min 3 required</Text>}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -86,16 +86,10 @@ export default function InterestsScreen() {
               {interests.map((interest) => (
                 <TouchableOpacity
                   key={interest}
-                  style={[
-                    styles.interestChip,
-                    selectedInterests.includes(interest) && styles.interestChipActive,
-                  ]}
+                  style={[styles.interestChip, selectedInterests.includes(interest) && styles.interestChipActive]}
                   onPress={() => toggleInterest(interest)}
                 >
-                  <Text style={[
-                    styles.interestChipText,
-                    selectedInterests.includes(interest) && styles.interestChipTextActive,
-                  ]}>
+                  <Text style={[styles.interestChipText, selectedInterests.includes(interest) && styles.interestChipTextActive]}>
                     {interest}
                   </Text>
                 </TouchableOpacity>
@@ -103,19 +97,16 @@ export default function InterestsScreen() {
             </View>
           </View>
         ))}
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.saveButton, (saving || selectedInterests.length < 3) && styles.saveButtonDisabled]}
-          onPress={handleSave}
+          onPress={() => void handleSave()}
           disabled={saving || selectedInterests.length < 3}
         >
-          <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : '✓ Save Interests'}
-          </Text>
+          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : '✓ Save Interests'}</Text>
         </TouchableOpacity>
       </View>
     </View>

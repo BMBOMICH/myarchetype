@@ -1,0 +1,989 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║              ULTIMATE PROJECT AUDIT REPORT v4.0                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+  Generated: 2026-03-31T11:41:33.058Z
+  Duration:  14.88s
+  Platform:  win32 (x64)
+  Node:      v20.20.2
+
+══════════════════════════════════════════════════════════════════════
+  OVERALL HEALTH SCORE
+══════════════════════════════════════════════════════════════════════
+
+  🏥 OVERALL           [█████████████░░░░░░░] 65/100
+
+  🔒 security          [██████████████████░░] 90/100
+  ✨ codeQuality        [█████████████░░░░░░░] 65/100
+  🧪 testing           [░░░░░░░░░░░░░░░░░░░░] 0/100
+  📚 documentation     [███████████████░░░░░] 75/100
+  ♿ accessibility      [█████████████░░░░░░░] 65/100
+  ⚡ performance        [███████████░░░░░░░░░] 55/100
+  📘 typeSafety        [███████████░░░░░░░░░] 55/100
+  🚨 errorHandling     [██████████████░░░░░░] 70/100
+  📦 dependencies      [██████████████████░░] 90/100
+  🏗️ architecture     [██████████████████░░] 90/100
+
+══════════════════════════════════════════════════════════════════════
+  1. PROJECT IDENTITY
+══════════════════════════════════════════════════════════════════════
+  Name:                               myarchetype
+  Version:                            1.0.0
+  License:                            unknown
+  Package Manager:                    npm
+  Monorepo:                           No
+  Module Type:                        commonjs
+  Node.js:                            v20.20.2
+
+  ── Expo
+  ────────
+  SDK Version:                        N/A
+  Bundle ID (iOS):                    com.bmbomich.myarchetype
+  Package (Android):                  com.bmbomich.myarchetype
+  Scheme:                             myarchetype
+  New Architecture:                   Disabled
+  OTA Updates:                        Not configured
+  Runtime Version:                    Not set
+  Owner:                              Not set
+
+  ── Expo Plugins
+  ────────────────
+  • expo-router
+  • expo-camera
+  • expo-location
+  • expo-notifications (configured)
+  • expo-secure-store
+  • @sentry/react-native
+
+  ── EAS Build Profiles
+  ──────────────────────
+  • development (internal)
+  • preview (internal)
+  • production (default)
+
+══════════════════════════════════════════════════════════════════════
+  2. TECH STACK
+══════════════════════════════════════════════════════════════════════
+
+  ── Mobile Framework
+  ────────────────────
+  Framework:                          Expo v55.0.8
+  React:                              19.2.0
+  React Native:                       0.83.2
+  Workflow:                           bare
+  Hermes:                             Yes ✅
+
+  ── Language / TypeScript
+  ─────────────────────────
+  TypeScript:                         v5.9.3
+  Strict Mode:                        YES ✅
+  No Implicit Any:                    No
+  Strict Null Checks:                 No
+  Module Resolution:                  bundler
+  Path Aliases:                       @/*
+
+  ── Navigation
+  ──────────────
+  ✅ Expo Router v55.0.7
+  ❌ React Navigation v7.2.1
+  ❌ Stack Navigator
+  ❌ Tab Navigator
+  ❌ Drawer Navigator
+
+  ── Backend Services
+  ────────────────────
+  ✅ Firebase v12.11.0
+     Services: auth, firestore, storage, functions
+  ✅   Firestore Rules
+  ❌   Storage Rules
+  ✅   Firestore Indexes
+  ❌ Supabase v?
+  ❌ MongoDB v?
+  ❌ Redis v?
+  ❌ Prisma v?
+  ❌ GraphQL v?
+  ❌ tRPC v?
+
+  ── Server
+  ──────────
+  Framework:                          Express.js
+  Language:                           TypeScript
+  Hosting:                            Firebase Cloud Functions
+  Endpoints:                          30
+  Server Files:                       4
+  Security Middleware:
+  ✅   Helmet
+  ✅   CORS
+  ✅   Rate Limiting
+  ✅   HMAC Signing
+  ✅   Origin Validation
+  ✅   Auth Middleware
+  ✅   Input Validation
+  ❌   CSRF Protection
+
+  ── Authentication
+  ──────────────────
+  ✅ Firebase Auth
+  ✅ Google Sign-In
+  ❌ Apple Sign-In
+  ❌ Biometric / Face ID
+  ✅ E2EE (TweetNaCl (X25519 + XSalsa20-Poly1305))
+  ❌ Multi-Factor Auth
+  ❌ JWT
+  ✅ OAuth
+
+  ── Payments
+  ────────────
+  ❌ Stripe v?
+  ❌ RevenueCat v?
+  ❌ In-App Purchases
+
+  ── AI / ML
+  ───────────
+  ❌ face-api.js v?
+  ✅ TensorFlow.js v?
+  ❌ OpenAI v?
+  ❌ LangChain v?
+  ✅ Cloudinary AI
+  🌐 Google Safe Browsing
+
+  ── Media
+  ─────────
+  ✅ Cloudinary
+     Used for: Image Upload, Video Upload, Face Detection, EXIF Metadata, Content Moderation, Quality Analysis
+  ❌ AWS S3/SDK
+  ✅ expo-image
+  ✅ Image Picker
+  ✅ Camera
+  ✅ Video
+
+  ── Security Libraries
+  ──────────────────────
+  ✅ TweetNaCl v1.0.3
+  ✅ Expo SecureStore
+  ✅ Expo Crypto
+  ❌ Web Crypto API
+  ✅ Node.js crypto
+  ✅ HMAC signing
+  ✅ Certificate Pinning
+  ❌ Jailbreak Detection
+
+  ── State Management
+  ────────────────────
+  ❌ Redux Toolkit
+  ❌ Zustand
+  ❌ Jotai
+  ✅ MMKV
+  ✅ SecureStore
+  ❌ AsyncStorage
+  createContext() usages:             2
+  useReducer() usages:                10
+
+  ── UI & Animation
+  ──────────────────
+  ✅ Reanimated v4.2.1
+  ❌ Gesture Handler v2.30.0
+  ❌ NativeWind v?
+  ❌ Bottom Sheet
+  ✅ Haptics
+  ❌ Carousel
+  ❌ Charts
+  ❌ WebView
+
+  ── Notifications
+  ─────────────────
+  ✅ Expo Notifications v55.0.13
+  ❌ Firebase Cloud Messaging
+  ❌ OneSignal
+  ✅ Web Push
+
+  ── Analytics & Monitoring
+  ──────────────────────────
+  ❌ Sentry v7.11.0
+  ❌ Amplitude
+  ❌ Mixpanel
+  ❌ Firebase Analytics
+  ❌ Crashlytics
+
+  ── Testing
+  ───────────
+  ❌ Jest v30.3.0
+  ❌ Vitest
+  ❌ Testing Library
+  ❌ Detox E2E
+  ❌ Maestro
+  ❌ MSW (Mock Service Worker)
+  Test files:                         0
+  Snapshot files:                     0
+
+  ── Build & Deployment
+  ──────────────────────
+  ✅ EAS Build
+  ✅ GitHub Actions
+  ❌ Docker
+  ❌ OTA Updates
+  ❌ Bundle Analyzer
+  Workflow files:
+    • ci.yml
+
+  ── Permissions
+  ───────────────
+  ✅ camera
+  ✅ microphone
+  ✅ location
+  ✅ notifications
+  ✅ speechRecognition
+
+══════════════════════════════════════════════════════════════════════
+  3. EXTERNAL APIs
+══════════════════════════════════════════════════════════════════════
+  8 external API endpoints detected:
+
+  [Media]
+    ✅ Cloudinary Upload (api.cloudinary.com)
+       Used in: app\edit-profile.tsx, app\height-verification.tsx, app\selfie-verification.tsx, functions\index.js, utils\bodyTypeDetection.ts
+    ✅ Cloudinary CDN (res.cloudinary.com)
+       Used in: server\src\index.ts
+
+  [Safety]
+    ✅ Google Safe Browsing (safebrowsing.googleapis.com)
+       Used in: server\src\index.ts, utils\socialVerification.ts
+
+  [Security]
+    ✅ HaveIBeenPwned (api.pwnedpasswords.com)
+       Used in: app\signup.tsx, server\src\index.ts
+
+  [Music]
+    ✅ Spotify (api.spotify.com)
+       Used in: utils\sharedPlaylist.ts, utils\spotifyIntegration.ts
+
+  [Location]
+    ✅ OpenStreetMap (overpass-api.de)
+       Used in: app\chat.tsx, utils\location.ts
+    ✅ ip-api (ip-api.com)
+       Used in: server\src\index.ts
+
+  [Notifications]
+    ✅ Expo Push (exp.host/--/api)
+       Used in: app\second-look.tsx, server\src\index.ts
+
+
+══════════════════════════════════════════════════════════════════════
+  4. PACKAGES
+══════════════════════════════════════════════════════════════════════
+  Total:                              56
+  Production:                         46
+  Development:                        10
+  Actually imported:                  49
+  Not installed:                      0
+  Categories:                         13
+
+  ── ⚠️  Possibly Unused
+  ───────────────────────
+  • @sentry/react-native
+  • expo-apple-authentication
+  • react-native-reanimated-carousel
+
+  ── ⚠️  Imported but not in package.json
+  ────────────────────────────────────────
+  • firebase-functions
+  • firebase-admin
+  • web-push
+  • cors
+  • express
+  • express-rate-limit
+  • helmet
+  • @tensorflow/tfjs
+  • nsfwjs
+
+  ── All Packages by Category
+  ────────────────────────────
+
+  🎨 UI Assets (1)
+    ✅ @expo/vector-icons                            15.1.1
+
+  🧭 Navigation (3)
+    ✅ @react-navigation/bottom-tabs                 7.15.8
+    ✅ @react-navigation/elements                    2.9.13
+    ✅ @react-navigation/native                      7.2.1
+
+  🐛 Monitoring (1)
+    ⚪ @sentry/react-native                          7.11.0
+
+  🌐 Networking (1)
+    ✅ axios                                         1.13.6
+
+  📱 Expo (26)
+    ✅ expo                                          55.0.8
+    ⚪ expo-apple-authentication                     55.0.9
+    ✅ expo-asset                                    55.0.10
+    ✅ expo-audio                                    55.0.9
+    ✅ expo-auth-session                             55.0.9
+    ✅ expo-camera                                   55.0.11
+    ✅ expo-clipboard                                55.0.9
+    ✅ expo-constants                                55.0.9
+    ✅ expo-crypto                                   55.0.10
+    ✅ expo-device                                   55.0.10
+    ✅ expo-font                                     55.0.4
+    ✅ expo-haptics                                  55.0.9
+    ✅ expo-image                                    55.0.6
+    ✅ expo-image-picker                             55.0.13
+    ✅ expo-linear-gradient                          55.0.9
+    ✅ expo-linking                                  55.0.8
+    ✅ expo-location                                 55.1.4
+    ✅ expo-notifications                            55.0.13
+    ✅ expo-router                                   55.0.7
+    ✅ expo-secure-store                             55.0.9
+    ✅ expo-splash-screen                            55.0.12
+    ✅ expo-status-bar                               55.0.4
+    ✅ expo-symbols                                  55.0.5
+    ✅ expo-system-ui                                55.0.10
+    ✅ expo-video                                    55.0.11
+    ✅ expo-web-browser                              55.0.10
+
+  🔥 Firebase (1)
+    ✅ firebase                                      12.11.0
+
+  ⚛️ React (2)
+    ✅ react                                         19.2.0
+    ✅ react-dom                                     19.2.0
+
+  📱 React Native (9)
+    ✅ react-native                                  0.83.2
+    ✅ react-native-gesture-handler                  2.30.0
+    ✅ react-native-mmkv                             4.3.0
+    ✅ react-native-reanimated                       4.2.1
+    ⚪ react-native-reanimated-carousel              4.0.3
+    ✅ react-native-safe-area-context                5.6.2
+    ✅ react-native-screens                          4.23.0
+    ✅ react-native-web                              0.21.2
+    ✅ react-native-worklets                         0.7.2
+
+  🔒 Security (2)
+    ✅ tweetnacl                                     1.0.3
+    ✅ tweetnacl-util                                0.15.1
+
+  🔧 Build Tools (1)
+    ✅ @babel/core                                   7.29.0
+
+  🧪 Testing (3)
+    ⚪ @types/jest                                   30.0.0
+    ⚪ jest                                          30.3.0
+    ⚪ ts-jest                                       29.4.6
+
+  📘 TypeScript (3)
+    ✅ @types/node                                   25.5.0
+    ✅ @types/react                                  19.2.14
+    ✅ typescript                                    5.9.3
+
+  ✨ Linting (3)
+    ✅ eslint                                        10.1.0
+    ✅ eslint-config-expo                            55.0.0
+    ⚪ prettier                                      3.8.1
+
+  ── NPM Scripts
+  ───────────────
+  start                     expo start
+  android                   expo run:android
+  ios                       expo run:ios
+  web                       expo start --web
+  build:web                 expo export --platform web
+  export                    expo export --platform web
+  lint                      eslint .
+  typecheck                 tsc --noEmit
+  format                    prettier --write "**/*.{ts,tsx,js,jsx,json}"
+  save                      git add . && git commit -m "Update" && git push
+
+══════════════════════════════════════════════════════════════════════
+  5. ENVIRONMENT VARIABLES
+══════════════════════════════════════════════════════════════════════
+  Total vars:                         23
+  Unique vars:                        23
+  Empty:                              1
+  Placeholders:                       0
+  Secrets:                            11
+  EXPO_PUBLIC_ vars:                  13
+  ✅ .env in .gitignore
+  ❌ .env.example exists
+
+  ── ❌ Needs Attention
+  ─────────────────────
+  • EXPO_PUBLIC_SPOTIFY_CLIENT_ID
+
+  ── .env
+  ────────
+  ✅ 🔑 EXPO_PUBLIC_FIREBASE_API_KEY                  AIza********
+  ✅ 🔑 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN              myar********
+  ✅    EXPO_PUBLIC_FIREBASE_PROJECT_ID               myar********
+  ✅    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET           myar********
+  ✅    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID      4609********
+  ✅    EXPO_PUBLIC_FIREBASE_APP_ID                   1:46********
+  ✅ 🔑 EXPO_PUBLIC_VAPID_PUBLIC_KEY                  BLAm********
+  ✅    EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME             dryu********
+  ✅    EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET          myar********
+  ✅ 🔑 VAPID_PUBLIC_KEY                              BLAm********
+  ✅ 🔑 VAPID_PRIVATE_KEY                             ZM8C********
+  ✅ 🔑 VAPID_EMAIL                                   mail********
+  ✅    EXPO_PUBLIC_FUNCTIONS_URL                     http********
+  ✅    EXPO_PUBLIC_SERVER_URL                        http********
+  ❌    EXPO_PUBLIC_SPOTIFY_CLIENT_ID                 (empty)
+  ✅    FIREBASE_PROJECT_ID                           myar********
+  ✅    NODE_ENV                                      prod********
+  ✅    PORT                                          ****
+  ✅ 🔑 HMAC_SECRET                                   XfIx********
+  ✅ 🔑 ANALYTICS_HMAC_SECRET                         rbXe********
+  ✅ 🔑 GOOGLE_SAFE_BROWSING_KEY                      get_********
+  ✅ 🔑 NCMEC_API_KEY                                 get_********
+  ✅ 🔑 EXPO_PUBLIC_SAFE_BROWSING_API_KEY             same********
+
+══════════════════════════════════════════════════════════════════════
+  6. SECURITY
+══════════════════════════════════════════════════════════════════════
+  Critical:                           0
+  High:                               1
+  Medium:                             0
+  Low:                                69
+  Info:                               75
+
+  ── .gitignore Coverage
+  ───────────────────────
+  ✅ envFiles
+  ✅ nodeModules
+  ✅ buildDirs
+  ✅ osFiles
+  ✅ ideFiles
+  ✅ coverage
+  ✅ logs
+  ✅ keystores
+  ✅ certificates
+
+  ── Issues Requiring Action
+  ───────────────────────────
+
+  [HIGH] Firebase API key ref — ensure env var not hardcoded
+  File: firebaseConfig.ts (1x)
+
+══════════════════════════════════════════════════════════════════════
+  7. API ENDPOINTS
+══════════════════════════════════════════════════════════════════════
+  Total:                              30
+  Without auth:                       1
+  Without rate limit:                 1
+  Without validation:                 0
+  Server files:                       4
+
+  ── All Endpoints
+  ─────────────────
+  🔓   [OPTIONS] *                                   server\src\index.ts:45
+  🔒⏱✓ [POST  ] /send-notification                  server\src\index.ts:643
+  🔒⏱✓ [POST  ] /send-expo-notification             server\src\index.ts:658
+  🔒⏱✓ [POST  ] /check-email                        server\src\index.ts:672
+  🔒⏱✓ [POST  ] /check-password-breach              server\src\index.ts:679
+  🔒⏱✓ [POST  ] /register-device                    server\src\index.ts:685
+  🔒⏱✓ [POST  ] /login-track                        server\src\index.ts:695
+  🔒⏱✓ [POST  ] /check-device-integrity             server\src\index.ts:705
+  🔒⏱✓ [POST  ] /validate-location                  server\src\index.ts:713
+  🔒⏱✓ [POST  ] /moderate-text                      server\src\index.ts:736
+  🔒⏱✓ [POST  ] /scan-csam                          server\src\index.ts:744
+  🔒⏱✓ [POST  ] /age-gate-check                     server\src\index.ts:757
+  🔒⏱✓ [POST  ] /dmca-takedown                      server\src\index.ts:762
+  🔒⏱✓ [POST  ] /log-screenshot                     server\src\index.ts:773
+  🔒⏱✓ [POST  ] /share-meeting-location             server\src\index.ts:778
+  🔒⏱✓ [POST  ] /enforce-trust                      server\src\index.ts:784
+  🔒⏱✓ [POST  ] /check-url                          server\src\index.ts:790
+  🔒⏱✓ [POST  ] /screen-name                        server\src\index.ts:796
+  🔒⏱✓ [POST  ] /pdq-cross-account                  server\src\index.ts:804
+  🔒⏱✓ [POST  ] /check-cib                          server\src\index.ts:813
+  🔒⏱✓ [POST  ] /ab-test                            server\src\index.ts:821
+  🔒⏱✓ [POST  ] /admin/rotate-key                   server\src\index.ts:830
+  🔒⏱✓ [POST  ] /wcag-audit                         server\src\index.ts:843
+  🔒⏱✓ [POST  ] /check-contrast                     server\src\index.ts:849
+  🔒⏱✓ [POST  ] /validate-event                     server\src\index.ts:855
+  🔒⏱✓ [POST  ] /check-engagement                   server\src\index.ts:862
+  🔒⏱✓ [POST  ] /check-bot                          server\src\index.ts:870
+  🔒⏱✓ [POST  ] /track-conversion                   server\src\index.ts:876
+  🔒⏱✓ [POST  ] /admin/action                       server\src\index.ts:885
+  🟢   [GET   ] /health                             server\src\index.ts:897
+
+══════════════════════════════════════════════════════════════════════
+  8. ROUTES & NAVIGATION
+══════════════════════════════════════════════════════════════════════
+  Router type:                        expo-router
+  Total routes:                       44
+  Dynamic routes:                     0
+  Static routes:                      44
+  Layouts:                            1
+  Groups:                             None
+  Modals:                             0
+  API routes:                         
+  ❌ 404 / Not Found page
+  ❌ Tab navigation
+  ✅ Stack navigation
+  ❌ Drawer navigation
+
+  ── Deep Links
+  ──────────────
+  • [scheme] myarchetype
+
+══════════════════════════════════════════════════════════════════════
+  9. COMPONENTS & HOOKS
+══════════════════════════════════════════════════════════════════════
+  Total components:                   53
+  Functional:                         49
+  Class (legacy):                     4
+  Memoized:                           9
+  Custom hooks:                       0
+  Contexts:                           1
+  Error boundaries:                   4
+  Avg component lines:                475
+
+  ── ⚠️  Components with 5+ useState
+  ───────────────────────────────────
+  • app\chat.tsx (52 states)
+  • app\profile-setup.tsx (17 states)
+  • app\signup.tsx (5 states)
+  • app\settings.tsx (22 states)
+  • app\login.tsx (6 states)
+  • app\personality-quiz.tsx (10 states)
+  • app\my-matches.tsx (14 states)
+  • app\second-look.tsx (7 states)
+  • app\stories.tsx (7 states)
+  • app\selfie-verification.tsx (16 states)
+  • app\matches.tsx (10 states)
+  • app\edit-profile.tsx (37 states)
+  • app\shared-playlist.tsx (11 states)
+  • app\height-verification.tsx (13 states)
+  • app\referral.tsx (6 states)
+  • app\post-date-rating.tsx (10 states)
+  • app\referral-leaderboard.tsx (5 states)
+  • app\video-profile-recorder.tsx (5 states)
+  • app\voice-intro-recorder.tsx (11 states)
+  • app\admin\reports.tsx (5 states)
+  • app\profile-views.tsx (5 states)
+  • app\index.tsx (6 states)
+  • app\_layout.tsx (5 states)
+  • app\admin\users.tsx (7 states)
+  • app\social-verification.tsx (6 states)
+  • app\relationship-mode.tsx (9 states)
+  • app\smart-photos.tsx (5 states)
+  • app\icebreaker-game.tsx (10 states)
+  • app\achievements.tsx (6 states)
+  • app\compatibility-quiz.tsx (8 states)
+  • app\date-spot-reviews.tsx (15 states)
+  • app\daily-question.tsx (6 states)
+
+══════════════════════════════════════════════════════════════════════
+  10. ERROR HANDLING
+══════════════════════════════════════════════════════════════════════
+  Try/catch blocks:                   455
+  Empty catch blocks:                 0
+  Error boundaries:                   4
+  Throw statements:                   49
+  Sentry captures:                    0
+  Error logging:                      console.error only
+  Error Handling       [██████████████░░░░░░] 70/100
+
+  ── Global Handlers
+  ───────────────────
+  ❌ unhandledRejection
+  ✅ uncaughtException
+  ✅ errorBoundaryWrapper
+  ✅ globalCatch
+  ❌ sentryInit
+  ❌ crashlytics
+
+══════════════════════════════════════════════════════════════════════
+  11. NETWORK & DATA FETCHING
+══════════════════════════════════════════════════════════════════════
+  Fetch calls:                        61
+  Axios calls:                        2
+  Data libraries:                     axios
+  ✅ Timeout configured
+  ✅ Retry logic
+  ✅ AbortController
+  ❌ GraphQL
+  ❌ WebSocket
+  ❌ Circuit breaker
+
+══════════════════════════════════════════════════════════════════════
+  12. ACCESSIBILITY
+══════════════════════════════════════════════════════════════════════
+  Accessibility        [█████████████░░░░░░░] 65/100
+  Labels:                             255
+  Roles:                              196
+  Hints:                              28
+  Touchable without label:            338
+  Image without alt:                  21
+  ✅ Screen reader support
+  ✅ Dynamic font sizing
+  ✅ Reduced motion support
+
+  ── Issues
+  ──────────
+  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
+  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
+  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\reports.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\reports.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\reports.tsx: Touchable without accessibilityLabel
+  ⚠️  app\admin\reports.tsx: Image without accessibilityLabel/alt
+  ⚠️  app\admin\users.tsx: Image without accessibilityLabel/alt
+  ⚠️  app\blocked-users.tsx: Image without accessibilityLabel/alt
+  ⚠️  app\date-spot-reviews.tsx: Image without accessibilityLabel/alt
+  ⚠️  app\matches.tsx: Image without accessibilityLabel/alt
+
+══════════════════════════════════════════════════════════════════════
+  13. PERFORMANCE
+══════════════════════════════════════════════════════════════════════
+  Performance          [███████████░░░░░░░░░] 55/100
+  Inline functions in JSX:            335
+  Heavy imports:                      0
+
+  ── Optimizations Used
+  ──────────────────────
+  ❌ usesFlashList
+  ✅ usesFlatList
+  ❌ usesSectionList
+  ❌ usesVirtualizedList
+    usesMemo:                         58
+    usesCallback:                     246
+    usesReactMemo:                    30
+  ❌ usesLazy
+  ❌ usesSuspense
+  ✅ usesInteractionManager
+  ✅ usesRequestAnimationFrame
+  ❌ usesPureComponent
+  ✅ hasImageOptimization
+  ✅ hasListOptimization
+  ❌ hermes
+  ✅ proguard
+
+  ── Issues
+  ──────────
+  [medium] app\admin\reports.tsx: 7 inline arrow functions in JSX
+  [high] app\admin\stats.tsx: ScrollView with many children — consider FlatList/FlashList
+  [medium] app\chat.tsx: 63 inline arrow functions in JSX
+  [low] app\chat.tsx: Component file is 1709 lines — consider splitting
+  [low] app\date-checkin.tsx: Component file is 520 lines — consider splitting
+  [medium] app\date-spot-reviews.tsx: 11 inline arrow functions in JSX
+  [high] app\dating-stats.tsx: ScrollView with many children — consider FlatList/FlashList
+  [high] app\deal-breakers.tsx: ScrollView with many children — consider FlatList/FlashList
+  [medium] app\edit-profile.tsx: 26 inline arrow functions in JSX
+  [high] app\edit-profile.tsx: ScrollView with many children — consider FlatList/FlashList
+  [low] app\edit-profile.tsx: Component file is 718 lines — consider splitting
+  [medium] app\height-verification.tsx: 8 inline arrow functions in JSX
+  [low] app\height-verification.tsx: Component file is 650 lines — consider splitting
+  [high] app\home.tsx: ScrollView with many children — consider FlatList/FlashList
+  [low] app\home.tsx: Component file is 691 lines — consider splitting
+
+══════════════════════════════════════════════════════════════════════
+  14. ASSETS
+══════════════════════════════════════════════════════════════════════
+  Total assets:                       13
+  Total size:                         501.5 KB
+  Images:                             6
+  SVGs:                               0
+  Fonts:                              0
+  Videos:                             0
+  Audios:                             0
+
+  ── Recommendations
+  ───────────────────
+  💡 No @2x/@3x image variants detected — may look blurry on high-DPI screens
+
+══════════════════════════════════════════════════════════════════════
+  15. INTERNATIONALIZATION
+══════════════════════════════════════════════════════════════════════
+  ✅ i18n (none)
+  Languages:                          None
+  Translation files:                  0
+  ✅ RTL support
+  ✅ Locale detection
+  ✅ Date formatting
+  ✅ Number formatting
+  Hardcoded strings (est):            603
+
+══════════════════════════════════════════════════════════════════════
+  16. DOCUMENTATION
+══════════════════════════════════════════════════════════════════════
+  Documentation        [███████████████░░░░░] 75/100
+  ✅ README (51 lines, 5 sections)
+  ✅ Install instructions
+  ✅ Usage instructions
+  ✅ CHANGELOG
+  ❌ CONTRIBUTING
+  ✅ LICENSE
+  ✅ SECURITY
+  ❌ Storybook (0 stories)
+  JSDoc comments:                     76
+  Documented exports:                 39
+  Undocumented exports:               591
+  Documentation ratio:                6%
+
+══════════════════════════════════════════════════════════════════════
+  17. TYPE SAFETY
+══════════════════════════════════════════════════════════════════════
+  Type Safety          [███████████░░░░░░░░░] 55/100
+  TS files:                           121
+  JS files:                           5
+  Coverage:                           96%
+  "any" usage:                        156
+  "unknown" usage:                    60
+  Type assertions:                    367
+  Non-null assertions (!.):           60
+  Interfaces:                         222
+  Type aliases:                       60
+  Enums:                              0
+  @ts-ignore:                         0
+  @ts-nocheck:                        0
+  Runtime validation:                 None
+
+  ── Files with most "any"
+  ─────────────────────────
+  ⚠️  app\signup.tsx (16 any)
+  ⚠️  app\login.tsx (10 any)
+  ⚠️  utils\ageEstimation.ts (10 any)
+  ⚠️  utils\icebreakerGames.ts (10 any)
+  ⚠️  utils\moderation.ts (6 any)
+
+══════════════════════════════════════════════════════════════════════
+  18. BUNDLE SIZE ESTIMATION
+══════════════════════════════════════════════════════════════════════
+  Source code:                        1.8 MB
+  Image assets:                       500.6 KB
+  Font assets:                        0 B
+  Estimated total:                    2.2 MB
+  Barrel (index) files:               6
+  Wildcard re-exports:                0
+
+  ── Heavy Dependencies
+  ──────────────────────
+  📦 27.8 MB      firebase
+
+══════════════════════════════════════════════════════════════════════
+  19. DEPENDENCY GRAPH
+══════════════════════════════════════════════════════════════════════
+  Total modules:                      126
+  Total imports:                      225
+  Avg imports/file:                   1.8
+  Circular deps:                      0
+
+  ── Most Imported Files (High Coupling)
+  ───────────────────────────────────────
+    73x  firebaseConfig
+    20x  utils\moderation
+    13x  utils\logger
+     8x  utils\ageVerification
+     8x  cloudinaryConfig
+     5x  components\TrustScoreDisplay
+     5x  utils\location
+     5x  utils\storage
+     5x  utils\rateLimiter
+     4x  utils\e2ee
+
+  ── Possibly Orphan Files
+  ─────────────────────────
+  • app\icebreaker-game.tsx
+  • app\privacy.tsx
+  • app\relationship-mode.tsx
+  • app\social-verification.tsx
+  • app\terms.tsx
+  • app\voice-intro-recorder.tsx
+  • cloudinaryConfig.ts
+  • components\AdvancedFilters.tsx
+  • components\BodyTypeSelector.tsx
+  • components\HeightBadge.tsx
+
+══════════════════════════════════════════════════════════════════════
+  20. DEPENDENCY HEALTH
+══════════════════════════════════════════════════════════════════════
+  ✅ Lockfile present
+  ❌ Auto-update (Renovate/Dependabot)
+  Native modules:                     33
+  Outdated packages:                  Run npm outdated
+  Major updates:                      N/A
+
+══════════════════════════════════════════════════════════════════════
+  21. FILE STRUCTURE
+══════════════════════════════════════════════════════════════════════
+  Total files:                        166
+  Code files:                         126
+  Lines of code:                      39,354
+  Avg lines/file:                     312
+  Median lines/file:                  197
+  Files >300 lines:                   43
+  Empty files:                        0
+  Max directory depth:                3
+
+  ── Top-Level Directories
+  ─────────────────────────
+  📁 app
+  📁 assets
+  📁 components
+  📁 functions
+  📁 public
+  📁 scripts
+  📁 server
+  📁 services
+  📁 utils
+  📁 web-push
+
+  ── By Directory
+  ────────────────
+  utils                          61 files
+  app                            45 files
+  components                     8 files
+  functions                      3 files
+  web-push                       2 files
+  cloudinaryConfig.ts            1 files
+  eslint.config.js               1 files
+  expo-env.d.ts                  1 files
+  firebaseConfig.ts              1 files
+  public                         1 files
+  server                         1 files
+  services                       1 files
+
+  ── Largest Files
+  ─────────────────
+    1709 lines  app\chat.tsx
+    1481 lines  app\profile-setup.tsx
+    1269 lines  app\signup.tsx
+    1092 lines  app\settings.tsx
+    1073 lines  app\login.tsx
+     946 lines  app\personality-quiz.tsx
+     912 lines  app\my-matches.tsx
+     902 lines  server\src\index.ts
+     799 lines  app\second-look.tsx
+     793 lines  app\stories.tsx
+     788 lines  app\selfie-verification.tsx
+     784 lines  utils\moderation.ts
+     722 lines  app\matches.tsx
+     719 lines  utils\i18n.ts
+     718 lines  app\edit-profile.tsx
+
+  ── Config Files Present
+  ────────────────────────
+  ✅ tsconfig.json
+  ✅ eslint.config.js
+  ✅ .prettierrc
+  ✅ app.json
+  ✅ eas.json
+  ✅ firebase.json
+  ✅ firestore.rules
+  ✅ firestore.indexes.json
+  ✅ .gitignore
+  ✅ .nvmrc
+  ✅ README.md
+  ✅ CHANGELOG.md
+  ✅ LICENSE
+  ✅ SECURITY.md
+  ✅ .github/workflows
+  ✅ vercel.json
+
+  ── Config Files Missing
+  ────────────────────────
+  ❌ babel.config.js
+  ❌ babel.config.ts
+  ❌ metro.config.js
+  ❌ metro.config.ts
+  ❌ jest.config.js
+  ❌ jest.config.ts
+  ❌ jest.config.mjs
+  ❌ eslint.config.mjs
+  ❌ .eslintrc.js
+  ❌ .eslintrc.json
+  ❌ .eslintrc.yml
+  ❌ .prettierrc.json
+  ❌ .prettierrc.js
+  ❌ prettier.config.js
+  ❌ prettier.config.mjs
+  ❌ .prettierignore
+  ❌ .eslintignore
+  ❌ app.config.js
+  ❌ app.config.ts
+  ❌ storage.rules
+
+══════════════════════════════════════════════════════════════════════
+  22. CODE QUALITY
+══════════════════════════════════════════════════════════════════════
+  Total lines:                        39,354
+  Code lines:                         33,967
+  Comment ratio:                      4%
+  Blank ratio:                        10%
+  ✅ ESLint
+  ✅ Prettier
+  ❌ .editorconfig
+  ❌ Husky git hooks
+  ❌ lint-staged
+  ❌ commitlint
+
+  ── Issues
+  ──────────
+  TODOs:                              0
+  FIXMEs:                             0
+  "any" types:                        150
+  @ts-ignore:                         0
+  console.log():                      333
+
+  ── File Breakdown
+  ──────────────────
+  Components:                         54
+  Hooks:                              1
+  Utils:                              61
+  Types:                              1
+  Tests:                              0
+  Config:                             1
+
+  ── Complexity
+  ──────────────
+  Longest function:                   PersonalityQuizInner (387 lines) in app\personality-quiz.tsx
+  Most complex file:                  app\profile-setup.tsx (complexity: 262)
+
+══════════════════════════════════════════════════════════════════════
+  23. GIT
+══════════════════════════════════════════════════════════════════════
+  Branch:                             main
+  Total commits:                      44
+  Last commit:                        2026-03-27 18:07:44 +0400
+  Last message:                       Update
+  Uncommitted:                        88
+  Staged:                             0
+  Untracked:                          14
+  Stash count:                        0
+  Remote:                             https://github.com/MrBMRBLX/MyArchetype.git
+  Tags:                               0
+  Branches:                           2
+  ✅ GitHub Actions
+  ✅ .gitignore
+  ❌ .gitattributes
+  ✅ Git LFS
+  ❌ Submodules
+
+  ── Commit Conventions
+  ──────────────────────
+  Conventional commits:               0/44 (0%)
+
+  ── Contributors
+  ────────────────
+  44	Elxan
+
+  ── Recent Commits
+  ──────────────────
+  60eb0dd Update
+  8c45f58 Update
+  3210c08 Update
+  6ad63d5 Update
+  b1c3453 Update
+  131d83b Update
+  6624833 Update
+  77e61a3 Update
+  3f213ad Update
+  1d6cd54 Update
+
+
+╔══════════════════════════════════════════════════════════════════════╗
+║                        END OF REPORT                               ║
+╚══════════════════════════════════════════════════════════════════════╝

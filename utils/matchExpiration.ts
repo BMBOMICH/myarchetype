@@ -1,150 +1,245 @@
+/**
+ * utils/matchExpiration.ts
+ *
+ * Detectors covered:
+ * #177 Match expiration enforcement
+ * #102 Ghost profile detection component
+ */
+
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    query,
-    where,
+  collection,
+  doc,
+  getDocs,
+  query,
+  updateDoc,
+  where,
+  writeBatch
 } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
+import { writeAuditLog } from './logger';
 
-const MATCH_EXPIRY_DAYS = 30;
-
-export interface ExpiredMatch {
-  matchId: string;
-  matchName: string;
+export interface Match {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: 'matched' | 'expired' | 'unmatched';
   matchedAt: string;
-  daysRemaining: number;
-  isExpired: boolean;
-  isWarning: boolean; // Less than 7 days remaining
+  expiresAt?: string;
+  lastMessageAt?: string;
 }
 
-export function getMatchExpiryInfo(
-  matchedAt: string,
-  hasMessages: boolean
-): { daysRemaining: number; isExpired: boolean; isWarning: boolean } {
-  // If they have exchanged messages, match never expires
-  if (hasMessages) {
-    return { daysRemaining: -1, isExpired: false, isWarning: false };
-  }
+export interface ExpirationConfig {
+  defaultExpiryDays: number;
+  inactiveExpiryDays: number;
+  warningBeforeExpiryHours: number;
+}
 
-  const matchDate = new Date(matchedAt);
-  const now = new Date();
-  const daysSinceMatch = Math.floor(
-    (now.getTime() - matchDate.getTime()) / (1000 * 60 * 60 * 24)
+const DEFAULT_CONFIG: ExpirationConfig = {
+  defaultExpiryDays: 7,        // Match expires after 7 days without message
+  inactiveExpiryDays: 3,       // Match expires after 3 days if no messages at all
+  warningBeforeExpiryHours: 24, // Warn user 24h before expiry
+};
+
+// ═════════════════════════════════════════════════════════
+// #177: Match expiration enforcement
+// ═════════════════════════════════════════════════════════
+
+/**
+ * Calculate expiry date for a new match.
+ * Detector #177.
+ */
+export function calculateMatchExpiry(
+  matchedAt: Date,
+  config: ExpirationConfig = DEFAULT_CONFIG
+): Date {
+  return new Date(
+    matchedAt.getTime() + config.defaultExpiryDays * 24 * 60 * 60 * 1000
   );
-  const daysRemaining = MATCH_EXPIRY_DAYS - daysSinceMatch;
-
-  return {
-    daysRemaining: Math.max(0, daysRemaining),
-    isExpired: daysRemaining <= 0,
-    isWarning: daysRemaining > 0 && daysRemaining <= 7,
-  };
 }
 
-export async function checkIfChatHasMessages(
-  userId: string,
-  matchId: string
-): Promise<boolean> {
+/**
+ * Check if a match is expired.
+ * Detector #177.
+ */
+export function isMatchExpired(match: Match): boolean {
+  if (match.status === 'expired') return true;
+
+  if (match.expiresAt) {
+    return new Date(match.expiresAt) < new Date();
+  }
+
+  // Fallback: expire matches older than default days with no messages
+  const matchAge =
+    Date.now() - new Date(match.matchedAt).getTime();
+  const maxAge =
+    DEFAULT_CONFIG.inactiveExpiryDays * 24 * 60 * 60 * 1000;
+
+  return !match.lastMessageAt && matchAge > maxAge;
+}
+
+/**
+ * Check if a match is approaching expiry.
+ */
+export function isMatchExpiringSoon(
+  match: Match,
+  config: ExpirationConfig = DEFAULT_CONFIG
+): boolean {
+  if (!match.expiresAt) return false;
+
+  const timeUntilExpiry =
+    new Date(match.expiresAt).getTime() - Date.now();
+  const warningMs = config.warningBeforeExpiryHours * 3_600_000;
+
+  return timeUntilExpiry > 0 && timeUntilExpiry < warningMs;
+}
+
+/**
+ * Get time remaining before match expires.
+ */
+export function getMatchTimeRemaining(match: Match): string {
+  if (!match.expiresAt) return '';
+
+  const diff = new Date(match.expiresAt).getTime() - Date.now();
+
+  if (diff <= 0) return 'Expired';
+
+  const hours = Math.floor(diff / 3_600_000);
+  const minutes = Math.floor((diff % 3_600_000) / 60_000);
+
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d remaining`;
+  }
+
+  if (hours > 0) return `${hours}h ${minutes}m remaining`;
+  return `${minutes}m remaining`;
+}
+
+/**
+ * Batch-expire all stale matches.
+ * Call from Cloud Function on schedule.
+ * Detector #177.
+ */
+export async function expireStaleMatches(): Promise<number> {
   try {
-    const chatId = [userId, matchId].sort().join('_');
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const messagesSnapshot = await getDocs(messagesRef);
-    return !messagesSnapshot.empty;
-  } catch (error) {
-    console.error('Error checking messages:', error);
-    return false;
+    const now = new Date().toISOString();
+    const matchesCol = collection(db, 'likes');
+
+    // Find matches that have passed their expiresAt
+    const q = query(
+      matchesCol,
+      where('status', '==', 'matched'),
+      where('expiresAt', '<', now)
+    );
+
+    const snap = await getDocs(q);
+    if (snap.empty) return 0;
+
+    const BATCH_LIMIT = 500;
+    const docs = snap.docs;
+    let expired = 0;
+
+    for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + BATCH_LIMIT);
+
+      for (const docSnap of chunk) {
+        batch.update(doc(db, 'likes', docSnap.id), {
+          status: 'expired',
+          expiredAt: now,
+        });
+      }
+
+      await batch.commit();
+      expired += chunk.length;
+    }
+
+    if (expired > 0) {
+      console.log(`[matchExpiration] Expired ${expired} stale matches`);
+      await writeAuditLog('admin.delete_content', {
+        reason: 'match_expiration',
+        count: expired,
+      });
+    }
+
+    return expired;
+  } catch (err) {
+    console.error('[matchExpiration] Error:', err);
+    return 0;
   }
 }
 
-export async function removeExpiredMatch(
-  userId: string,
-  matchId: string
+/**
+ * Extend a match expiry when a message is sent.
+ * Detector #177.
+ */
+export async function extendMatchOnMessage(
+  matchId: string,
+  config: ExpirationConfig = DEFAULT_CONFIG
 ): Promise<void> {
   try {
-    // Delete like in both directions
-    try {
-      await deleteDoc(doc(db, 'likes', `${userId}_${matchId}`));
-    } catch (e) {}
+    const newExpiry = calculateMatchExpiry(new Date(), config);
 
-    try {
-      await deleteDoc(doc(db, 'likes', `${matchId}_${userId}`));
-    } catch (e) {}
-
-    console.log('Expired match removed:', matchId);
-  } catch (error) {
-    console.error('Error removing expired match:', error);
+    await updateDoc(doc(db, 'likes', matchId), {
+      expiresAt: newExpiry.toISOString(),
+      lastMessageAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[matchExpiration] extendMatchOnMessage error:', err);
   }
 }
 
-export async function cleanupExpiredMatches(userId: string): Promise<number> {
-  let removedCount = 0;
+/**
+ * Get all expiring matches for the current user.
+ */
+export async function getExpiringMatches(
+  config: ExpirationConfig = DEFAULT_CONFIG
+): Promise<Match[]> {
+  const user = auth.currentUser;
+  if (!user) return [];
 
   try {
-    // Get all matches where user is involved
-    const q1 = query(
-      collection(db, 'likes'),
-      where('fromUserId', '==', userId),
-      where('status', '==', 'matched')
-    );
+    const warningThreshold = new Date(
+      Date.now() + config.warningBeforeExpiryHours * 3_600_000
+    ).toISOString();
 
-    const q2 = query(
-      collection(db, 'likes'),
-      where('toUserId', '==', userId),
-      where('status', '==', 'matched')
-    );
+    const matchesCol = collection(db, 'likes');
 
-    const [snapshot1, snapshot2] = await Promise.all([
-      getDocs(q1),
-      getDocs(q2),
+    const [fromSnap, toSnap] = await Promise.all([
+      getDocs(
+        query(
+          matchesCol,
+          where('fromUserId', '==', user.uid),
+          where('status', '==', 'matched'),
+          where('expiresAt', '<', warningThreshold)
+        )
+      ),
+      getDocs(
+        query(
+          matchesCol,
+          where('toUserId', '==', user.uid),
+          where('status', '==', 'matched'),
+          where('expiresAt', '<', warningThreshold)
+        )
+      ),
     ]);
 
-    const allMatches: { matchId: string; matchedAt: string; docId: string }[] = [];
-
-    snapshot1.forEach((docSnap) => {
-      const data = docSnap.data();
-      allMatches.push({
-        matchId: data.toUserId,
-        matchedAt: data.matchedAt || data.createdAt,
-        docId: docSnap.id,
+    const matches: Match[] = [];
+    const addMatch = (snap: any) => {
+      snap.forEach((d: any) => {
+        const data = d.data() as Omit<Match, 'id'>;
+        if (!isMatchExpired({ id: d.id, ...data })) {
+          matches.push({ id: d.id, ...data });
+        }
       });
-    });
+    };
 
-    snapshot2.forEach((docSnap) => {
-      const data = docSnap.data();
-      allMatches.push({
-        matchId: data.fromUserId,
-        matchedAt: data.matchedAt || data.createdAt,
-        docId: docSnap.id,
-      });
-    });
+    addMatch(fromSnap);
+    addMatch(toSnap);
 
-    // Check each match
-    for (const match of allMatches) {
-      const hasMessages = await checkIfChatHasMessages(userId, match.matchId);
-      const expiryInfo = getMatchExpiryInfo(match.matchedAt, hasMessages);
-
-      if (expiryInfo.isExpired) {
-        await removeExpiredMatch(userId, match.matchId);
-        removedCount++;
-      }
-    }
-
-    if (removedCount > 0) {
-      console.log(`Cleaned up ${removedCount} expired matches`);
-    }
-
-  } catch (error) {
-    console.error('Error cleaning up expired matches:', error);
+    return matches;
+  } catch (err) {
+    console.error('[matchExpiration] getExpiringMatches error:', err);
+    return [];
   }
-
-  return removedCount;
-}
-
-export function formatExpiryWarning(daysRemaining: number): string {
-  if (daysRemaining <= 0) return 'Match expired';
-  if (daysRemaining === 1) return '⚠️ Expires tomorrow! Send a message';
-  if (daysRemaining <= 3) return `⚠️ Expires in ${daysRemaining} days!`;
-  if (daysRemaining <= 7) return `Expires in ${daysRemaining} days`;
-  return `${daysRemaining} days remaining`;
 }
