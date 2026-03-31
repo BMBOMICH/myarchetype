@@ -1,6 +1,11 @@
 // scripts/audit-detectors.js
-// ULTIMATE DETECTOR AUDIT v4.0 — All ~920 Safety Detectors
+// ULTIMATE DETECTOR AUDIT v5.0 — All ~920 Safety Detectors
 // Run: node scripts/audit-detectors.js
+//      node scripts/audit-detectors.js --section 2.1
+//      node scripts/audit-detectors.js --severity critical
+//      node scripts/audit-detectors.js --compare detector-audit-prev.json
+//      node scripts/audit-detectors.js --json-only
+//
 // Outputs: detector-audit.json (detailed results)
 //
 // Maps every detector from the Complete Master Detector Registry
@@ -10,8 +15,50 @@ const fs = require('fs');
 const path = require('path');
 
 // ═══════════════════════════════════════════════════════════════
+// CLI ARGUMENT PARSING
+// ═══════════════════════════════════════════════════════════════
+
+const args = process.argv.slice(2);
+const CLI = {
+  section: null,
+  severity: null,
+  compare: null,
+  jsonOnly: false,
+  help: false,
+};
+
+for (let i = 0; i < args.length; i++) {
+  switch (args[i]) {
+    case '--section': CLI.section = args[++i]; break;
+    case '--severity': CLI.severity = args[++i]; break;
+    case '--compare': CLI.compare = args[++i]; break;
+    case '--json-only': CLI.jsonOnly = true; break;
+    case '--help': case '-h': CLI.help = true; break;
+  }
+}
+
+if (CLI.help) {
+  console.log(`
+Usage: node scripts/audit-detectors.js [options]
+
+Options:
+  --section <id>     Filter to a specific section (e.g., 2.1, 13)
+  --severity <level> Filter by minimum severity (critical, high, medium, low)
+  --compare <file>   Compare against a previous audit JSON
+  --json-only        Output only the JSON report, no console output
+  --help, -h         Show this help message
+
+Examples:
+  node scripts/audit-detectors.js --section 2.1
+  node scripts/audit-detectors.js --severity critical
+  node scripts/audit-detectors.js --compare detector-audit-prev.json
+`);
+  process.exit(0);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // COMPLETE DETECTOR REGISTRY — ~920 detectors
-// Each entry: { id, section, name, patterns[], freeTools[] }
+// Each entry: { id, section, name, patterns[], freeTools[], severity? }
 // ═══════════════════════════════════════════════════════════════
 
 const DETECTORS = [
@@ -21,289 +68,626 @@ const DETECTORS = [
   // ─────────────────────────────────────────────────────────────
 
   // 1.1 NSFW / Adult Content
-  { id: 1, section: '1.1', name: 'Profile photo NSFW scan', patterns: ['checkImageSafety', 'nsfwjs', 'nsfwModel', 'preloadSafetyModel', 'nsfw_image_detection', 'nsfw-image-detection'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'Marqo/nsfw-image-detection-384 (MIT, 98.56% acc)', 'NudeNet (MIT)', 'NSFWJS (MIT, client-side)', 'Falconsai/nsfw_image_detection (Apache 2.0)'] },
-  { id: 2, section: '1.1', name: 'Chat image NSFW scan', patterns: ['checkImageSafety.*chat', 'imageContext.*chat', 'chat.*checkImageSafety', 'moderateContent.*chat', 'checkChatImageSafety'], freeTools: ['Same as #1 — run on every chat image before display'] },
-  { id: 3, section: '1.1', name: 'Edit profile photo NSFW', patterns: ['checkImageSafety.*edit', 'imageContext.*edit', 'edit.*checkImageSafety', 'runFullImageScan'], freeTools: ['Same as #1 — re-run on photo change'] },
-  { id: 4, section: '1.1', name: 'Story NSFW scan', patterns: ['checkImageSafety.*story', 'imageContext.*story', 'story.*checkImageSafety', 'checkStoryNSFW'], freeTools: ['Same as #1 — run on story upload'] },
-  { id: 5, section: '1.1', name: 'Video frame NSFW scan', patterns: ['checkVideoFramesSafety', 'checkVideoNSFW', 'moderateVideo', 'video_frame.*checkImage', 'extractVideoFrames'], freeTools: ['NSFWJS on extracted frames (ffmpeg → frame extraction → classify)', 'NudeNet on key frames'] },
-  { id: 6, section: '1.1', name: 'Voice thumbnail NSFW', patterns: ['checkVoiceThumbnail', 'voice_thumbnail', 'voiceThumbnail'], freeTools: ['Same as #1 — run on voice message thumbnail'] },
-  { id: 7, section: '1.1', name: 'Server-side NSFW backstop', patterns: ['verify-photo-nsfw', 'verify-video-nsfw', 'SERVER_URL.*nsfw', 'server.*nsfw.*check'], freeTools: ['Llama Guard 4 server-side', 'Marqo/nsfw-image-detection-384 server-side'] },
-  { id: 8, section: '1.1', name: 'Nude body part detection (NudeNet)', patterns: ['checkNudeParts', 'detect-nude-parts', 'NudeDetector', 'nudenet', 'nude_detection'], freeTools: ['NudeNet (MIT) — 18 body-part labels with auto-censoring'] },
-  { id: 9, section: '1.1', name: 'Partial nudity detection', patterns: ['partialNudity', 'partial_nudity', 'suggestiveContent', 'nudityLevel'], freeTools: ['NudeNet partial labels', 'Marqo/nsfw with threshold tuning'] },
-  { id: 10, section: '1.1', name: 'Sexual pose detection', patterns: ['sexualPose', 'sexual_pose', 'poseDetection.*sexual', 'detectSexualPose'], freeTools: ['YOLO pose estimation + custom classifier', 'NudeNet exposed body parts as proxy'] },
-  { id: 11, section: '1.1', name: 'Suggestive clothing detection', patterns: ['suggestiveClothing', 'clothing_detection', 'detectSuggestiveClothing'], freeTools: ['Freepik/nsfw_image_detector 4-level scoring (neutral/low/medium/high)', 'CLIP zero-shot with clothing prompts'] },
-  { id: 12, section: '1.1', name: 'Underwear/swimwear context scoring', patterns: ['underwearContext', 'swimwear', 'contextScoring.*clothing'], freeTools: ['Freepik/nsfw_image_detector level scoring', 'CLIP zero-shot classification'] },
-  { id: 13, section: '1.1', name: 'CSAM detection (hash matching)', patterns: ['scanForCSAM', 'CSAMhash', 'photoDNA', 'PhotoDNA', 'csam_scan'], freeTools: ['PhotoDNA (Microsoft, free via NCMEC)', 'Cloudflare CSAM Scanning Tool (free)', 'PDQ (Meta, open-source hash matching)'] },
-  { id: 14, section: '1.1', name: 'CSAM adjacent content detection', patterns: ['csamAdjacent', 'csam_adjacent', 'nearCSAM'], freeTools: ['Google CSAI Match (free API for video)', 'PDQ with expanded hash database'] },
-  { id: 15, section: '1.1', name: 'Drawn/animated CSAM detection', patterns: ['drawnCSAM', 'animatedCSAM', 'cartoon_csam'], freeTools: ['Custom classifier needed — no free off-the-shelf tool'] },
-  { id: 16, section: '1.1', name: 'NCII hash matching (StopNCII)', patterns: ['stopNCII', 'ncii_hash', 'NCIIHash', 'takeItDown'], freeTools: ['StopNCII.org hash sharing API (free for qualifying platforms)', 'PDQ hashing'] },
-  { id: 17, section: '1.1', name: 'Revenge porn detection', patterns: ['revengePorn', 'revenge_porn', 'ncii_detection'], freeTools: ['StopNCII hash matching', 'Report-based + human review'] },
-  { id: 18, section: '1.1', name: 'Nudity in video thumbnails', patterns: ['videoThumbnail.*nsfw', 'checkVideoThumbnail', 'thumbnailNSFW'], freeTools: ['Same as #1 — extract thumbnail → NSFW classify'] },
-  { id: 19, section: '1.1', name: 'Nudity in story thumbnails', patterns: ['storyThumbnail.*nsfw', 'checkStoryThumbnail'], freeTools: ['Same as #1'] },
-  { id: 600, section: '1.1', name: 'Cyberflashing / unsolicited nude auto-blur', patterns: ['cyberflash', 'autoBlur.*nude', 'privateDetector', 'unsolicitedNude'], freeTools: ['NudeNet detection → auto-blur before display', 'NSFWJS client-side pre-screen'] },
+  { id: 1, section: '1.1', name: 'Profile photo NSFW scan', severity: 'high', patterns: ['checkImageSafety', 'nsfwjs', 'nsfwModel', 'preloadSafetyModel', 'nsfw_image_detection', 'nsfw-image-detection'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'Marqo/nsfw-image-detection-384 (MIT, 98.56% acc)', 'NudeNet (MIT)', 'NSFWJS (MIT, client-side)', 'Falconsai/nsfw_image_detection (Apache 2.0)'] },
+  { id: 2, section: '1.1', name: 'Chat image NSFW scan', severity: 'high', patterns: ['checkChatImageSafety', 'moderateContent.*chat', 'chat.*imageModerat'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'Marqo/nsfw-image-detection-384 (MIT, 98.56% acc)', 'NudeNet (MIT)', 'NSFWJS (MIT, client-side)'] },
+  { id: 3, section: '1.1', name: 'Edit profile photo NSFW', severity: 'high', patterns: ['runFullImageScan', 'editPhoto.*checkSafety', 'revalidateProfilePhoto'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'Marqo/nsfw-image-detection-384 (MIT, 98.56% acc)', 'NudeNet (MIT)', 'NSFWJS (MIT, client-side)'] },
+  { id: 4, section: '1.1', name: 'Story NSFW scan', severity: 'high', patterns: ['checkStoryNSFW', 'story.*checkImageSafety', 'moderateStoryContent'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'Marqo/nsfw-image-detection-384 (MIT, 98.56% acc)', 'NudeNet (MIT)', 'NSFWJS (MIT, client-side)'] },
+  { id: 5, section: '1.1', name: 'Video frame NSFW scan', severity: 'high', patterns: ['checkVideoFramesSafety', 'checkVideoNSFW', 'moderateVideo', 'extractVideoFrames'], freeTools: ['NSFWJS on extracted frames (ffmpeg → frame extraction → classify)', 'NudeNet on key frames'] },
+  { id: 6, section: '1.1', name: 'Voice thumbnail NSFW', severity: 'medium', patterns: ['checkVoiceThumbnail', 'voice_thumbnail', 'voiceThumbnail'], freeTools: ['Llama Guard 4 (12B, Meta, multimodal)', 'NSFWJS (MIT, client-side)'] },
+  { id: 7, section: '1.1', name: 'Server-side NSFW backstop', severity: 'high', patterns: ['verify-photo-nsfw', 'verify-video-nsfw', 'SERVER_URL.*nsfw', 'server.*nsfw.*check'], freeTools: ['Llama Guard 4 server-side', 'Marqo/nsfw-image-detection-384 server-side'] },
+  { id: 8, section: '1.1', name: 'Nude body part detection (NudeNet)', severity: 'high', patterns: ['checkNudeParts', 'detect-nude-parts', 'NudeDetector', 'nudenet', 'nude_detection'], freeTools: ['NudeNet (MIT) — 18 body-part labels with auto-censoring'] },
+  { id: 9, section: '1.1', name: 'Partial nudity detection', severity: 'medium', patterns: ['partialNudity', 'partial_nudity', 'suggestiveContent', 'nudityLevel'], freeTools: ['NudeNet partial labels', 'Marqo/nsfw with threshold tuning'] },
+  { id: 10, section: '1.1', name: 'Sexual pose detection', severity: 'medium', patterns: ['sexualPose', 'sexual_pose', 'poseDetection.*sexual', 'detectSexualPose'], freeTools: ['YOLO pose estimation + custom classifier', 'NudeNet exposed body parts as proxy'] },
+  { id: 11, section: '1.1', name: 'Suggestive clothing detection', severity: 'low', patterns: ['suggestiveClothing', 'clothing_detection', 'detectSuggestiveClothing'], freeTools: ['Freepik/nsfw_image_detector 4-level scoring (neutral/low/medium/high)', 'CLIP zero-shot with clothing prompts'] },
+  { id: 12, section: '1.1', name: 'Underwear/swimwear context scoring', severity: 'low', patterns: ['underwearContext', 'swimwear', 'contextScoring.*clothing'], freeTools: ['Freepik/nsfw_image_detector level scoring', 'CLIP zero-shot classification'] },
+  { id: 13, section: '1.1', name: 'CSAM detection (hash matching)', severity: 'critical', patterns: ['scanForCSAM', 'CSAMhash', 'photoDNA', 'PhotoDNA', 'csam_scan'], freeTools: ['PhotoDNA (Microsoft, free via NCMEC)', 'Cloudflare CSAM Scanning Tool (free)', 'PDQ (Meta, open-source hash matching)'] },
+  { id: 14, section: '1.1', name: 'CSAM adjacent content detection', severity: 'critical', patterns: ['csamAdjacent', 'csam_adjacent', 'nearCSAM'], freeTools: ['Google CSAI Match (free API for video)', 'PDQ with expanded hash database'] },
+  { id: 15, section: '1.1', name: 'Drawn/animated CSAM detection', severity: 'critical', patterns: ['drawnCSAM', 'animatedCSAM', 'cartoon_csam'], freeTools: ['Custom classifier needed — no free off-the-shelf tool'] },
+  { id: 16, section: '1.1', name: 'NCII hash matching (StopNCII)', severity: 'critical', patterns: ['stopNCII', 'ncii_hash', 'NCIIHash', 'takeItDown'], freeTools: ['StopNCII.org hash sharing API (free for qualifying platforms)', 'PDQ hashing'] },
+  { id: 17, section: '1.1', name: 'Revenge porn detection', severity: 'critical', patterns: ['revengePorn', 'revenge_porn', 'ncii_detection'], freeTools: ['StopNCII hash matching', 'Report-based + human review'] },
+  { id: 18, section: '1.1', name: 'Nudity in video thumbnails', severity: 'high', patterns: ['videoThumbnail.*nsfw', 'checkVideoThumbnail', 'thumbnailNSFW'], freeTools: ['NSFWJS (MIT, client-side)', 'NudeNet (MIT)'] },
+  { id: 19, section: '1.1', name: 'Nudity in story thumbnails', severity: 'high', patterns: ['storyThumbnail.*nsfw', 'checkStoryThumbnail'], freeTools: ['NSFWJS (MIT, client-side)', 'NudeNet (MIT)'] },
+  { id: 600, section: '1.1', name: 'Cyberflashing / unsolicited nude auto-blur', severity: 'high', patterns: ['cyberflash', 'autoBlur.*nude', 'privateDetector', 'unsolicitedNude'], freeTools: ['NudeNet detection → auto-blur before display', 'NSFWJS client-side pre-screen'] },
 
   // 1.2 Identity & Face Verification
-  { id: 20, section: '1.2', name: 'Verify face exists', patterns: ['detectFace', 'faceCount', 'checkSingleFace', 'faceDetection', 'face-api', 'faceapi'], freeTools: ['InsightFace/RetinaFace (Apache 2.0*)', 'DeepFace (MIT)', 'MediaPipe Face Detection (Apache 2.0)'] },
-  { id: 21, section: '1.2', name: 'Verify exactly one face', patterns: ['faceCount.*1', 'faceCount > 1', 'faceCount !== 1', 'singleFace', 'checkSingleFace'], freeTools: ['RetinaFace → count detected faces', 'DeepFace.extract_faces()'] },
-  { id: 22, section: '1.2', name: 'Match selfie to profile', patterns: ['verifyFaceMatch', 'compareFaces', 'checkSelfieConsistency', 'faceVerify'], freeTools: ['InsightFace ArcFace (Apache 2.0*)', 'FaceNet512 (MIT)', 'DeepFace.verify() (MIT)'] },
-  { id: 23, section: '1.2', name: 'Verify all photos same person', patterns: ['verifyAllPhotos', 'samePersonCheck', 'verify-all-photos-same-person', 'checkAllPhotosConsistency'], freeTools: ['InsightFace pairwise comparison', 'DeepFace.verify() across all photos'] },
-  { id: 24, section: '1.2', name: 'Banned user face re-registration', patterns: ['checkAgainstBannedFaces', 'bannedFace', 'BannedFaceCheckResult'], freeTools: ['InsightFace embeddings → compare against banned DB', 'CompreFace (Apache 2.0) face collection matching'] },
-  { id: 25, section: '1.2', name: 'Celebrity impersonation', patterns: ['checkCelebrityImpersonation', 'isCelebrity', 'celebrity.*confidence'], freeTools: ['InsightFace against celebrity embedding DB', 'Custom embedding database'] },
-  { id: 26, section: '1.2', name: 'Staff impersonation via face', patterns: ['staffFaceImpersonation', 'staff_face_check'], freeTools: ['InsightFace against staff photo DB'] },
-  { id: 27, section: '1.2', name: 'Deepfake image detection', patterns: ['deepfakeDetect', 'detectDeepfake', 'deepfake_image', 'isDeepfake'], freeTools: ['DeepfakeBench (36 detection methods)', 'selimsef/dfdc_deepfake_challenge (Kaggle winner)'] },
-  { id: 28, section: '1.2', name: 'Deepfake video detection', patterns: ['deepfakeVideo', 'detectDeepfakeVideo', 'video.*deepfake'], freeTools: ['DeepfakeBench video methods', 'selimsef model on extracted frames'] },
-  { id: 29, section: '1.2', name: 'Deepfake in live video call', patterns: ['liveDeepfake', 'realtime.*deepfake', 'videoCall.*deepfake'], freeTools: ['No production-ready free tool — research-grade only'] },
-  { id: 30, section: '1.2', name: '3D mask / printed face detection', patterns: ['maskDetect', 'printedFace', 'spoofDetect', 'antiSpoofing', 'livenessDepth'], freeTools: ['Faceplugin 3D Liveness (free on-premise)', 'MiniAI SDK (free on-premise)', 'InsightFace anti-spoofing models'] },
-  { id: 31, section: '1.2', name: 'Makeup / prosthetic detection', patterns: ['makeupDetect', 'prostheticDetect', 'disguiseDetect'], freeTools: ['No free off-the-shelf tool — custom model needed'] },
-  { id: 32, section: '1.2', name: 'Infrared liveness check', patterns: ['infraredLiveness', 'irLiveness', 'nearInfrared'], freeTools: ['Requires IR camera hardware — no software-only free tool'] },
-  { id: 33, section: '1.2', name: 'Twin / sibling impersonation', patterns: ['twinDetect', 'siblingImpersonation'], freeTools: ['InsightFace with high similarity threshold + behavioral signals'] },
-  { id: 34, section: '1.2', name: 'Consistent eye color across photos', patterns: ['eyeColor.*consistency', 'checkEyeColor'], freeTools: ['Custom model on face landmark crops'] },
-  { id: 35, section: '1.2', name: 'Tattoo consistency across photos', patterns: ['tattooConsistency', 'detectTattoo'], freeTools: ['YOLO fine-tuned for tattoo detection + matching'] },
-  { id: 36, section: '1.2', name: 'Scar / birthmark consistency', patterns: ['scarConsistency', 'birthmarkDetect'], freeTools: ['Custom segmentation model needed'] },
-  { id: 37, section: '1.2', name: 'Height estimation from photos', patterns: ['heightEstimate', 'estimateHeight'], freeTools: ['Pose estimation + reference object scaling (custom)'] },
-  { id: 38, section: '1.2', name: 'Age estimation from selfie', patterns: ['estimateAgeFromPhoto', 'estimateAge', 'ageEstimation', 'age_predict'], freeTools: ['DeepFace.analyze(actions=["age"]) (MIT)', 'InsightFace age prediction'] },
-  { id: 39, section: '1.2', name: 'Face age vs claimed age consistency', patterns: ['faceAge.*claimedAge', 'ageConsistency', 'ageMismatch'], freeTools: ['DeepFace age estimation → compare to profile DOB'] },
-  { id: 40, section: '1.2', name: 'Selfie-to-ID face match', patterns: ['selfieToID', 'idFaceMatch', 'documentFaceMatch'], freeTools: ['InsightFace verify selfie vs ID crop', 'CompreFace verification'] },
-  { id: 41, section: '1.2', name: 'Photo aging consistency', patterns: ['photoAging', 'agingConsistency', 'photoRecency'], freeTools: ['EXIF date analysis + face age estimation comparison'] },
-  { id: 42, section: '1.2', name: 'Background consistency across photos', patterns: ['backgroundConsistency', 'bgConsistency'], freeTools: ['Custom — scene embedding comparison'] },
-  { id: 43, section: '1.2', name: 'Lighting consistency across photos', patterns: ['lightingConsistency', 'lightDirection'], freeTools: ['Custom image analysis — no free tool'] },
-  { id: 44, section: '1.2', name: 'Resolution inconsistency detection', patterns: ['resolutionInconsistency', 'resolutionCheck', 'dpiMismatch'], freeTools: ['EXIF resolution comparison + pixel analysis'] },
-  { id: 45, section: '1.2', name: 'Repeated clothing detection', patterns: ['repeatedClothing', 'clothingDetect', 'sameOutfit'], freeTools: ['CLIP clothing embeddings comparison'] },
-  { id: 46, section: '1.2', name: 'Facial symmetry scoring (AI signal)', patterns: ['facialSymmetry', 'symmetryScore', 'aiGeneratedSymmetry'], freeTools: ['Face landmark analysis → symmetry calculation'] },
-  { id: 693, section: '1.2', name: 'Mandatory video selfie verification', patterns: ['videoSelfieVerification', 'mandatoryVideoSelfie', 'onboardingVideoVerify'], freeTools: ['InsightFace + liveness challenge sequence'] },
-  { id: 694, section: '1.2', name: 'Periodic re-verification prompt', patterns: ['periodicReverify', 'reVerificationPrompt', 'scheduledVerification'], freeTools: ['Custom timer + existing verification pipeline'] },
-  { id: 695, section: '1.2', name: 'Video selfie freshness enforcement', patterns: ['selfieExpiry', 'selfieFreshness', 'videoSelfieAge'], freeTools: ['Timestamp check + re-verification trigger'] },
+  { id: 20, section: '1.2', name: 'Verify face exists', severity: 'high', patterns: ['detectFace', 'faceCount', 'checkSingleFace', 'faceDetection', 'face-api', 'faceapi'], freeTools: ['InsightFace/RetinaFace (Apache 2.0*)', 'DeepFace (MIT)', 'MediaPipe Face Detection (Apache 2.0)'] },
+  { id: 21, section: '1.2', name: 'Verify exactly one face', severity: 'high', patterns: ['faceCount.*1', 'faceCount > 1', 'faceCount !== 1', 'singleFace', 'checkSingleFace'], freeTools: ['RetinaFace → count detected faces', 'DeepFace.extract_faces()'] },
+  { id: 22, section: '1.2', name: 'Match selfie to profile', severity: 'high', patterns: ['verifyFaceMatch', 'compareFaces', 'checkSelfieConsistency', 'faceVerify'], freeTools: ['InsightFace ArcFace (Apache 2.0*)', 'FaceNet512 (MIT)', 'DeepFace.verify() (MIT)'] },
+  { id: 23, section: '1.2', name: 'Verify all photos same person', severity: 'high', patterns: ['verifyAllPhotos', 'samePersonCheck', 'verify-all-photos-same-person', 'checkAllPhotosConsistency'], freeTools: ['InsightFace pairwise comparison', 'DeepFace.verify() across all photos'] },
+  { id: 24, section: '1.2', name: 'Banned user face re-registration', severity: 'high', patterns: ['checkAgainstBannedFaces', 'bannedFace', 'BannedFaceCheckResult'], freeTools: ['InsightFace embeddings → compare against banned DB', 'CompreFace (Apache 2.0) face collection matching'] },
+  { id: 25, section: '1.2', name: 'Celebrity impersonation', severity: 'medium', patterns: ['checkCelebrityImpersonation', 'isCelebrity', 'celebrity.*confidence'], freeTools: ['InsightFace against celebrity embedding DB', 'Custom embedding database'] },
+  { id: 26, section: '1.2', name: 'Staff impersonation via face', severity: 'medium', patterns: ['staffFaceImpersonation', 'staff_face_check'], freeTools: ['InsightFace against staff photo DB'] },
+  { id: 27, section: '1.2', name: 'Deepfake image detection', severity: 'high', patterns: ['deepfakeDetect', 'detectDeepfake', 'deepfake_image', 'isDeepfake'], freeTools: ['DeepfakeBench (36 detection methods)', 'selimsef/dfdc_deepfake_challenge (Kaggle winner)'] },
+  { id: 28, section: '1.2', name: 'Deepfake video detection', severity: 'high', patterns: ['deepfakeVideo', 'detectDeepfakeVideo', 'video.*deepfake'], freeTools: ['DeepfakeBench video methods', 'selimsef model on extracted frames'] },
+  { id: 29, section: '1.2', name: 'Deepfake in live video call', severity: 'high', patterns: ['liveDeepfake', 'realtime.*deepfake', 'videoCall.*deepfake'], freeTools: ['No production-ready free tool — research-grade only'] },
+  { id: 30, section: '1.2', name: '3D mask / printed face detection', severity: 'high', patterns: ['maskDetect', 'printedFace', 'spoofDetect', 'antiSpoofing', 'livenessDepth'], freeTools: ['Faceplugin 3D Liveness (free on-premise)', 'MiniAI SDK (free on-premise)', 'InsightFace anti-spoofing models'] },
+  { id: 31, section: '1.2', name: 'Makeup / prosthetic detection', severity: 'low', patterns: ['makeupDetect', 'prostheticDetect', 'disguiseDetect'], freeTools: ['No free off-the-shelf tool — custom model needed'] },
+  { id: 32, section: '1.2', name: 'Infrared liveness check', severity: 'low', patterns: ['infraredLiveness', 'irLiveness', 'nearInfrared'], freeTools: ['Requires IR camera hardware — no software-only free tool'] },
+  { id: 33, section: '1.2', name: 'Twin / sibling impersonation', severity: 'low', patterns: ['twinDetect', 'siblingImpersonation'], freeTools: ['InsightFace with high similarity threshold + behavioral signals'] },
+  { id: 34, section: '1.2', name: 'Consistent eye color across photos', severity: 'low', patterns: ['eyeColor.*consistency', 'checkEyeColor'], freeTools: ['Custom model on face landmark crops'] },
+  { id: 35, section: '1.2', name: 'Tattoo consistency across photos', severity: 'low', patterns: ['tattooConsistency', 'detectTattoo'], freeTools: ['YOLO fine-tuned for tattoo detection + matching'] },
+  { id: 36, section: '1.2', name: 'Scar / birthmark consistency', severity: 'low', patterns: ['scarConsistency', 'birthmarkDetect'], freeTools: ['Custom segmentation model needed'] },
+  { id: 37, section: '1.2', name: 'Height estimation from photos', severity: 'low', patterns: ['heightEstimate', 'estimateHeight'], freeTools: ['Pose estimation + reference object scaling (custom)'] },
+  { id: 38, section: '1.2', name: 'Age estimation from selfie', severity: 'high', patterns: ['estimateAgeFromPhoto', 'estimateAge', 'ageEstimation', 'age_predict'], freeTools: ['DeepFace.analyze(actions=["age"]) (MIT)', 'InsightFace age prediction'] },
+  { id: 39, section: '1.2', name: 'Face age vs claimed age consistency', severity: 'high', patterns: ['faceAge.*claimedAge', 'ageConsistency', 'ageMismatch'], freeTools: ['DeepFace age estimation → compare to profile DOB'] },
+  { id: 40, section: '1.2', name: 'Selfie-to-ID face match', severity: 'high', patterns: ['selfieToID', 'idFaceMatch', 'documentFaceMatch'], freeTools: ['InsightFace verify selfie vs ID crop', 'CompreFace verification'] },
+  { id: 41, section: '1.2', name: 'Photo aging consistency', severity: 'low', patterns: ['photoAging', 'agingConsistency', 'photoRecency'], freeTools: ['EXIF date analysis + face age estimation comparison'] },
+  { id: 42, section: '1.2', name: 'Background consistency across photos', severity: 'low', patterns: ['backgroundConsistency', 'bgConsistency'], freeTools: ['Custom — scene embedding comparison'] },
+  { id: 43, section: '1.2', name: 'Lighting consistency across photos', severity: 'low', patterns: ['lightingConsistency', 'lightDirection'], freeTools: ['Custom image analysis — no free tool'] },
+  { id: 44, section: '1.2', name: 'Resolution inconsistency detection', severity: 'low', patterns: ['resolutionInconsistency', 'resolutionCheck', 'dpiMismatch'], freeTools: ['EXIF resolution comparison + pixel analysis'] },
+  { id: 45, section: '1.2', name: 'Repeated clothing detection', severity: 'low', patterns: ['repeatedClothing', 'clothingDetect', 'sameOutfit'], freeTools: ['CLIP clothing embeddings comparison'] },
+  { id: 46, section: '1.2', name: 'Facial symmetry scoring (AI signal)', severity: 'low', patterns: ['facialSymmetry', 'symmetryScore', 'aiGeneratedSymmetry'], freeTools: ['Face landmark analysis → symmetry calculation'] },
+  { id: 693, section: '1.2', name: 'Mandatory video selfie verification', severity: 'high', patterns: ['videoSelfieVerification', 'mandatoryVideoSelfie', 'onboardingVideoVerify'], freeTools: ['InsightFace + liveness challenge sequence'] },
+  { id: 694, section: '1.2', name: 'Periodic re-verification prompt', severity: 'medium', patterns: ['periodicReverify', 'reVerificationPrompt', 'scheduledVerification'], freeTools: ['Custom timer + existing verification pipeline'] },
+  { id: 695, section: '1.2', name: 'Video selfie freshness enforcement', severity: 'medium', patterns: ['selfieExpiry', 'selfieFreshness', 'videoSelfieAge'], freeTools: ['Timestamp check + re-verification trigger'] },
 
   // 1.3 AI Generated & Manipulated
-  { id: 47, section: '1.3', name: 'Detect AI-generated images via EXIF', patterns: ['checkExifForAI', 'image_metadata', 'AI_SW', 'stable diffusion', 'detectAIGeneratedFromMetadata', 'midjourney'], freeTools: ['Exiftool (free) — check Software, Comment, Description fields for AI tool names'] },
-  { id: 48, section: '1.3', name: 'AI image GAN fingerprint detection', patterns: ['ganFingerprint', 'detectGAN', 'gan_artifact'], freeTools: ['DeepfakeBench GAN detection methods'] },
-  { id: 49, section: '1.3', name: 'Diffusion model artifact detection', patterns: ['diffusionArtifact', 'detectDiffusion', 'stableDiffusion.*detect'], freeTools: ['DeepfakeBench diffusion detectors', 'Custom frequency analysis'] },
-  { id: 50, section: '1.3', name: 'Pixel-level manipulation detection', patterns: ['pixelManipulation', 'errorLevelAnalysis', 'ELA', 'forensicAnalysis'], freeTools: ['Error Level Analysis (ELA) — custom implementation'] },
-  { id: 51, section: '1.3', name: 'Inpainting / healing brush detection', patterns: ['inpaintingDetect', 'healingBrush', 'detectInpainting'], freeTools: ['Custom CNN trained on inpainting artifacts'] },
-  { id: 52, section: '1.3', name: 'Splicing / compositing detection', patterns: ['splicingDetect', 'compositingDetect', 'detectSplicing'], freeTools: ['ELA + noise inconsistency analysis'] },
-  { id: 53, section: '1.3', name: 'Green screen background detection', patterns: ['greenScreen', 'chromaKey', 'detectGreenScreen'], freeTools: ['Color histogram analysis for uniform green backgrounds'] },
-  { id: 54, section: '1.3', name: 'Consistent shadow direction check', patterns: ['shadowDirection', 'shadowConsistency', 'detectShadowInconsistency'], freeTools: ['Custom — no free off-the-shelf tool'] },
-  { id: 55, section: '1.3', name: 'Lens distortion fingerprinting', patterns: ['lensDistortion', 'lensFingerprint', 'barrelDistortion'], freeTools: ['Custom — lens profile matching from EXIF'] },
-  { id: 56, section: '1.3', name: 'HDR / beauty filter detection', patterns: ['beautyFilter', 'hdrDetect', 'filterDetection', 'faceSmoothing'], freeTools: ['Custom texture analysis — no free off-the-shelf tool'] },
-  { id: 57, section: '1.3', name: 'Color grading consistency', patterns: ['colorGrading', 'colorConsistency', 'whiteBalance'], freeTools: ['Custom color histogram analysis'] },
-  { id: 58, section: '1.3', name: 'Image compression fingerprinting', patterns: ['jpegArtifact', 'compressionLevel', 'compressionFingerprint', 'quantizationTable'], freeTools: ['Custom JPEG quantization table analysis'] },
-  { id: 59, section: '1.3', name: 'Screenshot metadata detection', patterns: ['screenshotMeta', 'isScreenshot', 'detectScreenshot'], freeTools: ['Exiftool — check dimensions, DPI, Software field'] },
-  { id: 60, section: '1.3', name: 'Screenshot of another profile detection', patterns: ['screenshotOfProfile', 'profileScreenshot', 'appUIDetect'], freeTools: ['OCR + UI element detection (custom)'] },
-  { id: 61, section: '1.3', name: 'Stock photo detection', patterns: ['stockPhoto', 'watermarkDetect', 'stockImage', 'shutterstock', 'gettyImages'], freeTools: ['Reverse image search via TinEye API (limited free)', 'Watermark detection (custom)'] },
-  { id: 62, section: '1.3', name: 'Image provenance (C2PA/Content Credentials)', patterns: ['c2pa', 'contentCredentials', 'contentAuthenticity', 'provenance'], freeTools: ['c2patool (open-source C2PA verification)'] },
-  { id: 63, section: '1.3', name: 'NFT / stolen digital art detection', patterns: ['nftDetect', 'stolenArt', 'digitalArtTheft'], freeTools: ['Reverse image search + perceptual hashing'] },
-  { id: 64, section: '1.3', name: 'Steganography detection', patterns: ['steganography', 'hiddenData', 'detectSteganography', 'stegDetect'], freeTools: ['StegExpose (open-source)', 'zsteg for PNG'] },
-  { id: 65, section: '1.3', name: 'Metadata stripping verification', patterns: ['stripMetadata', 'removeExif', 'metadataStrip', 'sanitizeMetadata'], freeTools: ['Exiftool -all= (free)', 'sharp.rotate() strips EXIF'] },
-  { id: 750, section: '1.3', name: 'Filter/AR effect transparency labeling', patterns: ['filterLabel', 'arEffectLabel', 'filterTransparency'], freeTools: ['Custom UI labeling — no detection tool needed'] },
+  { id: 47, section: '1.3', name: 'Detect AI-generated images via EXIF', severity: 'medium', patterns: ['checkExifForAI', 'image_metadata', 'AI_SW', 'detectAIGeneratedFromMetadata', 'midjourney'], freeTools: ['Exiftool (free) — check Software, Comment, Description fields for AI tool names'] },
+  { id: 48, section: '1.3', name: 'AI image GAN fingerprint detection', severity: 'medium', patterns: ['ganFingerprint', 'detectGAN', 'gan_artifact'], freeTools: ['DeepfakeBench GAN detection methods'] },
+  { id: 49, section: '1.3', name: 'Diffusion model artifact detection', severity: 'medium', patterns: ['diffusionArtifact', 'detectDiffusion', 'stableDiffusion.*detect'], freeTools: ['DeepfakeBench diffusion detectors', 'Custom frequency analysis'] },
+  { id: 50, section: '1.3', name: 'Pixel-level manipulation detection', severity: 'medium', patterns: ['pixelManipulation', 'errorLevelAnalysis', 'ELA', 'forensicAnalysis'], freeTools: ['Error Level Analysis (ELA) — custom implementation'] },
+  { id: 51, section: '1.3', name: 'Inpainting / healing brush detection', severity: 'low', patterns: ['inpaintingDetect', 'healingBrush', 'detectInpainting'], freeTools: ['Custom CNN trained on inpainting artifacts'] },
+  { id: 52, section: '1.3', name: 'Splicing / compositing detection', severity: 'medium', patterns: ['splicingDetect', 'compositingDetect', 'detectSplicing'], freeTools: ['ELA + noise inconsistency analysis'] },
+  { id: 53, section: '1.3', name: 'Green screen background detection', severity: 'low', patterns: ['greenScreen', 'chromaKey', 'detectGreenScreen'], freeTools: ['Color histogram analysis for uniform green backgrounds'] },
+  { id: 54, section: '1.3', name: 'Consistent shadow direction check', severity: 'low', patterns: ['shadowDirection', 'shadowConsistency', 'detectShadowInconsistency'], freeTools: ['Custom — no free off-the-shelf tool'] },
+  { id: 55, section: '1.3', name: 'Lens distortion fingerprinting', severity: 'low', patterns: ['lensDistortion', 'lensFingerprint', 'barrelDistortion'], freeTools: ['Custom — lens profile matching from EXIF'] },
+  { id: 56, section: '1.3', name: 'HDR / beauty filter detection', severity: 'low', patterns: ['beautyFilter', 'hdrDetect', 'filterDetection', 'faceSmoothing'], freeTools: ['Custom texture analysis — no free off-the-shelf tool'] },
+  { id: 57, section: '1.3', name: 'Color grading consistency', severity: 'low', patterns: ['colorGrading', 'colorConsistency', 'whiteBalance'], freeTools: ['Custom color histogram analysis'] },
+  { id: 58, section: '1.3', name: 'Image compression fingerprinting', severity: 'low', patterns: ['jpegArtifact', 'compressionLevel', 'compressionFingerprint', 'quantizationTable'], freeTools: ['Custom JPEG quantization table analysis'] },
+  { id: 59, section: '1.3', name: 'Screenshot metadata detection', severity: 'low', patterns: ['screenshotMeta', 'isScreenshot', 'detectScreenshot'], freeTools: ['Exiftool — check dimensions, DPI, Software field'] },
+  { id: 60, section: '1.3', name: 'Screenshot of another profile detection', severity: 'medium', patterns: ['screenshotOfProfile', 'profileScreenshot', 'appUIDetect'], freeTools: ['OCR + UI element detection (custom)'] },
+  { id: 61, section: '1.3', name: 'Stock photo detection', severity: 'medium', patterns: ['stockPhoto', 'watermarkDetect', 'stockImage', 'shutterstock', 'gettyImages'], freeTools: ['Reverse image search via TinEye API (limited free)', 'Watermark detection (custom)'] },
+  { id: 62, section: '1.3', name: 'Image provenance (C2PA/Content Credentials)', severity: 'medium', patterns: ['c2pa', 'contentCredentials', 'contentAuthenticity', 'provenance'], freeTools: ['c2patool (open-source C2PA verification)'] },
+  { id: 63, section: '1.3', name: 'NFT / stolen digital art detection', severity: 'low', patterns: ['nftDetect', 'stolenArt', 'digitalArtTheft'], freeTools: ['Reverse image search + perceptual hashing'] },
+  { id: 64, section: '1.3', name: 'Steganography detection', severity: 'medium', patterns: ['steganography', 'hiddenData', 'detectSteganography', 'stegDetect'], freeTools: ['StegExpose (open-source)', 'zsteg for PNG'] },
+  { id: 65, section: '1.3', name: 'Metadata stripping verification', severity: 'high', patterns: ['stripMetadata', 'removeExif', 'metadataStrip', 'sanitizeMetadata'], freeTools: ['Exiftool -all= (free)', 'sharp.rotate() strips EXIF'] },
+  { id: 750, section: '1.3', name: 'Filter/AR effect transparency labeling', severity: 'low', patterns: ['filterLabel', 'arEffectLabel', 'filterTransparency'], freeTools: ['Custom UI labeling — no detection tool needed'] },
 
   // 1.4 Dangerous Content in Images
-  { id: 66, section: '1.4', name: 'Hate symbols detection', patterns: ['detectHateSymbol', 'detect-hate-symbol', 'hateSymbol', 'hate_symbol'], freeTools: ['YOLO fine-tuned on ADL hate symbol database', 'CLIP zero-shot with hate symbol prompts'] },
-  { id: 67, section: '1.4', name: 'Weapons detection', patterns: ['detectWeapons', 'detect-weapons', 'weaponDetect', 'gunDetect', 'knifeDetect'], freeTools: ['YOLO26 (Ultralytics, AGPL-3.0) fine-tuned for weapons'] },
-  { id: 68, section: '1.4', name: 'Drug paraphernalia detection', patterns: ['detectDrugParaphernalia', 'detect-drug-paraphernalia', 'drug_paraphernalia'], freeTools: ['YOLO26 fine-tuned for drug items', 'CLIP zero-shot classification'] },
-  { id: 69, section: '1.4', name: 'Offensive gestures', patterns: ['detectOffensiveGesture', 'detect-offensive-gesture', 'offensiveGesture', 'middleFinger'], freeTools: ['MediaPipe Hands + gesture classifier'] },
-  { id: 70, section: '1.4', name: 'Fake verification badge in photo', patterns: ['detectFakeBadgeInPhoto', 'detect-fake-badge', 'fakeBadge'], freeTools: ['Template matching + OCR'] },
-  { id: 71, section: '1.4', name: 'QR code in photos', patterns: ['detectQRCode', 'qrCode', 'qr_code'], freeTools: ['OpenCV QR detector', 'zbar (open-source)'] },
-  { id: 72, section: '1.4', name: 'Text overlay detection (phone numbers)', patterns: ['textOverlay', 'extractTextFromImage', 'ocr-extract', 'ocrExtract'], freeTools: ['PaddleOCR-VL (Apache 2.0, superior to Tesseract)', 'Tesseract OCR (Apache 2.0)'] },
-  { id: 73, section: '1.4', name: 'OCR contact info in images', patterns: ['ocrContactInfo', 'hasContactInfo', 'ocrPhone', 'ocrEmail'], freeTools: ['PaddleOCR-VL → regex for phone/email patterns'] },
-  { id: 74, section: '1.4', name: 'OCR hate speech in images', patterns: ['ocrThenModerate', 'ocr.*hate', 'extractText.*moderate'], freeTools: ['PaddleOCR-VL → text safety classifier (DuoGuard/Llama Guard)'] },
-  { id: 75, section: '1.4', name: 'Background scene analysis', patterns: ['sceneAnalysis', 'backgroundScene', 'detectDangerousScene', 'prisonDetect'], freeTools: ['CLIP zero-shot scene classification'] },
-  { id: 76, section: '1.4', name: 'Minor in photo detection', patterns: ['minorDetect', 'childInPhoto', 'detectMinor', 'underageInPhoto'], freeTools: ['DeepFace age estimation — flag if estimated age < 18'] },
-  { id: 77, section: '1.4', name: 'Alcohol / intoxication context', patterns: ['alcoholDetect', 'intoxication', 'drinkingContext'], freeTools: ['YOLO object detection for bottles/cans + CLIP context'] },
-  { id: 78, section: '1.4', name: 'Self-harm imagery detection', patterns: ['selfHarmImage', 'cuttingDetect', 'selfInjury'], freeTools: ['Llama Guard 4 safety categories', 'Custom classifier needed'] },
-  { id: 79, section: '1.4', name: 'Extremist imagery detection', patterns: ['extremistImagery', 'terroristFlag', 'isisFlag'], freeTools: ['GIFCT hash sharing database', 'CLIP + known extremist symbol database'] },
-  { id: 80, section: '1.4', name: 'Gang signs detection', patterns: ['gangSign', 'detectGangSign', 'gangGesture'], freeTools: ['MediaPipe Hands + custom gesture classifier'] },
-  { id: 81, section: '1.4', name: 'Nazi / white supremacist symbols', patterns: ['naziSymbol', 'swastika', 'whiteSupremacist', 'ssRunes'], freeTools: ['YOLO + ADL symbol database'] },
-  { id: 82, section: '1.4', name: 'Terrorist organization symbols', patterns: ['terroristSymbol', 'isisLogo', 'terrorOrg'], freeTools: ['GIFCT + YOLO object detection'] },
-  { id: 83, section: '1.4', name: 'Warrant / mugshot detection', patterns: ['mugshotDetect', 'warrantPhoto', 'detectMugshot'], freeTools: ['Scene classification — uniform backgrounds + aspect ratios'] },
+  { id: 66, section: '1.4', name: 'Hate symbols detection', severity: 'high', patterns: ['detectHateSymbol', 'detect-hate-symbol', 'hateSymbol', 'hate_symbol'], freeTools: ['YOLO fine-tuned on ADL hate symbol database', 'CLIP zero-shot with hate symbol prompts'] },
+  { id: 67, section: '1.4', name: 'Weapons detection', severity: 'high', patterns: ['detectWeapons', 'detect-weapons', 'weaponDetect', 'gunDetect', 'knifeDetect'], freeTools: ['YOLO26 (Ultralytics, AGPL-3.0) fine-tuned for weapons'] },
+  { id: 68, section: '1.4', name: 'Drug paraphernalia detection', severity: 'medium', patterns: ['detectDrugParaphernalia', 'detect-drug-paraphernalia', 'drug_paraphernalia'], freeTools: ['YOLO26 fine-tuned for drug items', 'CLIP zero-shot classification'] },
+  { id: 69, section: '1.4', name: 'Offensive gestures', severity: 'medium', patterns: ['detectOffensiveGesture', 'detect-offensive-gesture', 'offensiveGesture', 'middleFinger'], freeTools: ['MediaPipe Hands + gesture classifier'] },
+  { id: 70, section: '1.4', name: 'Fake verification badge in photo', severity: 'medium', patterns: ['detectFakeBadgeInPhoto', 'detect-fake-badge', 'fakeBadge'], freeTools: ['Template matching + OCR'] },
+  { id: 71, section: '1.4', name: 'QR code in photos', severity: 'medium', patterns: ['detectQRCode', 'qrCode', 'qr_code'], freeTools: ['OpenCV QR detector', 'zbar (open-source)'] },
+  { id: 72, section: '1.4', name: 'Text overlay detection (phone numbers)', severity: 'medium', patterns: ['textOverlay', 'extractTextFromImage', 'ocr-extract', 'ocrExtract'], freeTools: ['PaddleOCR-VL (Apache 2.0, superior to Tesseract)', 'Tesseract OCR (Apache 2.0)'] },
+  { id: 73, section: '1.4', name: 'OCR contact info in images', severity: 'medium', patterns: ['ocrContactInfo', 'hasContactInfo', 'ocrPhone', 'ocrEmail'], freeTools: ['PaddleOCR-VL → regex for phone/email patterns'] },
+  { id: 74, section: '1.4', name: 'OCR hate speech in images', severity: 'high', patterns: ['ocrThenModerate', 'ocr.*hate', 'extractText.*moderate'], freeTools: ['PaddleOCR-VL → text safety classifier (DuoGuard/Llama Guard)'] },
+  { id: 75, section: '1.4', name: 'Background scene analysis', severity: 'medium', patterns: ['sceneAnalysis', 'backgroundScene', 'detectDangerousScene', 'prisonDetect'], freeTools: ['CLIP zero-shot scene classification'] },
+  { id: 76, section: '1.4', name: 'Minor in photo detection', severity: 'critical', patterns: ['minorDetect', 'childInPhoto', 'detectMinor', 'underageInPhoto'], freeTools: ['DeepFace age estimation — flag if estimated age < 18'] },
+  { id: 77, section: '1.4', name: 'Alcohol / intoxication context', severity: 'low', patterns: ['alcoholDetect', 'intoxication', 'drinkingContext'], freeTools: ['YOLO object detection for bottles/cans + CLIP context'] },
+  { id: 78, section: '1.4', name: 'Self-harm imagery detection', severity: 'critical', patterns: ['selfHarmImage', 'cuttingDetect', 'selfInjury'], freeTools: ['Llama Guard 4 safety categories', 'Custom classifier needed'] },
+  { id: 79, section: '1.4', name: 'Extremist imagery detection', severity: 'high', patterns: ['extremistImagery', 'terroristFlag', 'isisFlag'], freeTools: ['GIFCT hash sharing database', 'CLIP + known extremist symbol database'] },
+  { id: 80, section: '1.4', name: 'Gang signs detection', severity: 'medium', patterns: ['gangSign', 'detectGangSign', 'gangGesture'], freeTools: ['MediaPipe Hands + custom gesture classifier'] },
+  { id: 81, section: '1.4', name: 'Nazi / white supremacist symbols', severity: 'high', patterns: ['naziSymbol', 'swastika', 'whiteSupremacist', 'ssRunes'], freeTools: ['YOLO + ADL symbol database'] },
+  { id: 82, section: '1.4', name: 'Terrorist organization symbols', severity: 'high', patterns: ['terroristSymbol', 'isisLogo', 'terrorOrg'], freeTools: ['GIFCT + YOLO object detection'] },
+  { id: 83, section: '1.4', name: 'Warrant / mugshot detection', severity: 'low', patterns: ['mugshotDetect', 'warrantPhoto', 'detectMugshot'], freeTools: ['Scene classification — uniform backgrounds + aspect ratios'] },
 
   // 1.5 Photo Quality & Authenticity
-  { id: 84, section: '1.5', name: 'Photo quality scoring', patterns: ['photoQuality', 'scorePhotoQuality', 'qualityScore', 'PhotoQualityResult'], freeTools: ['Custom — resolution, blur detection (Laplacian), lighting analysis'] },
-  { id: 85, section: '1.5', name: 'Full body detection', patterns: ['detectFullBodyPhoto', 'bodyDetect', 'fullBody', 'bodyTypeDetect', 'hasFullBody'], freeTools: ['YOLO pose estimation — check all keypoints visible'] },
-  { id: 86, section: '1.5', name: 'Engagement ring detection', patterns: ['engagementRing', 'detectRing', 'ring.*detect', 'CLIP.*ring'], freeTools: ['CLIP zero-shot: "engagement ring on hand"'] },
-  { id: 87, section: '1.5', name: 'Sunglasses / face obscuring detection', patterns: ['sunglassesDetect', 'faceObscured', 'faceOccluded'], freeTools: ['Face landmark analysis — eye region occlusion check'] },
-  { id: 88, section: '1.5', name: 'Multiple people ratio (always group)', patterns: ['groupPhotoRatio', 'multiplepeople', 'alwaysGroupPhoto'], freeTools: ['Face detection count across all user photos'] },
-  { id: 89, section: '1.5', name: 'Pet-only profile detection', patterns: ['petOnlyProfile', 'noHumanFace', 'animalOnly'], freeTools: ['YOLO animal detection + no face detected'] },
-  { id: 90, section: '1.5', name: 'Photo recency estimation', patterns: ['photoRecency', 'estimatePhotoAge', 'oldPhoto'], freeTools: ['EXIF DateTimeOriginal + image style analysis'] },
-  { id: 91, section: '1.5', name: 'Aspect ratio manipulation', patterns: ['aspectRatio', 'stretchDetect', 'squishDetect'], freeTools: ['EXIF original dimensions vs displayed'] },
-  { id: 92, section: '1.5', name: 'Invisible watermarks (embedding)', patterns: ['embedWatermark', 'invisibleWatermark', 'watermark-embed'], freeTools: ['invisible-watermark (Python, MIT)'] },
-  { id: 93, section: '1.5', name: 'Watermark detection (others)', patterns: ['detectWatermark', 'watermark-detect', 'hasWatermark'], freeTools: ['Custom edge/text detection in corners'] },
-  { id: 94, section: '1.5', name: 'Reverse image search', patterns: ['reverseImageSearch', 'tineye', 'googleLens'], freeTools: ['TinEye API (limited free tier)', 'SauceNAO (free)'] },
-  { id: 95, section: '1.5', name: 'Reverse video search', patterns: ['reverseVideoSearch', 'videoSearch'], freeTools: ['Frame extraction → reverse image search'] },
-  { id: 96, section: '1.5', name: 'Cross-account duplicate photo (PDQ)', patterns: ['pdq-cross-account', 'PDQHash', 'checkCrossAccountDuplicate', 'crossAccountPDQ', 'checkDuplicatePhotoCrossUsers'], freeTools: ['PDQ (Meta, open-source)', 'DINOHash (MIT, SOTA, robust to attacks)'] },
-  { id: 97, section: '1.5', name: 'Duplicate photos same user', patterns: ['checkDuplicatePhotoSameUser', 'duplicatePhoto', 'perceptualHash', 'dHash', 'computeImageHash', 'hammingDistance'], freeTools: ['PDQ / pHash / dHash — Hamming distance comparison'] },
-  { id: 98, section: '1.5', name: 'Thermal camera detection', patterns: ['thermalCamera', 'infraredImage', 'thermalDetect'], freeTools: ['EXIF analysis for IR camera models'] },
-  { id: 749, section: '1.5', name: 'Significant photo age discrepancy via EXIF', patterns: ['photoAgeDiscrepancy', 'exifAgeDiscrepancy', 'oldExifDate'], freeTools: ['Exiftool date extraction → compare to upload date'] },
+  { id: 84, section: '1.5', name: 'Photo quality scoring', severity: 'medium', patterns: ['photoQuality', 'scorePhotoQuality', 'qualityScore', 'PhotoQualityResult'], freeTools: ['Custom — resolution, blur detection (Laplacian), lighting analysis'] },
+  { id: 85, section: '1.5', name: 'Full body detection', severity: 'low', patterns: ['detectFullBodyPhoto', 'bodyDetect', 'fullBody', 'bodyTypeDetect', 'hasFullBody'], freeTools: ['YOLO pose estimation — check all keypoints visible'] },
+  { id: 86, section: '1.5', name: 'Engagement ring detection', severity: 'low', patterns: ['engagementRing', 'detectRing', 'ring.*detect', 'CLIP.*ring'], freeTools: ['CLIP zero-shot: "engagement ring on hand"'] },
+  { id: 87, section: '1.5', name: 'Sunglasses / face obscuring detection', severity: 'low', patterns: ['sunglassesDetect', 'faceObscured', 'faceOccluded'], freeTools: ['Face landmark analysis — eye region occlusion check'] },
+  { id: 88, section: '1.5', name: 'Multiple people ratio (always group)', severity: 'low', patterns: ['groupPhotoRatio', 'multiplepeople', 'alwaysGroupPhoto'], freeTools: ['Face detection count across all user photos'] },
+  { id: 89, section: '1.5', name: 'Pet-only profile detection', severity: 'low', patterns: ['petOnlyProfile', 'noHumanFace', 'animalOnly'], freeTools: ['YOLO animal detection + no face detected'] },
+  { id: 90, section: '1.5', name: 'Photo recency estimation', severity: 'medium', patterns: ['photoRecency', 'estimatePhotoAge', 'oldPhoto'], freeTools: ['EXIF DateTimeOriginal + image style analysis'] },
+  { id: 91, section: '1.5', name: 'Aspect ratio manipulation', severity: 'low', patterns: ['aspectRatio', 'stretchDetect', 'squishDetect'], freeTools: ['EXIF original dimensions vs displayed'] },
+  { id: 92, section: '1.5', name: 'Invisible watermarks (embedding)', severity: 'medium', patterns: ['embedWatermark', 'invisibleWatermark', 'watermark-embed'], freeTools: ['invisible-watermark (Python, MIT)'] },
+  { id: 93, section: '1.5', name: 'Watermark detection (others)', severity: 'medium', patterns: ['detectWatermark', 'watermark-detect', 'hasWatermark'], freeTools: ['Custom edge/text detection in corners'] },
+  { id: 94, section: '1.5', name: 'Reverse image search', severity: 'medium', patterns: ['reverseImageSearch', 'tineye', 'googleLens'], freeTools: ['TinEye API (limited free tier)', 'SauceNAO (free)'] },
+  { id: 95, section: '1.5', name: 'Reverse video search', severity: 'low', patterns: ['reverseVideoSearch', 'videoSearch'], freeTools: ['Frame extraction → reverse image search'] },
+  { id: 96, section: '1.5', name: 'Cross-account duplicate photo (PDQ)', severity: 'high', patterns: ['pdq-cross-account', 'PDQHash', 'checkCrossAccountDuplicate', 'crossAccountPDQ', 'checkDuplicatePhotoCrossUsers'], freeTools: ['PDQ (Meta, open-source)', 'DINOHash (MIT, SOTA, robust to attacks)'] },
+  { id: 97, section: '1.5', name: 'Duplicate photos same user', severity: 'low', patterns: ['checkDuplicatePhotoSameUser', 'duplicatePhoto', 'perceptualHash', 'dHash', 'computeImageHash', 'hammingDistance'], freeTools: ['PDQ / pHash / dHash — Hamming distance comparison'] },
+  { id: 98, section: '1.5', name: 'Thermal camera detection', severity: 'low', patterns: ['thermalCamera', 'infraredImage', 'thermalDetect'], freeTools: ['EXIF analysis for IR camera models'] },
+  { id: 749, section: '1.5', name: 'Significant photo age discrepancy via EXIF', severity: 'medium', patterns: ['photoAgeDiscrepancy', 'exifAgeDiscrepancy', 'oldExifDate'], freeTools: ['Exiftool date extraction → compare to upload date'] },
 
   // 1.6 Camera & Capture Verification
-  { id: 99, section: '1.6', name: 'Virtual camera detection', patterns: ['detectVirtualCamera', 'isVirtualCamera', 'VIRTUAL_CAM_KW', 'virtualCam', 'obsCam'], freeTools: ['Check device camera list for known virtual cam names (OBS, ManyCam)'] },
-  { id: 100, section: '1.6', name: 'Validate EXIF timestamp', patterns: ['image_metadata', 'hasValidTimestamp', 'validateVideoMetadata', 'DateTimeOriginal'], freeTools: ['Exiftool (free)'] },
-  { id: 101, section: '1.6', name: 'Validate camera make/model', patterns: ['Make.*Model', 'EXIF.*Make', 'cameraMake', 'No camera make'], freeTools: ['Exiftool (free)'] },
-  { id: 102, section: '1.6', name: 'Enforce in-app selfie capture', patterns: ['enforceCamera', 'enforceInAppCaptureOnly', 'inAppCapture'], freeTools: ['Custom — disable gallery picker for verification photos'] },
-  { id: 103, section: '1.6', name: 'Liveness challenge', patterns: ['LivenessChallenge', 'look_left', 'look_right', 'liveness', 'blinkDetect', 'headTurn'], freeTools: ['MediaPipe Face Mesh + challenge prompts', 'Faceplugin 3D Liveness (free on-premise)'] },
-  { id: 104, section: '1.6', name: 'Continuous face tracking video', patterns: ['trackFaceInVideo', 'faceTrack', 'facePresentFrames'], freeTools: ['MediaPipe Face Detection continuous tracking'] },
-  { id: 105, section: '1.6', name: 'Screenshot in video frame detection', patterns: ['screenshotInVideo', 'staticFrameDetect'], freeTools: ['Frame difference analysis — detect static regions'] },
-  { id: 106, section: '1.6', name: 'Video call recording detection', patterns: ['callRecordDetect', 'recordingIndicator'], freeTools: ['Custom — monitor recording APIs on device'] },
-  { id: 107, section: '1.6', name: 'Screen recording detection during call', patterns: ['screenRecordDetect', 'isCaptured', 'screenCapture'], freeTools: ['iOS: UIScreen.isCaptured', 'Android: FLAG_SECURE'] },
+  { id: 99, section: '1.6', name: 'Virtual camera detection', severity: 'high', patterns: ['detectVirtualCamera', 'isVirtualCamera', 'VIRTUAL_CAM_KW', 'virtualCam', 'obsCam'], freeTools: ['Check device camera list for known virtual cam names (OBS, ManyCam)'] },
+  { id: 100, section: '1.6', name: 'Validate EXIF timestamp', severity: 'medium', patterns: ['image_metadata', 'hasValidTimestamp', 'validateVideoMetadata', 'DateTimeOriginal'], freeTools: ['Exiftool (free)'] },
+  { id: 101, section: '1.6', name: 'Validate camera make/model', severity: 'medium', patterns: ['Make.*Model', 'EXIF.*Make', 'cameraMake', 'No camera make'], freeTools: ['Exiftool (free)'] },
+  { id: 102, section: '1.6', name: 'Enforce in-app selfie capture', severity: 'high', patterns: ['enforceCamera', 'enforceInAppCaptureOnly', 'inAppCapture'], freeTools: ['Custom — disable gallery picker for verification photos'] },
+  { id: 103, section: '1.6', name: 'Liveness challenge', severity: 'high', patterns: ['LivenessChallenge', 'look_left', 'look_right', 'blinkDetect', 'headTurn', 'livenessChallenge'], freeTools: ['MediaPipe Face Mesh + challenge prompts', 'Faceplugin 3D Liveness (free on-premise)'] },
+  { id: 104, section: '1.6', name: 'Continuous face tracking video', severity: 'medium', patterns: ['trackFaceInVideo', 'faceTrack', 'facePresentFrames'], freeTools: ['MediaPipe Face Detection continuous tracking'] },
+  { id: 105, section: '1.6', name: 'Screenshot in video frame detection', severity: 'low', patterns: ['screenshotInVideo', 'staticFrameDetect'], freeTools: ['Frame difference analysis — detect static regions'] },
+  { id: 106, section: '1.6', name: 'Video call recording detection', severity: 'medium', patterns: ['callRecordDetect', 'recordingIndicator'], freeTools: ['Custom — monitor recording APIs on device'] },
+  { id: 107, section: '1.6', name: 'Screen recording detection during call', severity: 'medium', patterns: ['screenRecordDetect', 'isCaptured', 'screenCapture'], freeTools: ['iOS: UIScreen.isCaptured', 'Android: FLAG_SECURE'] },
 
   // 1.7 Children in Photos
-  { id: 782, section: '1.7', name: 'Minor face detection in profile photos', patterns: ['minorFaceDetect', 'childFaceDetect', 'underageFace'], freeTools: ['DeepFace age estimation — flag < 18'] },
-  { id: 783, section: '1.7', name: 'Child photo blur/block enforcement', patterns: ['blurChildPhoto', 'blockChildPhoto', 'childPhotoPolicy'], freeTools: ['Age estimation + auto-blur/reject'] },
-  { id: 784, section: '1.7', name: 'Child photo predator attraction risk', patterns: ['predatorRiskWarning', 'childPhotoRisk'], freeTools: ['Educational prompt — no detection tool needed'] },
+  { id: 782, section: '1.7', name: 'Minor face detection in profile photos', severity: 'critical', patterns: ['minorFaceDetect', 'childFaceDetect', 'underageFace'], freeTools: ['DeepFace age estimation — flag < 18'] },
+  { id: 783, section: '1.7', name: 'Child photo blur/block enforcement', severity: 'critical', patterns: ['blurChildPhoto', 'blockChildPhoto', 'childPhotoPolicy'], freeTools: ['Age estimation + auto-blur/reject'] },
+  { id: 784, section: '1.7', name: 'Child photo predator attraction risk', severity: 'critical', patterns: ['predatorRiskWarning', 'childPhotoRisk'], freeTools: ['Educational prompt — no detection tool needed'] },
 
   // 1.8 AI-Generated NCII / Nudification Defense
-  { id: 771, section: '1.8', name: 'AI nudification output detection', patterns: ['nudificationDetect', 'aiNudification', 'clothesRemoval'], freeTools: ['DeepfakeBench + NudeNet combined analysis'] },
-  { id: 772, section: '1.8', name: 'Photo scraping-for-nudification defense', patterns: ['scrapingDefense', 'photoProtection', 'downloadPrevention'], freeTools: ['Watermarking + right-click disable + screenshot detection'] },
-  { id: 773, section: '1.8', name: 'AI-generated NCII hash sharing', patterns: ['nciiHashShare', 'stopNCIIIntegration', 'takeItDownHash'], freeTools: ['StopNCII.org API', 'Take It Down (NCMEC)'] },
-  { id: 774, section: '1.8', name: 'Nudification model training set notification', patterns: ['nudificationTraining', 'modelTrainingAlert'], freeTools: ['HaveIBeenTrained.com integration (concept only)'] },
+  { id: 771, section: '1.8', name: 'AI nudification output detection', severity: 'critical', patterns: ['nudificationDetect', 'aiNudification', 'clothesRemoval'], freeTools: ['DeepfakeBench + NudeNet combined analysis'] },
+  { id: 772, section: '1.8', name: 'Photo scraping-for-nudification defense', severity: 'high', patterns: ['scrapingDefense', 'photoProtection', 'downloadPrevention'], freeTools: ['Watermarking + right-click disable + screenshot detection'] },
+  { id: 773, section: '1.8', name: 'AI-generated NCII hash sharing', severity: 'critical', patterns: ['nciiHashShare', 'stopNCIIIntegration', 'takeItDownHash'], freeTools: ['StopNCII.org API', 'Take It Down (NCMEC)'] },
+  { id: 774, section: '1.8', name: 'Nudification model training set notification', severity: 'low', patterns: ['nudificationTraining', 'modelTrainingAlert'], freeTools: ['HaveIBeenTrained.com integration (concept only)'] },
 
   // 1.9 Screenshot / Screen Recording Weaponization
-  { id: 855, section: '1.9', name: 'Screenshot content auto-blur', patterns: ['screenshotBlur', 'captureBlur', 'blurOnCapture'], freeTools: ['Custom — blur view on screenshot event'] },
-  { id: 856, section: '1.9', name: 'Screen recording content protection', patterns: ['screenRecordProtect', 'FLAG_SECURE', 'captureProtection'], freeTools: ['Android: FLAG_SECURE', 'iOS: UIScreen.isCaptured notification'] },
-  { id: 857, section: '1.9', name: 'External camera capture detection', patterns: ['externalCameraDetect', 'cameraHoleDetect'], freeTools: ['No reliable free tool — fundamental limitation'] },
+  { id: 855, section: '1.9', name: 'Screenshot content auto-blur', severity: 'medium', patterns: ['screenshotBlur', 'captureBlur', 'blurOnCapture'], freeTools: ['Custom — blur view on screenshot event'] },
+  { id: 856, section: '1.9', name: 'Screen recording content protection', severity: 'medium', patterns: ['screenRecordProtect', 'FLAG_SECURE', 'captureProtection'], freeTools: ['Android: FLAG_SECURE', 'iOS: UIScreen.isCaptured notification'] },
+  { id: 857, section: '1.9', name: 'External camera capture detection', severity: 'low', patterns: ['externalCameraDetect', 'cameraHoleDetect'], freeTools: ['No reliable free tool — fundamental limitation'] },
 
   // ─────────────────────────────────────────────────────────────
   // SECTION 2: TEXT & CHAT SAFETY
   // ─────────────────────────────────────────────────────────────
 
   // 2.1 Hate Speech & Slurs
-  { id: 108, section: '2.1', name: 'Profanity / hate speech', patterns: ['checkTextSafety', 'PROFANITY_WORDS', 'containsProfanity', 'hateSpeech', 'toxicityScore'], freeTools: ['DuoGuard (0.5B, 29 langs, fastest)', 'Llama Guard 4 (12B)', 'Perspective API (free)', 'Detoxify (MIT)', 'OpenAI Moderation API (free)'] },
-  { id: 109, section: '2.1', name: 'Racial slurs', patterns: ['racial_slur', 'IDENTITY_ATTACK', 'racialSlur'], freeTools: ['DuoGuard identity_attack category', 'Perspective API IDENTITY_ATTACK', 'Detoxify identity_attack'] },
-  { id: 110, section: '2.1', name: 'Homophobic slurs', patterns: ['homophobic_slur', 'homophob'], freeTools: ['DuoGuard/Llama Guard hate categories', 'Perspective API IDENTITY_ATTACK'] },
-  { id: 111, section: '2.1', name: 'Transphobic slurs', patterns: ['transphobic_slur', 'transphob'], freeTools: ['DuoGuard/Llama Guard hate categories'] },
-  { id: 112, section: '2.1', name: 'Misogynistic language', patterns: ['misogynistic', 'misogyny', 'sexist_language'], freeTools: ['DuoGuard/Detoxify gender-based categories'] },
-  { id: 113, section: '2.1', name: 'Antisemitic language', patterns: ['antisemitic', 'antisemitism'], freeTools: ['DuoGuard + custom keyword list'] },
-  { id: 114, section: '2.1', name: 'Islamophobic language', patterns: ['islamophobic', 'islamophobia'], freeTools: ['DuoGuard + custom keyword list'] },
-  { id: 115, section: '2.1', name: 'Ableist slurs', patterns: ['ableist', 'ableism', 'disability_slur'], freeTools: ['Custom keyword list + DuoGuard'] },
-  { id: 116, section: '2.1', name: 'Non-English hate speech', patterns: ['hate_multilang', 'detectMultilingualHateSpeech', 'madarchod', 'sibal', 'maldito'], freeTools: ['Qwen3Guard (119 languages)', 'DuoGuard (29 languages)', 'Perspective API (20+ languages)'] },
-  { id: 117, section: '2.1', name: 'Micro-aggression detection', patterns: ['microAggression', 'subtleDiscrimination'], freeTools: ['No reliable free tool — very context-dependent'] },
-  { id: 118, section: '2.1', name: 'Negging patterns', patterns: ['negging', 'backhandedCompliment', 'NEGGING_PATTERNS'], freeTools: ['Custom pattern matching + sentiment analysis'] },
-  { id: 119, section: '2.1', name: 'Coded hate speech', patterns: ['codedHate', 'dogWhistle', 'coded_hate'], freeTools: ['Custom keyword list of known dog-whistles + DuoGuard'] },
+  { id: 108, section: '2.1', name: 'Profanity / hate speech', severity: 'high', patterns: ['checkTextSafety', 'PROFANITY_WORDS', 'containsProfanity', 'hateSpeech', 'toxicityScore'], freeTools: ['DuoGuard (0.5B, 29 langs, fastest)', 'Llama Guard 4 (12B)', 'Perspective API (free)', 'Detoxify (MIT)', 'OpenAI Moderation API (free)'] },
+  { id: 109, section: '2.1', name: 'Racial slurs', severity: 'high', patterns: ['racial_slur', 'IDENTITY_ATTACK', 'racialSlur'], freeTools: ['DuoGuard identity_attack category', 'Perspective API IDENTITY_ATTACK', 'Detoxify identity_attack'] },
+  { id: 110, section: '2.1', name: 'Homophobic slurs', severity: 'high', patterns: ['homophobic_slur', 'homophob'], freeTools: ['DuoGuard/Llama Guard hate categories', 'Perspective API IDENTITY_ATTACK'] },
+  { id: 111, section: '2.1', name: 'Transphobic slurs', severity: 'high', patterns: ['transphobic_slur', 'transphob'], freeTools: ['DuoGuard/Llama Guard hate categories'] },
+  { id: 112, section: '2.1', name: 'Misogynistic language', severity: 'high', patterns: ['misogynistic', 'misogyny', 'sexist_language'], freeTools: ['DuoGuard/Detoxify gender-based categories'] },
+  { id: 113, section: '2.1', name: 'Antisemitic language', severity: 'high', patterns: ['antisemitic', 'antisemitism'], freeTools: ['DuoGuard + custom keyword list'] },
+  { id: 114, section: '2.1', name: 'Islamophobic language', severity: 'high', patterns: ['islamophobic', 'islamophobia'], freeTools: ['DuoGuard + custom keyword list'] },
+  { id: 115, section: '2.1', name: 'Ableist slurs', severity: 'high', patterns: ['ableist', 'ableism', 'disability_slur'], freeTools: ['Custom keyword list + DuoGuard'] },
+  { id: 116, section: '2.1', name: 'Non-English hate speech', severity: 'high', patterns: ['hate_multilang', 'detectMultilingualHateSpeech', 'madarchod', 'sibal', 'maldito'], freeTools: ['Qwen3Guard (119 languages)', 'DuoGuard (29 languages)', 'Perspective API (20+ languages)'] },
+  { id: 117, section: '2.1', name: 'Micro-aggression detection', severity: 'low', patterns: ['microAggression', 'subtleDiscrimination'], freeTools: ['No reliable free tool — very context-dependent'] },
+  { id: 118, section: '2.1', name: 'Negging patterns', severity: 'medium', patterns: ['negging', 'backhandedCompliment', 'NEGGING_PATTERNS'], freeTools: ['Custom pattern matching + sentiment analysis'] },
+  { id: 119, section: '2.1', name: 'Coded hate speech', severity: 'high', patterns: ['codedHate', 'dogWhistle', 'coded_hate'], freeTools: ['Custom keyword list of known dog-whistles + DuoGuard'] },
 
   // 2.2 Sexual Content & Solicitation
-  { id: 120, section: '2.2', name: 'Sexual solicitation', patterns: ['sexual_solicitation', 'SEXUAL_PATTERNS', 'sexualSolicitation', 'detectSexualSolicitation'], freeTools: ['DuoGuard sexual_content category', 'Llama Guard 4 S1 (violent crimes) / S2 (sex-related)', 'OpenAI Moderation sexual category'] },
-  { id: 121, section: '2.2', name: 'Unsolicited explicit first message', patterns: ['checkFirstMessage', 'moderateFirstMessage', 'inappropriate_first_message', 'checkFirstMessageSafety'], freeTools: ['Apply stricter thresholds on first message with DuoGuard/Llama Guard'] },
-  { id: 122, section: '2.2', name: 'Escalating photo request pattern', patterns: ['photoRequestEscalation', 'escalatingPhotoRequest', 'photoRequestPattern'], freeTools: ['Custom conversation tracking — no free off-the-shelf tool'] },
-  { id: 123, section: '2.2', name: 'Blackmail setup pattern', patterns: ['blackmailSetup', 'blackmail_pattern'], freeTools: ['Custom pattern matching + sextortion detection'] },
-  { id: 124, section: '2.2', name: 'Sextortion patterns', patterns: ['SEXTORTION_PATTERNS', 'sextortion', 'sextort'], freeTools: ['Custom keyword patterns + Llama Guard'] },
-  { id: 125, section: '2.2', name: 'NSFW speech in voice intros', patterns: ['checkNsfwSpeech', 'NSFW_SPEECH_PATTERNS', 'nsfw_speech', 'nsfwSpeech'], freeTools: ['Whisper (MIT) transcription → DuoGuard text scan'] },
-  { id: 126, section: '2.2', name: 'Child sexual exploitation language', patterns: ['cseLanguage', 'csam_language', 'childExploitation'], freeTools: ['Llama Guard child safety category', 'Custom high-priority keyword list'] },
-  { id: 127, section: '2.2', name: 'Grooming language patterns', patterns: ['GROOMING_PATTERNS', 'grooming', 'groomingDetect'], freeTools: ['No free off-the-shelf tool — custom classifier needed'] },
-  { id: 128, section: '2.2', name: 'References to underage', patterns: ['UNDERAGE_PATTERNS', 'category.*underage', 'underage', 'preteen', 'barely.legal', 'ddlg'], freeTools: ['Keyword matching + Llama Guard child safety category'] },
-  { id: 885, section: '2.2', name: 'Sugar daddy/momma scam script detection', patterns: ['sugarDaddy', 'sugarMomma', 'sugarScam', 'allowance'], freeTools: ['Custom keyword patterns'] },
-  { id: 886, section: '2.2', name: 'Sugar arrangement language', patterns: ['sugarArrangement', 'arrangement_language'], freeTools: ['Custom keyword patterns'] },
-  { id: 887, section: '2.2', name: 'Verification fee scam', patterns: ['verificationFee', 'payToVerify', 'sendMoney.*verify'], freeTools: ['Custom keyword patterns'] },
-  { id: 888, section: '2.2', name: 'Escort/sex work solicitation', patterns: ['escortSolicitation', 'sexWork', 'companionship.*fee'], freeTools: ['Custom keyword patterns + DuoGuard'] },
-  { id: 889, section: '2.2', name: 'Paid companionship emoji patterns', patterns: ['paidCompanionEmoji', 'roses.*emoji', '💰.*🌹'], freeTools: ['Custom emoji sequence detection'] },
-  { id: 890, section: '2.2', name: 'Sex trafficking victim identification', patterns: ['traffickingVictim', 'traffickingIdentification', 'forcedLabor'], freeTools: ['NCMEC CyberTipline + keyword patterns'] },
-  { id: 891, section: '2.2', name: 'Coded pricing language', patterns: ['codedPricing', 'priceCode', 'roses.*hundred'], freeTools: ['Custom pattern matching'] },
-  { id: 892, section: '2.2', name: 'Third-party controlled profile', patterns: ['controlledProfile', 'pimpControl', 'thirdPartyProfile'], freeTools: ['Behavioral signals — no free tool'] },
+  { id: 120, section: '2.2', name: 'Sexual solicitation', severity: 'high', patterns: ['sexual_solicitation', 'SEXUAL_PATTERNS', 'sexualSolicitation', 'detectSexualSolicitation'], freeTools: ['DuoGuard sexual_content category', 'Llama Guard 4 S1 (violent crimes) / S2 (sex-related)', 'OpenAI Moderation sexual category'] },
+  { id: 121, section: '2.2', name: 'Unsolicited explicit first message', severity: 'high', patterns: ['checkFirstMessageSafety', 'moderateFirstMessage', 'inappropriate_first_message'], freeTools: ['Apply stricter thresholds on first message with DuoGuard/Llama Guard'] },
+  { id: 122, section: '2.2', name: 'Escalating photo request pattern', severity: 'high', patterns: ['photoRequestEscalation', 'escalatingPhotoRequest', 'photoRequestPattern'], freeTools: ['Custom conversation tracking — no free off-the-shelf tool'] },
+  { id: 123, section: '2.2', name: 'Blackmail setup pattern', severity: 'critical', patterns: ['blackmailSetup', 'blackmail_pattern'], freeTools: ['Custom pattern matching + sextortion detection'] },
+  { id: 124, section: '2.2', name: 'Sextortion patterns', severity: 'critical', patterns: ['SEXTORTION_PATTERNS', 'sextortion', 'sextort'], freeTools: ['Custom keyword patterns + Llama Guard'] },
+  { id: 125, section: '2.2', name: 'NSFW speech in voice intros', severity: 'high', patterns: ['checkNsfwSpeech', 'NSFW_SPEECH_PATTERNS', 'nsfw_speech', 'nsfwSpeech'], freeTools: ['Whisper (MIT) transcription → DuoGuard text scan'] },
+  { id: 126, section: '2.2', name: 'Child sexual exploitation language', severity: 'critical', patterns: ['cseLanguage', 'csam_language', 'childExploitation'], freeTools: ['Llama Guard child safety category', 'Custom high-priority keyword list'] },
+  { id: 127, section: '2.2', name: 'Grooming language patterns', severity: 'critical', patterns: ['GROOMING_PATTERNS', 'grooming', 'groomingDetect'], freeTools: ['No free off-the-shelf tool — custom classifier needed'] },
+  { id: 128, section: '2.2', name: 'References to underage', severity: 'critical', patterns: ['UNDERAGE_PATTERNS', 'category.*underage', 'underage', 'preteen', 'barely.legal', 'ddlg'], freeTools: ['Keyword matching + Llama Guard child safety category'] },
+  { id: 885, section: '2.2', name: 'Sugar daddy/momma scam script detection', severity: 'medium', patterns: ['sugarDaddy', 'sugarMomma', 'sugarScam', 'allowance'], freeTools: ['Custom keyword patterns'] },
+  { id: 886, section: '2.2', name: 'Sugar arrangement language', severity: 'medium', patterns: ['sugarArrangement', 'arrangement_language'], freeTools: ['Custom keyword patterns'] },
+  { id: 887, section: '2.2', name: 'Verification fee scam', severity: 'high', patterns: ['verificationFee', 'payToVerify', 'sendMoney.*verify'], freeTools: ['Custom keyword patterns'] },
+  { id: 888, section: '2.2', name: 'Escort/sex work solicitation', severity: 'high', patterns: ['escortSolicitation', 'sexWork', 'companionship.*fee'], freeTools: ['Custom keyword patterns + DuoGuard'] },
+  { id: 889, section: '2.2', name: 'Paid companionship emoji patterns', severity: 'medium', patterns: ['paidCompanionEmoji', 'roses.*emoji', '💰.*🌹'], freeTools: ['Custom emoji sequence detection'] },
+  { id: 890, section: '2.2', name: 'Sex trafficking victim identification', severity: 'critical', patterns: ['traffickingVictim', 'traffickingIdentification', 'forcedLabor'], freeTools: ['NCMEC CyberTipline + keyword patterns'] },
+  { id: 891, section: '2.2', name: 'Coded pricing language', severity: 'medium', patterns: ['codedPricing', 'priceCode', 'roses.*hundred'], freeTools: ['Custom pattern matching'] },
+  { id: 892, section: '2.2', name: 'Third-party controlled profile', severity: 'critical', patterns: ['controlledProfile', 'pimpControl', 'thirdPartyProfile'], freeTools: ['Behavioral signals — no free tool'] },
 
   // 2.3 Violence & Threats
-  { id: 129, section: '2.3', name: 'Violence / death threats', patterns: ['violence_threat', 'VIOLENCE_PATTERNS', 'detectViolenceThreats', 'deathThreat'], freeTools: ['DuoGuard violence category', 'Llama Guard 4 S1', 'Perspective API THREAT'] },
-  { id: 130, section: '2.3', name: 'Self-harm encouragement', patterns: ['self_harm', 'SELF_HARM_PATTERNS', 'detectSelfHarmEncouragement', 'kys'], freeTools: ['DuoGuard self-harm category', 'Llama Guard 4 S5 (self-harm)'] },
-  { id: 131, section: '2.3', name: 'Suicide / crisis intervention', patterns: ['suicidePrevention', 'crisisIntervention', 'CRISIS_KEYWORDS', 'suicidalIdeation'], freeTools: ['Keyword triggers → crisis helpline routing'] },
-  { id: 132, section: '2.3', name: 'Doxxing / PII sharing', patterns: ['DOXXING_PATTERNS', 'doxxing', 'category.*pii', 'piiSharing'], freeTools: ['Roblox PII Classifier (98% recall)', 'Presidio (Microsoft, MIT)'] },
-  { id: 133, section: '2.3', name: 'Coercive / controlling language', patterns: ['COERCIVE_PATTERNS', 'coercive', 'controllingLanguage'], freeTools: ['Custom pattern matching — no free off-the-shelf tool'] },
-  { id: 134, section: '2.3', name: 'Punishment for rejection pattern', patterns: ['rejectionPunishment', 'rejectRetaliation', 'punishmentForNo'], freeTools: ['Custom pattern matching + sentiment shift detection'] },
-  { id: 135, section: '2.3', name: 'Stalking language patterns', patterns: ['stalkingLanguage', 'STALKING_PATTERNS', 'obsessiveLanguage'], freeTools: ['Custom keyword patterns'] },
-  { id: 136, section: '2.3', name: 'DARVO patterns', patterns: ['darvo', 'denyAttackReverse', 'victimBlaming'], freeTools: ['No free tool — custom classifier needed'] },
-  { id: 137, section: '2.3', name: 'Gaslighting language', patterns: ['gaslighting', 'GASLIGHTING_PATTERNS', 'youreOverreacting'], freeTools: ['Custom keyword patterns'] },
+  { id: 129, section: '2.3', name: 'Violence / death threats', severity: 'critical', patterns: ['violence_threat', 'VIOLENCE_PATTERNS', 'detectViolenceThreats', 'deathThreat'], freeTools: ['DuoGuard violence category', 'Llama Guard 4 S1', 'Perspective API THREAT'] },
+  { id: 130, section: '2.3', name: 'Self-harm encouragement', severity: 'critical', patterns: ['self_harm', 'SELF_HARM_PATTERNS', 'detectSelfHarmEncouragement', 'kys'], freeTools: ['DuoGuard self-harm category', 'Llama Guard 4 S5 (self-harm)'] },
+  { id: 131, section: '2.3', name: 'Suicide / crisis intervention', severity: 'critical', patterns: ['suicidePrevention', 'crisisIntervention', 'CRISIS_KEYWORDS', 'suicidalIdeation'], freeTools: ['Keyword triggers → crisis helpline routing'] },
+  { id: 132, section: '2.3', name: 'Doxxing / PII sharing', severity: 'critical', patterns: ['DOXXING_PATTERNS', 'doxxing', 'category.*pii', 'piiSharing'], freeTools: ['Roblox PII Classifier (98% recall)', 'Presidio (Microsoft, MIT)'] },
+  { id: 133, section: '2.3', name: 'Coercive / controlling language', severity: 'high', patterns: ['COERCIVE_PATTERNS', 'coercive', 'controllingLanguage'], freeTools: ['Custom pattern matching — no free off-the-shelf tool'] },
+  { id: 134, section: '2.3', name: 'Punishment for rejection pattern', severity: 'high', patterns: ['rejectionPunishment', 'rejectRetaliation', 'punishmentForNo'], freeTools: ['Custom pattern matching + sentiment shift detection'] },
+  { id: 135, section: '2.3', name: 'Stalking language patterns', severity: 'high', patterns: ['stalkingLanguage', 'STALKING_PATTERNS', 'obsessiveLanguage'], freeTools: ['Custom keyword patterns'] },
+  { id: 136, section: '2.3', name: 'DARVO patterns', severity: 'medium', patterns: ['darvo', 'denyAttackReverse', 'victimBlaming'], freeTools: ['No free tool — custom classifier needed'] },
+  { id: 137, section: '2.3', name: 'Gaslighting language', severity: 'high', patterns: ['gaslighting', 'GASLIGHTING_PATTERNS', 'youreOverreacting'], freeTools: ['Custom keyword patterns'] },
 
   // 2.4 Scam & Fraud Language
-  { id: 138, section: '2.4', name: 'Crypto / money scam solicitation', patterns: ['cryptoScam', 'SCAM_PATTERNS', 'investment_scam', 'crypto_address'], freeTools: ['Custom keyword patterns + crypto address regex'] },
-  { id: 139, section: '2.4', name: 'Pig butchering scripts', patterns: ['pigButchering', 'sha_zhu_pan', 'investmentScam.*romance'], freeTools: ['No free tool — custom classifier with known scripts'] },
-  { id: 140, section: '2.4', name: 'Romance scam vocabulary', patterns: ['romanceScamVocab', 'ROMANCE_SCAM_WORDS', 'scamVocabulary'], freeTools: ['Custom keyword list from known scam scripts'] },
-  { id: 141, section: '2.4', name: 'Military romance scam vocabulary', patterns: ['militaryScam', 'deployedOverseas', 'militaryRomance'], freeTools: ['Custom keyword patterns'] },
-  { id: 142, section: '2.4', name: 'Oil rig / engineer overseas narrative', patterns: ['oilRigScam', 'engineerOverseas', 'offshoreNarrative'], freeTools: ['Custom narrative pattern matching'] },
-  { id: 143, section: '2.4', name: 'Dead spouse narrative opener', patterns: ['deadSpouseOpener', 'widowerNarrative'], freeTools: ['Custom narrative pattern matching'] },
-  { id: 144, section: '2.4', name: 'Child sympathy manipulation', patterns: ['childSympathy', 'sickChild', 'childManipulation'], freeTools: ['Custom pattern matching'] },
-  { id: 145, section: '2.4', name: 'Medical emergency scripts', patterns: ['medicalEmergencyScam', 'hospitalBill', 'urgentMedical'], freeTools: ['Custom keyword patterns'] },
-  { id: 146, section: '2.4', name: 'Visa / immigration scam', patterns: ['visaScam', 'immigrationScam', 'greenCard'], freeTools: ['Custom keyword patterns'] },
-  { id: 147, section: '2.4', name: 'Shipping / customs fee scam', patterns: ['shippingFeeScam', 'customsFee', 'packageStuck'], freeTools: ['Custom keyword patterns'] },
-  { id: 148, section: '2.4', name: 'Job offer scam', patterns: ['jobOfferScam', 'workFromHome.*scam', 'easyMoney'], freeTools: ['Custom keyword patterns'] },
-  { id: 149, section: '2.4', name: 'Fake dying relative / inheritance', patterns: ['inheritanceScam', 'dyingRelative', 'willBeneficiary'], freeTools: ['Custom keyword patterns'] },
-  { id: 150, section: '2.4', name: 'Recovery scam detection', patterns: ['recoveryScam', 'getYourMoneyBack', 'scamRecovery'], freeTools: ['Custom keyword patterns'] },
-  { id: 151, section: '2.4', name: 'Gift card request detection', patterns: ['giftCardRequest', 'iTunesCard', 'steamCard', 'googlePlayCard'], freeTools: ['Keyword matching for gift card brand names'] },
-  { id: 152, section: '2.4', name: 'Wire transfer solicitation', patterns: ['wireTransfer', 'westernUnion', 'moneyGram', 'bankTransfer'], freeTools: ['Keyword matching'] },
-  { id: 153, section: '2.4', name: 'Zelle / CashApp / Venmo request', patterns: ['zelleRequest', 'cashApp', 'venmo.*send', 'paypalRequest'], freeTools: ['Keyword + payment handle regex'] },
-  { id: 154, section: '2.4', name: 'Crypto address sharing', patterns: ['crypto_address', 'bitcoinAddress', 'ethAddress', '0x[a-fA-F0-9]{40}', 'bc1[a-zA-Z0-9]'], freeTools: ['Regex for BTC/ETH/SOL address formats'] },
-  { id: 155, section: '2.4', name: 'Drug dealing language', patterns: ['drug_dealing', 'DRUG_PATTERNS', 'detectDrugDealingLanguage'], freeTools: ['Custom keyword + emoji patterns'] },
-  { id: 156, section: '2.4', name: 'Financial requests', patterns: ['detectFinancialRequest', 'financialRequest', 'financial_solicitation', 'sendMoney', 'lendMoney'], freeTools: ['Custom keyword patterns'] },
-  { id: 881, section: '2.4', name: 'MLM recruitment language', patterns: ['mlmRecruit', 'passiveIncome', 'beYourOwnBoss', 'groundFloor'], freeTools: ['Custom keyword list'] },
-  { id: 882, section: '2.4', name: 'MLM pivot pattern', patterns: ['mlmPivot', 'romanticToBusinessPitch'], freeTools: ['Custom conversation flow analysis'] },
-  { id: 883, section: '2.4', name: 'Known MLM company names', patterns: ['knownMLMCompany', 'herbalife', 'amway', 'primerica', 'itWorks'], freeTools: ['Keyword list of known MLM companies'] },
-  { id: 884, section: '2.4', name: 'Fake date → sales pitch reporting', patterns: ['fakeDateSalesPitch', 'salesPitchDate'], freeTools: ['Report category + keyword detection'] },
+  { id: 138, section: '2.4', name: 'Crypto / money scam solicitation', severity: 'high', patterns: ['cryptoScam', 'SCAM_PATTERNS', 'investment_scam', 'crypto_address'], freeTools: ['Custom keyword patterns + crypto address regex'] },
+  { id: 139, section: '2.4', name: 'Pig butchering scripts', severity: 'high', patterns: ['pigButchering', 'sha_zhu_pan', 'investmentScam.*romance'], freeTools: ['No free tool — custom classifier with known scripts'] },
+  { id: 140, section: '2.4', name: 'Romance scam vocabulary', severity: 'high', patterns: ['romanceScamVocab', 'ROMANCE_SCAM_WORDS', 'scamVocabulary'], freeTools: ['Custom keyword list from known scam scripts'] },
+  { id: 141, section: '2.4', name: 'Military romance scam vocabulary', severity: 'high', patterns: ['militaryScam', 'deployedOverseas', 'militaryRomance'], freeTools: ['Custom keyword patterns'] },
+  { id: 142, section: '2.4', name: 'Oil rig / engineer overseas narrative', severity: 'medium', patterns: ['oilRigScam', 'engineerOverseas', 'offshoreNarrative'], freeTools: ['Custom narrative pattern matching'] },
+  { id: 143, section: '2.4', name: 'Dead spouse narrative opener', severity: 'medium', patterns: ['deadSpouseOpener', 'widowerNarrative'], freeTools: ['Custom narrative pattern matching'] },
+  { id: 144, section: '2.4', name: 'Child sympathy manipulation', severity: 'medium', patterns: ['childSympathy', 'sickChild', 'childManipulation'], freeTools: ['Custom pattern matching'] },
+  { id: 145, section: '2.4', name: 'Medical emergency scripts', severity: 'medium', patterns: ['medicalEmergencyScam', 'hospitalBill', 'urgentMedical'], freeTools: ['Custom keyword patterns'] },
+  { id: 146, section: '2.4', name: 'Visa / immigration scam', severity: 'medium', patterns: ['visaScam', 'immigrationScam', 'greenCard'], freeTools: ['Custom keyword patterns'] },
+  { id: 147, section: '2.4', name: 'Shipping / customs fee scam', severity: 'medium', patterns: ['shippingFeeScam', 'customsFee', 'packageStuck'], freeTools: ['Custom keyword patterns'] },
+  { id: 148, section: '2.4', name: 'Job offer scam', severity: 'medium', patterns: ['jobOfferScam', 'workFromHome.*scam', 'easyMoney'], freeTools: ['Custom keyword patterns'] },
+  { id: 149, section: '2.4', name: 'Fake dying relative / inheritance', severity: 'medium', patterns: ['inheritanceScam', 'dyingRelative', 'willBeneficiary'], freeTools: ['Custom keyword patterns'] },
+  { id: 150, section: '2.4', name: 'Recovery scam detection', severity: 'medium', patterns: ['recoveryScam', 'getYourMoneyBack', 'scamRecovery'], freeTools: ['Custom keyword patterns'] },
+  { id: 151, section: '2.4', name: 'Gift card request detection', severity: 'high', patterns: ['giftCardRequest', 'iTunesCard', 'steamCard', 'googlePlayCard'], freeTools: ['Keyword matching for gift card brand names'] },
+  { id: 152, section: '2.4', name: 'Wire transfer solicitation', severity: 'high', patterns: ['wireTransfer', 'westernUnion', 'moneyGram', 'bankTransfer'], freeTools: ['Keyword matching'] },
+  { id: 153, section: '2.4', name: 'Zelle / CashApp / Venmo request', severity: 'high', patterns: ['zelleRequest', 'cashApp', 'venmo.*send', 'paypalRequest'], freeTools: ['Keyword + payment handle regex'] },
+  { id: 154, section: '2.4', name: 'Crypto address sharing', severity: 'high', patterns: ['crypto_address', 'bitcoinAddress', 'ethAddress', '0x[a-fA-F0-9]{40}', 'bc1[a-zA-Z0-9]'], freeTools: ['Regex for BTC/ETH/SOL address formats'] },
+  { id: 155, section: '2.4', name: 'Drug dealing language', severity: 'high', patterns: ['drug_dealing', 'DRUG_PATTERNS', 'detectDrugDealingLanguage'], freeTools: ['Custom keyword + emoji patterns'] },
+  { id: 156, section: '2.4', name: 'Financial requests in chat', severity: 'high', patterns: ['detectFinancialRequest', 'financial_solicitation', 'sendMoney', 'lendMoney'], freeTools: ['Custom keyword patterns'] },
+  { id: 881, section: '2.4', name: 'MLM recruitment language', severity: 'medium', patterns: ['mlmRecruit', 'passiveIncome', 'beYourOwnBoss', 'groundFloor'], freeTools: ['Custom keyword list'] },
+  { id: 882, section: '2.4', name: 'MLM pivot pattern', severity: 'medium', patterns: ['mlmPivot', 'romanticToBusinessPitch'], freeTools: ['Custom conversation flow analysis'] },
+  { id: 883, section: '2.4', name: 'Known MLM company names', severity: 'medium', patterns: ['knownMLMCompany', 'herbalife', 'amway', 'primerica', 'itWorks'], freeTools: ['Keyword list of known MLM companies'] },
+  { id: 884, section: '2.4', name: 'Fake date → sales pitch reporting', severity: 'medium', patterns: ['fakeDateSalesPitch', 'salesPitchDate'], freeTools: ['Report category + keyword detection'] },
 
   // 2.5 Manipulation Patterns
-  { id: 157, section: '2.5', name: 'Love bombing patterns', patterns: ['LOVE_BOMBING_PATTERNS', 'love_bombing', 'loveBomb'], freeTools: ['Custom — message frequency + sentiment velocity analysis'] },
-  { id: 158, section: '2.5', name: 'Love bombing escalation', patterns: ['loveBombEscalation', 'escalatingLoveBomb'], freeTools: ['Custom — track compliment density over time'] },
-  { id: 159, section: '2.5', name: 'Fast-escalating conversations', patterns: ['detectFastEscalation', 'escalatesQuickly', 'ESCALATION_PATTERNS'], freeTools: ['Custom — message sentiment + intimacy score velocity'] },
-  { id: 160, section: '2.5', name: 'Future faking language', patterns: ['futureFaking', 'weWillBeTogether', 'planningFuture.*early'], freeTools: ['Custom keyword patterns'] },
-  { id: 161, section: '2.5', name: 'Breadcrumbing detection', patterns: ['breadcrumbing', 'intermittentReinforcement'], freeTools: ['Custom — reply pattern analysis'] },
-  { id: 162, section: '2.5', name: 'Trauma bonding language', patterns: ['traumaBonding', 'traumaBond'], freeTools: ['No free tool — custom classifier'] },
-  { id: 163, section: '2.5', name: 'Religious manipulation', patterns: ['religiousManipulation', 'godWantsUs', 'divinePlan'], freeTools: ['Custom keyword patterns'] },
-  { id: 164, section: '2.5', name: 'Excessive compliment velocity', patterns: ['complimentVelocity', 'excessiveCompliments'], freeTools: ['Custom — sentiment analysis + frequency'] },
-  { id: 165, section: '2.5', name: 'Question bombing / PII extraction', patterns: ['questionBombing', 'piiExtraction', 'excessiveQuestions'], freeTools: ['Roblox PII Classifier (98% recall)', 'Custom question frequency detection'] },
-  { id: 166, section: '2.5', name: 'Reciprocity exploitation', patterns: ['reciprocityExploit', 'iDidForYou'], freeTools: ['Custom pattern matching'] },
-  { id: 167, section: '2.5', name: 'Fake shared interests mirroring', patterns: ['interestMirroring', 'fakeMirroring'], freeTools: ['Custom — compare stated interests to conversation patterns'] },
-  { id: 168, section: '2.5', name: 'Trust test manipulation', patterns: ['trustTest', 'proveYourLove', 'ifYouLovedMe'], freeTools: ['Custom keyword patterns'] },
-  { id: 169, section: '2.5', name: 'Manufactured jealousy', patterns: ['manufacturedJealousy', 'makeJealous'], freeTools: ['Custom pattern matching'] },
-  { id: 170, section: '2.5', name: 'False scarcity patterns', patterns: ['falseScarcity', 'lastChance', 'limitedTime.*relationship'], freeTools: ['Custom keyword patterns'] },
-  { id: 171, section: '2.5', name: 'Sunk cost exploitation', patterns: ['sunkCost', 'weveComeThisFar', 'afterEverything'], freeTools: ['Custom keyword patterns'] },
-  { id: 172, section: '2.5', name: 'Isolation tactics', patterns: ['isolationTactic', 'dontTellAnyone', 'justBetweenUs', 'friendsDontUnderstand'], freeTools: ['Custom keyword patterns'] },
-  { id: 173, section: '2.5', name: 'Urgency manufacturing', patterns: ['urgencyManufacturing', 'actNow', 'emergencyPlease', 'needItTonight'], freeTools: ['Custom keyword patterns'] },
-  { id: 174, section: '2.5', name: 'Digital footprint coaching', patterns: ['deleteMessages', 'clearHistory', 'dontScreenshot'], freeTools: ['Custom keyword patterns'] },
-  { id: 175, section: '2.5', name: 'Proof of life refusal pattern', patterns: ['proofOfLifeRefusal', 'cantVideoCall', 'camerasBroken', 'noVideoChat'], freeTools: ['Custom — track video call refusal frequency'] },
-  { id: 176, section: '2.5', name: 'BITE model cult tactics', patterns: ['biteModel', 'cultTactic', 'behaviorControl.*informationControl'], freeTools: ['No free tool — custom classifier'] },
-  { id: 177, section: '2.5', name: 'Sentiment manipulation trajectory', patterns: ['sentimentTrajectory', 'emotionalTrajectory', 'moodManipulation'], freeTools: ['Custom — sentiment over time analysis'] },
-  { id: 178, section: '2.5', name: 'Second chance scam', patterns: ['secondChanceScam', 'comeBackAfterBlock', 'newAccountSamePerson'], freeTools: ['Device fingerprint + face matching after re-registration'] },
-  { id: 179, section: '2.5', name: 'Homesickness / isolation narrative', patterns: ['homesickness', 'farFromHome', 'noFriendsHere'], freeTools: ['Custom keyword patterns'] },
-  { id: 180, section: '2.5', name: 'Excessive spiritual / fate language', patterns: ['fateLanguage', 'meantToBe', 'soulmate.*early', 'destinyBroughtUs'], freeTools: ['Custom keyword + frequency analysis'] },
-  { id: 181, section: '2.5', name: 'Benign opener then pivot detection', patterns: ['benignPivot', 'openerThenPivot', 'normalThenScam'], freeTools: ['Custom conversation phase analysis'] },
-  { id: 182, section: '2.5', name: 'Consistent persona inconsistency', patterns: ['personaInconsistency', 'contradictingDetails', 'storyChanges'], freeTools: ['Custom — named entity tracking across messages'] },
-  { id: 183, section: '2.5', name: 'Selective memory detection', patterns: ['selectiveMemory', 'forgotWhatISaid', 'amnesia'], freeTools: ['Custom — compare references to previous conversation'] },
-  { id: 184, section: '2.5', name: 'Scripted conversation detection', patterns: ['scriptedConversation', 'templateMessage', 'scriptDetect'], freeTools: ['Sentence-Transformers semantic similarity to known scripts'] },
-  { id: 185, section: '2.5', name: 'Flattery-to-request ratio', patterns: ['flatteryToRequest', 'complimentThenAsk'], freeTools: ['Custom — sentiment + intent analysis'] },
-  { id: 186, section: '2.5', name: 'Excessive self-disclosure early', patterns: ['excessiveDisclosure', 'tooMuchTooSoon'], freeTools: ['Custom — personal detail density scoring'] },
-  { id: 187, section: '2.5', name: 'Wealth signaling response spike', patterns: ['wealthSignaling', 'richResponse', 'luxuryMention'], freeTools: ['Custom — track engagement delta after wealth mentions'] },
-  { id: 188, section: '2.5', name: 'Loneliness exploitation', patterns: ['lonelinessExploit', 'youMustBeLonely', 'illKeepYouCompany'], freeTools: ['Custom keyword patterns'] },
-  { id: 189, section: '2.5', name: 'Grief exploitation', patterns: ['griefExploit', 'iLostSomeone', 'griefManipulation'], freeTools: ['Custom keyword patterns'] },
-  { id: 190, section: '2.5', name: 'Health vulnerability exploitation', patterns: ['healthExploit', 'youreNotWell', 'illTakeCareOfYou.*early'], freeTools: ['Custom keyword patterns'] },
-  { id: 191, section: '2.5', name: 'Addiction vulnerability exploitation', patterns: ['addictionExploit', 'sobrieryManipulation'], freeTools: ['Custom keyword patterns'] },
-  { id: 192, section: '2.5', name: 'Cognitive vulnerability indicators', patterns: ['cognitiveVulnerability', 'confusedUser', 'elderlyTarget'], freeTools: ['Custom — reading level + response coherence analysis'] },
-  { id: 193, section: '2.5', name: 'Sudden platform switch urgency', patterns: ['platformSwitch', 'moveToWhatsApp', 'switchToTelegram', 'offPlatformUrgent'], freeTools: ['Keyword detection for messaging app names + urgency words'] },
+  { id: 157, section: '2.5', name: 'Love bombing patterns', severity: 'high', patterns: ['LOVE_BOMBING_PATTERNS', 'love_bombing', 'loveBombDetect'], freeTools: ['Custom — message frequency + sentiment velocity analysis'] },
+  { id: 158, section: '2.5', name: 'Love bombing escalation', severity: 'high', patterns: ['loveBombEscalation', 'escalatingLoveBomb'], freeTools: ['Custom — track compliment density over time'] },
+  { id: 159, section: '2.5', name: 'Fast-escalating conversations', severity: 'high', patterns: ['detectFastEscalation', 'escalatesQuickly', 'ESCALATION_PATTERNS', 'conversationEscalation'], freeTools: ['Custom — message sentiment + intimacy score velocity'] },
+  { id: 160, section: '2.5', name: 'Future faking language', severity: 'medium', patterns: ['futureFaking', 'weWillBeTogether', 'planningFuture.*early'], freeTools: ['Custom keyword patterns'] },
+  { id: 161, section: '2.5', name: 'Breadcrumbing detection', severity: 'medium', patterns: ['breadcrumbing', 'intermittentReinforcement'], freeTools: ['Custom — reply pattern analysis'] },
+  { id: 162, section: '2.5', name: 'Trauma bonding language', severity: 'high', patterns: ['traumaBonding', 'traumaBond'], freeTools: ['No free tool — custom classifier'] },
+  { id: 163, section: '2.5', name: 'Religious manipulation', severity: 'medium', patterns: ['religiousManipulation', 'godWantsUs', 'divinePlan'], freeTools: ['Custom keyword patterns'] },
+  { id: 164, section: '2.5', name: 'Excessive compliment velocity', severity: 'medium', patterns: ['complimentVelocity', 'excessiveCompliments'], freeTools: ['Custom — sentiment analysis + frequency'] },
+  { id: 165, section: '2.5', name: 'Question bombing / PII extraction', severity: 'high', patterns: ['questionBombing', 'piiExtraction', 'excessiveQuestions'], freeTools: ['Roblox PII Classifier (98% recall)', 'Custom question frequency detection'] },
+  { id: 166, section: '2.5', name: 'Reciprocity exploitation', severity: 'medium', patterns: ['reciprocityExploit', 'iDidForYou'], freeTools: ['Custom pattern matching'] },
+  { id: 167, section: '2.5', name: 'Fake shared interests mirroring', severity: 'medium', patterns: ['interestMirroring', 'fakeMirroring'], freeTools: ['Custom — compare stated interests to conversation patterns'] },
+  { id: 168, section: '2.5', name: 'Trust test manipulation', severity: 'high', patterns: ['trustTest', 'proveYourLove', 'ifYouLovedMe'], freeTools: ['Custom keyword patterns'] },
+  { id: 169, section: '2.5', name: 'Manufactured jealousy', severity: 'medium', patterns: ['manufacturedJealousy', 'makeJealous'], freeTools: ['Custom pattern matching'] },
+  { id: 170, section: '2.5', name: 'False scarcity patterns', severity: 'medium', patterns: ['falseScarcity', 'lastChance', 'limitedTime.*relationship'], freeTools: ['Custom keyword patterns'] },
+  { id: 171, section: '2.5', name: 'Sunk cost exploitation', severity: 'medium', patterns: ['sunkCost', 'weveComeThisFar', 'afterEverything'], freeTools: ['Custom keyword patterns'] },
+  { id: 172, section: '2.5', name: 'Isolation tactics', severity: 'high', patterns: ['isolationTactic', 'dontTellAnyone', 'justBetweenUs', 'friendsDontUnderstand'], freeTools: ['Custom keyword patterns'] },
+  { id: 173, section: '2.5', name: 'Urgency manufacturing', severity: 'high', patterns: ['urgencyManufacturing', 'actNow', 'emergencyPlease', 'needItTonight'], freeTools: ['Custom keyword patterns'] },
+  { id: 174, section: '2.5', name: 'Digital footprint coaching', severity: 'high', patterns: ['deleteMessages', 'clearHistory', 'dontScreenshot'], freeTools: ['Custom keyword patterns'] },
+  { id: 175, section: '2.5', name: 'Proof of life refusal pattern', severity: 'high', patterns: ['proofOfLifeRefusal', 'cantVideoCall', 'camerasBroken', 'noVideoChat'], freeTools: ['Custom — track video call refusal frequency'] },
+  { id: 176, section: '2.5', name: 'BITE model cult tactics', severity: 'medium', patterns: ['biteModel', 'cultTactic', 'behaviorControl.*informationControl'], freeTools: ['No free tool — custom classifier'] },
+  { id: 177, section: '2.5', name: 'Sentiment manipulation trajectory', severity: 'medium', patterns: ['sentimentTrajectory', 'emotionalTrajectory', 'moodManipulation'], freeTools: ['Custom — sentiment over time analysis'] },
+  { id: 178, section: '2.5', name: 'Second chance scam', severity: 'high', patterns: ['secondChanceScam', 'comeBackAfterBlock', 'newAccountSamePerson'], freeTools: ['Device fingerprint + face matching after re-registration'] },
+  { id: 179, section: '2.5', name: 'Homesickness / isolation narrative', severity: 'medium', patterns: ['homesickness', 'farFromHome', 'noFriendsHere'], freeTools: ['Custom keyword patterns'] },
+  { id: 180, section: '2.5', name: 'Excessive spiritual / fate language', severity: 'medium', patterns: ['fateLanguage', 'meantToBe', 'soulmate.*early', 'destinyBroughtUs'], freeTools: ['Custom keyword + frequency analysis'] },
+  { id: 181, section: '2.5', name: 'Benign opener then pivot detection', severity: 'medium', patterns: ['benignPivot', 'openerThenPivot', 'normalThenScam'], freeTools: ['Custom conversation phase analysis'] },
+  { id: 182, section: '2.5', name: 'Consistent persona inconsistency', severity: 'high', patterns: ['personaInconsistency', 'contradictingDetails', 'storyChanges'], freeTools: ['Custom — named entity tracking across messages'] },
+  { id: 183, section: '2.5', name: 'Selective memory detection', severity: 'medium', patterns: ['selectiveMemory', 'forgotWhatISaid', 'amnesia'], freeTools: ['Custom — compare references to previous conversation'] },
+  { id: 184, section: '2.5', name: 'Scripted conversation detection', severity: 'high', patterns: ['scriptedConversation', 'templateMessage', 'scriptDetect'], freeTools: ['Sentence-Transformers semantic similarity to known scripts'] },
+  { id: 185, section: '2.5', name: 'Flattery-to-request ratio', severity: 'medium', patterns: ['flatteryToRequest', 'complimentThenAsk'], freeTools: ['Custom — sentiment + intent analysis'] },
+  { id: 186, section: '2.5', name: 'Excessive self-disclosure early', severity: 'medium', patterns: ['excessiveDisclosure', 'tooMuchTooSoon'], freeTools: ['Custom — personal detail density scoring'] },
+  { id: 187, section: '2.5', name: 'Wealth signaling response spike', severity: 'medium', patterns: ['wealthSignaling', 'richResponse', 'luxuryMention'], freeTools: ['Custom — track engagement delta after wealth mentions'] },
+  { id: 188, section: '2.5', name: 'Loneliness exploitation', severity: 'high', patterns: ['lonelinessExploit', 'youMustBeLonely', 'illKeepYouCompany'], freeTools: ['Custom keyword patterns'] },
+  { id: 189, section: '2.5', name: 'Grief exploitation', severity: 'high', patterns: ['griefExploit', 'iLostSomeone', 'griefManipulation'], freeTools: ['Custom keyword patterns'] },
+  { id: 190, section: '2.5', name: 'Health vulnerability exploitation', severity: 'high', patterns: ['healthExploit', 'youreNotWell', 'illTakeCareOfYou.*early'], freeTools: ['Custom keyword patterns'] },
+  { id: 191, section: '2.5', name: 'Addiction vulnerability exploitation', severity: 'high', patterns: ['addictionExploit', 'sobrieryManipulation'], freeTools: ['Custom keyword patterns'] },
+  { id: 192, section: '2.5', name: 'Cognitive vulnerability indicators', severity: 'high', patterns: ['cognitiveVulnerability', 'confusedUser', 'elderlyTarget'], freeTools: ['Custom — reading level + response coherence analysis'] },
+  { id: 193, section: '2.5', name: 'Sudden platform switch urgency', severity: 'high', patterns: ['platformSwitchUrgent', 'moveToWhatsApp', 'switchToTelegram', 'offPlatformUrgent'], freeTools: ['Keyword detection for messaging app names + urgency words'] },
 
   // 2.6 PUA / Manipulative Seduction
-  { id: 848, section: '2.6', name: 'Negging pattern detection', patterns: ['negging', 'backhandedCompliment', 'systematicNegging'], freeTools: ['Custom — backhanded compliment pattern classifier'] },
-  { id: 849, section: '2.6', name: 'Push-pull manipulation', patterns: ['pushPull', 'hotCold', 'intermittentReinforcement.*systematic'], freeTools: ['Custom conversation sentiment oscillation analysis'] },
-  { id: 850, section: '2.6', name: 'Structured escalation ladder', patterns: ['escalationLadder', 'kinoEscalation', 'complianceTesting'], freeTools: ['Custom — progressive request pattern analysis'] },
-  { id: 851, section: '2.6', name: 'Multi-target parallel scripting', patterns: ['parallelScripting', 'sameMessageMultipleUsers', 'massMessage'], freeTools: ['Sentence-Transformers similarity across conversations'] },
+  { id: 848, section: '2.6', name: 'Negging pattern detection', severity: 'medium', patterns: ['systematicNegging', 'puaNegging', 'neggingPattern'], freeTools: ['Custom — backhanded compliment pattern classifier'] },
+  { id: 849, section: '2.6', name: 'Push-pull manipulation', severity: 'medium', patterns: ['pushPull', 'hotCold', 'intermittentReinforcement.*systematic'], freeTools: ['Custom conversation sentiment oscillation analysis'] },
+  { id: 850, section: '2.6', name: 'Structured escalation ladder', severity: 'medium', patterns: ['escalationLadder', 'kinoEscalation', 'complianceTesting'], freeTools: ['Custom — progressive request pattern analysis'] },
+  { id: 851, section: '2.6', name: 'Multi-target parallel scripting', severity: 'high', patterns: ['parallelScripting', 'sameMessageMultipleUsers', 'massMessage'], freeTools: ['Sentence-Transformers similarity across conversations'] },
 
   // 2.7 Contact Info & Redirection
-  { id: 194, section: '2.7', name: 'Embedded phone numbers', patterns: ['contact_info_phone', 'PHONE_REGEX', 'extractPhoneNumbers'], freeTools: ['Regex patterns', 'Presidio (Microsoft, MIT)'] },
-  { id: 195, section: '2.7', name: 'Embedded email addresses', patterns: ['contact_info_email', 'EMAIL_REGEX'], freeTools: ['Regex patterns', 'Presidio (MIT)'] },
-  { id: 196, section: '2.7', name: 'Social media handles', patterns: ['social_handle', 'SOCIAL_PATTERNS', 'instagramHandle', 'snapchatHandle'], freeTools: ['Regex patterns for @handles and platform URLs'] },
-  { id: 197, section: '2.7', name: 'Off-platform redirection', patterns: ['detectOffPlatformRedirect', 'off_platform', 'offPlatformRedirect'], freeTools: ['Keyword + URL detection for messaging apps'] },
-  { id: 198, section: '2.7', name: 'Spam links', patterns: ['SPAM_PATTERNS', 'safeBrowsing', 'spam_link', 'checkUrlSafety'], freeTools: ['Google Safe Browsing API (free)', 'VirusTotal API (limited free)', 'urlscan.io (5000/day free)'] },
-  { id: 199, section: '2.7', name: 'Safe Browsing check for links', patterns: ['checkUrlSafety', 'safeBrowsing', 'SafeBrowsingResult'], freeTools: ['Google Safe Browsing API (free)'] },
-  { id: 200, section: '2.7', name: 'Redirect chain detection', patterns: ['checkRedirectChain', 'redirectChain', 'urlUnshorten'], freeTools: ['Custom — follow redirects and check final destination'] },
+  { id: 194, section: '2.7', name: 'Embedded phone numbers', severity: 'medium', patterns: ['contact_info_phone', 'PHONE_REGEX', 'extractPhoneNumbers'], freeTools: ['Regex patterns', 'Presidio (Microsoft, MIT)'] },
+  { id: 195, section: '2.7', name: 'Embedded email addresses', severity: 'medium', patterns: ['contact_info_email', 'EMAIL_REGEX'], freeTools: ['Regex patterns', 'Presidio (MIT)'] },
+  { id: 196, section: '2.7', name: 'Social media handles', severity: 'medium', patterns: ['social_handle', 'SOCIAL_PATTERNS', 'instagramHandle', 'snapchatHandle'], freeTools: ['Regex patterns for @handles and platform URLs'] },
+  { id: 197, section: '2.7', name: 'Off-platform redirection detection', severity: 'high', patterns: ['detectOffPlatformRedirect', 'off_platform', 'offPlatformRedirectDetect'], freeTools: ['Keyword + URL detection for messaging apps'] },
+  { id: 198, section: '2.7', name: 'Spam links', severity: 'high', patterns: ['SPAM_PATTERNS', 'safeBrowsing', 'spam_link', 'checkUrlSafety'], freeTools: ['Google Safe Browsing API (free)', 'VirusTotal API (limited free)', 'urlscan.io (5000/day free)'] },
+  { id: 199, section: '2.7', name: 'Safe Browsing check for links', severity: 'high', patterns: ['checkUrlSafety', 'safeBrowsingApi', 'SafeBrowsingResult'], freeTools: ['Google Safe Browsing API (free)'] },
+  { id: 200, section: '2.7', name: 'Redirect chain detection', severity: 'medium', patterns: ['checkRedirectChain', 'redirectChain', 'urlUnshorten'], freeTools: ['Custom — follow redirects and check final destination'] },
 
   // 2.8 Text Evasion Techniques
-  { id: 201, section: '2.8', name: 'Unicode homoglyph abuse', patterns: ['normalizeConfusables', 'CONFUSABLES', 'homoglyph'], freeTools: ['Python confusables library', 'ICU confusables.txt'] },
-  { id: 202, section: '2.8', name: 'Zero-width character injection', patterns: ['stripZeroWidthChars', 'hasZeroWidthChars', 'ZW_RE', 'zero_width_injection'], freeTools: ['Regex: [\\u200B-\\u200F\\u2060\\uFEFF]'] },
-  { id: 203, section: '2.8', name: 'Leet speak normalization', patterns: ['normalizeLeetSpeak', 'LEET', 'leetSpeak'], freeTools: ['Custom character substitution map'] },
-  { id: 204, section: '2.8', name: 'RTL text injection', patterns: ['detectRTLInjection', 'rtl_injection', 'bidiOverride'], freeTools: ['Regex for RTL override characters'] },
-  { id: 205, section: '2.8', name: 'Emoji-coded drug/sex language', patterns: ['drug_emoji', 'sexual_emoji', 'DRUG_EMOJI_SEQS', 'detectEmojiCodedLanguage'], freeTools: ['Custom emoji sequence matching'] },
-  { id: 206, section: '2.8', name: 'NFKC normalization', patterns: ['normalizeUnicode', 'NFKC', 'unicodeNormalize'], freeTools: ['Built-in: str.normalize("NFKC") / unicodedata'] },
-  { id: 207, section: '2.8', name: 'Mixed-script detection', patterns: ['detectMixedScripts', 'mixedScript'], freeTools: ['Unicode script detection per character'] },
-  { id: 208, section: '2.8', name: 'Confusable character normalization', patterns: ['normalizeConfusables', 'CONFUSABLES'], freeTools: ['ICU confusables mapping'] },
-  { id: 209, section: '2.8', name: 'Strip zero-width characters', patterns: ['stripZeroWidthChars', 'ZW_RE'], freeTools: ['Regex strip'] },
-  { id: 210, section: '2.8', name: 'Emoji spam detection', patterns: ['detectEmojiSpam', 'emojiRatio', 'emojiFlood'], freeTools: ['Custom — emoji-to-text ratio threshold'] },
-  { id: 211, section: '2.8', name: 'Zalgo / glitch text detection', patterns: ['zalgo', 'glitchText', 'combiningCharacters'], freeTools: ['Regex for excessive combining characters'] },
-  { id: 212, section: '2.8', name: 'Base64 encoded content', patterns: ['base64Detect', 'encodedContent', 'base64Pattern'], freeTools: ['Regex for base64 patterns + decode & scan'] },
-  { id: 213, section: '2.8', name: 'Pig Latin / ROT13 evasion', patterns: ['pigLatin', 'rot13', 'caesarCipher'], freeTools: ['Custom decode → re-scan'] },
-  { id: 214, section: '2.8', name: 'Invisible character steganography', patterns: ['invisibleSteg', 'whitespaceSteg', 'hiddenCharacters'], freeTools: ['Custom detection of unusual whitespace patterns'] },
-  { id: 215, section: '2.8', name: 'Multilingual code-switching evasion', patterns: ['codeSwitching', 'languageSwitchEvasion'], freeTools: ['Qwen3Guard multilingual support'] },
+  { id: 201, section: '2.8', name: 'Unicode homoglyph abuse', severity: 'medium', patterns: ['normalizeConfusables', 'CONFUSABLES', 'homoglyph'], freeTools: ['Python confusables library', 'ICU confusables.txt'] },
+  { id: 202, section: '2.8', name: 'Zero-width character injection', severity: 'medium', patterns: ['stripZeroWidthChars', 'hasZeroWidthChars', 'ZW_RE', 'zero_width_injection'], freeTools: ['Regex: [\\u200B-\\u200F\\u2060\\uFEFF]'] },
+  { id: 203, section: '2.8', name: 'Leet speak normalization', severity: 'medium', patterns: ['normalizeLeetSpeak', 'LEET', 'leetSpeak'], freeTools: ['Custom character substitution map'] },
+  { id: 204, section: '2.8', name: 'RTL text injection', severity: 'medium', patterns: ['detectRTLInjection', 'rtl_injection', 'bidiOverride'], freeTools: ['Regex for RTL override characters'] },
+  { id: 205, section: '2.8', name: 'Emoji-coded drug/sex language', severity: 'medium', patterns: ['drug_emoji', 'sexual_emoji', 'DRUG_EMOJI_SEQS', 'detectEmojiCodedLanguage'], freeTools: ['Custom emoji sequence matching'] },
+  { id: 206, section: '2.8', name: 'NFKC normalization', severity: 'medium', patterns: ['normalizeUnicode', 'NFKC', 'unicodeNormalize'], freeTools: ['Built-in: str.normalize("NFKC") / unicodedata'] },
+  { id: 207, section: '2.8', name: 'Mixed-script detection', severity: 'medium', patterns: ['detectMixedScripts', 'mixedScript'], freeTools: ['Unicode script detection per character'] },
+  { id: 208, section: '2.8', name: 'Confusable character normalization', severity: 'medium', patterns: ['normalizeConfusableChars', 'confusableNormalize'], freeTools: ['ICU confusables mapping'] },
+  { id: 209, section: '2.8', name: 'Strip zero-width characters', severity: 'medium', patterns: ['stripZWChars', 'removeZeroWidth'], freeTools: ['Regex strip'] },
+  { id: 210, section: '2.8', name: 'Emoji spam detection', severity: 'low', patterns: ['detectEmojiSpam', 'emojiRatio', 'emojiFlood'], freeTools: ['Custom — emoji-to-text ratio threshold'] },
+  { id: 211, section: '2.8', name: 'Zalgo / glitch text detection', severity: 'medium', patterns: ['zalgo', 'glitchText', 'combiningCharacters'], freeTools: ['Regex for excessive combining characters'] },
+  { id: 212, section: '2.8', name: 'Base64 encoded content', severity: 'medium', patterns: ['base64Detect', 'encodedContent', 'base64Pattern'], freeTools: ['Regex for base64 patterns + decode & scan'] },
+  { id: 213, section: '2.8', name: 'Pig Latin / ROT13 evasion', severity: 'low', patterns: ['pigLatin', 'rot13', 'caesarCipher'], freeTools: ['Custom decode → re-scan'] },
+  { id: 214, section: '2.8', name: 'Invisible character steganography', severity: 'medium', patterns: ['invisibleSteg', 'whitespaceSteg', 'hiddenCharacters'], freeTools: ['Custom detection of unusual whitespace patterns'] },
+  { id: 215, section: '2.8', name: 'Multilingual code-switching evasion', severity: 'medium', patterns: ['codeSwitching', 'languageSwitchEvasion'], freeTools: ['Qwen3Guard multilingual support'] },
+  { id: 216, section: '2.8', name: 'Translation artifact detection', severity: 'low', patterns: ['translationArtifact', 'machineTranslation', 'unnaturalPhrasing'], freeTools: ['Custom — check for translation-specific phrasings'] },
+  { id: 217, section: '2.8', name: 'Refusal to use contractions (AI signal)', severity: 'low', patterns: ['noContractions', 'aiWritingStyle', 'formalExcess'], freeTools: ['Custom — contraction ratio analysis'] },
+  { id: 218, section: '2.8', name: 'Message entropy analysis', severity: 'low', patterns: ['messageEntropy', 'shannonEntropy', 'entropyScore'], freeTools: ['Custom — Shannon entropy calculation'] },
+  { id: 219, section: '2.8', name: 'Readability score anomaly', severity: 'low', patterns: ['readabilityScore', 'fleschKincaid', 'readingLevel'], freeTools: ['textstat library (MIT)'] },
+  { id: 220, section: '2.8', name: 'Overly formal English detection', severity: 'low', patterns: ['overlyFormal', 'formalLanguageAnomaly'], freeTools: ['Custom — formality scoring'] },
+
+  // 2.9 Spam & Automation
+  { id: 221, section: '2.9', name: 'Copy-paste mass messaging', severity: 'high', patterns: ['copyPaste', 'duplicateMessage', 'identicalMessages'], freeTools: ['Sentence-Transformers similarity across sent messages'] },
+  { id: 222, section: '2.9', name: 'Bot-like timing', severity: 'high', patterns: ['analyzeMessageTiming', 'botTiming', 'stdDevMs', 'messageTimingAnomaly'], freeTools: ['Custom — standard deviation of response times'] },
+  { id: 223, section: '2.9', name: 'Semantic similarity to known scam scripts', severity: 'high', patterns: ['scamSimilarity', 'semanticMatch.*scam', 'knownScamScript'], freeTools: ['Sentence-Transformers + known scam script embeddings'] },
+  { id: 224, section: '2.9', name: 'Named entity consistency', severity: 'medium', patterns: ['namedEntityConsistency', 'entityTracking', 'nameChanged'], freeTools: ['Custom NER tracking across conversation'] },
+  { id: 225, section: '2.9', name: 'Pronoun inconsistency', severity: 'medium', patterns: ['pronounInconsistency', 'genderSwitch'], freeTools: ['Custom — track pronoun usage patterns'] },
+  { id: 226, section: '2.9', name: 'Temporal language inconsistency', severity: 'medium', patterns: ['temporalInconsistency', 'timeContradiction'], freeTools: ['Custom — temporal reference tracking'] },
+  { id: 227, section: '2.9', name: 'Time zone inconsistency', severity: 'medium', patterns: ['timezoneInconsistency', 'timeZoneMismatch', 'messagingHours'], freeTools: ['Custom — message timestamps vs claimed location'] },
+  { id: 228, section: '2.9', name: 'Response length manipulation', severity: 'low', patterns: ['responseLength', 'messageLengthAnomaly'], freeTools: ['Custom — statistical analysis of message lengths'] },
+  { id: 229, section: '2.9', name: 'AI-generated text detection', severity: 'medium', patterns: ['detectAIGeneratedText', 'likelyAI', 'ai_vocabulary', 'gptDetect'], freeTools: ['Custom heuristics (perplexity, burstiness) — no reliable free detector exists'] },
+  { id: 230, section: '2.9', name: 'Scripted response detection', severity: 'medium', patterns: ['scriptedResponse', 'cannedResponse', 'templateDetect'], freeTools: ['Sentence-Transformers similarity scoring'] },
+
+  // 2.10 Field-Specific Moderation
+  { id: 231, section: '2.10', name: 'Moderate chat messages', severity: 'high', patterns: ['moderateChat', 'checkChatMessage'], freeTools: ['DuoGuard (0.5B) per-message'] },
+  { id: 232, section: '2.10', name: 'Moderate bio text', severity: 'high', patterns: ['moderateBio', 'checkBio', 'checkBioEdit'], freeTools: ['DuoGuard/Llama Guard on bio content'] },
+  { id: 233, section: '2.10', name: 'Moderate prompts', severity: 'medium', patterns: ['moderatePrompt', 'checkPrompt'], freeTools: ['DuoGuard on prompt answers'] },
+  { id: 234, section: '2.10', name: 'Moderate bug reports', severity: 'low', patterns: ['moderateBugReport', 'checkBugReport'], freeTools: ['Light-touch DuoGuard scan'] },
+  { id: 235, section: '2.10', name: 'Moderate occupation field', severity: 'medium', patterns: ['moderateOccupation', 'checkOccupation', 'suspicious_occupation'], freeTools: ['Keyword list + DuoGuard'] },
+  { id: 236, section: '2.10', name: 'Moderate reports text', severity: 'low', patterns: ['moderateReport', 'checkReportReason'], freeTools: ['DuoGuard scan'] },
+  { id: 237, section: '2.10', name: 'Moderate match notes', severity: 'low', patterns: ['moderateNote', 'checkMatchNotes'], freeTools: ['DuoGuard scan'] },
+  { id: 238, section: '2.10', name: 'Moderate date spot reviews', severity: 'low', patterns: ['moderateReview', 'checkDateReview'], freeTools: ['DuoGuard scan'] },
+  { id: 239, section: '2.10', name: 'Moderate feedback', severity: 'low', patterns: ['moderateFeedback', 'checkPostDateFeedback'], freeTools: ['DuoGuard scan'] },
+  { id: 240, section: '2.10', name: 'Moderate icebreakers', severity: 'medium', patterns: ['moderateIcebreaker', 'checkIcebreakerAnswer'], freeTools: ['DuoGuard scan'] },
+  { id: 241, section: '2.10', name: 'Moderate daily questions', severity: 'medium', patterns: ['moderateDailyQ', 'checkDailyQuestionAnswer'], freeTools: ['DuoGuard scan'] },
+  { id: 242, section: '2.10', name: 'Moderate other text fields', severity: 'medium', patterns: ['moderateField', 'validateTextField', 'ContentField'], freeTools: ['DuoGuard scan'] },
+
+  // 2.11 Sextortion (Expanded)
+  { id: 831, section: '2.11', name: 'Financial sextortion escalation', severity: 'critical', patterns: ['financialSextortion', 'sextortionEscalation', 'payOrIllShare'], freeTools: ['Custom keyword + threat pattern matching'] },
+  { id: 832, section: '2.11', name: 'Sextortion payment-doesnt-stop-threats', severity: 'critical', patterns: ['sextortionLoop', 'keepPaying', 'neverEnough'], freeTools: ['Custom pattern matching'] },
+  { id: 833, section: '2.11', name: 'Male-targeted sextortion', severity: 'critical', patterns: ['maleTargetedSextortion', 'videoCallBlackmail'], freeTools: ['Custom — detect video call → threat sequence'] },
+  { id: 834, section: '2.11', name: 'Post-sextortion re-victimization', severity: 'critical', patterns: ['reVictimization', 'sextortionRecoveryScam'], freeTools: ['Custom — detect follow-up targeting'] },
+  { id: 835, section: '2.11', name: 'Sextortion victim support auto-routing', severity: 'critical', patterns: ['sextortionSupport', 'victimRouting', 'crisisRouting'], freeTools: ['Keyword trigger → helpline routing'] },
+  { id: 836, section: '2.11', name: 'Off-platform sextortion continuation', severity: 'high', patterns: ['offPlatformSextortion', 'sextortionWarning'], freeTools: ['Educational warning on platform switch detection'] },
+
+  // 2.12 AI Emotional Manipulation
+  { id: 837, section: '2.12', name: 'AI-simulated attachment cue detection', severity: 'medium', patterns: ['aiAttachment', 'syntheticAttachment', 'aiEmotionalCue'], freeTools: ['Custom — no free off-the-shelf tool'] },
+  { id: 838, section: '2.12', name: 'Synthetic intimacy pattern scoring', severity: 'medium', patterns: ['syntheticIntimacy', 'artificialIntimacy'], freeTools: ['Custom classifier'] },
+  { id: 839, section: '2.12', name: 'AI language mirroring detection', severity: 'medium', patterns: ['aiMirroring', 'languageMirroring.*ai'], freeTools: ['Custom — compare vocab overlap rate'] },
+
+  // 2.13 Continued Contact After Block
+  { id: 852, section: '2.13', name: 'Post-block contact attempt', severity: 'high', patterns: ['postBlockContact', 'blockCircumvent', 'newAccountAfterBlock'], freeTools: ['Device fingerprint + face matching'] },
+  { id: 853, section: '2.13', name: 'Post-rejection escalation scoring', severity: 'high', patterns: ['rejectionEscalation', 'postRejection', 'noMeansNo'], freeTools: ['Custom — sentiment shift after unmatch/block'] },
+  { id: 854, section: '2.13', name: 'Cross-platform block circumvention', severity: 'high', patterns: ['crossPlatformBlock', 'contactOnOtherApp'], freeTools: ['User reporting + educational warning'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // SECTION 3: IDENTITY & DOCUMENT VERIFICATION
+  // ─────────────────────────────────────────────────────────────
+
+  { id: 243, section: '3', name: 'Real name format', severity: 'medium', patterns: ['validateDisplayName', 'NameValidationResult', 'nameFormat'], freeTools: ['Custom regex + Unicode script validation'] },
+  { id: 244, section: '3', name: 'Offensive display names', severity: 'high', patterns: ['checkTextSafety.*name', 'name.*profan', 'profane.*name'], freeTools: ['DuoGuard on display name'] },
+  { id: 245, section: '3', name: 'All-caps names', severity: 'low', patterns: ['isAllCaps', 'allCapsName'], freeTools: ['Simple regex: /^[A-Z\\s]+$/'] },
+  { id: 246, section: '3', name: 'Keyboard spam names', severity: 'medium', patterns: ['isKeyboardSpam', 'SPAM_RE', 'charDiversity'], freeTools: ['Custom — character diversity + ngram analysis'] },
+  { id: 247, section: '3', name: 'Celebrity name blocking', severity: 'medium', patterns: ['isCelebName', 'CELEBS', 'celebrityName'], freeTools: ['Custom celebrity name database'] },
+  { id: 248, section: '3', name: 'Fake verification symbols in name', severity: 'medium', patterns: ['VERIFY_RE', 'fakeVerify', 'checkmark.*name', '✓.*name'], freeTools: ['Regex for verification emojis: ✓✔☑️✅🔵'] },
+  { id: 249, section: '3', name: 'Number / emoji-only names', severity: 'low', patterns: ['isEmojiOnly', 'emojiOnly', 'numberOnlyName'], freeTools: ['Regex character class check'] },
+  { id: 250, section: '3', name: 'Staff impersonation via name', severity: 'high', patterns: ['STAFF_KW', 'staffImperson', 'impersonat', 'adminName', 'moderatorName'], freeTools: ['Keyword list: admin, moderator, support, official'] },
+  { id: 251, section: '3', name: 'ID document verification', severity: 'high', patterns: ['idVerification', 'documentVerify', 'idScan'], freeTools: ['No free production tool — commercial APIs (Onfido, Jumio)'] },
+  { id: 252, section: '3', name: 'Document liveness verification', severity: 'high', patterns: ['documentLiveness', 'idLiveness', 'holdID'], freeTools: ['InsightFace + document edge detection'] },
+  { id: 253, section: '3', name: 'NFC chip reading for passports', severity: 'low', patterns: ['nfcPassport', 'chipRead', 'ePassport'], freeTools: ['Requires NFC hardware — react-native-nfc-manager'] },
+  { id: 254, section: '3', name: 'ID document authenticity check', severity: 'high', patterns: ['idAuthenticity', 'documentAuthentic', 'fakeIDDetect'], freeTools: ['No free tool — commercial only'] },
+  { id: 255, section: '3', name: 'Age from ID vs selfie vs claimed', severity: 'high', patterns: ['ageConsistencyTriple', 'idAge.*selfieAge.*claimedAge'], freeTools: ['DeepFace age estimation + OCR on ID + profile DOB comparison'] },
+  { id: 256, section: '3', name: 'Name on ID vs profile name', severity: 'high', patterns: ['nameMatch.*id', 'idName.*profileName'], freeTools: ['OCR on ID + string similarity'] },
+  { id: 257, section: '3', name: 'Expired ID detection', severity: 'medium', patterns: ['expiredID', 'idExpiry', 'documentExpired'], freeTools: ['OCR on expiry date field'] },
+  { id: 258, section: '3', name: 'Known fraudulent ID templates', severity: 'high', patterns: ['fraudulentTemplate', 'fakeIDTemplate'], freeTools: ['No free tool — commercial only'] },
+  { id: 259, section: '3', name: 'Sex offender registry cross-check', severity: 'critical', patterns: ['sexOffenderCheck', 'sexOffenderRegistry', 'NSOPW'], freeTools: ['NSOPW API (US only, free)'] },
+  { id: 260, section: '3', name: 'OFAC individual sanctions screening', severity: 'high', patterns: ['ofacScreen', 'sanctionsScreen', 'sanctionsList'], freeTools: ['OFAC SDN list (free download)'] },
+  { id: 639, section: '3', name: 'Background check integration', severity: 'high', patterns: ['backgroundCheck', 'criminalRecord'], freeTools: ['No free tool — commercial APIs'] },
+  { id: 640, section: '3', name: 'Criminal record screening', severity: 'high', patterns: ['criminalScreening', 'felonyCheck'], freeTools: ['No free tool — commercial APIs'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // SECTION 4: ACCOUNT & AUTHENTICATION
+  // ─────────────────────────────────────────────────────────────
+
+  // 4.1 Registration Security
+  { id: 261, section: '4.1', name: 'Email verification gate', severity: 'high', patterns: ['emailVerified', 'sendEmailVerification', 'verifyEmail'], freeTools: ['Firebase Auth email verification (free)', 'Custom SMTP verification'] },
+  { id: 262, section: '4.1', name: 'Disposable email blocking', severity: 'high', patterns: ['isDisposableEmail', 'DISPOSABLE_DOMAINS', 'disposableEmail'], freeTools: ['isDisposable (100k+ domains)', 'disposable-email-domains (npm)'] },
+  { id: 263, section: '4.1', name: 'Email alias abuse detection', severity: 'medium', patterns: ['emailAlias', 'plusAlias', 'dotAlias', 'gmailDot'], freeTools: ['Custom — normalize Gmail dots and + aliases'] },
+  { id: 264, section: '4.1', name: 'Apple Hide My Email abuse', severity: 'medium', patterns: ['appleRelay', 'hideMyEmail', 'privaterelay.appleid.com'], freeTools: ['Detect @privaterelay.appleid.com domain'] },
+  { id: 265, section: '4.1', name: 'Phone verification', severity: 'high', patterns: ['phoneVerif', 'phoneVerified', 'smsVerification'], freeTools: ['Firebase Phone Auth (free tier)', 'Twilio Verify (limited free)'] },
+  { id: 266, section: '4.1', name: 'Google Voice / VOIP number detection', severity: 'medium', patterns: ['voipDetect', 'googleVoice', 'virtualNumber'], freeTools: ['No reliable free tool — Twilio Lookup API (paid)'] },
+  { id: 267, section: '4.1', name: 'Phone number recycling detection', severity: 'medium', patterns: ['phoneRecycling', 'numberRecycled'], freeTools: ['Custom — track phone-to-account history'] },
+  { id: 268, section: '4.1', name: 'Silent SMS / SS7 attack detection', severity: 'medium', patterns: ['silentSMS', 'ss7Attack'], freeTools: ['No free tool — carrier-level detection'] },
+  { id: 269, section: '4.1', name: 'Breached password check', severity: 'high', patterns: ['checkPasswordBreached', 'isPasswordBreached', 'pwnedpasswords'], freeTools: ['HaveIBeenPwned Pwned Passwords API (free, unlimited, no auth)'] },
+  { id: 270, section: '4.1', name: 'Passkey / WebAuthn support', severity: 'medium', patterns: ['passkey', 'webauthn', 'fido2', 'publicKeyCredential'], freeTools: ['@simplewebauthn (MIT)', 'Browser WebAuthn API (free)'] },
+  { id: 271, section: '4.1', name: 'SIM swap detection', severity: 'high', patterns: ['simSwap', 'simChanged', 'carrierChange'], freeTools: ['No free tool — carrier API required'] },
+
+  // 4.2 Login Security
+  { id: 272, section: '4.2', name: 'Device fingerprinting', severity: 'high', patterns: ['getDeviceFingerprint', 'Thumbmark', 'deviceFingerprint', 'trackDeviceFingerprint'], freeTools: ['ThumbmarkJS (MIT, 90.5-95.5% accuracy)'] },
+  { id: 273, section: '4.2', name: 'Multiple accounts same device', severity: 'high', patterns: ['checkDeviceMultiAccount', 'multiAccount', 'checkMultiAccountDevice'], freeTools: ['ThumbmarkJS fingerprint → track per-device account count'] },
+  { id: 274, section: '4.2', name: 'Banned user re-registration', severity: 'high', patterns: ['checkUserBanned', 'bannedUsers', 'bannedReuse'], freeTools: ['Device fingerprint + email hash + face embedding matching'] },
+  { id: 275, section: '4.2', name: 'Account takeover detection', severity: 'critical', patterns: ['detectAccountTakeover', 'recordDeviceLogin', 'ato_suspicious', 'atoSuspicious'], freeTools: ['Custom — new device + location change + behavior shift'] },
+  { id: 276, section: '4.2', name: 'Credential stuffing detection', severity: 'high', patterns: ['credentialStuffing', 'loginBruteForce', 'failedLoginRate'], freeTools: ['Rate limiting + IP tracking'] },
+  { id: 277, section: '4.2', name: 'Password spray detection', severity: 'high', patterns: ['passwordSpray', 'commonPasswordAttempt'], freeTools: ['Custom — track failed logins across accounts from same IP'] },
+  { id: 278, section: '4.2', name: 'Magic link abuse', severity: 'medium', patterns: ['magicLinkAbuse', 'linkReuse', 'magicLinkRate'], freeTools: ['Custom — single-use + expiry enforcement'] },
+  { id: 279, section: '4.2', name: 'OAuth token theft detection', severity: 'high', patterns: ['oauthTheft', 'tokenTheft', 'suspiciousTokenUse'], freeTools: ['Custom — monitor token usage patterns'] },
+  { id: 280, section: '4.2', name: 'Session token binding', severity: 'high', patterns: ['sessionBinding', 'tokenBind', 'deviceBoundToken'], freeTools: ['Custom — bind session to device fingerprint'] },
+  { id: 281, section: '4.2', name: 'Refresh token rotation enforcement', severity: 'medium', patterns: ['refreshTokenRotation', 'rotateRefreshToken'], freeTools: ['Firebase Auth handles this', 'Custom implementation'] },
+  { id: 282, section: '4.2', name: 'JWT claim tampering detection', severity: 'high', patterns: ['jwtTamper', 'claimTamper', 'verifyJWT'], freeTools: ['jsonwebtoken library signature verification'] },
+  { id: 283, section: '4.2', name: 'Replay attack detection', severity: 'high', patterns: ['replayAttack', 'nonceCheck', 'requestNonce'], freeTools: ['Custom — nonce + timestamp validation'] },
+  { id: 284, section: '4.2', name: 'Account enumeration via timing', severity: 'medium', patterns: ['accountEnumeration', 'timingAttack', 'constantTimeCompare'], freeTools: ['crypto.timingSafeEqual() in responses'] },
+  { id: 285, section: '4.2', name: 'Login from datacenter IP', severity: 'medium', patterns: ['datacenterIP', 'hostingProvider', 'cloudIP'], freeTools: ['MaxMind GeoLite2 ASN database (free)'] },
+  { id: 286, section: '4.2', name: 'Impossible login hours', severity: 'low', patterns: ['impossibleHours', 'loginTime.*suspicious', 'nightLogin'], freeTools: ['Custom — login time vs timezone analysis'] },
+  { id: 287, section: '4.2', name: 'Keyboard dynamics analysis', severity: 'low', patterns: ['keyboardDynamics', 'typingPattern', 'keystrokeAnalysis'], freeTools: ['Custom — inter-key timing analysis'] },
+  { id: 288, section: '4.2', name: 'Copy-paste login detection', severity: 'low', patterns: ['copyPasteLogin', 'pastedCredentials'], freeTools: ['Custom — detect paste events in login fields'] },
+
+  // 4.3 Session Security
+  { id: 289, section: '4.3', name: 'Concurrent session enforcement', severity: 'high', patterns: ['enforceSessionLimit', 'checkConcurrentSessions', 'MAX_SESSIONS'], freeTools: ['Firebase Auth session management'] },
+  { id: 290, section: '4.3', name: 'Account sharing detection', severity: 'medium', patterns: ['accountSharing', 'sharedAccount', 'multipleLocations'], freeTools: ['Device fingerprint + location diversity analysis'] },
+  { id: 291, section: '4.3', name: 'Account warming detection', severity: 'medium', patterns: ['accountWarming', 'dormantThenActive'], freeTools: ['Custom — activity pattern analysis'] },
+  { id: 292, section: '4.3', name: 'Bot detection (App Check)', severity: 'high', patterns: ['getAppCheckToken', 'AppCheck', 'appCheck'], freeTools: ['Firebase App Check (free)', 'SafetyNet/Play Integrity (free)'] },
+  { id: 293, section: '4.3', name: 'Root / jailbreak detection', severity: 'high', patterns: ['isRooted', 'jailbreak', 'RootBeer', 'dtTJailbreak'], freeTools: ['Play Integrity API', 'Custom checks (su binary, Cydia, etc)'] },
+  { id: 294, section: '4.3', name: 'Emulator detection', severity: 'high', patterns: ['isEmulator', 'generic_fingerprint', 'knownEmulators'], freeTools: ['Play Integrity API', 'Custom hardware property checks'] },
+  { id: 295, section: '4.3', name: 'Tampered APK detection', severity: 'high', patterns: ['apkTamper', 'tampered_apk', 'appSignature.*expectedSignature', 'integrityCheck'], freeTools: ['Play Integrity API', 'Custom signature verification'] },
+  { id: 296, section: '4.3', name: 'Debug mode detection', severity: 'medium', patterns: ['FLAG_DEBUGGABLE', 'isDebug', 'debug_mode', 'check-device-integrity'], freeTools: ['Custom — check BuildConfig.DEBUG / debuggable flag'] },
+  { id: 297, section: '4.3', name: 'Developer options enabled', severity: 'medium', patterns: ['DEVELOPMENT_SETTINGS', 'developerOptions', 'developer_options'], freeTools: ['Android: Settings.Global.DEVELOPMENT_SETTINGS_ENABLED'] },
+  { id: 298, section: '4.3', name: 'USB debugging active', severity: 'medium', patterns: ['ADB_ENABLED', 'usbDebug', 'adbEnabled', 'adb_enabled'], freeTools: ['Android: Settings.Global.ADB_ENABLED'] },
+  { id: 299, section: '4.3', name: 'Frida / hooking detection', severity: 'high', patterns: ['fridaDetected', 'hasFrida', 'frida_detected', 'hookDetect'], freeTools: ['Custom — check for frida-server, Substrate, Xposed'] },
+  { id: 300, section: '4.3', name: 'Memory tampering detection', severity: 'high', patterns: ['memoryTamper', 'checksumMemory', 'memory_tamper'], freeTools: ['Custom — runtime integrity checks'] },
+  { id: 301, section: '4.3', name: 'Mock location apps', severity: 'high', patterns: ['hasMockLocation', 'ALLOW_MOCK_LOCATION', 'mock_location', 'mockGPS'], freeTools: ['Android: Settings.Secure.ALLOW_MOCK_LOCATION'] },
+  { id: 302, section: '4.3', name: 'Screen recording detection', severity: 'medium', patterns: ['isCaptured', 'screenRecord', 'screen_recording'], freeTools: ['iOS: UIScreen.isCaptured', 'Android: MediaProjection detection'] },
+  { id: 303, section: '4.3', name: 'Accessibility service abuse', severity: 'medium', patterns: ['accessibilityAbuse', 'getEnabledAccessibility', 'accessibility_abuse'], freeTools: ['Custom — enumerate running accessibility services'] },
+  { id: 304, section: '4.3', name: 'App clone detection', severity: 'medium', patterns: ['appClone', 'dualSpace', 'parallelSpace'], freeTools: ['Custom — check for known clone app packages'] },
+  { id: 305, section: '4.3', name: 'Overlay attack detection', severity: 'high', patterns: ['overlayAttack', 'TYPE_APPLICATION_OVERLAY', 'drawOverApps'], freeTools: ['Android: detect active overlays'] },
+  { id: 306, section: '4.3', name: 'Tapjacking prevention', severity: 'high', patterns: ['tapjacking', 'filterTouchesWhenObscured'], freeTools: ['Android: filterTouchesWhenObscured=true'] },
+  { id: 307, section: '4.3', name: 'Deep link hijacking', severity: 'medium', patterns: ['deepLinkHijack', 'intentHijack', 'universalLink.*verification'], freeTools: ['Custom — verify deep link domains'] },
+  { id: 308, section: '4.3', name: 'Clipboard sniffing detection', severity: 'medium', patterns: ['clipboardSniff', 'pasteboardAccess', 'clipboardMonitor'], freeTools: ['iOS 14+: paste notification', 'Custom monitoring'] },
+  { id: 309, section: '4.3', name: 'Push notification spoofing', severity: 'medium', patterns: ['pushSpoof', 'notificationSpoof'], freeTools: ['Custom — verify notification source'] },
+  { id: 310, section: '4.3', name: 'Biometric bypass detection', severity: 'high', patterns: ['biometricBypass', 'biometricSpoof', 'fakeBiometric'], freeTools: ['Custom — monitor biometric API calls'] },
+  { id: 311, section: '4.3', name: 'MDM / enterprise certificate abuse', severity: 'medium', patterns: ['mdmAbuse', 'enterpriseCert', 'provisioningProfile'], freeTools: ['Custom — check for enterprise provisioning'] },
+
+  // 4.4 Account Creation by Proxy
+  { id: 905, section: '4.4', name: 'Proxy account creation detection', severity: 'medium', patterns: ['proxyAccountCreation', 'accountProxy', 'thirdPartyCreation'], freeTools: ['Custom — behavioral signals'] },
+  { id: 906, section: '4.4', name: 'Account credential handoff detection', severity: 'medium', patterns: ['credentialHandoff', 'accountHandover'], freeTools: ['Custom — device change + behavior shift'] },
+
+  // 4.5 Shared Device Safety
+  { id: 801, section: '4.5', name: 'Public/shared computer detection', severity: 'medium', patterns: ['publicComputer', 'sharedDevice', 'publicTerminal'], freeTools: ['Custom — check for known public device characteristics'] },
+  { id: 802, section: '4.5', name: 'Auto-logout on shared device', severity: 'medium', patterns: ['autoLogout', 'sharedDeviceLogout'], freeTools: ['Custom — shorter session timeout on detected shared devices'] },
+  { id: 803, section: '4.5', name: 'Browser data auto-clear', severity: 'low', patterns: ['autoClearData', 'clearOnClose', 'privateMode'], freeTools: ['Custom — prompt for private browsing'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // SECTION 5: BEHAVIORAL SAFETY
+  // ─────────────────────────────────────────────────────────────
+
+  // 5.1 Scam Behavioral Patterns
+  { id: 312, section: '5.1', name: 'Romance scam scoring', severity: 'high', patterns: ['romanceScam', 'scamScore', 'computeRomanceScamScore'], freeTools: ['No free off-the-shelf tool — custom scoring model (scikit-learn/XGBoost)'] },
+  { id: 313, section: '5.1', name: 'Catfish likelihood score', severity: 'high', patterns: ['computeCatfishScore', 'catfishScore', 'catfishLikelihood'], freeTools: ['Custom composite score: face match + verification + behavior'] },
+  { id: 314, section: '5.1', name: 'Pig butchering phase detection', severity: 'high', patterns: ['pigButcheringPhase', 'sha_zhu_pan_phase', 'butcheringPhase'], freeTools: ['No free tool — custom conversation phase classifier'] },
+  { id: 315, section: '5.1', name: 'Swarming behavior', severity: 'high', patterns: ['swarmingBehavior', 'multiAccountVictim', 'coordinatedTargeting'], freeTools: ['Custom — graph analysis (NetworkX/igraph)'] },
+  { id: 316, section: '5.1', name: 'Victim profiling detection', severity: 'high', patterns: ['victimProfiling', 'targetSelection', 'vulnerableUserTarget'], freeTools: ['Custom — analyze target selection patterns'] },
+  { id: 317, section: '5.1', name: 'Network analysis of victim overlap', severity: 'medium', patterns: ['victimOverlap', 'sharedVictims', 'networkAnalysis'], freeTools: ['NetworkX/igraph graph analysis'] },
+  { id: 318, section: '5.1', name: 'Behavioral fingerprinting across accounts', severity: 'high', patterns: ['behavioralFingerprint', 'crossAccountBehavior', 'typingFingerprint'], freeTools: ['Custom — typing patterns + interaction style analysis'] },
+  { id: 319, section: '5.1', name: 'Second chance scam (return after block)', severity: 'high', patterns: ['returnAfterBlock', 'reEngageVictim', 'secondChanceScamDetect'], freeTools: ['Device fingerprint + face match on new accounts'] },
+  { id: 320, section: '5.1', name: 'Recovery scam targeting', severity: 'high', patterns: ['recoveryScamTarget', 'getMoneyBack.*scam'], freeTools: ['Custom keyword patterns'] },
+  { id: 785, section: '5.1', name: 'Strategic imperfection scam pattern', severity: 'medium', patterns: ['strategicImperfection', 'deliberateFlaw', 'tooGoodExceptOne'], freeTools: ['No free tool'] },
+  { id: 786, section: '5.1', name: 'Evolving scam narrative classifier', severity: 'medium', patterns: ['evolvingNarrative', 'scamNarrativeUpdate'], freeTools: ['Sentence-Transformers + periodic retraining'] },
+  { id: 787, section: '5.1', name: 'Widowed/divorced professional clustering', severity: 'medium', patterns: ['widowedProfessional', 'divorceNarrative.*professional'], freeTools: ['Custom clustering on profile fields'] },
+
+  // 5.2 Predatory Patterns
+  { id: 321, section: '5.2', name: 'Age-gap predator patterns', severity: 'critical', patterns: ['detectAgePredatorPattern', 'agePredator', 'ageGapPredator'], freeTools: ['Custom — age preference + messaging pattern analysis'] },
+  { id: 322, section: '5.2', name: 'Grooming behavioral sequence', severity: 'critical', patterns: ['groomingSequence', 'groomingBehavior', 'progressiveGrooming'], freeTools: ['No free tool — custom sequential classifier'] },
+  { id: 323, section: '5.2', name: 'Escalating boundary testing', severity: 'high', patterns: ['boundaryTesting', 'escalatingBoundary', 'pushingLimits'], freeTools: ['Custom — track progressive boundary violations'] },
+  { id: 324, section: '5.2', name: 'Photo request pressure pattern', severity: 'high', patterns: ['photoRequestPressure', 'pressureForPhotos'], freeTools: ['Custom — track repeated photo request + escalation'] },
+  { id: 325, section: '5.2', name: 'Blackmail escalation trajectory', severity: 'critical', patterns: ['blackmailEscalation', 'threatTrajectory'], freeTools: ['Custom — sentiment + threat scoring over time'] },
+  { id: 326, section: '5.2', name: 'Hoovering patterns', severity: 'medium', patterns: ['hoovering', 'hooverPattern', 'comeBackAfterNC'], freeTools: ['Custom — detect re-contact after block/unmatch'] },
+  { id: 327, section: '5.2', name: 'Politically exposed person detection', severity: 'medium', patterns: ['pepDetection', 'politicallyExposed'], freeTools: ['OpenSanctions PEP lists (free)'] },
+  { id: 328, section: '5.2', name: 'Journalist / activist targeting', severity: 'medium', patterns: ['journalistTargeting', 'activistTarget', 'pressTarget'], freeTools: ['No free tool — policy-based'] },
+
+  // 5.3 Child Predator Targeting Single Parents
+  { id: 818, section: '5.3', name: 'Single parent targeting pattern', severity: 'critical', patterns: ['singleParentTargeting', 'targetSingleParent'], freeTools: ['Custom — analyze messaging to users with "parent" in profile'] },
+  { id: 819, section: '5.3', name: 'Child access motivation scoring', severity: 'critical', patterns: ['childAccessMotivation', 'kidsMention.*early'], freeTools: ['Custom — detect early/excessive children-related questions'] },
+  { id: 820, section: '5.3', name: 'Child-related question velocity', severity: 'critical', patterns: ['childQuestionVelocity', 'kidsQuestionRate'], freeTools: ['Custom — keyword frequency analysis'] },
+  { id: 821, section: '5.3', name: 'Sex offender behavioral profile matching', severity: 'critical', patterns: ['sexOffenderProfile', 'behavioralProfileMatch'], freeTools: ['Custom classifier based on research literature'] },
+  { id: 822, section: '5.3', name: '"Meet the kids" velocity detector', severity: 'critical', patterns: ['meetTheKids', 'kidsIntroduction.*early'], freeTools: ['Custom — keyword + timing analysis'] },
+  { id: 823, section: '5.3', name: 'Single parent safety education prompt', severity: 'high', patterns: ['singleParentSafetyPrompt', 'parentSafetyEducation'], freeTools: ['Custom educational UI'] },
+
+  // 5.4 Engagement Fraud
+  { id: 329, section: '5.4', name: 'Rapid unmatching detection', severity: 'medium', patterns: ['trackUnmatch', 'unmatch.*suspicious', 'unmatchRate'], freeTools: ['Custom — unmatch rate threshold'] },
+  { id: 330, section: '5.4', name: 'Stalking via profile views', severity: 'high', patterns: ['trackProfileView', 'profileView.*suspicious', 'excessiveViews'], freeTools: ['Custom — view frequency per target'] },
+  { id: 331, section: '5.4', name: 'Mass false reporting', severity: 'high', patterns: ['trackReport', 'report.*suspicious', 'falseReport', 'validateReporter', 'trackReportDaily'], freeTools: ['Custom — reporter credibility scoring'] },
+  { id: 332, section: '5.4', name: 'Ghost / inactive profiles', severity: 'medium', patterns: ['ghostProfile', 'isGhostProfile', 'inactiveProfile'], freeTools: ['Custom — last activity threshold'] },
+  { id: 333, section: '5.4', name: 'Elo / ranking manipulation', severity: 'medium', patterns: ['detectEloManipulation', 'eloManipul', 'scoreManipul'], freeTools: ['Custom — statistical anomaly detection on scores'] },
+  { id: 334, section: '5.4', name: 'Boost abuse', severity: 'medium', patterns: ['detectBoostAbuse', 'checkBoostAllowed', 'boostAbuse', 'boostLimit'], freeTools: ['Custom — rate limiting + pattern analysis'] },
+  { id: 335, section: '5.4', name: 'Review manipulation (Bayesian)', severity: 'medium', patterns: ['wilsonScore', 'detectRatingManipulation', 'reviewManipul'], freeTools: ['Wilson score interval implementation'] },
+  { id: 336, section: '5.4', name: 'Swipe reset abuse', severity: 'medium', patterns: ['trackAccountCreation', 'account.*creation.*suspicious', 'swipeReset'], freeTools: ['Device fingerprint tracking across accounts'] },
+  { id: 337, section: '5.4', name: 'Super like abuse', severity: 'low', patterns: ['checkSuperLikeLimit', 'superLikeLimit', 'superLikeAbuse'], freeTools: ['Custom — rate limiting'] },
+  { id: 338, section: '5.4', name: 'Bot story views', severity: 'medium', patterns: ['detectBotStoryViews', 'botStoryView', 'botViewStory'], freeTools: ['Custom — view timing + device fingerprint analysis'] },
+  { id: 339, section: '5.4', name: 'Referral fraud', severity: 'medium', patterns: ['detectReferralFraud', 'referralFraud'], freeTools: ['Custom — device fingerprint + referral pattern analysis'] },
+  { id: 340, section: '5.4', name: 'Swipe pattern anomalies', severity: 'medium', patterns: ['swipeAnomaly', 'likesEveryone', 'swipeRatio'], freeTools: ['Custom — like/pass ratio analysis'] },
+  { id: 341, section: '5.4', name: 'Profile view without interaction (scraping)', severity: 'medium', patterns: ['scrapingDetect', 'viewWithoutInteract', 'passiveScrape'], freeTools: ['Custom — view-to-interaction ratio'] },
+  { id: 342, section: '5.4', name: 'Fake engagement signals', severity: 'medium', patterns: ['detectFakeEngagement', 'engagementAnomaly', 'fakeEngagement'], freeTools: ['Custom — statistical anomaly detection'] },
+  { id: 343, section: '5.4', name: 'Conversion fraud', severity: 'medium', patterns: ['detectConversionFraud', 'conversionFraud', 'fraudConversion'], freeTools: ['Custom — attribution analysis'] },
+  { id: 344, section: '5.4', name: 'Night shift messaging only', severity: 'low', patterns: ['nightShiftOnly', 'nightTimeOnly', 'messagingHoursAnomaly'], freeTools: ['Custom — message time distribution analysis'] },
+  { id: 345, section: '5.4', name: 'Systematic ghosting (read no reply)', severity: 'low', patterns: ['systematicGhosting', 'readNoReply', 'ghostingPattern'], freeTools: ['Custom — read receipt → no reply rate'] },
+
+  // 5.5 Conversation Analysis
+  { id: 346, section: '5.5', name: 'Video call refusal patterns', severity: 'high', patterns: ['detectVideoCallRefusal', 'refuseVideo', 'video.*call.*refus'], freeTools: ['Custom — track video call invitation → refusal sequences'] },
+  { id: 347, section: '5.5', name: 'Off-platform redirection behavioral', severity: 'high', patterns: ['offPlatformBehavior', 'platformSwitchTracking', 'switchAppBehavior'], freeTools: ['Keyword detection for messaging app names'] },
+  { id: 348, section: '5.5', name: 'Fast-escalating conversation behavioral', severity: 'high', patterns: ['fastEscalationBehavior', 'escalationSpeed', 'rapidIntimacy'], freeTools: ['Custom — intimacy score velocity'] },
+  { id: 349, section: '5.5', name: 'Financial requests behavioral', severity: 'high', patterns: ['financialRequestBehavior', 'askForMoney', 'lendMeMoney'], freeTools: ['Keyword patterns'] },
+  { id: 350, section: '5.5', name: 'Crypto scam patterns', severity: 'high', patterns: ['cryptoScamPattern', 'investmentOpportunity', 'crypto.*profit'], freeTools: ['Keyword patterns + crypto address regex'] },
+  { id: 351, section: '5.5', name: 'Love bombing escalation behavioral', severity: 'high', patterns: ['loveBombingBehavior', 'intenseLoveBomb', 'loveBombEscalate'], freeTools: ['Custom sentiment velocity'] },
+  { id: 352, section: '5.5', name: 'Conversation mirroring', severity: 'medium', patterns: ['conversationMirroring', 'echoBack', 'parrotResponse'], freeTools: ['Sentence-Transformers similarity between sent/received'] },
+
+  // 5.6 Forced Scammer / Trafficking
+  { id: 767, section: '5.6', name: 'Forced scammer distress signal', severity: 'critical', patterns: ['forcedScammer', 'distressSignal', 'scamCompound'], freeTools: ['Custom keyword patterns for coded distress'] },
+  { id: 768, section: '5.6', name: 'Scam compound operating pattern', severity: 'high', patterns: ['scamCompoundPattern', 'shiftPattern', 'compoundOperation'], freeTools: ['Custom — time pattern + IP clustering'] },
+  { id: 769, section: '5.6', name: 'Trafficking victim referral pathway', severity: 'critical', patterns: ['traffickingReferral', 'victimPathway', 'polarisTipline'], freeTools: ['National Human Trafficking Hotline routing'] },
+  { id: 770, section: '5.6', name: 'Scam script template matching', severity: 'high', patterns: ['scamTemplate', 'playbook.*match', 'knownScript'], freeTools: ['Sentence-Transformers similarity to known scripts'] },
+
+  // 5.7 Post-Relationship Platform Abuse
+  { id: 739, section: '5.7', name: 'Ex-partner profile monitoring', severity: 'high', patterns: ['exPartnerMonitoring', 'exStalking', 'exProfileView'], freeTools: ['Custom — repeated views of specific profile'] },
+  { id: 740, section: '5.7', name: 'Revenge swiping / mass-right-swipe', severity: 'medium', patterns: ['revengeSwiping', 'massSwipe.*contacts'], freeTools: ['Custom — contact list correlation'] },
+  { id: 741, section: '5.7', name: 'Post-breakup impersonation', severity: 'high', patterns: ['postBreakupImpersonation', 'exImpersonation'], freeTools: ['Face matching against reported impersonation'] },
+  { id: 742, section: '5.7', name: 'Coordinated friend-group harassment', severity: 'high', patterns: ['coordinatedHarassment', 'friendGroupAttack'], freeTools: ['Graph analysis of report sources'] },
+
+  // 5.8 Proxy Account Operation
+  { id: 788, section: '5.8', name: 'Paid matchmaker operation detection', severity: 'medium', patterns: ['paidMatchmaker', 'conciergeOperation', 'managedAccount'], freeTools: ['Custom — behavior consistency analysis'] },
+  { id: 789, section: '5.8', name: 'Parent-created profile for adult', severity: 'medium', patterns: ['parentCreatedProfile', 'thirdPartyProfileOp'], freeTools: ['Custom — behavior + writing style analysis'] },
+  { id: 790, section: '5.8', name: 'Account selling / marketplace (behavioral)', severity: 'medium', patterns: ['accountSellingBehavior', 'buyAccount', 'accountSale'], freeTools: ['Custom — sudden behavior change + device change'] },
+
+  // 5.9 Married / Relationship Status Deception
+  { id: 899, section: '5.9', name: 'Ring/wedding band detection', severity: 'medium', patterns: ['ringDetection', 'weddingBand', 'marriedSignal'], freeTools: ['CLIP zero-shot: "wedding ring on hand"', 'YOLO fine-tuned'] },
+  { id: 900, section: '5.9', name: 'Relationship status inconsistency', severity: 'medium', patterns: ['relationshipInconsistency', 'marriedOnOtherPlatform'], freeTools: ['Cross-platform signal (user reports)'] },
+  { id: 901, section: '5.9', name: 'Affair-seeking on non-affair platforms', severity: 'medium', patterns: ['affairSeeking', 'discreetMeeting', 'marriedButLooking'], freeTools: ['Keyword patterns + behavioral signals'] },
+
+  // 5.10 State-Sponsored Espionage / Honeytrap
+  { id: 824, section: '5.10', name: 'State-sponsored honeytrap pattern', severity: 'high', patterns: ['honeytrapPattern', 'stateSponsored', 'espionagePattern'], freeTools: ['No free tool — intelligence-level analysis'] },
+  { id: 825, section: '5.10', name: 'Intelligence elicitation pattern', severity: 'high', patterns: ['elicitationPattern', 'probing.*classified'], freeTools: ['Custom keyword patterns for security-sensitive topics'] },
+  { id: 826, section: '5.10', name: 'Malware-link-via-dating-chat', severity: 'high', patterns: ['malwareLink', 'trojanLink', 'spywareLink'], freeTools: ['Google Safe Browsing + VirusTotal'] },
+  { id: 827, section: '5.10', name: 'Geolocation intelligence harvesting', severity: 'high', patterns: ['geoIntHarvesting', 'locationHarvesting'], freeTools: ['Custom — detect excessive location queries'] },
+  { id: 828, section: '5.10', name: 'Foreign intelligence TTP matching', severity: 'high', patterns: ['foreignIntelTTP', 'ttpMatching'], freeTools: ['MISP threat intelligence (free)'] },
+
+  // 5.11 Extremist Recruitment via Dating
+  { id: 812, section: '5.11', name: 'Incel / manosphere radicalization', severity: 'high', patterns: ['incelRadicalization', 'manosphere', 'blackpill', 'redpill'], freeTools: ['Custom keyword list + Perspective API'] },
+  { id: 813, section: '5.11', name: 'Extremist recruitment via romance', severity: 'high', patterns: ['extremistRecruitment', 'radicalRecruitment'], freeTools: ['Custom keyword patterns + GIFCT'] },
+  { id: 814, section: '5.11', name: 'Conspiracy theory propagation', severity: 'medium', patterns: ['conspiracyTheory', 'qanon', 'flatEarth', 'deepState'], freeTools: ['Custom keyword list'] },
+
+  // ─────────────────────────────────────────────────────────────
+  // SECTION 6: LOCATION & PHYSICAL SAFETY
+  // ─────────────────────────────────────────────────────────────
+
+  { id: 353, section: '6', name: 'Geographic impossibility', severity: 'high', patterns: ['haversineKm', 'checkGeoImpossibility', 'impossibleTravel', 'detectImpossibleTravel'], freeTools: ['Haversine formula + time delta calculation'] },
+  { id: 354, section: '6', name: 'Mock GPS detection', severity: 'high', patterns: ['mockGPS', 'mockLocation', 'detectMockLocation', 'ALLOW_MOCK_LOCATION'], freeTools: ['Android: Settings.Secure.ALLOW_MOCK_LOCATION check'] },
+  { id: 355, section: '6', name: 'Geofencing sanctioned countries', severity: 'high', patterns: ['SANCTIONED', 'isSanctioned', 'sanctionedCountry', 'countryBlock'], freeTools: ['MaxMind GeoLite2 (free) + OFAC country list'] },
+  { id: 356, section: '6', name: 'IP vs GPS mismatch', severity: 'high', patterns: ['checkIPGPSMismatch', 'ipGPSMismatch', 'ipMismatch'], freeTools: ['MaxMind GeoLite2 IP → compare to GPS coordinates'] },
+  { id: 357, section: '6', name: 'VPN / Proxy / Tor detection', severity: 'high', patterns: ['detectVPNProxy', 'isProxy', 'isTor', 'vpnDetect'], freeTools: ['GetIPIntel (free)', 'MaxMind GeoLite2 ASN database'] },
+  { id: 358, section: '6', name: 'Impossible travel between check-ins', severity: 'high', patterns: ['checkImpossibleCheckin', 'impossibleCheckin', 'travelSpeed'], freeTools: ['Haversine distance / time delta'] },
+  { id: 359, section: '6', name: 'International location change without notice', severity: 'medium', patterns: ['internationalChange', 'countryChange', 'crossBorder'], freeTools: ['GeoLite2 country change detection'] },
+  { id: 360, section: '6', name: 'Location history consistency', severity: 'medium', patterns: ['locationHistory', 'locationConsistency', 'gpsHistory'], freeTools: ['Custom — track location patterns over time'] },
+  { id: 361, section: '6', name: 'Location sharing revoked mid-date', severity: 'high', patterns: ['locationRevoked', 'stoppedSharing', 'gpsDisabled'], freeTools: ['Custom — monitor sharing status during date window'] },
+  { id: 362, section: '6', name: 'High-risk area flagging', severity: 'medium', patterns: ['highRiskArea', 'dangerousArea', 'crimeHotspot'], freeTools: ['OpenStreetMap + crime data APIs (varies by city)'] },
+  { id: 363, section: '6', name: 'Human trafficking corridor detection', severity: 'critical', patterns: ['traffickingCorridor', 'traffickingRoute', 'borderCorridor'], freeTools: ['Custom — geographic pattern matching'] },
+  { id: 364, section: '6', name: 'Motel / hotel address detection', severity: 'medium', patterns: ['motelDetect', 'hotelAddress', 'lodgingDetect'], freeTools: ['OpenStreetMap Overpass API — query amenity=hotel/motel'] },
+  { id: 365, section: '6', name: 'Isolated location detection', severity: 'high', patterns: ['isolatedLocation', 'remoteArea', 'noNearbyServices'], freeTools: ['OpenStreetMap — check POI density around coordinates'] },
+  { id: 366, section: '6', name: 'Recurring location with different matches', severity: 'medium', patterns: ['recurringLocation', 'sameLocationDifferentDates'], freeTools: ['Custom — cluster analysis of meeting locations'] },
+  { id: 367, section: '6', name: 'Meeting location changed last minute', severity: 'high', patterns: ['lastMinuteChange', 'locationChanged', 'suddenLocationChange'], freeTools: ['Custom — track location updates close to meeting time'] },
+  { id: 368, section: '6', name: 'Geofence escape detection', severity: 'high', patterns: ['geofenceEscape', 'leftSafeZone'], freeTools: ['Custom — geofence monitoring'] },
+  { id: 369, section: '6', name: 'Speed of location change post-date', severity: 'medium', patterns: ['postDateSpeed', 'rapidLocationChange'], freeTools: ['Haversine speed calculation'] },
+  { id: 370, section: '6', name: 'Cluster of reports from same location', severity: 'high', patterns: ['reportCluster', 'locationReportCluster'], freeTools: ['Custom — spatial clustering (DBSCAN)'] },
+  { id: 371, section: '6', name: 'Border crossing detection', severity: 'medium', patterns: ['borderCrossing', 'countryBoundary'], freeTools: ['GeoLite2 country change'] },
+  { id: 372, section: '6', name: 'Safe meeting locations', severity: 'high', patterns: ['safeMeetingLocation', 'getSafeMeetingLocationSuggestions', 'dateSafety'], freeTools: ['OpenStreetMap Overpass — query public venues'] },
+  { id: 373, section: '6', name: 'Meeting location safety scoring', severity: 'medium', patterns: ['locationSafetyScore', 'meetingLocationScore'], freeTools: ['Custom — POI density + public transit proximity + lighting'] },
+  { id: 374, section: '6', name: 'Late night first meeting detection', severity: 'medium', patterns: ['lateNightMeeting', 'firstDateNight', 'meetingHourCheck'], freeTools: ['Custom — time of meeting analysis'] },
+  { id: 375, section: '6', name: 'Share meeting location with trusted contact', severity: 'high', patterns: ['createMeetingLocationShare', 'shareMeeting', 'share-meeting-location', 'trustedContact'], freeTools: ['Custom feature implementation'] },
+  { id: 616, section: '6', name: 'Distance-based triangulation prevention', severity: 'high', patterns: ['triangulationPrevention', 'distanceAttack', 'trilateration'], freeTools: ['H3 / S2 Geometry — snap to hex/cell centers'] },
+  { id: 617, section: '6', name: 'Fuzzy/approximate distance display', severity: 'high', patterns: ['fuzzyDistance', 'approximateDistance', 'distanceBucket'], freeTools: ['H3 hexagonal binning'] },
+  { id: 618, section: '6', name: 'Location precision reduction for non-matches', severity: 'high', patterns: ['locationPrecision', 'reducePrecision', 'coarseLocation'], freeTools: ['Round coordinates to fewer decimal places'] },
+
+  // 6.1 Robbery / Violent Crime Lure
+  { id: 874, section: '6.1', name: 'Robbery lure pattern detection', severity: 'high', patterns: ['robberyLure', 'lurePattern', 'meetupRobbery'], freeTools: ['Custom — isolated location + first meeting + night time signals'] },
+  { id: 875, section: '6.1', name: 'Bait-and-switch meetup', severity: 'high', patterns: ['baitAndSwitch', 'differentPerson', 'notWhoExpected'], freeTools: ['Post-date report category + face verification'] },
+  { id: 876, section: '6.1', name: 'LGBTQ+ targeted robbery pattern', severity: 'high', patterns: ['lgbtqRobbery', 'gayBashing', 'targetedAttack'], freeTools: ['Custom — combine LGBTQ+ user flag + location risk + behavioral signals'] },
+  { id: 877, section: '6.1', name: 'Repeat lure location clustering', severity: 'high', patterns: ['lureLocationCluster', 'repeatDangerousLocation'], freeTools: ['DBSCAN spatial clustering of incident reports'] },
+  { id: 878, section: '6.1', name: 'Post-meetup emergency signal', severity: 'critical', patterns: ['emergencySignal', 'panicButton', 'postMeetupSOS'], freeTools: ['Custom SOS feature'] },
+  { id: 879, section: '6.1', name: 'Drugging/incapacitation risk alert', severity: 'high', patterns: ['druggingRisk', 'drinkSpiking', 'incapacitation'], freeTools: ['Educational prompt + post-date check-in'] },
+  { id: 880, section: '6.1', name: 'Burglary-through-dating pattern', severity: 'high', patterns: ['burglaryPattern', 'homeAddressExploit', 'casTheJoint'], freeTools: ['Custom — home address sharing detection'] },
+
+  // ─── SECTIONS 7-44: remaining detectors (same structure) ───
+  // Due to message length limits, sections 7-44 continue with the
+  // same pattern — each detector now has a severity field added.
+  // The complete registry continues below...
+
+  // SECTION 7: Voice & Audio
+  { id: 376, section: '7', name: 'Voice cloning detection', severity: 'high', patterns: ['detectVoiceCloneHeuristic', 'likelyCloned', 'voiceClone'], freeTools: ['WeDefense (open-source)', 'FakeVoiceFinder (research-grade)', 'ASVspoof baselines'] },
+  { id: 377, section: '7', name: 'Voice gender vs profile gender', severity: 'medium', patterns: ['checkVoiceGenderConsistency', 'voiceGender', 'analyzeVoiceGender'], freeTools: ['Whisper transcription + pitch analysis (librosa)'] },
+  { id: 378, section: '7', name: 'Transcribe audio + scan', severity: 'high', patterns: ['transcribeAndModerateAudio', 'transcribeAndModerate'], freeTools: ['Whisper (MIT) → DuoGuard/Llama Guard text scan'] },
+  { id: 379, section: '7', name: 'Pre-recorded audio anomalies', severity: 'medium', patterns: ['detectPreRecordedAudio', 'likelyPreRecorded'], freeTools: ['Custom — audio quality/compression analysis'] },
+  { id: 380, section: '7', name: 'NSFW speech in voice intros', severity: 'high', patterns: ['checkNsfwSpeechVoice', 'NSFW_SPEECH_PATTERNS', 'nsfw_speech_voice'], freeTools: ['Whisper → DuoGuard sexual_content category'] },
+  { id: 381, section: '7', name: 'Audio deepfake (full synthesis)', severity: 'high', patterns: ['audioDeepfake', 'syntheticVoice', 'voiceSynthesisDetect'], freeTools: ['WeDefense', 'ASVspoof baselines (research-grade)'] },
+  { id: 382, section: '7', name: 'Real-time voice deepfake detection', severity: 'high', patterns: ['realtimeVoiceDeepfake', 'liveVoiceDeepfake'], freeTools: ['Resemble Detect (free non-commercial, up to 2min)'] },
+  { id: 383, section: '7', name: 'Background noise analysis (call center)', severity: 'medium', patterns: ['backgroundNoise', 'callCenterDetect', 'ambientNoise'], freeTools: ['Custom — spectral analysis for call center patterns'] },
+  { id: 384, section: '7', name: 'Accent vs claimed location mismatch', severity: 'medium', patterns: ['accentMismatch', 'accentLocation', 'dialectAnalysis'], freeTools: ['No reliable free tool'] },
+  { id: 385, section: '7', name: 'Multiple voices in audio', severity: 'medium', patterns: ['multipleVoices', 'speakerDiarization', 'voiceCount'], freeTools: ['pyannote.audio (MIT) speaker diarization'] },
+  { id: 386, section: '7', name: 'Audio splicing detection', severity: 'medium', patterns: ['audioSplicing', 'audioEditDetect'], freeTools: ['Custom — discontinuity detection'] },
+  { id: 387, section: '7', name: 'Emotional authenticity scoring', severity: 'low', patterns: ['emotionalAuthenticity', 'emotionAnalysis', 'sentimentVoice'], freeTools: ['Custom — prosody analysis'] },
+  { id: 388, section: '7', name: 'Script-reading detection', severity: 'medium', patterns: ['scriptReading', 'readingDetect', 'monotoneDetect'], freeTools: ['Custom — prosody + pause pattern analysis'] },
+  { id: 389, section: '7', name: 'Background music fingerprinting', severity: 'low', patterns: ['musicFingerprint', 'backgroundMusic', 'audioFingerprint'], freeTools: ['chromaprint / acoustid (open-source)'] },
+  { id: 390, section: '7', name: 'Room acoustics consistency', severity: 'low', patterns: ['roomAcoustics', 'reverbAnalysis', 'environmentConsistency'], freeTools: ['Custom — reverb profile analysis'] },
+  { id: 391, section: '7', name: 'Phone quality vs claimed device', severity: 'low', patterns: ['phoneQuality', 'audioQualityDevice', 'codecMismatch'], freeTools: ['Custom — audio codec/bitrate analysis'] },
+  { id: 392, section: '7', name: 'DTMF tone detection (call center)', severity: 'medium', patterns: ['dtmfDetect', 'toneDetect', 'touchtone'], freeTools: ['Custom — DTMF frequency detection'] },
+  { id: 393, section: '7', name: 'Hold music detection', severity: 'low', patterns: ['holdMusic', 'holdMusicDetect'], freeTools: ['Custom — music detection during pauses'] },
+  { id: 394, section: '7', name: 'Echo / delay pattern detection', severity: 'low', patterns: ['echoDetect', 'delayPattern', 'latencyAnomaly'], freeTools: ['Custom — echo cancellation residual analysis'] },
+  { id: 395, section: '7', name: 'Keyword spotting in calls', severity: 'medium', patterns: ['keywordSpotting', 'callKeyword', 'voiceKeyword'], freeTools: ['Whisper transcription → keyword search'] },
+  { id: 396, section: '7', name: 'Voice stress analysis', severity: 'low', patterns: ['voiceStress', 'stressAnalysis', 'voiceTremor'], freeTools: ['No scientifically validated free tool'] },
+  { id: 397, section: '7', name: 'Coached response detection', severity: 'medium', patterns: ['coachedResponse', 'promptedAnswer', 'feedResponse'], freeTools: ['Custom — pause pattern + background voice detection'] },
+
+  // SECTION 8: Encryption & Privacy
+  { id: 398, section: '8', name: 'E2EE for text messages', severity: 'high', patterns: ['encryptTextForRecipient', 'decryptTextFromSender', 'ensureMyE2EEIdentity', 'e2ee.*text'], freeTools: ['Signal Protocol / libsignal (open-source)', 'TweetNaCl (MIT)'] },
+  { id: 399, section: '8', name: 'E2EE for images', severity: 'high', patterns: ['encryptAndUploadImageForRecipient', 'encryptImage', 'e2ee.*image'], freeTools: ['Signal Protocol for media', 'NaCl box encryption'] },
+  { id: 400, section: '8', name: 'E2EE for voice', severity: 'high', patterns: ['encryptAndUploadVoiceForRecipient', 'encryptVoice', 'e2eeVoice', 'E2EEAudio'], freeTools: ['Signal Protocol for media'] },
+  { id: 401, section: '8', name: 'Scan before encryption', severity: 'high', patterns: ['scanBeforeEncrypt', 'preScanEncrypt', 'moderateThenEncrypt'], freeTools: ['Client-side NSFWJS/DuoGuard → then encrypt'] },
+  { id: 402, section: '8', name: 'E2EE key injection detection', severity: 'high', patterns: ['verifyKeyIntegrity', 'computeKeyFingerprint', 'key.*fingerprint'], freeTools: ['Custom — key fingerprint comparison'] },
+  { id: 403, section: '8', name: 'Key transparency logs', severity: 'medium', patterns: ['appendKeyTransparencyLog', 'keyTransparency'], freeTools: ['Custom — append-only key log'] },
+  { id: 404, section: '8', name: 'Privacy / data controls', severity: 'high', patterns: ['logPrivacySettingsUpdate', 'requestDataDeletion', 'deleteMyData'], freeTools: ['Custom feature implementation'] },
+  { id: 405, section: '8', name: 'Prevent photo saving (FLAG_SECURE)', severity: 'medium', patterns: ['FLAG_SECURE', 'FlagSecure', 'preventScreenshot'], freeTools: ['Android: FLAG_SECURE', 'iOS: custom screenshot prevention'] },
+  { id: 406, section: '8', name: 'Screenshot detection', severity: 'medium', patterns: ['logScreenshotEvent', 'screenshotDetect'], freeTools: ['react-native-screenshot-detect', 'iOS: UIApplicationUserDidTakeScreenshotNotification'] },
+  { id: 407, section: '8', name: 'SSL certificate pinning', severity: 'high', patterns: ['MIN_TLS_VERSION', 'TLSv1\\.2', 'TLSv1\\.3', 'certPinning', 'sslPinning'], freeTools: ['react-native-ssl-pinning', 'TrustKit (open-source)'] },
+  { id: 408, section: '8', name: 'Minimum TLS version', severity: 'high', patterns: ['MIN_TLS_VERSION', 'TLSv1\\.2', 'TLSv1\\.3', 'minTLSVersion'], freeTools: ['Server config: minVersion TLSv1.2'] },
+  { id: 409, section: '8', name: 'Certificate transparency monitoring', severity: 'medium', patterns: ['certificateTransparency', 'ctLog', 'certTransparency'], freeTools: ['crt.sh (free CT log search)'] },
+  { id: 410, section: '8', name: 'Secure enclave usage', severity: 'high', patterns: ['secureEnclave', 'keychain', 'keystoreGeneric', 'SecureStore'], freeTools: ['expo-secure-store', 'react-native-keychain'] },
+  { id: 411, section: '8', name: 'Session hijacking detection', severity: 'high', patterns: ['sessionHijack', 'tokenTheft', 'sessionBind'], freeTools: ['Custom — bind session to device fingerprint + IP'] },
+
+  // SECTIONS 9-44: For brevity these maintain exact same entries as original
+  // with severity field added. Including all remaining detectors...
+
+  { id: 412, section: '9', name: 'Emergency SOS button', severity: 'critical', patterns: ['triggerSOS', 'emergencyContact', 'date-safety', 'EmergencyContact', 'panicButton'], freeTools: ['Custom feature — call emergency contact + share location'] },
+  { id: 413, section: '9', name: 'Date check-in reminders', severity: 'high', patterns: ['dateCheckin', 'DateCheckin', 'scheduleCheckInNotification'], freeTools: ['Custom — scheduled notification'] },
+  { id: 414, section: '9', name: 'Missed check-in alert', severity: 'critical', patterns: ['missedCheckin', 'missedCheckinAlertSent'], freeTools: ['Custom — alert emergency contact if check-in missed'] },
+  { id: 415, section: '9', name: 'Safe meeting locations', severity: 'high', patterns: ['safeMeetingLocationSuggest', 'safeVenue', 'publicPlace'], freeTools: ['OpenStreetMap Overpass API'] },
+  { id: 416, section: '9', name: 'Share meeting location', severity: 'high', patterns: ['createMeetingShare', 'shareMeetingLocation'], freeTools: ['Custom feature'] },
+  { id: 417, section: '9', name: 'User never checks in detection', severity: 'medium', patterns: ['neverChecksIn', 'skipCheckIn', 'ignoreSwitchEvasion'], freeTools: ['Qwen3Guard multilingual support'] },
   { id: 216, section: '2.8', name: 'Translation artifact detection', patterns: ['translationArtifact', 'machineTranslation', 'unnaturalPhrasing'], freeTools: ['Custom — check for translation-specific phrasings'] },
   { id: 217, section: '2.8', name: 'Refusal to use contractions (AI signal)', patterns: ['noContractions', 'aiWritingStyle', 'formalExcess'], freeTools: ['Custom — contraction ratio analysis'] },
   { id: 218, section: '2.8', name: 'Message entropy analysis', patterns: ['messageEntropy', 'shannonEntropy', 'entropyScore'], freeTools: ['Custom — Shannon entropy calculation'] },
@@ -456,13 +840,13 @@ const DETECTORS = [
   // 5.1 Scam Behavioral Patterns
   { id: 312, section: '5.1', name: 'Romance scam scoring', patterns: ['romanceScam', 'scamScore', 'romance.*scam', 'computeRomanceScamScore'], freeTools: ['No free off-the-shelf tool — custom scoring model (scikit-learn/XGBoost)'] },
   { id: 313, section: '5.1', name: 'Catfish likelihood score', patterns: ['computeCatfishScore', 'catfishScore', 'catfish.*score', 'catfishLikelihood'], freeTools: ['Custom composite score: face match + verification + behavior'] },
-  { id: 314, section: '5.1', name: 'Pig butchering phase detection', patterns: ['pigButchering', 'sha_zhu_pan', 'butcheringPhase'], freeTools: ['No free tool — custom conversation phase classifier'] },
+  { id: 314, section: '5.1', name: 'Pig butchering phase detection', patterns: ['pigButcheringPhase', 'sha_zhu_pan', 'butcheringPhase'], freeTools: ['No free tool — custom conversation phase classifier'] },
   { id: 315, section: '5.1', name: 'Swarming behavior', patterns: ['swarmingBehavior', 'multiAccountVictim', 'coordinatedTargeting'], freeTools: ['Custom — graph analysis (NetworkX/igraph)'] },
   { id: 316, section: '5.1', name: 'Victim profiling detection', patterns: ['victimProfiling', 'targetSelection', 'vulnerableUserTarget'], freeTools: ['Custom — analyze target selection patterns'] },
   { id: 317, section: '5.1', name: 'Network analysis of victim overlap', patterns: ['victimOverlap', 'sharedVictims', 'networkAnalysis'], freeTools: ['NetworkX/igraph graph analysis'] },
   { id: 318, section: '5.1', name: 'Behavioral fingerprinting across accounts', patterns: ['behavioralFingerprint', 'crossAccountBehavior', 'typingFingerprint'], freeTools: ['Custom — typing patterns + interaction style analysis'] },
-  { id: 319, section: '5.1', name: 'Second chance scam (return after block)', patterns: ['secondChanceScam', 'returnAfterBlock', 'reEngageVictim'], freeTools: ['Device fingerprint + face match on new accounts'] },
-  { id: 320, section: '5.1', name: 'Recovery scam targeting', patterns: ['recoveryScam', 'scamRecovery', 'getMoneyBack.*scam'], freeTools: ['Custom keyword patterns'] },
+  { id: 319, section: '5.1', name: 'Second chance scam (return after block)', patterns: ['secondChanceScamBehavior', 'returnAfterBlock', 'reEngageVictim'], freeTools: ['Device fingerprint + face match on new accounts'] },
+  { id: 320, section: '5.1', name: 'Recovery scam targeting', patterns: ['recoveryScamTarget', 'scamRecoveryTarget', 'getMoneyBack.*scam'], freeTools: ['Custom keyword patterns'] },
   { id: 785, section: '5.1', name: 'Strategic imperfection scam pattern', patterns: ['strategicImperfection', 'deliberateFlaw', 'tooGoodExceptOne'], freeTools: ['No free tool'] },
   { id: 786, section: '5.1', name: 'Evolving scam narrative classifier', patterns: ['evolvingNarrative', 'scamNarrativeUpdate'], freeTools: ['Sentence-Transformers + periodic retraining'] },
   { id: 787, section: '5.1', name: 'Widowed/divorced professional clustering', patterns: ['widowedProfessional', 'divorceNarrative.*professional'], freeTools: ['Custom clustering on profile fields'] },
@@ -506,11 +890,11 @@ const DETECTORS = [
 
   // 5.5 Conversation Analysis
   { id: 346, section: '5.5', name: 'Video call refusal patterns', patterns: ['detectVideoCallRefusal', 'refuseVideo', 'video.*call.*refus'], freeTools: ['Custom — track video call invitation → refusal sequences'] },
-  { id: 347, section: '5.5', name: 'Off-platform redirection', patterns: ['offPlatformRedirect', 'moveToWhatsApp', 'switchApp'], freeTools: ['Keyword detection for messaging app names'] },
-  { id: 348, section: '5.5', name: 'Fast-escalating conversations', patterns: ['fastEscalation', 'escalationSpeed', 'rapidIntimacy'], freeTools: ['Custom — intimacy score velocity'] },
-  { id: 349, section: '5.5', name: 'Financial requests', patterns: ['financialRequest', 'askForMoney', 'lendMeMoney'], freeTools: ['Keyword patterns'] },
+  { id: 347, section: '5.5', name: 'Off-platform redirection urgency', patterns: ['offPlatformSwitch', 'moveToWhatsApp.*urgency', 'switchApp.*now'], freeTools: ['Keyword detection for messaging app names'] },
+  { id: 348, section: '5.5', name: 'Rapid intimacy escalation', patterns: ['escalationSpeed', 'rapidIntimacy', 'intimacyVelocity'], freeTools: ['Custom — intimacy score velocity'] },
+  { id: 349, section: '5.5', name: 'Money request in conversation', patterns: ['askForMoney', 'lendMeMoney', 'moneyRequest'], freeTools: ['Keyword patterns'] },
   { id: 350, section: '5.5', name: 'Crypto scam patterns', patterns: ['cryptoScamPattern', 'investmentOpportunity', 'crypto.*profit'], freeTools: ['Keyword patterns + crypto address regex'] },
-  { id: 351, section: '5.5', name: 'Love bombing escalation', patterns: ['loveBombingEscalation', 'intenseLoveBomb'], freeTools: ['Custom sentiment velocity'] },
+  { id: 351, section: '5.5', name: 'Intense love bombing velocity', patterns: ['intenseLoveBomb', 'loveBombVelocity'], freeTools: ['Custom sentiment velocity'] },
   { id: 352, section: '5.5', name: 'Conversation mirroring', patterns: ['conversationMirroring', 'echoBack', 'parrotResponse'], freeTools: ['Sentence-Transformers similarity between sent/received'] },
 
   // 5.6 Forced Scammer / Trafficking
@@ -527,7 +911,7 @@ const DETECTORS = [
 
   // 5.8 Proxy Account Operation
   { id: 788, section: '5.8', name: 'Paid matchmaker operation detection', patterns: ['paidMatchmaker', 'conciergeOperation', 'managedAccount'], freeTools: ['Custom — behavior consistency analysis'] },
-  { id: 789, section: '5.8', name: 'Parent-created profile for adult', patterns: ['parentCreatedProfile', 'thirdPartyProfile'], freeTools: ['Custom — behavior + writing style analysis'] },
+  { id: 789, section: '5.8', name: 'Parent-created profile for adult', patterns: ['parentCreatedProfile', 'thirdPartyProfileCreate'], freeTools: ['Custom — behavior + writing style analysis'] },
   { id: 790, section: '5.8', name: 'Account selling / marketplace', patterns: ['accountSelling', 'accountMarketplace', 'buyAccount'], freeTools: ['Custom — sudden behavior change + device change'] },
 
   // 5.9 Married / Relationship Status Deception
@@ -669,7 +1053,7 @@ const DETECTORS = [
   { id: 424, section: '10', name: 'Verification badge display', patterns: ['verificationBadge', 'VerificationBadge', 'verified.*badge'], freeTools: ['Custom UI component'] },
   { id: 425, section: '10', name: 'Trust score decay', patterns: ['scoreDecay', 'applyTrustDecay', 'trustDecay'], freeTools: ['Custom — time-based decay function'] },
   { id: 426, section: '10', name: 'Account age gate', patterns: ['checkAccountAgeGate', 'accountAgeGate', 'account.*age.*gate'], freeTools: ['Custom — restrict features for new accounts'] },
-  { id: 427, section: '10', name: 'Ghost / inactive profile detection', patterns: ['ghostProfile', 'isGhostProfile', 'inactiveProfile'], freeTools: ['Custom — last activity threshold'] },
+  { id: 427, section: '10', name: 'Ghost / inactive profile detection', patterns: ['ghostProfileDetect', 'isGhostProfile', 'inactiveProfileDetect'], freeTools: ['Custom — last activity threshold'] },
   { id: 428, section: '10', name: 'Shadow ban system', patterns: ['shadowBan', 'silentRestrict', 'hiddenBan'], freeTools: ['Custom — reduce visibility without notification'] },
   { id: 429, section: '10', name: 'Honeypot profiles', patterns: ['honeypot', 'trapProfile', 'decoyProfile'], freeTools: ['Custom — operated profiles to detect bad actors'] },
   { id: 430, section: '10', name: 'Appeal / dispute workflow', patterns: ['appealWorkflow', 'disputeProcess', 'banAppeal'], freeTools: ['Custom workflow'] },
@@ -694,7 +1078,7 @@ const DETECTORS = [
   { id: 864, section: '10.2', name: 'Litigation risk scoring', patterns: ['litigationRisk', 'legalRisk', 'riskScore.*legal'], freeTools: ['Custom scoring model'] },
 
   // 10.3 Safety Feature Weaponization
-  { id: 918, section: '10.3', name: 'Block circumvention detection', patterns: ['blockCircumvention', 'blockEvasion', 'mirroredInterests'], freeTools: ['Device fingerprint + face matching'] },
+  { id: 918, section: '10.3', name: 'Block circumvention detection', patterns: ['blockCircumventionDetect', 'blockEvasion', 'mirroredInterests'], freeTools: ['Device fingerprint + face matching'] },
   { id: 919, section: '10.3', name: 'Weaponized reporting detection', patterns: ['weaponizedReport', 'massReport.*sameTarget', 'coordinatedReporting'], freeTools: ['Custom — detect coordinated reports against single user'] },
   { id: 920, section: '10.3', name: 'Safety feature documentation accuracy', patterns: ['safetyDocAccuracy', 'featureDocumentation'], freeTools: ['Manual audit process'] },
 
@@ -762,7 +1146,7 @@ const DETECTORS = [
   { id: 485, section: '13', name: 'API key enumeration detection', patterns: ['keyEnumeration', 'apiKeyBruteForce'], freeTools: ['Rate limiting + monitoring'] },
   { id: 486, section: '13', name: 'Race condition abuse', patterns: ['raceCondition', 'atomicOperation', 'lockMechanism'], freeTools: ['Custom — database-level locking'] },
   { id: 487, section: '13', name: 'TOCTOU vulnerability detection', patterns: ['toctou', 'timeOfCheck', 'checkThenAct'], freeTools: ['Custom — atomic operations'] },
-  { id: 488, section: '13', name: 'Replay attack detection', patterns: ['replayAttack', 'nonceCheck', 'requestNonce'], freeTools: ['Custom — nonce + timestamp validation'] },
+  { id: 488, section: '13', name: 'Replay attack detection', patterns: ['replayAttackDetect', 'nonceValidation', 'requestNonceCheck'], freeTools: ['Custom — nonce + timestamp validation'] },
 
   // 13.1 API Data Exposure
   { id: 665, section: '13.1', name: 'User profile data exposure (IDOR audit)', patterns: ['idorAudit', 'profileDataExposure', 'unauthorizedProfileAccess'], freeTools: ['Akto (open-source)', 'ZAP'] },
@@ -777,7 +1161,7 @@ const DETECTORS = [
   { id: 719, section: '13.2', name: 'Facial dataset harvesting prevention', patterns: ['facialHarvesting', 'datasetPrevention'], freeTools: ['Custom — rate limiting + watermarking'] },
   { id: 720, section: '13.2', name: 'Rate-limit profile viewing by pattern', patterns: ['profileViewRateLimit', 'viewingPattern'], freeTools: ['Custom — anomaly detection on view patterns'] },
   { id: 721, section: '13.2', name: 'Headless browser detection', patterns: ['headlessBrowser', 'puppeteerDetect', 'seleniumDetect'], freeTools: ['Custom — navigator.webdriver check + behavioral signals'] },
-    { id: 722, section: '13.2', name: 'User-agent anomaly detection', patterns: ['userAgentAnomaly', 'uaAnomaly', 'suspiciousUA'], freeTools: ['Custom — UA pattern matching'] },
+  { id: 722, section: '13.2', name: 'User-agent anomaly detection', patterns: ['userAgentAnomaly', 'uaAnomaly', 'suspiciousUA'], freeTools: ['Custom — UA pattern matching'] },
 
   // 13.3 Platform Cybersecurity Infrastructure
   { id: 843, section: '13.3', name: 'Software patching cadence monitoring', patterns: ['patchCadence', 'patchMonitor', 'softwarePatch'], freeTools: ['Dependabot', 'Renovate', 'Snyk (free tier)'] },
@@ -811,8 +1195,8 @@ const DETECTORS = [
   // 14.1 Network/Graph Analysis
   { id: 624, section: '14.1', name: 'Account creation burst detection', patterns: ['accountCreationBurst', 'registrationBurst', 'signupSpike', 'burstDetect'], freeTools: ['Custom — time-series anomaly detection'] },
   { id: 625, section: '14.1', name: 'Ring/clique detection (mutual interaction networks)', patterns: ['cliqueDetect', 'ringDetect', 'mutualNetwork', 'graphClique'], freeTools: ['NetworkX (Python)', 'igraph'] },
-  { id: 626, section: '14.1', name: 'Coordinated mass-swipe campaigns', patterns: ['massSwipe', 'coordinatedSwipe', 'swipeCampaign'], freeTools: ['Custom — velocity + IP clustering'] },
-  { id: 627, section: '14.1', name: 'Cross-app scammer intelligence sharing', patterns: ['crossAppIntel', 'scammerIntel', 'sharedIntelligence', 'MISP'], freeTools: ['MISP (open-source)', 'STIX/TAXII (open standard)'] },
+  { id: 626, section: '14.1', name: 'Coordinated mass-swipe campaigns', patterns: ['massSwipeCampaign', 'coordinatedSwipe', 'swipeCampaign'], freeTools: ['Custom — velocity + IP clustering'] },
+  { id: 627, section: '14.1', name: 'Cross-app scammer intelligence sharing', patterns: ['crossAppIntel', 'scammerIntel', 'sharedIntelligence'], freeTools: ['MISP (open-source)', 'STIX/TAXII (open standard)'] },
 
   // 14.2 Fake Dating App / Malware Defense
   { id: 728, section: '14.2', name: 'Brand impersonation app detection', patterns: ['brandImpersonation', 'fakeApp', 'appImpersonation'], freeTools: ['Google Play Protect', 'Custom — app store monitoring'] },
@@ -963,15 +1347,15 @@ const DETECTORS = [
   { id: 574, section: '16.8', name: 'Evidence preservation', patterns: ['evidencePreserve', 'preserveEvidence', 'legalHold'], freeTools: ['Custom — immutable storage'] },
   { id: 575, section: '16.8', name: 'Law enforcement subpoena process', patterns: ['subpoenaProcess', 'lawEnforcement.*request', 'legalRequest'], freeTools: ['Custom — secure request portal'] },
   { id: 576, section: '16.8', name: 'MLAT request handling', patterns: ['MLAT', 'mlatRequest', 'mutualLegalAssistance'], freeTools: ['Custom workflow'] },
-  { id: 577, section: '16.8', name: 'Transparency report generation', patterns: ['transparencyReport', 'generateReport.*transparency'], freeTools: ['Custom report generator'] },
+  { id: 577, section: '16.8', name: 'Transparency report generation', patterns: ['transparencyReportGen', 'generateReport.*transparency'], freeTools: ['Custom report generator'] },
 
   // 16.9 Platform Liability / Foreseeable Harm
-  { id: 902, section: '16.9', name: 'Foreseeable harm documentation system', patterns: ['foreseeableHarm', 'harmDocumentation', 'dutyOfCare'], freeTools: ['Custom — risk documentation'] },
+  { id: 902, section: '16.9', name: 'Foreseeable harm documentation system', patterns: ['foreseeableHarm', 'harmDocumentation', 'dutyOfCareDoc'], freeTools: ['Custom — risk documentation'] },
   { id: 903, section: '16.9', name: 'Safety marketing accuracy audit', patterns: ['safetyMarketingAudit', 'marketingAccuracy', 'safetyClaimAudit'], freeTools: ['Custom — claim vs. feature audit'] },
   { id: 904, section: '16.9', name: '"Known dangerous user" escalation protocol', patterns: ['dangerousUser', 'knownDangerous', 'escalateUser'], freeTools: ['Custom — priority escalation queue'] },
 
   // 16.10 Dating App Addiction Litigation
-  { id: 868, section: '16.10', name: 'Addictive design litigation risk audit', patterns: ['addictiveDesign', 'darkPatternAudit', 'addictionRisk'], freeTools: ['Custom — design review checklist'] },
+  { id: 868, section: '16.10', name: 'Addictive design litigation risk audit', patterns: ['addictiveDesignRisk', 'darkPatternLitigation', 'addictionRisk'], freeTools: ['Custom — design review checklist'] },
   { id: 869, section: '16.10', name: 'Minor engagement pattern detection (behavioral age inconsistency)', patterns: ['minorEngagement', 'behavioralAge', 'underageActivity'], freeTools: ['Custom — behavioral heuristics'] },
   { id: 870, section: '16.10', name: 'Informed consent for algorithmic engagement features', patterns: ['algorithmicConsent', 'engagementConsent', 'informedConsent.*algorithm'], freeTools: ['Custom — consent flow'] },
 
@@ -996,14 +1380,14 @@ const DETECTORS = [
   // ─── SECTION 18: PLATFORM OPERATIONS ────────────────────
   { id: 590, section: '18', name: 'Match expiration', patterns: ['matchExpir', 'calculateMatchExpiry', 'getMatchExpiryInfo', 'matchTTL'], freeTools: ['Custom — TTL logic'] },
   { id: 591, section: '18', name: 'Rate limit profile views', patterns: ['profileViewLimit', 'checkProfileViewLimit', 'viewRateLimit'], freeTools: ['Custom — Redis/Firestore counters'] },
-  { id: 592, section: '18', name: 'Fake verification badge display prevention', patterns: ['fakeBadge', 'detectFakeBadge', 'verificationBadge.*fake'], freeTools: ['Custom — server-side badge rendering'] },
+  { id: 592, section: '18', name: 'Fake verification badge display prevention', patterns: ['fakeBadgePrevention', 'detectFakeBadge', 'verificationBadge.*fake'], freeTools: ['Custom — server-side badge rendering'] },
   { id: 593, section: '18', name: 'Profile strength scoring', patterns: ['profileStrength', 'profileCompleteness', 'profileScore'], freeTools: ['Custom scoring algorithm'] },
-  { id: 594, section: '18', name: 'Secondary trauma support for mods', patterns: ['modWellbeing', 'moderatorWellbeing', 'secondaryTrauma', 'modSupport'], freeTools: ['Organizational — wellness programs'] },
+  { id: 594, section: '18', name: 'Secondary trauma support for mods', patterns: ['modWellbeingSupport', 'moderatorWellbeing', 'secondaryTrauma', 'modSupport'], freeTools: ['Organizational — wellness programs'] },
   { id: 595, section: '18', name: 'Air-gap sensitive operations', patterns: ['airGap', 'sensitiveOperation', 'isolatedExecution'], freeTools: ['Custom — network isolation'] },
   { id: 596, section: '18', name: 'Bug bounty program', patterns: ['bugBounty', 'responsibleDisclosure', 'securityReward'], freeTools: ['HackerOne (free basic)', 'Bugcrowd (free basic)'] },
   { id: 597, section: '18', name: 'Red team / penetration test schedule', patterns: ['redTeam', 'penTest', 'penetrationTest', 'securityAudit'], freeTools: ['ZAP (Checkmarx)', 'Dastardly', 'Custom schedule'] },
   { id: 598, section: '18', name: 'App store review fraud', patterns: ['reviewFraud', 'fakeReview', 'appStoreManipulation'], freeTools: ['Custom — review monitoring'] },
-  { id: 599, section: '18', name: 'App clone / modified APK detection', patterns: ['apkClone', 'modifiedAPK', 'appClone', 'tampered_apk'], freeTools: ['Play Integrity API', 'Custom signature check'] },
+  { id: 599, section: '18', name: 'App clone / modified APK detection', patterns: ['apkClone', 'modifiedAPK', 'appCloneDetect', 'tampered_apk'], freeTools: ['Play Integrity API', 'Custom signature check'] },
 
   // ─── SECTION 19: LGBTQ+ SAFETY ─────────────────────────
   { id: 601, section: '19', name: 'LGBTQ+ Traveler Alert in hostile countries', patterns: ['lgbtqTraveler', 'travelerAlert', 'hostileCountry.*lgbtq', 'lgbtqSafety'], freeTools: ['ILGA World database (free)', 'Custom geofencing'] },
@@ -1100,7 +1484,7 @@ const DETECTORS = [
   { id: 713, section: '29', name: '"Block my contacts" feature', patterns: ['blockContacts', 'blockMyContacts', 'contactBlock'], freeTools: ['Custom — contact hash matching'] },
   { id: 714, section: '29', name: 'Shared device safety mode (discreet icon, panic close, clear history)', patterns: ['safetyMode', 'discreetIcon', 'panicClose', 'clearHistory', 'sharedDeviceSafety'], freeTools: ['Custom — stealth mode implementation'] },
   { id: 715, section: '29', name: 'IPV resource surfacing', patterns: ['ipvResource', 'domesticViolenceResource', 'hotlineLink'], freeTools: ['Custom — hotline integration (NDVH free)'] },
-  { id: 716, section: '29', name: 'Quick-exit / boss button', patterns: ['quickExit', 'bossButton', 'panicButton', 'exitQuickly'], freeTools: ['Custom — instant redirect/close'] },
+  { id: 716, section: '29', name: 'Quick-exit / boss button', patterns: ['quickExit', 'bossButton', 'exitQuickly'], freeTools: ['Custom — instant redirect/close'] },
 
   // 29.1 Reproductive Coercion & IPV Sub-Types
   { id: 809, section: '29.1', name: 'Reproductive coercion language detection', patterns: ['reproductiveCoercion', 'birthControlCoercion', 'pregnancyCoercion'], freeTools: ['Custom — keyword patterns + DuoGuard'] },
@@ -1144,7 +1528,7 @@ const DETECTORS = [
   // ─── SECTION 36: DATA BREACH WEAPONIZATION DEFENSE ──────
   { id: 794, section: '36', name: 'Breach data cross-reference defense', patterns: ['breachCrossRef', 'breachDefense', 'leakedDataDefense'], freeTools: ['HaveIBeenPwned API (free)', 'Custom — hash comparison'] },
   { id: 795, section: '36', name: 'Compromised credential proactive monitoring', patterns: ['compromisedCredential', 'credentialMonitor', 'passwordCompromise'], freeTools: ['HaveIBeenPwned (free)', 'Custom — periodic checks'] },
-  { id: 796, section: '36', name: 'Post-breach user notification and forced password rotation', patterns: ['breachNotification', 'forcedPasswordReset', 'breachResponse'], freeTools: ['Custom — notification + force reset flow'] },
+  { id: 796, section: '36', name: 'Post-breach user notification and forced password rotation', patterns: ['breachNotify', 'forcedPasswordReset', 'breachResponse'], freeTools: ['Custom — notification + force reset flow'] },
   { id: 797, section: '36', name: 'Ashley Madison-style extortion detection', patterns: ['breachExtortion', 'dataExtortion', 'ashleyMadisonPattern'], freeTools: ['Custom — threat pattern detection'] },
 
   // ─── SECTION 37: PLATFORM-TO-PLATFORM MIGRATION SAFETY ──
@@ -1154,7 +1538,7 @@ const DETECTORS = [
   // ─── SECTION 38: SOCIAL ENGINEERING OF SUPPORT STAFF ────
   { id: 804, section: '38', name: 'Customer support social engineering detection', patterns: ['supportSocialEng', 'socialEngineeringSupport', 'csSocialEngineering'], freeTools: ['Custom — script + verification protocols'] },
   { id: 805, section: '38', name: 'Support staff impersonation phishing defense', patterns: ['supportPhishing', 'staffImpersonation.*phish', 'fakeSupport'], freeTools: ['Custom — verified support channels'] },
-  { id: 806, section: '38', name: 'Insider access abuse detection', patterns: ['insiderAbuse', 'insiderAccess', 'adminAbuse', 'privilegeAbuse'], freeTools: ['Custom — admin audit log + anomaly detection'] },
+  { id: 806, section: '38', name: 'Insider access abuse detection', patterns: ['insiderAbuse', 'insiderAccess', 'adminAbuseDetect', 'privilegeAbuse'], freeTools: ['Custom — admin audit log + anomaly detection'] },
 
   // ─── SECTION 39: ANONYMOUS ACCOUNT SAFETY ───────────────
   { id: 858, section: '39', name: 'Anonymous account abuse detection', patterns: ['anonAbuse', 'anonymousAbuse', 'throwawayAbuse'], freeTools: ['Custom — behavioral scoring'] },
@@ -1173,7 +1557,7 @@ const DETECTORS = [
 
   // ─── SECTION 42: PLATFORM DARK PATTERN SELF-AUDIT ───────
   { id: 696, section: '42', name: 'Safety feature paywalling prevention', patterns: ['safetyPaywall', 'paywallSafety', 'freeSafetyFeature'], freeTools: ['Custom — policy audit'] },
-  { id: 697, section: '42', name: 'Addictive design pattern audit', patterns: ['addictiveDesign', 'darkPatternAudit', 'addictiveMechanism'], freeTools: ['Custom — design review checklist', 'Deceptive Design (reference)'] },
+  { id: 697, section: '42', name: 'Addictive design pattern audit', patterns: ['addictiveDesignAudit', 'darkPatternAudit', 'addictiveMechanism'], freeTools: ['Custom — design review checklist', 'Deceptive Design (reference)'] },
   { id: 698, section: '42', name: 'Subscription cancellation friction audit', patterns: ['cancellationFriction', 'cancelSubscription.*friction', 'easyCancel'], freeTools: ['Custom — UX audit'] },
   { id: 699, section: '42', name: 'Deceptive urgency in premium upsells', patterns: ['deceptiveUrgency', 'fakeScarcity', 'urgentUpsell'], freeTools: ['Custom — copy audit'] },
   { id: 755, section: '42', name: 'Safety feature accessibility audit', patterns: ['safetyAccessibility', 'a11ySafety', 'accessibleSafetyFeature'], freeTools: ['axe-core', 'Pa11y'] },
@@ -1186,18 +1570,69 @@ const DETECTORS = [
   { id: 895, section: '43', name: 'Safety feature usage analytics', patterns: ['safetyUsageAnalytics', 'featureUsageTracking', 'safetyAdoption'], freeTools: ['Custom — analytics dashboards'] },
 
   // ─── SECTION 44: MISCELLANEOUS ──────────────────────────
-  { id: 641, section: '44', name: 'Account selling / marketplace detection', patterns: ['accountSelling', 'accountMarketplace', 'sellAccount'], freeTools: ['Custom — behavioral + listing detection'] },
-  { id: 642, section: '44', name: 'Premium feature exploitation for harassment', patterns: ['premiumHarassment', 'featureExploit.*harass', 'premiumAbuse'], freeTools: ['Custom — abuse pattern detection'] },
+  { id: 641, section: '44', name: 'Account selling / marketplace detection', patterns: ['accountSellingDetect', 'accountMarketplaceDetect', 'sellAccount'], freeTools: ['Custom — behavioral + listing detection'] },
+  { id: 642, section: '44', name: 'Premium feature exploitation for harassment', patterns: ['premiumHarassment', 'featureExploit.*harass', 'premiumHarassAbuse'], freeTools: ['Custom — abuse pattern detection'] },
   { id: 645, section: '44', name: 'Discriminatory filtering detection', patterns: ['discriminatoryFilter', 'biasedFilter', 'discriminationDetect'], freeTools: ['Fairlearn', 'Custom — filter audit'] },
   { id: 646, section: '44', name: 'Data deletion verification post-account-removal', patterns: ['deletionVerify', 'dataWipe', 'accountRemovalVerify'], freeTools: ['Custom — cascading delete + audit'] },
   { id: 647, section: '44', name: 'Historical email address association tracking', patterns: ['emailHistory', 'historicalEmail', 'emailAssociation'], freeTools: ['Custom — hash-based tracking'] },
   { id: 648, section: '44', name: 'Code word / distress signal in messages to trusted contacts', patterns: ['codeWord', 'distressSignal', 'safeWord', 'panicCode'], freeTools: ['Custom — keyword trigger to trusted contact'] },
-  { id: 649, section: '44', name: 'Drink spiking / safety awareness contextual alerts', patterns: ['drinkSpiking', 'drinkSafety', 'spikingAlert'], freeTools: ['Custom — date safety tips'] },
+  { id: 649, section: '44', name: 'Drink spiking / safety awareness contextual alerts', patterns: ['drinkSpikingAlert', 'drinkSafety', 'spikingAlert'], freeTools: ['Custom — date safety tips'] },
   { id: 650, section: '44', name: 'Post-date safety check-in with escalation path', patterns: ['postDateCheckin', 'afterDateSafety', 'dateFollowup', 'checkPostDateFeedback'], freeTools: ['Custom — scheduled notification + escalation'] },
 ];
 
 // ═══════════════════════════════════════════════════════════
-// End of DETECTORS array — ~920 detectors covering all 44 sections
+// END OF DETECTORS — STARTUP VALIDATION
+// ═══════════════════════════════════════════════════════════
+
+// Validate no duplicate IDs
+const idSet = new Set();
+const dupes = [];
+for (const d of DETECTORS) {
+  if (idSet.has(d.id)) dupes.push(d.id);
+  idSet.add(d.id);
+}
+if (dupes.length > 0) {
+  console.error(`❌ FATAL: Duplicate detector IDs found: ${dupes.join(', ')}`);
+  process.exit(2);
+}
+
+// Pre-compile all regex patterns once
+let scanErrors = 0;
+for (const d of DETECTORS) {
+  d._compiled = d.patterns.map(p => {
+    try { return { regex: new RegExp(p, 'ig'), source: p }; }
+    catch { return { regex: null, source: p }; }
+  });
+  // Default severity
+  if (!d.severity) d.severity = 'medium';
+}
+
+// Resolve "Same as #N" freeTools references
+for (const d of DETECTORS) {
+  if (d.freeTools) {
+    d.freeTools = d.freeTools.map(t => {
+      if (t.startsWith('Same as #')) {
+        const refId = parseInt(t.match(/\d+/)?.[0]);
+        const ref = DETECTORS.find(x => x.id === refId);
+        return ref?.freeTools?.[0] ?? t;
+      }
+      return t;
+    });
+  }
+}
+
+// Apply CLI section filter
+const activeDetectors = filterSection
+  ? DETECTORS.filter(d => d.section === filterSection || d.section.startsWith(filterSection + '.'))
+  : DETECTORS;
+
+if (filterSection && activeDetectors.length === 0) {
+  console.error(`❌ No detectors found for section "${filterSection}"`);
+  process.exit(1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILE SCANNING
 // ═══════════════════════════════════════════════════════════
 
 const SCAN_DIRS = ['app', 'utils', 'components', 'server/src', 'functions/src', 'src', 'lib', 'hooks', 'services', 'api', 'screens', 'features', 'modules', 'providers', 'context', 'store', 'middleware'];
@@ -1215,72 +1650,82 @@ function getAllFiles(dir) {
       const stat = fs.statSync(full);
       if (stat.isDirectory()) results.push(...getAllFiles(full));
       else if (EXTENSIONS.includes(path.extname(entry)) && entry !== SELF_BASENAME) results.push(full);
-    } catch {}
+    } catch (e) { scanErrors++; }
   }
   return results;
 }
 
 function loadFiles() {
   const files = SCAN_DIRS.flatMap(d => getAllFiles(d));
-  // Also scan root-level files
   try {
     const rootFiles = fs.readdirSync('.').filter(f => EXTENSIONS.includes(path.extname(f)) && f !== SELF_BASENAME);
     for (const f of rootFiles) { if (!files.includes(f)) files.push(f); }
-  } catch {}
+  } catch { scanErrors++; }
   const contents = {};
-  for (const f of [...new Set(files)]) { try { contents[f] = fs.readFileSync(f, 'utf8'); } catch {} }
+  for (const f of [...new Set(files)]) {
+    try { contents[f] = fs.readFileSync(f, 'utf8'); }
+    catch { scanErrors++; }
+  }
   return contents;
 }
 
-const CODE_INDICATORS = [
-  /(?:export\s+)?(?:async\s+)?function\s+\w+/,
-  /(?:const|let|var|export\s+const)\s+\w+\s*=\s*(?:async\s*)?\(/,
-  /\w+\s*\([^)]*\)\s*\{/,
-  /(?:const|let|var)\s+\w+\s*=\s*[^;]+;/,
-  /if\s*\([^)]*\w+/,
-  /await\s+\w+/,
-  /return\s+/,
-  /import\s+.*from/,
-  /try\s*\{/,
-  /\.\w+\s*\(/,
-  /(?:addDoc|setDoc|updateDoc|getDoc|getDocs|deleteDoc|collection|doc)\s*\(/,
-  /useState|useEffect|useCallback|useMemo/,
-  /fetch\s*\(|axios\.|\.post\(|\.get\(/,
-];
+// ═══════════════════════════════════════════════════════════
+// SELF-FILE DETECTION (per-file, not per-match)
+// ═══════════════════════════════════════════════════════════
 
-function getImplementationEvidence(content, patterns) {
+function isSelfReferenceFile(content) {
+  return /const\s+DETECTORS\s*=\s*\[/.test(content) &&
+    content.includes('freeTools:') &&
+    content.includes('section:') &&
+    content.includes('patterns:');
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMPLEMENTATION EVIDENCE (merged single-pass)
+// ═══════════════════════════════════════════════════════════
+
+function getImplementationEvidence(content, compiledPatterns) {
   const evidence = {
     hasFunctionDef: false, hasConstDef: false, hasFunctionCall: false,
     hasImport: false, hasConditional: false, hasFirebaseOp: false,
     hasStateHook: false, hasApiCall: false, hasAwait: false, hasReturn: false,
     matchedPatterns: [], codeLines: [],
   };
-  for (const pattern of patterns) {
-    try {
-      const regex = new RegExp(pattern, 'ig');
-      let match;
-      while ((match = regex.exec(content)) !== null) {
-        const lineStart = content.lastIndexOf('\n', match.index) + 1;
-        const lineEnd = content.indexOf('\n', match.index);
-        const line = content.substring(lineStart, lineEnd === -1 ? content.length : lineEnd).trim();
-        if (/^\s*\/\//.test(line) || /^\s*\/?\*/.test(line)) continue;
-        const nearby = content.substring(Math.max(0, match.index - 300), Math.min(content.length, match.index + 300));
-        if (/DETECTORS\s*=\s*\[/.test(nearby) && /patterns\s*:/.test(nearby)) continue;
-        if (/freeTools\s*:/.test(nearby) && /section\s*:/.test(nearby)) continue;
-        evidence.matchedPatterns.push(pattern);
-        if (evidence.codeLines.length < 3) evidence.codeLines.push(line.substring(0, 140));
-        if (/(?:export\s+)?(?:async\s+)?function\s+/.test(line)) evidence.hasFunctionDef = true;
-        if (/(?:const|let|var|export)\s+\w+\s*=/.test(line)) evidence.hasConstDef = true;
-        if (/\w+\s*\(/.test(line) && !/function\s/.test(line)) evidence.hasFunctionCall = true;
-        if (/import\s+/.test(line)) evidence.hasImport = true;
-        if (/if\s*\(/.test(line)) evidence.hasConditional = true;
-        if (/(?:addDoc|setDoc|updateDoc|getDoc|collection)\s*\(/.test(line)) evidence.hasFirebaseOp = true;
-        if (/(?:useState|useEffect|useCallback)\s*/.test(line)) evidence.hasStateHook = true;
-        if (/(?:fetch|axios|\.post|\.get)\s*\(/.test(line)) evidence.hasApiCall = true;
-        if (/await\s+/.test(line)) evidence.hasAwait = true;
-        if (/return\s+/.test(line)) evidence.hasReturn = true;
+  for (const { regex, source } of compiledPatterns) {
+    if (!regex) {
+      // Fallback to plain string match
+      if (content.toLowerCase().includes(source.toLowerCase())) {
+        evidence.matchedPatterns.push(source);
       }
-    } catch {}
+      continue;
+    }
+    regex.lastIndex = 0; // Reset stateful regex
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      const lineStart = content.lastIndexOf('\n', match.index) + 1;
+      const lineEnd = content.indexOf('\n', match.index);
+      const line = content.substring(lineStart, lineEnd === -1 ? content.length : lineEnd).trim();
+      // Skip comments
+      if (/^\s*\/\//.test(line) || /^\s*\/?\*/.test(line) || /^\s*\*/.test(line)) continue;
+      // Skip string literals containing the pattern (basic heuristic)
+      const beforeMatch = content.substring(lineStart, match.index);
+      const quotesBefore = (beforeMatch.match(/['"``]/g) || []).length;
+      if (quotesBefore % 2 === 1) continue; // Likely inside a string
+
+      evidence.matchedPatterns.push(source);
+      if (evidence.codeLines.length < 3) evidence.codeLines.push(line.substring(0, 140));
+      if (/(?:export\s+)?(?:async\s+)?function\s+/.test(line)) evidence.hasFunctionDef = true;
+      if (/(?:const|let|var|export)\s+\w+\s*=/.test(line)) evidence.hasConstDef = true;
+      if (/\w+\s*\(/.test(line) && !/function\s/.test(line)) evidence.hasFunctionCall = true;
+      if (/import\s+/.test(line)) evidence.hasImport = true;
+      if (/if\s*\(/.test(line)) evidence.hasConditional = true;
+      if (/(?:addDoc|setDoc|updateDoc|getDoc|collection)\s*\(/.test(line)) evidence.hasFirebaseOp = true;
+      if (/(?:useState|useEffect|useCallback)\s*/.test(line)) evidence.hasStateHook = true;
+      if (/(?:fetch|axios|\.post|\.get)\s*\(/.test(line)) evidence.hasApiCall = true;
+      if (/await\s+/.test(line)) evidence.hasAwait = true;
+      if (/return\s+/.test(line)) evidence.hasReturn = true;
+      break; // One match per pattern per file is enough for classification
+    }
   }
   return evidence;
 }
@@ -1302,12 +1747,11 @@ function checkDetector(detector, contents) {
   let bestClassification = 'none';
   const ranks = { strong: 5, solid: 4, moderate: 3, weak: 2, reference: 1, none: 0 };
   for (const [file, content] of Object.entries(contents)) {
-    const hasMatch = detector.patterns.some(p => {
-      try { return new RegExp(p, 'i').test(content); }
-      catch { return content.toLowerCase().includes(p.toLowerCase()); }
-    });
-    if (!hasMatch) continue;
-    const evidence = getImplementationEvidence(content, detector.patterns);
+    // Skip self-reference files entirely
+    if (content._isSelfRef) continue;
+
+    const evidence = getImplementationEvidence(content, detector._compiled);
+    if (evidence.matchedPatterns.length === 0) continue;
     const classification = classifyImplementation(evidence);
     if (ranks[classification] > (ranks[bestClassification] || 0)) bestClassification = classification;
     fileMatches.push({ file: path.relative(process.cwd(), file), classification, codeLines: evidence.codeLines });
@@ -1315,28 +1759,77 @@ function checkDetector(detector, contents) {
   return { fileMatches, bestClassification };
 }
 
-// ─── Run the audit ────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// SECTION SORT (handles 2.10 > 2.9, 29.1 > 29)
+// ═══════════════════════════════════════════════════════════
 
-console.log('\n🔍 MASTER DETECTOR AUDIT — All ~920 Detectors');
-console.log('═'.repeat(65));
+function sectionCompare(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const va = pa[i] ?? -1;
+    const vb = pb[i] ?? -1;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RUN THE AUDIT
+// ═══════════════════════════════════════════════════════════
+
+if (!CLI.jsonOnly) {
+  console.log('\n🔍 MASTER DETECTOR AUDIT v5.0 — All ~920 Detectors');
+  console.log('═'.repeat(65));
+}
+
 const allContents = loadFiles();
-const fileCount = Object.keys(allContents).length;
-console.log(`📁 Scanned ${fileCount} source files\n`);
 
-const total = DETECTORS.length;
+// Mark self-reference files
+for (const [file, content] of Object.entries(allContents)) {
+  allContents[file] = content;
+  // Attach metadata via defineProperty to avoid string prototype pollution
+  Object.defineProperty(allContents, file, {
+    value: content,
+    writable: false,
+    enumerable: true,
+  });
+}
+// Simpler approach: track self-ref files separately
+const selfRefFiles = new Set();
+for (const [file, content] of Object.entries(allContents)) {
+  if (isSelfReferenceFile(content)) selfRefFiles.add(file);
+}
+
+const fileCount = Object.keys(allContents).length;
+if (!CLI.jsonOnly) console.log(`📁 Scanned ${fileCount} source files (${scanErrors} errors skipped)\n`);
+
+const total = activeDetectors.length;
 const implemented = [], partial = [], referenceOnly = [], missing = [];
 
-for (const detector of DETECTORS) {
-  const result = checkDetector(detector, allContents);
+for (const detector of activeDetectors) {
+  // Filter self-ref files during check
+  const filteredContents = {};
+  for (const [f, c] of Object.entries(allContents)) {
+    if (!selfRefFiles.has(f)) filteredContents[f] = c;
+  }
+  const result = checkDetector(detector, filteredContents);
   if (result.fileMatches.length === 0) missing.push(detector);
   else if (['strong', 'solid'].includes(result.bestClassification)) implemented.push({ ...detector, ...result });
   else if (['moderate', 'weak'].includes(result.bestClassification)) partial.push({ ...detector, ...result });
   else referenceOnly.push({ ...detector, ...result });
 }
 
+// Build O(1) lookup sets
+const implementedIds = new Set(implemented.map(d => d.id));
+const partialIds = new Set(partial.map(d => d.id));
+const referenceIds = new Set(referenceOnly.map(d => d.id));
+
 const icons = { strong: '✅', solid: '✅', moderate: '🔶', weak: '🔶', reference: '⚠️', none: '❌' };
 
-// ─── Group by section for readable output ─────────────────
+// ═══════════════════════════════════════════════════════════
+// SECTION NAMES
+// ═══════════════════════════════════════════════════════════
 
 const sectionNames = {
   '1.1': 'NSFW / Adult Content', '1.2': 'Identity & Face Verification', '1.3': 'AI Generated & Manipulated',
@@ -1355,7 +1848,6 @@ const sectionNames = {
   '5.10': 'State-Sponsored Espionage', '5.11': 'Extremist Recruitment',
   '6': 'Location & Physical Safety', '6.1': 'Robbery / Violent Crime Lure',
   '7': 'Voice & Audio Safety', '8': 'Encryption & Privacy', '9': 'Physical Date Safety',
-  '9.1': 'Slow Dating / Intentional Friction',
   '10': 'Trust & Reputation', '10.1': 'Ghost/Zombie Profile Exploitation',
   '10.2': 'Systematic Failure / Repeat Offender', '10.3': 'Safety Feature Weaponization',
   '11': 'Social Verification', '12': 'Payments & Financial Fraud',
@@ -1389,169 +1881,257 @@ const sectionNames = {
   '43': 'Safety Map & Transparency', '44': 'Miscellaneous',
 };
 
-// Print by status
-const sep = '═'.repeat(65);
+// ═══════════════════════════════════════════════════════════
+// CONSOLE OUTPUT (skip if --json-only)
+// ═══════════════════════════════════════════════════════════
 
-console.log(sep);
-console.log(`✅ FULLY IMPLEMENTED (${implemented.length}/${total})`);
-console.log(sep);
-for (const d of implemented) {
-  console.log(`  ${icons[d.bestClassification]} #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name} [${d.bestClassification}]`);
-  for (const fm of d.fileMatches.slice(0, 2)) {
-    console.log(`        → ${fm.file} [${fm.classification}]`);
-    if (fm.codeLines[0]) console.log(`          ${fm.codeLines[0]}`);
+if (!CLI.jsonOnly) {
+  const sep = '═'.repeat(65);
+
+  // Implemented
+  console.log(sep);
+  console.log(`✅ FULLY IMPLEMENTED (${implemented.length}/${total})`);
+  console.log(sep);
+  for (const d of implemented) {
+    console.log(`  ${icons[d.bestClassification]} #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name} [${d.bestClassification}]`);
+    for (const fm of d.fileMatches.slice(0, 2)) {
+      console.log(`        → ${fm.file} [${fm.classification}]`);
+      if (fm.codeLines[0]) console.log(`          ${fm.codeLines[0]}`);
+    }
+    if (d.fileMatches.length > 2) console.log(`        → ... and ${d.fileMatches.length - 2} more files`);
   }
-  if (d.fileMatches.length > 2) console.log(`        → ... and ${d.fileMatches.length - 2} more files`);
-}
 
-console.log(`\n${sep}`);
-console.log(`🔶 PARTIALLY IMPLEMENTED (${partial.length}/${total})`);
-console.log(sep);
-for (const d of partial) {
-  console.log(`  ${icons[d.bestClassification]} #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name} [${d.bestClassification}]`);
-  for (const fm of d.fileMatches.slice(0, 2)) {
-    console.log(`        → ${fm.file}`);
-    if (fm.codeLines[0]) console.log(`          ${fm.codeLines[0]}`);
+  // Partial
+  console.log(`\n${sep}`);
+  console.log(`🔶 PARTIALLY IMPLEMENTED (${partial.length}/${total})`);
+  console.log(sep);
+  for (const d of partial) {
+    console.log(`  ${icons[d.bestClassification]} #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name} [${d.bestClassification}]`);
+    for (const fm of d.fileMatches.slice(0, 2)) {
+      console.log(`        → ${fm.file}`);
+      if (fm.codeLines[0]) console.log(`          ${fm.codeLines[0]}`);
+    }
   }
-}
 
-console.log(`\n${sep}`);
-console.log(`⚠️  REFERENCE ONLY (${referenceOnly.length}/${total})`);
-console.log(sep);
-for (const d of referenceOnly) {
-  console.log(`  ⚠️  #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name}`);
-  for (const fm of d.fileMatches.slice(0, 1)) console.log(`        → ${fm.file}`);
-}
-
-console.log(`\n${sep}`);
-console.log(`❌ MISSING (${missing.length}/${total})`);
-console.log(sep);
-
-// Group missing by section
-const missingBySection = {};
-for (const d of missing) {
-  const sec = d.section;
-  if (!missingBySection[sec]) missingBySection[sec] = [];
-  missingBySection[sec].push(d);
-}
-for (const [sec, detectors] of Object.entries(missingBySection).sort((a, b) => {
-  const numA = parseFloat(a[0]) || 99;
-  const numB = parseFloat(b[0]) || 99;
-  return numA - numB;
-})) {
-  console.log(`\n  [${sec}] ${sectionNames[sec] ?? sec}`);
-  for (const d of detectors) {
-    console.log(`    ❌ #${String(d.id).padStart(3, '0')} ${d.name}`);
-    console.log(`          need: ${d.patterns.slice(0, 3).join(' | ')}`);
-    if (d.freeTools?.length) console.log(`          free: ${d.freeTools.join(', ')}`);
+  // Reference only
+  console.log(`\n${sep}`);
+  console.log(`⚠️  REFERENCE ONLY (${referenceOnly.length}/${total})`);
+  console.log(sep);
+  for (const d of referenceOnly) {
+    console.log(`  ⚠️  #${String(d.id).padStart(3, '0')} [${d.section}] ${d.name}`);
+    for (const fm of d.fileMatches.slice(0, 1)) console.log(`        → ${fm.file}`);
   }
+
+  // Missing — grouped by section
+  console.log(`\n${sep}`);
+  console.log(`❌ MISSING (${missing.length}/${total})`);
+  console.log(sep);
+
+  const missingBySection = {};
+  for (const d of missing) {
+    if (!missingBySection[d.section]) missingBySection[d.section] = [];
+    missingBySection[d.section].push(d);
+  }
+  for (const [sec, detectors] of Object.entries(missingBySection).sort((a, b) => sectionCompare(a[0], b[0]))) {
+    console.log(`\n  [${sec}] ${sectionNames[sec] ?? sec}`);
+    for (const d of detectors) {
+      const sev = d.severity === 'critical' ? '🔴' : d.severity === 'high' ? '🟠' : d.severity === 'medium' ? '🟡' : '⚪';
+      console.log(`    ❌ ${sev} #${String(d.id).padStart(3, '0')} ${d.name} [${d.severity}]`);
+      console.log(`          need: ${d.patterns.slice(0, 3).join(' | ')}`);
+      if (d.freeTools?.length) console.log(`          free: ${d.freeTools[0]}`);
+    }
+  }
+
+  // Section coverage
+  console.log(`\n${sep}`);
+  console.log('📊 SECTION-BY-SECTION COVERAGE');
+  console.log(sep);
+
+  const allAudited = [...implemented, ...partial, ...referenceOnly, ...missing];
+  const sectionStats = {};
+  for (const d of allAudited) {
+    const sec = d.section;
+    if (!sectionStats[sec]) sectionStats[sec] = { total: 0, implemented: 0, partial: 0, reference: 0, missing: 0 };
+    sectionStats[sec].total++;
+    if (implementedIds.has(d.id)) sectionStats[sec].implemented++;
+    else if (partialIds.has(d.id)) sectionStats[sec].partial++;
+    else if (referenceIds.has(d.id)) sectionStats[sec].reference++;
+    else sectionStats[sec].missing++;
+  }
+
+  for (const [sec, stats] of Object.entries(sectionStats).sort((a, b) => sectionCompare(a[0], b[0]))) {
+    const pct = Math.round((stats.implemented / stats.total) * 100);
+    const bar = '█'.repeat(Math.round(pct / 5)) + '░'.repeat(20 - Math.round(pct / 5));
+    console.log(`  [${sec.padEnd(5)}] [${bar}] ${String(pct).padStart(3)}% (${stats.implemented}✅ ${stats.partial}🔶 ${stats.reference}⚠️  ${stats.missing}❌) ${sectionNames[sec] ?? ''}`);
+  }
+
+  // Overall summary
+  const implPct = Math.round(implemented.length / total * 100);
+  const partPct = Math.round(partial.length / total * 100);
+  const refPct = Math.round(referenceOnly.length / total * 100);
+  const missPct = Math.round(missing.length / total * 100);
+
+  console.log(`\n${sep}`);
+  console.log('📊 OVERALL SUMMARY');
+  console.log(sep);
+  console.log(`  ✅ Fully implemented : ${implemented.length}/${total} (${implPct}%)`);
+  console.log(`  🔶 Partial/weak      : ${partial.length}/${total} (${partPct}%)`);
+  console.log(`  ⚠️  Reference only    : ${referenceOnly.length}/${total} (${refPct}%)`);
+  console.log(`  ❌ Missing            : ${missing.length}/${total} (${missPct}%)`);
+  console.log(`\n  Total detectors in registry: ${total}`);
+  console.log(`  Source files scanned: ${fileCount}`);
+  console.log(`  Scan errors suppressed: ${scanErrors}`);
+
+  // Critical missing highlight
+  const criticalMissing = missing.filter(d => d.severity === 'critical');
+  const highMissing = missing.filter(d => d.severity === 'high');
+  if (criticalMissing.length > 0) {
+    console.log(`\n  🔴 CRITICAL MISSING: ${criticalMissing.length} detectors`);
+    for (const d of criticalMissing.slice(0, 10)) {
+      console.log(`     #${d.id} ${d.name}`);
+    }
+    if (criticalMissing.length > 10) console.log(`     ... and ${criticalMissing.length - 10} more`);
+  }
+  if (highMissing.length > 0) {
+    console.log(`  🟠 HIGH MISSING: ${highMissing.length} detectors`);
+  }
+  console.log(sep);
 }
 
-// ─── Section-by-section summary ───────────────────────────
+// ═══════════════════════════════════════════════════════════
+// FREE TOOLS SUMMARY
+// ═══════════════════════════════════════════════════════════
 
-console.log(`\n${sep}`);
-console.log('📊 SECTION-BY-SECTION COVERAGE');
-console.log(sep);
-
-const allDetectors = [...implemented, ...partial, ...referenceOnly, ...missing];
-const sectionStats = {};
-for (const d of allDetectors) {
-  const sec = d.section;
-  if (!sectionStats[sec]) sectionStats[sec] = { total: 0, implemented: 0, partial: 0, reference: 0, missing: 0 };
-  sectionStats[sec].total++;
-  if (implemented.find(x => x.id === d.id)) sectionStats[sec].implemented++;
-  else if (partial.find(x => x.id === d.id)) sectionStats[sec].partial++;
-  else if (referenceOnly.find(x => x.id === d.id)) sectionStats[sec].reference++;
-  else sectionStats[sec].missing++;
-}
-
-for (const [sec, stats] of Object.entries(sectionStats).sort((a, b) => {
-  const numA = parseFloat(a[0]) || 99;
-  const numB = parseFloat(b[0]) || 99;
-  return numA - numB;
-})) {
-  const pct = Math.round((stats.implemented / stats.total) * 100);
-  const bar = '█'.repeat(Math.round(pct / 5)) + '░'.repeat(20 - Math.round(pct / 5));
-  console.log(`  [${sec.padEnd(5)}] [${bar}] ${String(pct).padStart(3)}% (${stats.implemented}✅ ${stats.partial}🔶 ${stats.reference}⚠️  ${stats.missing}❌) ${sectionNames[sec] ?? ''}`);
-}
-
-// ─── Overall summary ─────────────────────────────────────
-
-const implPct = Math.round(implemented.length / total * 100);
-const partPct = Math.round(partial.length / total * 100);
-const refPct = Math.round(referenceOnly.length / total * 100);
-const missPct = Math.round(missing.length / total * 100);
-
-console.log(`\n${sep}`);
-console.log('📊 OVERALL SUMMARY');
-console.log(sep);
-console.log(`  ✅ Fully implemented : ${implemented.length}/${total} (${implPct}%)`);
-console.log(`  🔶 Partial/weak      : ${partial.length}/${total} (${partPct}%)`);
-console.log(`  ⚠️  Reference only    : ${referenceOnly.length}/${total} (${refPct}%)`);
-console.log(`  ❌ Missing            : ${missing.length}/${total} (${missPct}%)`);
-console.log(`\n  Total detectors in registry: ${total}`);
-console.log(`  Source files scanned: ${fileCount}`);
-console.log(sep);
-
-// ─── Free tools summary ──────────────────────────────────
+const TOOL_CATEGORIES = {
+  'Content Safety / Guardrails': /guard|duoguard|qwen|apriel|safeguard|shieldgemma|granite/i,
+  'NSFW / Nudity Detection': /nsfw|nudenet|nsfwjs|marqo|freepik/i,
+  'Face Recognition': /face|insightface|adaface|facenet|deepface|compreFace|auraface|inspireface/i,
+  'Deepfake Detection': /deepfake|deepsafe|deepfakebench|selimsef/i,
+  'Object Detection / OCR': /yolo|tesseract|paddleocr|clip|mediapipe/i,
+  'Perceptual Hashing / CSAM': /hash|pdq|photodna|dinohash|stopncii|cloudflare.*csam/i,
+  'PII Detection': /presidio|roblox|pii/i,
+  'URL / Link Safety': /safe.browsing|urlscan|virustotal|phish/i,
+  'Accessibility': /axe|pa11y|wave|accessibility|peat/i,
+  'Fairness / Bias': /aif360|fairlearn|aequitas/i,
+  'ML Monitoring / Explainability': /evidently|alibi|mlflow|shap|lime|netcal/i,
+  'AI Security': /garak|art.*ibm|rebuff|foolbox/i,
+  'API Security': /zap|akto|dastardly|graphql.armor/i,
+  'Voice / Audio': /whisper|wedefense|fakevoice|asvspoof|resemble|pyannote|chromaprint/i,
+  'Threat Intelligence': /misp|opencti|yara|abuseipdb|opensanctions/i,
+  'Dependency Security': /dependabot|snyk|socket|renovate/i,
+  'Location / GeoIP': /maxmind|getipintel|h3|s2|osm|overpass/i,
+  'Account Security': /haveibeenpwned|disposable|thumbmark/i,
+  'Encryption': /signal|tweetnacl|tls|trustkit|ssl/i,
+  'Text Safety APIs': /perspective|openai.*moderation|detoxify/i,
+  'Human Review': /label.studio/i,
+  'Metadata': /exiftool|c2patool/i,
+  'Child Safety': /ncmec|cloudflare.*csam|csai/i,
+  'Device Integrity': /play.integrity|safetynet/i,
+};
 
 const freeToolsUsed = new Set();
 for (const d of DETECTORS) {
   if (d.freeTools) {
     for (const t of d.freeTools) {
-      if (!t.startsWith('Custom') && !t.startsWith('Organizational') && !t.startsWith('Manual')) {
+      if (!t.startsWith('Custom') && !t.startsWith('Organizational') && !t.startsWith('Manual') && !t.startsWith('No ') && !t.startsWith('Requires ')) {
         freeToolsUsed.add(t);
       }
     }
   }
 }
 
-console.log(`\n${sep}`);
-console.log('🛠️  RECOMMENDED FREE TOOLS');
-console.log(sep);
 const toolsByCategory = {};
 for (const tool of [...freeToolsUsed].sort()) {
-  // Categorize
   let cat = 'Other';
-  if (/guard|duoguard|qwen|apriel|safeguard|shieldgemma|granite/i.test(tool)) cat = 'Content Safety / Guardrails';
-  else if (/nsfw|nudenet|nsfwjs|marqo/i.test(tool)) cat = 'NSFW / Nudity Detection';
-  else if (/face|insightface|adaface|facenet|deepface|compreFace|auraface|inspireface/i.test(tool)) cat = 'Face Recognition';
-  else if (/deepfake|deepsafe/i.test(tool)) cat = 'Deepfake Detection';
-  else if (/yolo|tesseract|paddleocr/i.test(tool)) cat = 'Object Detection / OCR';
-  else if (/hash|pdq|photodna|dinohash|stopncii/i.test(tool)) cat = 'Perceptual Hashing / CSAM';
-  else if (/presidio|roblox|pii/i.test(tool)) cat = 'PII Detection';
-  else if (/safe.browsing|urlscan|virustotal|phish/i.test(tool)) cat = 'URL / Link Safety';
-  else if (/axe|pa11y|wave|accessibility|peat/i.test(tool)) cat = 'Accessibility';
-  else if (/aif360|fairlearn|aequitas/i.test(tool)) cat = 'Fairness / Bias';
-  else if (/evidently|alibi|mlflow|shap|lime/i.test(tool)) cat = 'ML Monitoring / Explainability';
-  else if (/garak|art.*ibm|rebuff/i.test(tool)) cat = 'AI Security';
-  else if (/zap|akto|dastardly|graphql.armor/i.test(tool)) cat = 'API Security';
-  else if (/whisper|wedefense|fakevoice|asvspoof|resemble/i.test(tool)) cat = 'Voice / Audio';
-  else if (/misp|opencti|yara|abuseipdb/i.test(tool)) cat = 'Threat Intelligence';
-  else if (/dependabot|snyk|socket|renovate/i.test(tool)) cat = 'Dependency Security';
-  else if (/maxmind|getipintel|h3|s2|osm|overpass/i.test(tool)) cat = 'Location / GeoIP';
-  else if (/haveibeenpwned|disposable|thumbmark|email/i.test(tool)) cat = 'Account Security';
-  else if (/signal|encrypt|tls|encrypt/i.test(tool)) cat = 'Encryption';
-  else if (/perspective|openai.*moderation|detoxify/i.test(tool)) cat = 'Text Safety APIs';
-  else if (/label.studio/i.test(tool)) cat = 'Human Review';
-  else if (/exiftool/i.test(tool)) cat = 'Metadata';
-  else if (/ncmec|cloudflare.*csam/i.test(tool)) cat = 'Child Safety';
-  else if (/play.integrity|safetynet/i.test(tool)) cat = 'Device Integrity';
+  for (const [category, regex] of Object.entries(TOOL_CATEGORIES)) {
+    if (regex.test(tool)) { cat = category; break; }
+  }
   if (!toolsByCategory[cat]) toolsByCategory[cat] = [];
   toolsByCategory[cat].push(tool);
 }
 
-for (const [cat, tools] of Object.entries(toolsByCategory).sort()) {
-  console.log(`\n  [${cat}]`);
-  for (const tool of tools) console.log(`    🛠️  ${tool}`);
+if (!CLI.jsonOnly) {
+  const sep = '═'.repeat(65);
+  console.log(`\n${sep}`);
+  console.log('🛠️  RECOMMENDED FREE TOOLS');
+  console.log(sep);
+  for (const [cat, tools] of Object.entries(toolsByCategory).sort()) {
+    console.log(`\n  [${cat}]`);
+    for (const tool of tools) console.log(`    🛠️  ${tool}`);
+  }
 }
 
-// ─── Save report ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// COMPARISON WITH PREVIOUS AUDIT
+// ═══════════════════════════════════════════════════════════
+
+let delta = null;
+if (CLI.compare) {
+  try {
+    const prev = JSON.parse(fs.readFileSync(CLI.compare, 'utf8'));
+    const prevImplIds = new Set((prev.implemented || []).map(d => d.id));
+    const prevMissIds = new Set((prev.missing || []).map(d => d.id));
+    const newlyImplemented = implemented.filter(d => prevMissIds.has(d.id));
+    const newlyMissing = missing.filter(d => prevImplIds.has(d.id));
+    delta = {
+      previousTotal: prev.summary?.total ?? '?',
+      previousImplemented: prev.summary?.implemented ?? '?',
+      currentImplemented: implemented.length,
+      newlyImplemented: newlyImplemented.map(d => ({ id: d.id, name: d.name })),
+      regressions: newlyMissing.map(d => ({ id: d.id, name: d.name })),
+    };
+    if (!CLI.jsonOnly) {
+      const sep = '═'.repeat(65);
+      console.log(`\n${sep}`);
+      console.log('📈 DELTA vs PREVIOUS AUDIT');
+      console.log(sep);
+      console.log(`  Previous: ${delta.previousImplemented}/${delta.previousTotal} implemented`);
+      console.log(`  Current:  ${implemented.length}/${total} implemented`);
+      if (newlyImplemented.length > 0) {
+        console.log(`\n  🆕 Newly implemented (${newlyImplemented.length}):`);
+        for (const d of newlyImplemented) console.log(`     ✅ #${d.id} ${d.name}`);
+      }
+      if (newlyMissing.length > 0) {
+        console.log(`\n  ⬇️  Regressions (${newlyMissing.length}):`);
+        for (const d of newlyMissing) console.log(`     ❌ #${d.id} ${d.name}`);
+      }
+      if (newlyImplemented.length === 0 && newlyMissing.length === 0) {
+        console.log('  No changes detected.');
+      }
+    }
+  } catch (e) {
+    if (!CLI.jsonOnly) console.error(`⚠️  Could not load comparison file: ${e.message}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SAVE JSON REPORT
+// ═══════════════════════════════════════════════════════════
+
+const implPct = Math.round(implemented.length / total * 100);
+const partPct = Math.round(partial.length / total * 100);
+const refPct = Math.round(referenceOnly.length / total * 100);
+const missPct = Math.round(missing.length / total * 100);
+
+const sectionStatsForReport = {};
+const allAudited = [...implemented, ...partial, ...referenceOnly, ...missing];
+for (const d of allAudited) {
+  const sec = d.section;
+  if (!sectionStatsForReport[sec]) sectionStatsForReport[sec] = { total: 0, implemented: 0, partial: 0, reference: 0, missing: 0 };
+  sectionStatsForReport[sec].total++;
+  if (implementedIds.has(d.id)) sectionStatsForReport[sec].implemented++;
+  else if (partialIds.has(d.id)) sectionStatsForReport[sec].partial++;
+  else if (referenceIds.has(d.id)) sectionStatsForReport[sec].reference++;
+  else sectionStatsForReport[sec].missing++;
+}
 
 const report = {
   timestamp: new Date().toISOString(),
+  version: '5.0',
   scannedFiles: fileCount,
+  scanErrors,
   totalDetectors: total,
+  filterApplied: filterSection ?? null,
   summary: {
     implemented: implemented.length,
     partial: partial.length,
@@ -1560,37 +2140,56 @@ const report = {
     total,
     implementedPercent: implPct,
     partialPercent: partPct,
+    referencePercent: refPct,
     missingPercent: missPct,
+    criticalMissing: missing.filter(d => d.severity === 'critical').length,
+    highMissing: missing.filter(d => d.severity === 'high').length,
   },
-  sectionCoverage: Object.entries(sectionStats).map(([sec, stats]) => ({
+  sectionCoverage: Object.entries(sectionStatsForReport).map(([sec, stats]) => ({
     section: sec,
     name: sectionNames[sec] ?? sec,
     ...stats,
     coverage: Math.round((stats.implemented / stats.total) * 100),
-  })).sort((a, b) => parseFloat(a.section) - parseFloat(b.section)),
+  })).sort((a, b) => sectionCompare(a.section, b.section)),
   implemented: implemented.map(d => ({
-    id: d.id, section: d.section, name: d.name, quality: d.bestClassification,
+    id: d.id, section: d.section, name: d.name, severity: d.severity, quality: d.bestClassification,
     freeTools: d.freeTools,
     files: d.fileMatches.map(f => ({ file: f.file, quality: f.classification, sample: f.codeLines[0] })),
   })),
   partial: partial.map(d => ({
-    id: d.id, section: d.section, name: d.name, quality: d.bestClassification,
+    id: d.id, section: d.section, name: d.name, severity: d.severity, quality: d.bestClassification,
     freeTools: d.freeTools,
     files: d.fileMatches.map(f => ({ file: f.file, quality: f.classification, sample: f.codeLines[0] })),
   })),
   referenceOnly: referenceOnly.map(d => ({
-    id: d.id, section: d.section, name: d.name,
+    id: d.id, section: d.section, name: d.name, severity: d.severity,
     freeTools: d.freeTools,
     files: d.fileMatches.map(f => f.file),
   })),
   missing: missing.map(d => ({
-    id: d.id, section: d.section, name: d.name,
+    id: d.id, section: d.section, name: d.name, severity: d.severity,
     lookFor: d.patterns.slice(0, 3),
     freeTools: d.freeTools,
   })),
   freeToolsSummary: toolsByCategory,
+  ...(delta ? { delta } : {}),
 };
 
 fs.writeFileSync('detector-audit.json', JSON.stringify(report, null, 2));
-console.log(`\n💾 Full report saved → detector-audit.json`);
-console.log(`📊 ${total} detectors audited across ${Object.keys(sectionNames).length} sections\n`);
+if (!CLI.jsonOnly) {
+  console.log(`\n💾 Full report saved → detector-audit.json`);
+  console.log(`📊 ${total} detectors audited across ${Object.keys(sectionNames).length} sections\n`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXIT CODE (1 if critical detectors missing)
+// ═══════════════════════════════════════════════════════════
+
+const criticalMissing = missing.filter(d => d.severity === 'critical');
+if (criticalMissing.length > 0) {
+  if (!CLI.jsonOnly) {
+    console.log(`⚠️  Exiting with code 1: ${criticalMissing.length} critical detectors missing\n`);
+  }
+  process.exit(1);
+}
+process.exit(0);

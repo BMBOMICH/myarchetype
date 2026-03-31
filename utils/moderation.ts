@@ -1,4 +1,3 @@
-// utils/moderation.ts
 import { Platform } from 'react-native';
 
 const IS_WEB = Platform.OS === 'web';
@@ -69,8 +68,8 @@ const DRUG_EMOJI_SEQS: Array<{ pattern: RegExp; category: string }> = [
   { pattern: /🔞💋|🔞🍆|🔞👅/, category: 'sexual_emoji' },
 ];
 
-export function detectEmojiCodedLanguage(text: string): { detected: boolean; matches: Array<{ category: string }> } {
-  const matches: Array<{ category: string }> = [];
+export function detectEmojiCodedLanguage(text: string): { detected: boolean; matches: Array<{ category: string; meaning?: string }> } {
+  const matches: Array<{ category: string; meaning?: string }> = [];
   for (const seq of DRUG_EMOJI_SEQS) {
     if (seq.pattern.test(text)) matches.push({ category: seq.category });
   }
@@ -82,10 +81,29 @@ export function preprocessText(text: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════
+// NSFW model types
+// ═══════════════════════════════════════════════════════════
+
+interface NsfwPrediction { className: string; probability: number; }
+interface NsfwModel { classify: (img: HTMLImageElementLike) => Promise<NsfwPrediction[]>; }
+interface HTMLImageElementLike {
+  crossOrigin: string;
+  onload: (() => void) | null;
+  onerror: (() => void) | null;
+  src: string;
+}
+interface GlobalWithDocument {
+  document?: {
+    createElement?: (tag: string) => HTMLImageElementLike & { crossOrigin: string };
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
 // IMAGE MODERATION
 // ═══════════════════════════════════════════════════════════
-let nsfwModel: any = null;
-let nsfwLoadPromise: Promise<any> | null = null;
+
+let nsfwModel: NsfwModel | null = null;
+let nsfwLoadPromise: Promise<NsfwModel | null> | null = null;
 let modelReady = false;
 
 export async function preloadSafetyModel(): Promise<boolean> {
@@ -94,7 +112,7 @@ export async function preloadSafetyModel(): Promise<boolean> {
 }
 export function isSafetyModelReady(): boolean { return modelReady; }
 
-async function loadNsfwModel(): Promise<any> {
+async function loadNsfwModel(): Promise<NsfwModel | null> {
   if (nsfwModel) return nsfwModel;
   if (nsfwLoadPromise) return nsfwLoadPromise;
   nsfwLoadPromise = (async () => {
@@ -102,7 +120,7 @@ async function loadNsfwModel(): Promise<any> {
       const tf = await import('@tensorflow/tfjs');
       const nsfwjs = await import('nsfwjs');
       await tf.ready();
-      nsfwModel = await nsfwjs.load('https://nsfwjs.com/quant_nsfw_mobilenet/', { size: 224, type: 'graph' });
+      nsfwModel = await nsfwjs.load('https://nsfwjs.com/quant_nsfw_mobilenet/', { size: 224, type: 'graph' }) as NsfwModel;
       modelReady = true;
       return nsfwModel;
     } catch (err) {
@@ -114,10 +132,10 @@ async function loadNsfwModel(): Promise<any> {
   return nsfwLoadPromise;
 }
 
-function createImageElement(uri: string): Promise<any> {
+function createImageElement(uri: string): Promise<HTMLImageElementLike> {
   return new Promise((resolve, reject) => {
-    const doc = (globalThis as any).document;
-    const img = doc?.createElement?.('img');
+    const g = globalThis as GlobalWithDocument;
+    const img = g.document?.createElement?.('img');
     if (!img) { reject(new Error('No DOM')); return; }
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
@@ -134,7 +152,7 @@ async function checkImageSafetyNative(imageUrl: string): Promise<ModerationResul
       body: JSON.stringify({ photoUrl: imageUrl }),
     });
     if (!res.ok) return { safe: true, reason: 'Server check unavailable' };
-    const data = await res.json();
+    const data = await res.json() as { isNSFW?: boolean };
     return data.isNSFW
       ? { safe: false, reason: 'Inappropriate content detected.', flaggedCategories: ['nsfw'] }
       : { safe: true, reason: 'OK' };
@@ -177,6 +195,34 @@ export async function checkChatImageSafety(imageUri: string): Promise<Moderation
   return checkImageSafety(imageUri, 'chat');
 }
 
+// ─── Video element types ──────────────────────────────────
+interface VideoElementLike {
+  crossOrigin: string;
+  src: string;
+  muted: boolean;
+  currentTime: number;
+  duration: number;
+  onloadedmetadata: (() => void) | null;
+  onerror: (() => void) | null;
+  onseeked: (() => void) | null;
+}
+interface CanvasElementLike {
+  getContext: (type: '2d') => CanvasContext2DLike | null;
+  toDataURL: (type?: string, quality?: number) => string;
+  width: number;
+  height: number;
+}
+interface CanvasContext2DLike {
+  drawImage: (source: VideoElementLike, x: number, y: number, w: number, h: number) => void;
+}
+interface GlobalWithDOM {
+  document?: {
+    createElement?: (tag: 'video') => VideoElementLike;
+  } & {
+    createElement?: (tag: 'canvas') => CanvasElementLike;
+  };
+}
+
 export async function checkVideoFramesSafety(videoUri: string, frameCount = 5): Promise<ModerationResult> {
   if (!IS_WEB) {
     try {
@@ -185,20 +231,22 @@ export async function checkVideoFramesSafety(videoUri: string, frameCount = 5): 
         body: JSON.stringify({ videoUrl: videoUri, frameCount }),
       });
       if (!res.ok) return { safe: true, reason: 'Server check unavailable' };
-      const data = await res.json();
+      const data = await res.json() as { isNSFW?: boolean };
       return data.isNSFW
         ? { safe: false, reason: 'Video contains inappropriate content.', flaggedCategories: ['nsfw_video'] }
         : { safe: true, reason: 'OK' };
     } catch { return { safe: true, reason: 'Video check error (allowed)' }; }
   }
   try {
-    const d = (globalThis as any).document;
-    const video = d?.createElement?.('video');
-    const canvas = d?.createElement?.('canvas');
+    const g = globalThis as unknown as GlobalWithDOM;
+    const video = g.document?.createElement?.('video' as never) as VideoElementLike | undefined;
+    const canvas = g.document?.createElement?.('canvas' as never) as CanvasElementLike | undefined;
     if (!video || !canvas) return { safe: true, reason: 'Cannot create video element' };
     video.crossOrigin = 'anonymous'; video.src = videoUri; video.muted = true;
     await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve(); video.onerror = () => reject(); setTimeout(() => reject(), 15000);
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Video load error'));
+      setTimeout(() => reject(new Error('Video load timeout')), 15000);
     });
     const duration = video.duration ?? 0;
     const ctx = canvas.getContext('2d');
@@ -207,7 +255,7 @@ export async function checkVideoFramesSafety(videoUri: string, frameCount = 5): 
       const seekTime = (duration / (frameCount + 1)) * (i + 1);
       video.currentTime = seekTime;
       await new Promise<void>(r => { video.onseeked = () => r(); setTimeout(r, 2000); });
-      ctx.drawImage(video, 0, 0, 224, 224);
+      ctx?.drawImage(video, 0, 0, 224, 224);
       const result = await checkImageSafety(canvas.toDataURL('image/jpeg', 0.8), 'video_frame');
       if (!result.safe) return { safe: false, reason: `Inappropriate content at ${Math.round(seekTime)}s`, flaggedCategories: result.flaggedCategories };
     }
@@ -229,7 +277,7 @@ export async function checkNudeParts(imageUri: string, authToken?: string): Prom
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/detect-nude-parts`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri }) });
     if (!res.ok) return { safe: true, reason: 'NudeNet check unavailable' };
-    const data = await res.json();
+    const data = await res.json() as { explicit?: boolean; parts?: string[]; };
     if (data.explicit) return { safe: false, reason: 'Explicit body parts detected.', flaggedCategories: data.parts ?? ['explicit'], severity: 'critical' };
     return { safe: true, reason: 'OK' };
   } catch { return { safe: true, reason: 'NudeNet error (allowed)' }; }
@@ -242,7 +290,7 @@ export async function verifyAllPhotosSamePerson(photoUrls: string[], authToken?:
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/verify-all-photos-same-person`, { method: 'POST', headers, body: JSON.stringify({ photoUrls }) });
     if (!res.ok) return { allSame: true, confidence: 0, reason: 'Server unavailable' };
-    return await res.json();
+    return await res.json() as { allSame: boolean; confidence: number; reason?: string };
   } catch { return { allSame: true, confidence: 0, reason: 'Check error' }; }
 }
 
@@ -253,9 +301,11 @@ export async function checkCrossAccountDuplicate(imageUri: string, userId: strin
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/pdq-cross-account`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri, userId }) });
     if (!res.ok) return { isDuplicate: false };
-    return await res.json();
+    return await res.json() as { isDuplicate: boolean; matchedUserId?: string };
   } catch { return { isDuplicate: false }; }
 }
+
+interface ServerDetectResponse { detected?: boolean; reason?: string; severity?: 'low' | 'medium' | 'high' | 'critical'; }
 
 async function serverDetect(endpoint: string, imageUri: string, authToken?: string): Promise<ModerationResult> {
   if (!imageUri.startsWith('https://')) return { safe: true, reason: 'Local URI' };
@@ -264,16 +314,19 @@ async function serverDetect(endpoint: string, imageUri: string, authToken?: stri
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri }) });
     if (!res.ok) return { safe: true, reason: 'Check unavailable' };
-    const data = await res.json();
+    const data = await res.json() as ServerDetectResponse;
     if (data.detected) return { safe: false, reason: data.reason ?? 'Prohibited content detected.', flaggedCategories: [endpoint], severity: data.severity ?? 'high' };
     return { safe: true, reason: 'OK' };
   } catch { return { safe: true, reason: 'Check error' }; }
 }
-export async function detectHateSymbols(imageUri: string, authToken?: string): Promise<ModerationResult> { return serverDetect('detect-hate-symbol', imageUri, authToken); }
-export async function detectWeapons(imageUri: string, authToken?: string): Promise<ModerationResult> { return serverDetect('detect-weapons', imageUri, authToken); }
+export async function detectHateSymbols(imageUri: string, authToken?: string): Promise<ModerationResult>       { return serverDetect('detect-hate-symbol', imageUri, authToken); }
+export async function detectWeapons(imageUri: string, authToken?: string): Promise<ModerationResult>           { return serverDetect('detect-weapons', imageUri, authToken); }
 export async function detectDrugParaphernalia(imageUri: string, authToken?: string): Promise<ModerationResult> { return serverDetect('detect-drug-paraphernalia', imageUri, authToken); }
-export async function detectOffensiveGesture(imageUri: string, authToken?: string): Promise<ModerationResult> { return serverDetect('detect-offensive-gesture', imageUri, authToken); }
-export async function detectFakeBadgeInPhoto(imageUri: string, authToken?: string): Promise<ModerationResult> { return serverDetect('detect-fake-badge', imageUri, authToken); }
+export async function detectOffensiveGesture(imageUri: string, authToken?: string): Promise<ModerationResult>  { return serverDetect('detect-offensive-gesture', imageUri, authToken); }
+export async function detectFakeBadgeInPhoto(imageUri: string, authToken?: string): Promise<ModerationResult>  { return serverDetect('detect-fake-badge', imageUri, authToken); }
+
+interface OcrResponse  { text?: string; }
+interface WatermarkEmbedResponse { url?: string; }
 
 export async function extractTextFromImage(imageUri: string, authToken?: string): Promise<{ text: string; hasContactInfo: boolean; contactTypes: string[] }> {
   try {
@@ -281,7 +334,7 @@ export async function extractTextFromImage(imageUri: string, authToken?: string)
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/ocr-extract`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri }) });
     if (!res.ok) return { text: '', hasContactInfo: false, contactTypes: [] };
-    const data = await res.json();
+    const data = await res.json() as OcrResponse;
     const text: string = data.text ?? '';
     const contactTypes: string[] = [];
     if (PHONE_REGEX.test(text)) contactTypes.push('phone');
@@ -305,16 +358,18 @@ export async function embedWatermark(imageUri: string, userId: string, authToken
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/watermark-embed`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri, userId }) });
     if (!res.ok) return { success: false };
-    return { success: true, watermarkedUrl: (await res.json()).url };
+    const data = await res.json() as WatermarkEmbedResponse;
+    return { success: true, watermarkedUrl: data.url };
   } catch { return { success: false }; }
 }
+
 export async function detectWatermark(imageUri: string, authToken?: string): Promise<{ hasWatermark: boolean; userId?: string }> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
     const res = await fetch(`${SERVER_URL}/watermark-detect`, { method: 'POST', headers, body: JSON.stringify({ photoUrl: imageUri }) });
     if (!res.ok) return { hasWatermark: false };
-    return await res.json();
+    return await res.json() as { hasWatermark: boolean; userId?: string };
   } catch { return { hasWatermark: false }; }
 }
 
@@ -399,7 +454,6 @@ const HATE_PATTERNS: HarmfulPattern[] = [
   { pattern: /\b(dyke|lesbo|homo|queer\s*bait)\b/i, category: 'homophobic_slur', reason: 'Homophobic language is not allowed.', severity: 'high' },
   { pattern: /\b(d[iy1]k[e3]|sh[e3]\s*m[a@]l[e3])\b/i, category: 'homophobic_slur', reason: 'Homophobic language is not allowed.', severity: 'high' },
   { pattern: /\b(no\s*homo)\b/i, category: 'homophobic_slur', reason: 'Homophobic language is not allowed.', severity: 'medium' },
-  // Multilingual
   { pattern: /\b(maldito|puta\s*madre|hijo\s*de\s*puta|maricon|pinche)\b/i, category: 'hate_multilang', reason: 'Hate speech is not allowed.', severity: 'high' },
   { pattern: /\b(connard|salope|bamboula|enculé|nique\s*ta\s*mère|batard)\b/i, category: 'hate_multilang', reason: 'Hate speech is not allowed.', severity: 'high' },
   { pattern: /\b(scheiß(e|er)|hurensohn|wichser|kanake|missgeburt)\b/i, category: 'hate_multilang', reason: 'Hate speech is not allowed.', severity: 'high' },
@@ -671,9 +725,6 @@ export function checkFirstMessage(text: string): ModerationResult {
 }
 export const moderateFirstMessage = checkFirstMessage;
 
-// ═══════════════════════════════════════════════════════════
-// Field exports
-// ═══════════════════════════════════════════════════════════
 export const moderateChat = (t: string) => checkTextSafety(t, 'chat');
 export const checkChatMessage = moderateChat;
 export const moderateBio = (t: string) => checkTextSafety(t, 'bio');
@@ -699,24 +750,21 @@ export const moderateOccupation = (t: string): ModerationResult => {
 };
 export const checkOccupation = moderateOccupation;
 
-export const moderateReport = (t: string) => checkTextSafety(t, 'report_reason');
+export const moderateReport    = (t: string) => checkTextSafety(t, 'report_reason');
 export const checkReportReason = moderateReport;
-export const moderateNote = (t: string) => checkTextSafety(t, 'match_notes');
-export const checkMatchNotes = moderateNote;
-export const moderateReview = (t: string) => checkTextSafety(t, 'date_review');
-export const checkDateReview = moderateReview;
-export const moderateFeedback = (t: string) => checkTextSafety(t, 'post_date_feedback');
+export const moderateNote      = (t: string) => checkTextSafety(t, 'match_notes');
+export const checkMatchNotes   = moderateNote;
+export const moderateReview    = (t: string) => checkTextSafety(t, 'date_review');
+export const checkDateReview   = moderateReview;
+export const moderateFeedback  = (t: string) => checkTextSafety(t, 'post_date_feedback');
 export const checkPostDateFeedback = moderateFeedback;
-export const moderateIcebreaker = (t: string) => checkTextSafety(t, 'icebreaker');
+export const moderateIcebreaker    = (t: string) => checkTextSafety(t, 'icebreaker');
 export const checkIcebreakerAnswer = moderateIcebreaker;
-export const moderateDailyQ = (t: string) => checkTextSafety(t, 'daily_question');
+export const moderateDailyQ        = (t: string) => checkTextSafety(t, 'daily_question');
 export const checkDailyQuestionAnswer = moderateDailyQ;
-export const moderateField = (t: string, field: ContentField = 'general') => checkTextSafety(t, field);
-export const validateTextField = moderateField;
+export const moderateField     = (t: string, field: ContentField = 'general') => checkTextSafety(t, field);
+export const validateTextField  = moderateField;
 
-// ═══════════════════════════════════════════════════════════
-// Combined + behavioral
-// ═══════════════════════════════════════════════════════════
 export async function moderateContent(options: {
   images?: string[];
   texts?: Array<{ text: string; field?: ContentField }>;
@@ -766,6 +814,8 @@ export function isDisposableEmail(email: string): boolean {
   return CLIENT_DISPOSABLE_DOMAINS.has(domain);
 }
 
+interface ServerModerateResponse { safe?: boolean; category?: string; }
+
 export async function serverModerateText(text: string, authToken: string): Promise<ModerationResult> {
   try {
     const res = await fetch(`${SERVER_URL}/moderate-text`, {
@@ -774,11 +824,11 @@ export async function serverModerateText(text: string, authToken: string): Promi
       body: JSON.stringify({ text }),
     });
     if (!res.ok) return { safe: true, reason: 'Server unavailable' };
-    const data = await res.json();
-    return data.safe ? { safe: true, reason: 'OK' } : { safe: false, reason: `Content flagged: ${data.category}`, flaggedCategories: [data.category] };
+    const data = await res.json() as ServerModerateResponse;
+    return data.safe ? { safe: true, reason: 'OK' } : { safe: false, reason: `Content flagged: ${data.category}`, flaggedCategories: [data.category ?? 'unknown'] };
   } catch { return { safe: true, reason: 'Server check error' }; }
 }
-export const preScanEncrypt = serverModerateText;
+export const preScanEncrypt      = serverModerateText;
 export const moderateThenEncrypt = serverModerateText;
-export const scanBeforeEncrypt = serverModerateText;
-export const checkBioEdit = (t: string) => checkTextSafety(t, 'bio_edit');
+export const scanBeforeEncrypt   = serverModerateText;
+export const checkBioEdit        = (t: string) => checkTextSafety(t, 'bio_edit');

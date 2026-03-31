@@ -58,7 +58,9 @@ const MAX_RESEND_ATTEMPTS = 3;
 const MAX_FORGOT_ATTEMPTS = 3;
 
 const getErrorCode = (error: unknown): string | undefined =>
-  typeof error === 'object' && error && 'code' in error ? String((error as Record<string, unknown>).code ?? '') : undefined;
+  typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as Record<string, unknown>).code ?? '')
+    : undefined;
 
 async function getDeviceFingerprint(): Promise<string | null> {
   if (!IS_WEB) return null;
@@ -67,7 +69,7 @@ async function getDeviceFingerprint(): Promise<string | null> {
     if (!canvas?.toDataURL) return null;
     canvas.getContext?.('2d')?.fillText('fp', 2, 10);
     const nav = globalThis.navigator;
-    const raw = [nav?.userAgent ?? '', nav?.language ?? '', nav?.hardwareConcurrency ?? '', nav?.platform ?? '', canvas.toDataURL()].join('|');
+    const raw = [nav?.userAgent ?? '', nav?.language ?? '', nav?.hardwareConcurrency ?? '', nav?.platform ?? '', canvas.toDataURL?.() ?? ''].join('|');
     let h = 0;
     for (let i = 0; i < raw.length; i++) h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
     return Math.abs(h).toString(36);
@@ -83,7 +85,7 @@ const getReducedMotion = () => IS_WEB ? !!window.matchMedia?.('(prefers-reduced-
 let prefersReducedMotion = getReducedMotion();
 const getAnimDuration = (ms: number) => (prefersReducedMotion ? 0 : ms);
 
-function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout>;
   return ((...args: Parameters<T>) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }) as T;
 }
@@ -109,6 +111,28 @@ const lightTokens = {
 } as const;
 
 type Tokens = typeof darkTokens;
+
+// ─── Web-only prop types ──────────────────────────────────
+type WebAriaProps = {
+  'aria-live'?: 'assertive' | 'polite' | 'off';
+  'aria-atomic'?: 'true' | 'false';
+  id?: string;
+  role?: string;
+  'aria-modal'?: 'true' | 'false';
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: 'true' | 'false';
+  'aria-required'?: 'true' | 'false';
+};
+
+type WebInputProps = { name?: string };
+type WebStyleProps = {
+  outline?: string; outlineWidth?: number; boxShadow?: string; border?: string;
+  WebkitTextFillColor?: string; caretColor?: string; backgroundColor?: string;
+  paddingTop?: number; paddingBottom?: number; paddingLeft?: number;
+  flex?: number; fontSize?: number; letterSpacing?: number; color?: string;
+  direction?: 'ltr' | 'rtl';
+};
 
 const CSS_ID = 'login-screen-styles';
 const META_ID = 'login-screen-meta';
@@ -137,10 +161,7 @@ const injectWebStyles = (C: Tokens, theme: 'dark' | 'light') => {
 
   if (!document.getElementById?.(META_ID)) {
     const m = document.createElement?.('meta');
-    if (m) {
-      m.id = META_ID;
-      document.head?.appendChild?.(m);
-    }
+    if (m) { m.id = META_ID; document.head?.appendChild?.(m); }
     document.title = 'Log In – MyArchetype';
     if (document.documentElement) { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
     let vp = document.querySelector?.('meta[name="viewport"]');
@@ -237,8 +258,13 @@ const AnimatedError = React.memo(({ message, inputId, C }: { message: string; in
     }
   }, [message, opacity, translateY]);
   if (!message) return null;
+
+  const webProps: WebAriaProps = IS_WEB
+    ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` }
+    : {};
+
   return (
-    <Animated.View style={[s.errorRow, { opacity, transform: [{ translateY }] }]} accessibilityLiveRegion="assertive" {...(IS_WEB ? ({ 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` } as any) : {})}>
+    <Animated.View style={[s.errorRow, { opacity, transform: [{ translateY }] }]} accessibilityLiveRegion="assertive" {...webProps}>
       <Ionicons name="alert-circle" size={14} color={C.error} accessibilityElementsHidden importantForAccessibility="no" />
       <Text style={[s.errorText, { color: C.error }]}>{message}</Text>
     </Animated.View>
@@ -289,15 +315,17 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
     ]).start();
     if (!IS_WEB) return;
     const h = (e: unknown) => {
-      const key = typeof e === 'object' && e && 'key' in e ? (e as WebKeyEvent).key : undefined;
+      const key = typeof e === 'object' && e !== null && 'key' in e ? (e as WebKeyEvent).key : undefined;
       if (key === 'Escape') void doClose(config.buttons.find(b => !b.primary && !b.danger));
     };
     window.addEventListener?.('keydown', h);
     return () => window.removeEventListener?.('keydown', h);
   }, [opacity, scale, doClose, config.buttons]);
 
+  const webDialogProps: WebAriaProps = IS_WEB ? { role: 'dialog', 'aria-modal': 'true' } : {};
+
   return (
-    <Animated.View style={[s.modalOverlay, { backgroundColor: C.overlay, opacity }]} {...(IS_WEB ? ({ role: 'dialog', 'aria-modal': 'true' } as any) : {})} accessibilityViewIsModal>
+    <Animated.View style={[s.modalOverlay, { backgroundColor: C.overlay, opacity }]} {...webDialogProps} accessibilityViewIsModal>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={() => void doClose(config.buttons.find(b => !b.primary && !b.danger))} accessibilityLabel="Close dialog" />
       <Animated.View style={[s.modalCard, { backgroundColor: C.card, borderColor: C.cardBorder, transform: [{ scale }] }]}>
         <Text style={[s.modalTitle, { color: C.textPrimary }]}>{config.title}</Text>
@@ -362,7 +390,7 @@ const GradientButton = React.memo(({ onPress, disabled, loading, label, C }: { o
   );
 });
 
-const buildWebInputStyle = (C: Tokens): Record<string, string | number> => ({
+const buildWebInputStyle = (C: Tokens): WebStyleProps => ({
   outline:'none', outlineWidth:0, boxShadow:'none', border:'none',
   WebkitTextFillColor:C.textPrimary, caretColor:C.accent, backgroundColor:'transparent',
   paddingTop:18, paddingBottom:18, paddingLeft:4, flex:1, fontSize:16, letterSpacing:0.2,
@@ -394,6 +422,11 @@ const InputField = React.memo(({
 
   const borderColor = borderAnim.interpolate({ inputRange: [0, 1], outputRange: [hasError ? C.error : C.inputBorder, hasError ? C.error : C.accent] });
 
+  const webNameProp: WebInputProps = webInputName ? { name: webInputName } : {};
+  const webErrorProps: WebAriaProps = hasError
+    ? { 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' }
+    : { 'aria-required': 'true' };
+
   return (
     <View style={s.inputContainer}>
       <Text style={[s.inputLabel, { color: C.textMuted }, focused && { color: C.accent }, hasError && { color: C.error }]} accessibilityElementsHidden importantForAccessibility="no">{label}</Text>
@@ -403,8 +436,8 @@ const InputField = React.memo(({
           <TextInput
             ref={inputRef}
             nativeID={inputId}
-            {...(webInputName ? ({ name: webInputName } as any) : {})}
-            style={webStyle as any}
+            {...webNameProp}
+            style={webStyle as WebStyleProps}
             placeholder={placeholder}
             placeholderTextColor={C.textMuted}
             value={value}
@@ -413,17 +446,17 @@ const InputField = React.memo(({
             keyboardType={keyboardType ?? 'default'}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete={(webAutoComplete as any) ?? autoComplete}
+            autoComplete={(webAutoComplete ?? autoComplete) as TextInput['props']['autoComplete']}
             textContentType={textContentType}
             editable={editable !== false}
             returnKeyType={returnKeyType}
             onFocus={onFocus}
             onBlur={onBlur}
             onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress as any}
+            onKeyPress={onKeyPress}
             accessibilityLabel={accessibilityLabel}
             selectionColor={C.accent}
-            {...(hasError ? ({ 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' } as any) : ({ 'aria-required': 'true' } as any))}
+            {...webErrorProps}
           />
         ) : (
           <TextInput
@@ -445,7 +478,7 @@ const InputField = React.memo(({
             onFocus={onFocus}
             onBlur={onBlur}
             onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress as any}
+            onKeyPress={onKeyPress}
             accessibilityLabel={accessibilityLabel}
             accessibilityHint={hasError ? error : undefined}
             selectionColor={C.accent}
@@ -781,7 +814,7 @@ export default function LoginScreen() {
       setSuccess(true);
       startSuccessCountdown();
       navTimeout.current = setTimeout(() => { if (isMounted.current) router.replace(ROUTES.HOME); }, getAnimDuration(SUCCESS_NAV_DELAY_MS));
-    } catch (error) {
+    } catch (error: unknown) {
       const code = getErrorCode(error);
       loginAttempts.current += 1;
       if (loginAttempts.current >= MAX_LOGIN_ATTEMPTS) {
@@ -835,7 +868,7 @@ export default function LoginScreen() {
       await sendEmailVerification(user);
       await auth.signOut();
       if (isMounted.current) showAppAlert('Email Sent', `Verification email sent to:\n${email}`);
-    } catch (error) {
+    } catch (error: unknown) {
       if (isMounted.current) showAppAlert('Error', getErrorMessage(getErrorCode(error)));
     } finally {
       if (isMounted.current) dispatch({ type: 'SET_LOADING', payload: false });
@@ -868,7 +901,7 @@ export default function LoginScreen() {
           try {
             await sendPasswordResetEmail(auth, email.toLowerCase());
             if (isMounted.current) showAppAlert('Email Sent', `Password reset instructions sent to:\n${email}`);
-          } catch (error) {
+          } catch (error: unknown) {
             if (isMounted.current) showAppAlert('Error', getErrorMessage(getErrorCode(error)));
           } finally {
             if (isMounted.current) dispatch({ type: 'SET_LOADING', payload: false });
@@ -947,68 +980,71 @@ const InnerContent = React.memo(({
   emailRef, passwordRef, canSubmit, shakeAnim, logoPaused, validateEmail, validatePassword,
   onEmailFocus, onEmailBlur, onPasswordFocus, onPasswordBlur, togglePassword, handleLogin,
   handleEmailSubmit, handleForgotPassword, handleResendVerification, handleSignUp, handleKeyPress,
-}: InnerContentProps) => (
-  <Animated.View style={[s.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }], maxWidth: 440 }]}>
-    <Animated.View style={[s.headerContainer, { opacity: headerFade, transform: [{ translateY: headerSlide }], marginBottom: IS_SMALL ? 28 : 40 }]}>
-      <BrandLogo C={C} paused={logoPaused} />
-      <Text style={[s.title, { color: C.textPrimary, fontSize: IS_SMALL ? 28 : 36 }]} accessibilityRole="header">Welcome Back</Text>
-      <Text style={[s.subtitle, { color: C.textSecondary, fontSize: IS_SMALL ? 14 : 16 }]}>Log in to find your perfect match</Text>
-    </Animated.View>
+}: InnerContentProps) => {
+  const webFormProps: WebAriaProps = IS_WEB ? { role: 'form', 'aria-label': 'Login form' } : {};
 
-    <LockoutBanner seconds={state.lockoutSeconds} C={C} />
+  return (
+    <Animated.View style={[s.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }], maxWidth: 440 }]}>
+      <Animated.View style={[s.headerContainer, { opacity: headerFade, transform: [{ translateY: headerSlide }], marginBottom: IS_SMALL ? 28 : 40 }]}>
+        <BrandLogo C={C} paused={logoPaused} />
+        <Text style={[s.title, { color: C.textPrimary, fontSize: IS_SMALL ? 28 : 36 }]} accessibilityRole="header">Welcome Back</Text>
+        <Text style={[s.subtitle, { color: C.textSecondary, fontSize: IS_SMALL ? 14 : 16 }]}>Log in to find your perfect match</Text>
+      </Animated.View>
 
-    <Animated.View style={[s.formCard, { opacity: formFade, transform: [{ translateX: shakeAnim }, { translateY: formSlide }], backgroundColor: C.card, borderColor: C.cardBorder, padding: IS_SMALL ? 24 : 34 }]} {...(IS_WEB ? ({ role: 'form', 'aria-label': 'Login form' } as any) : {})}>
-      <InputField
-        inputId="login-email" label="Email address" icon="mail-outline" placeholder="you@example.com"
-        value={state.email} onChangeText={validateEmail} error={state.emailError} focused={state.emailFocused}
-        onFocus={onEmailFocus} onBlur={onEmailBlur} keyboardType="email-address" autoComplete="email"
-        webAutoComplete="username" webInputName="username" textContentType="emailAddress"
-        returnKeyType="next" onSubmitEditing={handleEmailSubmit} inputRef={emailRef}
-        editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress}
-      />
+      <LockoutBanner seconds={state.lockoutSeconds} C={C} />
 
-      <InputField
-        inputId="login-password" label="Password" icon="lock-closed-outline" placeholder="Enter your password"
-        value={state.password} onChangeText={validatePassword} error={state.passwordError} focused={state.passwordFocused}
-        onFocus={onPasswordFocus} onBlur={onPasswordBlur} secureTextEntry showPassword={state.showPassword}
-        onTogglePassword={togglePassword} autoComplete="current-password" webAutoComplete="current-password"
-        webInputName="password" textContentType="password" returnKeyType="go" onSubmitEditing={handleLogin}
-        inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress}
-      />
+      <Animated.View style={[s.formCard, { opacity: formFade, transform: [{ translateX: shakeAnim }, { translateY: formSlide }], backgroundColor: C.card, borderColor: C.cardBorder, padding: IS_SMALL ? 24 : 34 }]} {...webFormProps}>
+        <InputField
+          inputId="login-email" label="Email address" icon="mail-outline" placeholder="you@example.com"
+          value={state.email} onChangeText={validateEmail} error={state.emailError} focused={state.emailFocused}
+          onFocus={onEmailFocus} onBlur={onEmailBlur} keyboardType="email-address" autoComplete="email"
+          webAutoComplete="username" webInputName="username" textContentType="emailAddress"
+          returnKeyType="next" onSubmitEditing={handleEmailSubmit} inputRef={emailRef}
+          editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress}
+        />
+        <InputField
+          inputId="login-password" label="Password" icon="lock-closed-outline" placeholder="Enter your password"
+          value={state.password} onChangeText={validatePassword} error={state.passwordError} focused={state.passwordFocused}
+          onFocus={onPasswordFocus} onBlur={onPasswordBlur} secureTextEntry showPassword={state.showPassword}
+          onTogglePassword={togglePassword} autoComplete="current-password" webAutoComplete="current-password"
+          webInputName="password" textContentType="password" returnKeyType="go" onSubmitEditing={handleLogin}
+          inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress}
+        />
 
-      {IS_WEB && state.capsLockOn && state.passwordFocused && (
-        <View style={[s.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]} accessibilityLiveRegion="polite">
-          <Ionicons name="warning-outline" size={14} color={C.warn} />
-          <Text style={[s.capsLockText, { color: C.warn }]}>Caps Lock is on</Text>
+        {IS_WEB && state.capsLockOn && state.passwordFocused && (
+          <View style={[s.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]} accessibilityLiveRegion="polite">
+            <Ionicons name="warning-outline" size={14} color={C.warn} />
+            <Text style={[s.capsLockText, { color: C.warn }]}>Caps Lock is on</Text>
+          </View>
+        )}
+
+        <Pressable onPress={handleForgotPassword} disabled={state.loading} style={s.forgotRow} accessibilityRole="link" accessibilityLabel="Forgot password" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={[s.forgotText, { color: C.warn }]}>Forgot Password?</Text>
+        </Pressable>
+
+        <View style={s.buttonSpacer} />
+        <GradientButton onPress={handleLogin} disabled={!canSubmit} loading={state.loading} label="Log In" C={C} />
+      </Animated.View>
+
+      <Animated.View style={[s.footer, { opacity: footerFade }]}>
+        <Pressable onPress={handleResendVerification} disabled={state.loading} style={[s.resendButton, { borderColor: C.separator, backgroundColor: C.accentGlow }]} accessibilityRole="button" accessibilityLabel="Resend verification email">
+          <Ionicons name="mail-unread-outline" size={16} color={C.accent} accessibilityElementsHidden importantForAccessibility="no" />
+          <Text style={[s.resendText, { color: C.accent }]}>Resend Verification Email</Text>
+        </Pressable>
+
+        <View style={s.separatorRow} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
+          <Text style={[s.separatorText, { color: C.textMuted }]}>or</Text>
+          <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
         </View>
-      )}
 
-      <Pressable onPress={handleForgotPassword} disabled={state.loading} style={s.forgotRow} accessibilityRole="link" accessibilityLabel="Forgot password" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-        <Text style={[s.forgotText, { color: C.warn }]}>Forgot Password?</Text>
-      </Pressable>
-
-      <View style={s.buttonSpacer} />
-      <GradientButton onPress={handleLogin} disabled={!canSubmit} loading={state.loading} label="Log In" C={C} />
+        <Pressable onPress={handleSignUp} disabled={state.loading} style={({ pressed }) => [s.signUpButton, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Create a new account">
+          <Text style={[s.signUpText, { color: C.textSecondary }]}>Don't have an account? <Text style={[s.signUpLink, { color: C.accent }]}>Sign Up</Text></Text>
+        </Pressable>
+      </Animated.View>
     </Animated.View>
-
-    <Animated.View style={[s.footer, { opacity: footerFade }]}>
-      <Pressable onPress={handleResendVerification} disabled={state.loading} style={[s.resendButton, { borderColor: C.separator, backgroundColor: C.accentGlow }]} accessibilityRole="button" accessibilityLabel="Resend verification email">
-        <Ionicons name="mail-unread-outline" size={16} color={C.accent} accessibilityElementsHidden importantForAccessibility="no" />
-        <Text style={[s.resendText, { color: C.accent }]}>Resend Verification Email</Text>
-      </Pressable>
-
-      <View style={s.separatorRow} accessibilityElementsHidden importantForAccessibility="no">
-        <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
-        <Text style={[s.separatorText, { color: C.textMuted }]}>or</Text>
-        <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
-      </View>
-
-      <Pressable onPress={handleSignUp} disabled={state.loading} style={({ pressed }) => [s.signUpButton, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Create a new account">
-        <Text style={[s.signUpText, { color: C.textSecondary }]}>Don't have an account? <Text style={[s.signUpLink, { color: C.accent }]}>Sign Up</Text></Text>
-      </Pressable>
-    </Animated.View>
-  </Animated.View>
-));
+  );
+});
 
 const s = StyleSheet.create({
   rootBg:{ flex:1 }, safe:{ flex:1 }, container:{ flex:1 }, fill:{ flex:1 },

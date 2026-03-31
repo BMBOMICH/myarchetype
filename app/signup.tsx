@@ -1,3 +1,5 @@
+// signup.tsx - fixed file
+
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -92,6 +94,45 @@ type FormAction =
   | { type: 'SET_CAPS_LOCK'; payload: boolean } | { type: 'SET_BREACHED_WARNING'; payload: boolean }
   | { type: 'CLEAR_ERRORS' } | { type: 'WIPE_SENSITIVE' } | { type: 'RESET' };
 
+// ─── Web-only prop types ──────────────────────────────────
+type WebAriaProps = {
+  'aria-live'?: 'assertive' | 'polite' | 'off';
+  'aria-atomic'?: 'true' | 'false';
+  id?: string;
+  role?: string;
+  'aria-modal'?: 'true' | 'false';
+  'aria-describedby'?: string;
+  'aria-invalid'?: 'true' | 'false';
+  'aria-required'?: 'true' | 'false';
+};
+
+type WebInputProps = {
+  name?: string;
+  cursor?: string;
+};
+
+type WebStyleProps = {
+  outline?: string;
+  outlineWidth?: number;
+  boxShadow?: string;
+  border?: string;
+  WebkitTextFillColor?: string;
+  caretColor?: string;
+  backgroundColor?: string;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  flex?: number;
+  fontSize?: number;
+  letterSpacing?: number;
+  color?: string;
+  direction?: 'ltr' | 'rtl';
+};
+
+type WebPressableStyle = {
+  cursor?: string;
+};
+
 const CSS_ID = 'signup-screen-styles';
 const META_ID = 'signup-screen-meta';
 let injectedTheme: string | null = null;
@@ -154,12 +195,12 @@ const maskEmail = (email: string) => {
   const [l, d] = email.split('@');
   return !l || !d ? email : `${l[0] ?? ''}${'*'.repeat(Math.max(1, Math.min(l.length - 2, 6)))}${l[l.length - 1] ?? ''}@${d}`;
 };
-const getFirebaseErrorCode = (error: unknown) =>
-  typeof error === 'object' && error && 'code' in error && typeof (error as { code?: unknown }).code === 'string'
+const getFirebaseErrorCode = (error: unknown): string | undefined =>
+  typeof error === 'object' && error !== null && 'code' in error && typeof (error as { code: unknown }).code === 'string'
     ? (error as { code: string }).code
     : undefined;
 
-const debounce = <T extends (...args: unknown[]) => void>(fn: T, ms: number) => {
+const debounce = <T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T => {
   let t: ReturnType<typeof setTimeout>;
   return ((...args: Parameters<T>) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }) as T;
 };
@@ -256,9 +297,7 @@ async function checkPasswordBreached(password: string): Promise<boolean> {
     const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, { headers: { 'Add-Padding': 'true' } });
     if (!res.ok) return false;
     return (await res.text()).split('\n').some(line => line.trim().startsWith(suffix));
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 async function getDeviceFingerprint(): Promise<string | null> {
@@ -277,12 +316,10 @@ async function getDeviceFingerprint(): Promise<string | null> {
     let h = 0;
     for (let i = 0; i < raw.length; i++) h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
     return Math.abs(h).toString(36);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-const buildWebInputStyle = (C: Tokens): Record<string, string | number> => ({
+const buildWebInputStyle = (C: Tokens): WebStyleProps => ({
   outline:'none', outlineWidth:0, boxShadow:'none', border:'none', WebkitTextFillColor:C.textPrimary,
   caretColor:C.accent, backgroundColor:'transparent', paddingTop:18, paddingBottom:18, paddingLeft:4,
   flex:1, fontSize:16, letterSpacing:0.2, color:C.textPrimary, direction: IS_RTL ? 'rtl' : 'ltr',
@@ -290,6 +327,14 @@ const buildWebInputStyle = (C: Tokens): Record<string, string | number> => ({
 
 const showNativeAlert = (title: string, message: string, buttons?: AlertButton[]) =>
   Alert.alert(title, message, buttons ?? [{ text: 'OK' }]);
+
+// ─── KeyPress event type ──────────────────────────────────
+type KeyPressEvent = {
+  nativeEvent?: {
+    key?: string;
+    getModifierState?: (name: string) => boolean;
+  };
+};
 
 const AnimatedError = React.memo(({ message, inputId, C }: { message: string; inputId: string; C: Tokens }) => {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -309,11 +354,15 @@ const AnimatedError = React.memo(({ message, inputId, C }: { message: string; in
 
   if (!message) return null;
 
+  const webProps: WebAriaProps = IS_WEB
+    ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` }
+    : {};
+
   return (
     <Animated.View
       style={[st.errorRow, { opacity, transform: [{ translateY }] }]}
       accessibilityLiveRegion="assertive"
-      {...(IS_WEB ? ({ 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` } as any) : {})}
+      {...webProps}
     >
       <Ionicons name="alert-circle" size={14} color={C.error} accessibilityElementsHidden importantForAccessibility="no" />
       <Text style={[st.errorText, { color: C.error }]} allowFontScaling maxFontSizeMultiplier={1.3}>{message}</Text>
@@ -375,10 +424,14 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
     return () => window.removeEventListener('keydown', h);
   }, [opacity, scale, doClose]);
 
+  const webDialogProps: WebAriaProps = IS_WEB
+    ? { role: 'dialog', 'aria-modal': 'true' }
+    : {};
+
   return (
     <Animated.View
       style={[st.modalOverlay, { backgroundColor: C.overlay, opacity }]}
-      {...(IS_WEB ? ({ role: 'dialog', 'aria-modal': 'true' } as any) : {})}
+      {...webDialogProps}
       accessibilityViewIsModal
     >
       <Pressable style={StyleSheet.absoluteFillObject} onPress={() => void doClose()} accessibilityLabel="Close dialog" />
@@ -467,7 +520,7 @@ const InputField = React.memo(({
   onTogglePassword?: () => void; keyboardType?: 'default' | 'email-address'; autoComplete?: string;
   textContentType?: string; webAutoComplete?: string; webInputName?: string; returnKeyType?: 'next' | 'go';
   onSubmitEditing?: () => void; inputRef?: React.RefObject<TextInput | null>; editable?: boolean;
-  accessibilityLabel: string; inputId: string; C: Tokens; onKeyPress?: (e: unknown) => void;
+  accessibilityLabel: string; inputId: string; C: Tokens; onKeyPress?: (e: KeyPressEvent) => void;
 }) => {
   const borderAnim = useRef(new Animated.Value(0)).current;
   const hasError = !!error;
@@ -482,6 +535,12 @@ const InputField = React.memo(({
     outputRange: [hasError ? C.error : successMsg ? C.success : C.inputBorder, hasError ? C.error : C.accent],
   });
 
+  const webNameProp: WebInputProps = webInputName ? { name: webInputName } : {};
+  const webErrorProps: WebAriaProps = hasError
+    ? { 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' }
+    : { 'aria-required': 'true' };
+  const webCursorStyle: WebPressableStyle = IS_WEB ? { cursor: 'pointer' } : {};
+
   return (
     <View style={st.inputContainer}>
       <Text style={[st.inputLabel, { color: C.textMuted }, focused && { color: C.accent }, hasError && { color: C.error }]} accessibilityElementsHidden importantForAccessibility="no" allowFontScaling maxFontSizeMultiplier={1.2}>
@@ -495,8 +554,8 @@ const InputField = React.memo(({
           <TextInput
             ref={inputRef}
             nativeID={inputId}
-            {...(webInputName ? ({ name: webInputName } as any) : {})}
-            style={webStyle as any}
+            {...webNameProp}
+            style={webStyle as WebStyleProps}
             placeholder={placeholder}
             placeholderTextColor={C.textMuted}
             value={value}
@@ -505,17 +564,17 @@ const InputField = React.memo(({
             keyboardType={keyboardType ?? 'default'}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete={(webAutoComplete as any) ?? (autoComplete as any)}
-            textContentType={textContentType as any}
+            autoComplete={(webAutoComplete ?? autoComplete) as TextInput['props']['autoComplete']}
+            textContentType={textContentType as TextInput['props']['textContentType']}
             editable={editable !== false}
             returnKeyType={returnKeyType}
             onFocus={onFocus}
             onBlur={onBlur}
             onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress as any}
+            onKeyPress={onKeyPress}
             accessibilityLabel={accessibilityLabel}
             selectionColor={C.accent}
-            {...(hasError ? ({ 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' } as any) : ({ 'aria-required': 'true' } as any))}
+            {...webErrorProps}
           />
         ) : (
           <TextInput
@@ -530,14 +589,14 @@ const InputField = React.memo(({
             keyboardType={keyboardType ?? 'default'}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete={autoComplete as any}
-            textContentType={textContentType as any}
+            autoComplete={autoComplete as TextInput['props']['autoComplete']}
+            textContentType={textContentType as TextInput['props']['textContentType']}
             editable={editable !== false}
             returnKeyType={returnKeyType}
             onFocus={onFocus}
             onBlur={onBlur}
             onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress as any}
+            onKeyPress={onKeyPress}
             accessibilityLabel={accessibilityLabel}
             accessibilityHint={hasError ? error : undefined}
             selectionColor={C.accent}
@@ -547,7 +606,7 @@ const InputField = React.memo(({
         )}
 
         {onTogglePassword && (
-          <Pressable onPress={onTogglePassword} hitSlop={12} style={[st.eyeButton, IS_WEB ? ({ cursor: 'pointer' } as any) : undefined]} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
+          <Pressable onPress={onTogglePassword} hitSlop={12} style={[st.eyeButton, webCursorStyle]} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
             <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={focused ? C.accent : C.textMuted} />
           </Pressable>
         )}
@@ -805,11 +864,10 @@ export default function SignupScreen() {
     }
   }, [openModal]);
 
-  const handleKeyPress = useCallback((e: unknown) => {
+  const handleKeyPress = useCallback((e: KeyPressEvent) => {
     if (!IS_WEB) return;
-    const event = e as { nativeEvent?: { key?: string; getModifierState?: (name: string) => boolean } };
-    if (!event.nativeEvent?.key) return;
-    dispatch({ type: 'SET_CAPS_LOCK', payload: !!event.nativeEvent.getModifierState?.('CapsLock') });
+    if (!e.nativeEvent?.key) return;
+    dispatch({ type: 'SET_CAPS_LOCK', payload: !!e.nativeEvent.getModifierState?.('CapsLock') });
   }, []);
 
   const pwValidation = useMemo(() => validators.password(state.password), [state.password]);
@@ -874,11 +932,7 @@ export default function SignupScreen() {
       return;
     }
 
-    if (Date.now() < lockoutUntil.current) {
-      startLockout();
-      shake();
-      return;
-    }
+    if (Date.now() < lockoutUntil.current) { startLockout(); shake(); return; }
 
     dispatch({ type: 'SET_LOADING', payload: true });
     const breached = await checkPasswordBreached(state.password);
@@ -919,13 +973,11 @@ export default function SignupScreen() {
             }
 
             const { user } = await createUserWithEmailAndPassword(auth, email, state.password);
-
             try { await sendEmailVerification(user); } catch {}
 
             await logTermsAccepted('1.0');
             await logPrivacyAccepted('1.0');
             await logConsent('account_creation', true);
-
             await writeAuditLog('user.register', {
               maskedEmail: maskEmail(email),
               emailDomain: email.split('@')[1] ?? '',
@@ -948,17 +1000,14 @@ export default function SignupScreen() {
               signupAttempts.current = 0;
               startLockout();
             }
-
             await triggerHaptic('error');
             shake();
             if (!isMounted.current) return;
-
             const code = getFirebaseErrorCode(error);
             if (code === 'auth/email-already-in-use' || code === 'auth/invalid-email') {
               dispatch({ type: 'SET_EMAIL_ERROR', payload: getErrorMessage(code) });
               setTimeout(() => emailRef.current?.focus(), FOCUS_DELAY_MS);
             }
-
             showAppAlert('Signup Failed', getErrorMessage(code));
             dispatch({ type: 'SET_LOADING', payload: false });
           }
@@ -981,6 +1030,8 @@ export default function SignupScreen() {
   const confirmSuccessMsg = state.confirmPassword.length > 0 && passwordsMatch && pwValidation.valid && !state.confirmPasswordError ? 'Passwords match' : '';
   const logoPaused = state.nameFocused || state.dobFocused || state.emailFocused || state.passwordFocused || state.confirmFocused || state.loading || !appActive;
 
+  const webCursorStyle: WebPressableStyle = IS_WEB ? { cursor: 'pointer' } : {};
+
   return (
     <SignupErrorBoundary>
       <View style={[st.rootBg, { backgroundColor: C.bg }]}>
@@ -998,7 +1049,7 @@ export default function SignupScreen() {
                 bounces={false}
               >
                 <Animated.View style={[st.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }], maxWidth: 440 }]}>
-                  <Pressable onPress={handleLogin} style={[st.backRow, IS_WEB ? ({ cursor: 'pointer' } as any) : undefined]} disabled={state.loading} accessibilityRole="button" accessibilityLabel="Back to login">
+                  <Pressable onPress={handleLogin} style={[st.backRow, webCursorStyle]} disabled={state.loading} accessibilityRole="button" accessibilityLabel="Back to login">
                     <Ionicons name={IS_RTL ? 'chevron-forward' : 'chevron-back'} size={20} color={C.accent} />
                     <Text style={[st.backText, { color: C.accent }]}>Back to Login</Text>
                   </Pressable>
@@ -1012,107 +1063,10 @@ export default function SignupScreen() {
                   <LockoutBanner seconds={state.lockoutSeconds} C={C} />
 
                   <Animated.View style={[st.formCard, { opacity: formFade, transform: [{ translateX: shakeAnim }, { translateY: formSlide }], backgroundColor: C.card, borderColor: C.cardBorder, padding: IS_SMALL ? 24 : 34 }]}>
-                    <InputField
-                      inputId="signup-name"
-                      label="Display name"
-                      icon="person-outline"
-                      placeholder="Your first name"
-                      value={state.name}
-                      onChangeText={validateName}
-                      error={state.nameError}
-                      focused={state.nameFocused}
-                      onFocus={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: true })}
-                      onBlur={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: false })}
-                      autoComplete="name"
-                      webAutoComplete="given-name"
-                      webInputName="given-name"
-                      textContentType="name"
-                      returnKeyType="next"
-                      onSubmitEditing={focusDOB}
-                      inputRef={nameRef}
-                      editable={!state.loading}
-                      accessibilityLabel="Display name"
-                      C={C}
-                    />
-
-                    <InputField
-                      inputId="signup-dob"
-                      label="Date of birth"
-                      icon="calendar-outline"
-                      placeholder="YYYY-MM-DD"
-                      value={state.dob}
-                      onChangeText={validateDOB}
-                      error={state.dobError}
-                      focused={state.dobFocused}
-                      onFocus={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: true })}
-                      onBlur={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: false })}
-                      autoComplete="bday"
-                      webAutoComplete="bday"
-                      webInputName="bday"
-                      textContentType="birthdate"
-                      returnKeyType="next"
-                      onSubmitEditing={focusEmail}
-                      inputRef={dobRef}
-                      editable={!state.loading}
-                      accessibilityLabel="Date of birth (YYYY-MM-DD)"
-                      C={C}
-                    />
-
-                    <InputField
-                      inputId="signup-email"
-                      label="Email address"
-                      icon="mail-outline"
-                      placeholder="you@example.com"
-                      value={state.email}
-                      onChangeText={validateEmail}
-                      error={state.emailError}
-                      successMsg={emailSuccessMsg}
-                      focused={state.emailFocused}
-                      onFocus={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: true })}
-                      onBlur={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: false })}
-                      keyboardType="email-address"
-                      autoComplete="email"
-                      webAutoComplete="email"
-                      webInputName="email"
-                      textContentType="emailAddress"
-                      returnKeyType="next"
-                      onSubmitEditing={focusPassword}
-                      inputRef={emailRef}
-                      editable={!state.loading}
-                      accessibilityLabel="Email address"
-                      C={C}
-                      onKeyPress={handleKeyPress}
-                    />
-
-                    <InputField
-                      inputId="signup-password"
-                      label="Password"
-                      icon="lock-closed-outline"
-                      placeholder="Create a strong password"
-                      value={state.password}
-                      onChangeText={validatePassword}
-                      error={state.passwordError}
-                      focused={state.passwordFocused}
-                      onFocus={() => {
-                        dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true });
-                        dispatch({ type: 'SET_SHOW_REQUIREMENTS', payload: true });
-                      }}
-                      onBlur={() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false })}
-                      secureTextEntry
-                      showPassword={state.showPassword}
-                      onTogglePassword={() => dispatch({ type: 'TOGGLE_PASSWORD' })}
-                      autoComplete="password-new"
-                      webAutoComplete="new-password"
-                      webInputName="new-password"
-                      textContentType="newPassword"
-                      returnKeyType="next"
-                      onSubmitEditing={focusConfirm}
-                      inputRef={passwordRef}
-                      editable={!state.loading}
-                      accessibilityLabel="Password"
-                      C={C}
-                      onKeyPress={handleKeyPress}
-                    />
+                    <InputField inputId="signup-name" label="Display name" icon="person-outline" placeholder="Your first name" value={state.name} onChangeText={validateName} error={state.nameError} focused={state.nameFocused} onFocus={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: false })} autoComplete="name" webAutoComplete="given-name" webInputName="given-name" textContentType="name" returnKeyType="next" onSubmitEditing={focusDOB} inputRef={nameRef} editable={!state.loading} accessibilityLabel="Display name" C={C} />
+                    <InputField inputId="signup-dob" label="Date of birth" icon="calendar-outline" placeholder="YYYY-MM-DD" value={state.dob} onChangeText={validateDOB} error={state.dobError} focused={state.dobFocused} onFocus={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: false })} autoComplete="bday" webAutoComplete="bday" webInputName="bday" textContentType="birthdate" returnKeyType="next" onSubmitEditing={focusEmail} inputRef={dobRef} editable={!state.loading} accessibilityLabel="Date of birth (YYYY-MM-DD)" C={C} />
+                    <InputField inputId="signup-email" label="Email address" icon="mail-outline" placeholder="you@example.com" value={state.email} onChangeText={validateEmail} error={state.emailError} successMsg={emailSuccessMsg} focused={state.emailFocused} onFocus={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: false })} keyboardType="email-address" autoComplete="email" webAutoComplete="email" webInputName="email" textContentType="emailAddress" returnKeyType="next" onSubmitEditing={focusPassword} inputRef={emailRef} editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress} />
+                    <InputField inputId="signup-password" label="Password" icon="lock-closed-outline" placeholder="Create a strong password" value={state.password} onChangeText={validatePassword} error={state.passwordError} focused={state.passwordFocused} onFocus={() => { dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true }); dispatch({ type: 'SET_SHOW_REQUIREMENTS', payload: true }); }} onBlur={() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false })} secureTextEntry showPassword={state.showPassword} onTogglePassword={() => dispatch({ type: 'TOGGLE_PASSWORD' })} autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password" textContentType="newPassword" returnKeyType="next" onSubmitEditing={focusConfirm} inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress} />
 
                     <StrengthBar password={state.password} C={C} />
                     {state.showRequirements && state.password.length > 0 && (state.passwordFocused || !pwValidation.valid) && <PasswordRequirements password={state.password} C={C} />}
@@ -1124,36 +1078,7 @@ export default function SignupScreen() {
                       </View>
                     )}
 
-                    <InputField
-                      inputId="signup-confirm"
-                      label="Confirm password"
-                      icon="lock-closed-outline"
-                      placeholder="Re-enter your password"
-                      value={state.confirmPassword}
-                      onChangeText={validateConfirm}
-                      error={confirmError}
-                      successMsg={confirmSuccessMsg}
-                      focused={state.confirmFocused}
-                      onFocus={() => {
-                        dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: true });
-                        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350);
-                      }}
-                      onBlur={() => dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: false })}
-                      secureTextEntry
-                      showPassword={state.showConfirmPassword}
-                      onTogglePassword={() => dispatch({ type: 'TOGGLE_CONFIRM_PASSWORD' })}
-                      autoComplete="password-new"
-                      webAutoComplete="new-password"
-                      webInputName="new-password"
-                      textContentType="newPassword"
-                      returnKeyType="go"
-                      onSubmitEditing={canSubmit ? handleSignup : undefined}
-                      inputRef={confirmRef}
-                      editable={!state.loading}
-                      accessibilityLabel="Confirm password"
-                      C={C}
-                      onKeyPress={handleKeyPress}
-                    />
+                    <InputField inputId="signup-confirm" label="Confirm password" icon="lock-closed-outline" placeholder="Re-enter your password" value={state.confirmPassword} onChangeText={validateConfirm} error={confirmError} successMsg={confirmSuccessMsg} focused={state.confirmFocused} onFocus={() => { dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: true }); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350); }} onBlur={() => dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: false })} secureTextEntry showPassword={state.showConfirmPassword} onTogglePassword={() => dispatch({ type: 'TOGGLE_CONFIRM_PASSWORD' })} autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password" textContentType="newPassword" returnKeyType="go" onSubmitEditing={canSubmit ? handleSignup : undefined} inputRef={confirmRef} editable={!state.loading} accessibilityLabel="Confirm password" C={C} onKeyPress={handleKeyPress} />
 
                     {IS_WEB && state.capsLockOn && (state.passwordFocused || state.confirmFocused) && (
                       <View style={[st.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]} accessibilityLiveRegion="polite">
@@ -1173,8 +1098,7 @@ export default function SignupScreen() {
                       {' and '}
                       <Text style={[st.legalLink, { color: C.accentSoft }]} onPress={handlePrivacy} accessibilityRole="link">Privacy Policy</Text>
                     </Text>
-
-                    <Pressable onPress={handleLogin} disabled={state.loading} style={({ pressed }) => [st.loginButton, { opacity: pressed ? 0.7 : 1 }, IS_WEB ? ({ cursor: 'pointer' } as any) : undefined]}>
+                    <Pressable onPress={handleLogin} disabled={state.loading} style={({ pressed }) => [st.loginButton, { opacity: pressed ? 0.7 : 1 }, webCursorStyle]}>
                       <Text style={[st.loginText, { color: C.textSecondary }]}>Already have an account? <Text style={[st.loginLink, { color: C.accent }]}>Log in</Text></Text>
                     </Pressable>
                   </Animated.View>

@@ -13,18 +13,24 @@ type MMKVStore = {
   delete:    (key: string) => void;
 };
 
-const E = (key: string) => process.env[key];
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) throw new Error(`Missing required environment variable: ${key}`);
+  return value;
+}
 
-const firebaseConfig = {
-  apiKey:            E('EXPO_PUBLIC_FIREBASE_API_KEY'),
-  authDomain:        E('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN')        ?? 'myarchetype-b2ba0.firebaseapp.com',
-  projectId:         E('EXPO_PUBLIC_FIREBASE_PROJECT_ID')         ?? 'myarchetype-b2ba0',
-  storageBucket:     E('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET')     ?? 'myarchetype-b2ba0.firebasestorage.app',
-  messagingSenderId: E('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID') ?? '460955155446',
-  appId:             E('EXPO_PUBLIC_FIREBASE_APP_ID')             ?? '1:460955155446:web:0809c96ab99cd5b9c0e5d7',
-};
+function getFirebaseConfig() {
+  return {
+    apiKey:            requireEnv('EXPO_PUBLIC_FIREBASE_API_KEY'),
+    authDomain:        requireEnv('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'),
+    projectId:         requireEnv('EXPO_PUBLIC_FIREBASE_PROJECT_ID'),
+    storageBucket:     requireEnv('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: requireEnv('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+    appId:             requireEnv('EXPO_PUBLIC_FIREBASE_APP_ID'),
+  };
+}
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(getFirebaseConfig());
 
 function getMMKV(): MMKVStore | null {
   try {

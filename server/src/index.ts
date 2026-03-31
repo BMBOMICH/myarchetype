@@ -31,7 +31,7 @@ const ALLOWED_ORIGINS = new Set([
 const CORS_OPTIONS: cors.CorsOptions = {
   origin: (origin, cb) => {
     if (!origin || ALLOWED_ORIGINS.has(origin)) { cb(null, true); }
-    else { console.warn(`[cors] Blocked: ${origin}`); cb(new Error('CORS policy violation')); }
+    else { cb(new Error('CORS policy violation')); }
   },
   methods:         ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders:  ['Content-Type', 'Authorization', 'X-Request-Signature', 'X-Request-Timestamp', 'X-Device-Fingerprint', 'X-Session-Id', 'X-App-Check-Token', 'X-Request-ID'],
@@ -57,7 +57,7 @@ app.use((_req, res, next) => {
 
 app.use(express.json({ limit: '10kb' }));
 
-// ─── TLS info (health endpoint) ───────────────────────────
+// ─── TLS info ─────────────────────────────────────────────
 const TLS_INFO = { min: 'TLSv1.2', supported: ['TLSv1.2', 'TLSv1.3'] };
 
 // ─── Rate limiters ────────────────────────────────────────
@@ -103,11 +103,21 @@ function verifyHMAC(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+// ─── Global error handler ─────────────────────────────────
+function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res, next).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'internal_error';
+      if (!res.headersSent) res.status(500).json({ success: false, reason: message });
+    });
+  };
+}
+
 // ─── VAPID ────────────────────────────────────────────────
 const { VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env;
 if (VAPID_EMAIL && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-} else { console.warn('[Server] Missing VAPID env vars.'); }
+}
 
 // ─── Auth middleware ──────────────────────────────────────
 interface AuthRequest extends Request { uid: string; }
@@ -255,11 +265,7 @@ interface IntegrityResult {
 
 function checkDeviceIntegrity(info: DeviceInfo): IntegrityResult {
   const flags: string[] = [];
-  let isRooted   = false;
-  let isEmulator = false;
-  let isDebug    = false;
-  let hasFrida   = false;
-  let hasMockLocation = false;
+  let isRooted = false, isEmulator = false, isDebug = false, hasFrida = false, hasMockLocation = false;
 
   if (info.jailbreak || info.isRooted || info.rooted)                       { isRooted = true;   flags.push('rooted'); }
   if (info.dtTJailbreak || info.RootBeer)                                    { isRooted = true;   flags.push('jailbreak_detected'); }
@@ -276,7 +282,6 @@ function checkDeviceIntegrity(info: DeviceInfo): IntegrityResult {
 
   if (info.frida || info.fridaDetected || info.hookDetect)                   { hasFrida = true;   flags.push('frida_detected'); }
   if (info.memoryTamper || info.checksumMemory)                              { flags.push('memory_tamper'); }
-
   if (info.ALLOW_MOCK_LOCATION || info.mockLocationApp || info.mockLocation) { hasMockLocation = true; flags.push('mock_location'); }
   if (info.isCaptured || info.screenRecord)                                  { flags.push('screen_recording'); }
   if (info.accessibilityAbuse || info.getEnabledAccessibility)               { flags.push('accessibility_abuse'); }
@@ -330,7 +335,7 @@ async function checkImpossibleCheckin(userId: string, lat: number, lon: number, 
 const SANCTIONED_COUNTRIES = new Set(['KP', 'IR', 'SY', 'CU', 'RU']);
 const SANCTIONS_NAMES       = ['kim jong', 'ali khamenei', 'bashar al-assad', 'nicolas maduro'];
 
-function isSanctioned(cc: string): boolean      { return SANCTIONED_COUNTRIES.has(cc.toUpperCase()); }
+function isSanctioned(cc: string): boolean          { return SANCTIONED_COUNTRIES.has(cc.toUpperCase()); }
 function screenSanctionsName(name: string): boolean { return SANCTIONS_NAMES.some((s) => name.toLowerCase().includes(s)); }
 
 // ─── Safe Browsing ────────────────────────────────────────
@@ -424,7 +429,7 @@ async function scanForCSAM(imageUrl: string): Promise<{ isCSAM: boolean; confide
   } catch { return { isCSAM: false, confidence: 0 }; }
 }
 
-interface NcmecDetails { imageUrl: string; userId: string; reporterUid: string; }
+interface NcmecDetails  { imageUrl: string; userId: string; reporterUid: string; }
 interface NcmecResponse { tiplineId?: string; }
 
 async function reportToNCMEC(details: NcmecDetails): Promise<{ success: boolean; tiplineId?: string }> {
@@ -449,11 +454,11 @@ async function reportToNCMEC(details: NcmecDetails): Promise<{ success: boolean;
 async function detectCoordinatedInauthentic(userIds: string[]): Promise<{ detected: boolean; clusterSize: number; reason?: string }> {
   if (userIds.length < 3) return { detected: false, clusterSize: 0 };
   try {
-    const fps = await Promise.all(userIds.map(async (id) => {
+    const fps   = await Promise.all(userIds.map(async (id) => {
       const snap = await adminDb.collection('deviceFingerprints').where('users', 'array-contains', id).limit(1).get();
       return snap.docs[0]?.id ?? null;
     }));
-    const valid = fps.filter(Boolean);
+    const valid  = fps.filter(Boolean);
     const unique = new Set(valid);
     if (unique.size < valid.length) return { detected: true, clusterSize: userIds.length, reason: 'Multiple accounts share device fingerprints.' };
     return { detected: false, clusterSize: 0 };
@@ -505,7 +510,6 @@ async function enforceTrustThreshold(userId: string): Promise<{ action: TrustAct
     const snap       = await adminDb.collection('users').doc(userId).get();
     if (!snap.exists) return { action: 'none', trustScore: 50 };
     const trustScore: number = snap.data()?.['trustScore'] ?? 50;
-
     if (trustScore < 5) {
       await adminDb.collection('users').doc(userId).update({ status: 'banned', autoBan: true, bannedAt: admin.firestore.FieldValue.serverTimestamp() });
       await logAdminAction('system', 'autoBan', userId, { trustScore });
@@ -536,6 +540,7 @@ async function checkCrossAccountPDQ(imageUrl: string, userId: string): Promise<{
 }
 
 // ─── A/B testing ──────────────────────────────────────────
+// NOTE: In-memory — resets on cold start. Move to Firestore for persistence.
 const abTestAssignments: Record<string, Record<string, string>> = {};
 
 function assignABTest(userId: string, experimentId: string, variants: string[]): string {
@@ -553,6 +558,7 @@ function validateABTestIntegrity(userId: string, experimentId: string, claimedVa
 }
 
 // ─── API key rotation ─────────────────────────────────────
+// NOTE: In-memory cache — resets on cold start. Keys are persisted to Firestore.
 const API_KEY_CACHE: Record<string, { key: string; rotatedAt: number }> = {};
 
 async function rotateApiKey(service: string): Promise<{ success: boolean }> {
@@ -599,13 +605,14 @@ interface EngagementMetrics { likes: number; views: number; messages: number; ti
 
 function detectFakeEngagement(metrics: EngagementMetrics): { suspicious: boolean; signals: string[] } {
   const signals: string[] = [];
-  if (metrics.likes > 0 && metrics.views === 0)                          signals.push('likes_without_views');
-  if (metrics.messages > 500 && metrics.timeOnAppMinutes < 10)           signals.push('impossible_message_rate');
-  if (metrics.likes / Math.max(metrics.views, 1) > 0.95)                signals.push('abnormal_like_rate');
+  if (metrics.likes > 0 && metrics.views === 0)                signals.push('likes_without_views');
+  if (metrics.messages > 500 && metrics.timeOnAppMinutes < 10) signals.push('impossible_message_rate');
+  if (metrics.likes / Math.max(metrics.views, 1) > 0.95)      signals.push('abnormal_like_rate');
   return { suspicious: signals.length > 0, signals };
 }
 
 // ─── Bot detection ────────────────────────────────────────
+// NOTE: In-memory — resets on cold start. Sufficient for rate-burst detection per instance.
 const requestTimestamps: Record<string, number[]> = {};
 const BOT_UA_PATTERNS = ['bot','crawler','spider','headless','phantomjs','puppeteer','selenium','playwright','curl','wget'];
 
@@ -622,6 +629,7 @@ function detectBotTraffic(ip: string, userAgent: string): { isBot: boolean; conf
 }
 
 // ─── Conversion fraud ─────────────────────────────────────
+// NOTE: In-memory — resets on cold start. Move to Firestore for cross-instance tracking.
 const conversionEvents: Record<string, number[]> = {};
 
 function detectConversionFraud(userId: string, eventType: string, value: number): { fraudulent: boolean; reason?: string } {
@@ -631,8 +639,8 @@ function detectConversionFraud(userId: string, eventType: string, value: number)
   conversionEvents[key] = conversionEvents[key]!.filter((t) => now - t < 3_600_000);
   conversionEvents[key]!.push(now);
   const count = conversionEvents[key]!.length;
-  if (count > 10)  return { fraudulent: true, reason: `${count} ${eventType} conversions in 1 hour.` };
-  if (value < 0)   return { fraudulent: true, reason: 'Negative conversion value.' };
+  if (count > 10) return { fraudulent: true, reason: `${count} ${eventType} conversions in 1 hour.` };
+  if (value < 0)  return { fraudulent: true, reason: 'Negative conversion value.' };
   return { fraudulent: false };
 }
 
@@ -640,12 +648,12 @@ function detectConversionFraud(userId: string, eventType: string, value: number)
 // Routes
 // ═══════════════════════════════════════════════════════════
 
-app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
+  const { subscription, title, body, screen } = req.body as Record<string, unknown>;
+  const t = sanitize(title), b = sanitize(body);
+  if (!isValidPushSub(subscription) || !t || !b) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
+  if (!VAPID_EMAIL) { res.status(500).json({ success: false, reason: 'missing_vapid_config' }); return; }
   try {
-    const { subscription, title, body, screen } = req.body as Record<string, unknown>;
-    const t = sanitize(title), b = sanitize(body);
-    if (!isValidPushSub(subscription) || !t || !b) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
-    if (!VAPID_EMAIL) { res.status(500).json({ success: false, reason: 'missing_vapid_config' }); return; }
     await webpush.sendNotification(subscription, JSON.stringify({ title: t, body: b, data: { screen: sanitize(screen) ?? 'home' } }));
     res.json({ success: true });
   } catch (e) {
@@ -653,36 +661,34 @@ app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, async 
     if (err.statusCode === 410 || err.statusCode === 404) { res.status(410).json({ success: false, reason: 'subscription_expired' }); return; }
     res.status(500).json({ success: false, reason: 'failed' });
   }
-});
+}));
 
-app.post('/send-expo-notification', notifLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { expoPushToken, title, body, screen } = req.body as Record<string, unknown>;
-    const t = sanitize(title), b = sanitize(body);
-    if (!isValidExpoToken(expoPushToken) || !t || !b) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
-    const r = await fetch('https://exp.host/--/api/v2/push/send', {
-      method:  'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ to: expoPushToken, sound: 'default', title: t, body: b, data: { screen: sanitize(screen) ?? 'home' } }),
-    });
-    res.json({ success: r.ok, data: await r.json() });
-  } catch { res.status(500).json({ success: false, reason: 'failed' }); }
-});
+app.post('/send-expo-notification', notifLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
+  const { expoPushToken, title, body, screen } = req.body as Record<string, unknown>;
+  const t = sanitize(title), b = sanitize(body);
+  if (!isValidExpoToken(expoPushToken) || !t || !b) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
+  const r = await fetch('https://exp.host/--/api/v2/push/send', {
+    method:  'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ to: expoPushToken, sound: 'default', title: t, body: b, data: { screen: sanitize(screen) ?? 'home' } }),
+  });
+  res.json({ success: r.ok, data: await r.json() });
+}));
 
-app.post('/check-email', authLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-email', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const email = sanitize((req.body as Record<string, unknown>)['email'], 254);
   if (!email) { res.status(400).json({ success: false, reason: 'missing_email' }); return; }
   const disposable = isDisposableEmail(email);
   res.json({ success: true, disposable, allowed: !disposable });
-});
+}));
 
-app.post('/check-password-breach', authLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-password-breach', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { password } = req.body as Record<string, unknown>;
   if (typeof password !== 'string' || password.length < 6) { res.status(400).json({ success: false, reason: 'invalid_password' }); return; }
   res.json({ success: true, ...(await isPasswordBreached(password)) });
-});
+}));
 
-app.post('/register-device', authLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/register-device', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id = uid(req);
   const fp = (req.headers['x-device-fingerprint'] as string) ?? (req.body as Record<string, unknown>)['fingerprint'] ?? '';
   if (!fp || (fp as string).length < 8) { res.status(400).json({ success: false, reason: 'invalid_fingerprint' }); return; }
@@ -690,9 +696,9 @@ app.post('/register-device', authLimiter, validateOrigin, requireAuth, async (re
   const multi  = await checkMultiAccountDevice(fp as string, id);
   if (multi.bannedReuse) await logAdminAction('system', 'banned_device_reuse', id, { fingerprint: fp, accounts: multi.accounts });
   res.json({ success: true, knownDevice: device.knownDevice, multiAccount: multi.multiAccount, bannedReuse: multi.bannedReuse });
-});
+}));
 
-app.post('/login-track', authLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/login-track', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { sessionId, fingerprint } = req.body as Record<string, unknown>;
   const ip  = clientIp(req);
@@ -700,28 +706,28 @@ app.post('/login-track', authLimiter, validateOrigin, requireAuth, async (req: R
   if (ato.suspicious) await logAdminAction('system', 'ato_suspicious', id, { reason: ato.reason });
   const session = sessionId ? await checkConcurrentSessions(id, sessionId as string) : { allowed: true, activeSessions: 1 };
   res.json({ success: true, atoSuspicious: ato.suspicious, sessionAllowed: session.allowed, activeSessions: session.activeSessions });
-});
+}));
 
-app.post('/check-device-integrity', authLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-device-integrity', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id     = uid(req);
   const info   = ((req.body as Record<string, unknown>)['deviceInfo'] ?? {}) as DeviceInfo;
   const result = checkDeviceIntegrity(info);
   if (result.isRooted || result.hasFrida || result.isEmulator) await logAdminAction('system', 'device_integrity_fail', id, { flags: result.flags });
   res.json({ success: true, ...result });
-});
+}));
 
-app.post('/validate-location', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/validate-location', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { lat, lon, timestamp, countryCode } = req.body as Record<string, unknown>;
   if (typeof lat !== 'number' || typeof lon !== 'number') { res.status(400).json({ success: false, reason: 'invalid_coordinates' }); return; }
   if (countryCode && isSanctioned(countryCode as string)) { res.status(403).json({ success: false, reason: 'region_not_supported' }); return; }
-  const ts  = (timestamp as number) ?? Date.now();
+  const ts = (timestamp as number) ?? Date.now();
   let impossible = false, speedKmH = 0;
   try {
     const prev = await adminDb.collection('userLocations').doc(id).get();
     if (prev.exists) {
-      const p    = prev.data()!;
-      const chk  = checkGeoImpossibility(p['lat'], p['lon'], p['timestamp'], lat, lon, ts);
+      const p   = prev.data()!;
+      const chk = checkGeoImpossibility(p['lat'], p['lon'], p['timestamp'], lat, lon, ts);
       impossible = chk.impossible; speedKmH = chk.speedKmH;
     }
     await adminDb.collection('userLocations').doc(id).set({ lat, lon, timestamp: ts, countryCode: countryCode ?? '' });
@@ -731,17 +737,17 @@ app.post('/validate-location', modLimiter, validateOrigin, requireAuth, async (r
   const checkin    = await checkImpossibleCheckin(id, lat, lon, ts);
   const vpn        = await detectVPNProxy(req);
   res.json({ success: true, impossible, speedKmH, ipMismatch: ipMismatch.mismatch, impossibleCheckin: checkin.impossible, isProxy: vpn.isProxy, isTor: vpn.isTor });
-});
+}));
 
-app.post('/moderate-text', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/moderate-text', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const text = sanitize((req.body as Record<string, unknown>)['text'], 5000);
   if (!text) { res.status(400).json({ success: false, reason: 'missing_text' }); return; }
   const result = serverCheckText(text);
   if (!result.safe) await logAdminAction('system', 'text_flagged', uid(req), { category: result.category, preview: text.slice(0, 100) });
   res.json({ success: true, safe: result.safe, category: result.category });
-});
+}));
 
-app.post('/scan-csam', modLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
+app.post('/scan-csam', modLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { imageUrl } = req.body as Record<string, unknown>;
   if (!imageUrl) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
@@ -752,151 +758,155 @@ app.post('/scan-csam', modLimiter, validateOrigin, requireAuth, verifyHMAC, asyn
     res.json({ success: true, isCSAM: true, reported: report.success, tiplineId: report.tiplineId }); return;
   }
   res.json({ success: true, isCSAM: false });
-});
+}));
 
-app.post('/age-gate-check', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/age-gate-check', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { contentType } = req.body as Record<string, unknown>;
   res.json({ success: true, ...(await enforceAgeGatedContent(uid(req), (contentType as string) ?? 'explicit')) });
-});
+}));
 
-app.post('/dmca-takedown', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
+app.post('/dmca-takedown', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
   const { contentUrl, reporterEmail, copyrightOwner, workDescription } = req.body as Record<string, unknown>;
   if (!contentUrl || !reporterEmail) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   const caseId = `DMCA-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-  try {
-    await adminDb.collection('dmcaNotices').add({ caseId, contentUrl, reporterEmail, copyrightOwner, workDescription, status: 'received', receivedAt: admin.firestore.FieldValue.serverTimestamp() });
-    await logAdminAction('system', 'dmca_takedown', uid(req), { caseId, contentUrl });
-    res.json({ success: true, caseId });
-  } catch { res.status(500).json({ success: false, reason: 'failed' }); }
-});
+  await adminDb.collection('dmcaNotices').add({ caseId, contentUrl, reporterEmail, copyrightOwner, workDescription, status: 'received', receivedAt: admin.firestore.FieldValue.serverTimestamp() });
+  await logAdminAction('system', 'dmca_takedown', uid(req), { caseId, contentUrl });
+  res.json({ success: true, caseId });
+}));
 
-app.post('/log-screenshot',        modLimiter,     validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/log-screenshot', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   await logScreenshotEvent(uid(req), ((req.body as Record<string, unknown>)['screen'] as string) ?? 'unknown');
   res.json({ success: true });
-});
+}));
 
-app.post('/share-meeting-location', modLimiter,     validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/share-meeting-location', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { lat, lon, trustedContactId } = req.body as Record<string, unknown>;
   if (typeof lat !== 'number' || typeof lon !== 'number' || !trustedContactId) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   res.json({ success: true, ...(await createMeetingLocationShare(uid(req), lat, lon, trustedContactId as string)) });
-});
+}));
 
-app.post('/enforce-trust', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
+app.post('/enforce-trust', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
   const { targetUid } = req.body as Record<string, unknown>;
   if (!targetUid) { res.status(400).json({ success: false, reason: 'missing_uid' }); return; }
   res.json({ success: true, ...(await enforceTrustThreshold(targetUid as string)) });
-});
+}));
 
-app.post('/check-url', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-url', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const url = sanitize((req.body as Record<string, unknown>)['url'], 2048);
   if (!url) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
   res.json({ success: true, ...(await checkUrlSafety(url)) });
-});
+}));
 
-app.post('/screen-name', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/screen-name', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const name = sanitize((req.body as Record<string, unknown>)['name'], 200);
   if (!name) { res.status(400).json({ success: false, reason: 'missing_name' }); return; }
   const flagged = screenSanctionsName(name);
   if (flagged) await logAdminAction('system', 'sanctions_match', uid(req), { name });
   res.json({ success: true, flagged });
-});
+}));
 
-app.post('/pdq-cross-account', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/pdq-cross-account', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { photoUrl } = req.body as Record<string, unknown>;
   if (!photoUrl) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
   const result = await checkCrossAccountPDQ(photoUrl as string, id);
   if (result.isDuplicate) await logAdminAction('system', 'cross_account_duplicate', id, { matchedUserId: result.matchedUserId });
   res.json({ success: true, ...result });
-});
+}));
 
-app.post('/check-cib', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
+app.post('/check-cib', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
   const { userIds } = req.body as Record<string, unknown>;
   if (!Array.isArray(userIds)) { res.status(400).json({ success: false, reason: 'missing_userIds' }); return; }
   const result = await detectCoordinatedInauthentic(userIds as string[]);
   if (result.detected) await logAdminAction('system', 'cib_detected', 'system', { clusterSize: result.clusterSize, userIds });
   res.json({ success: true, ...result });
-});
+}));
 
-app.post('/ab-test', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/ab-test', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { experimentId, claimedVariant, variants } = req.body as Record<string, unknown>;
   if (!experimentId || !variants) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   const assigned = assignABTest(id, experimentId as string, variants as string[]);
   const valid    = !claimedVariant || validateABTestIntegrity(id, experimentId as string, claimedVariant as string, variants as string[]);
   res.json({ success: true, variant: assigned, valid });
-});
+}));
 
-app.post('/admin/rotate-key', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
+app.post('/admin/rotate-key', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { service } = req.body as Record<string, unknown>;
   if (!service) { res.status(400).json({ success: false, reason: 'missing_service' }); return; }
-  try {
-    const snap = await adminDb.collection('users').doc(id).get();
-    if (!snap.exists || snap.data()?.['role'] !== 'admin') { res.status(403).json({ success: false, reason: 'not_admin' }); return; }
-  } catch { res.status(403).json({ success: false, reason: 'auth_error' }); return; }
+  const snap = await adminDb.collection('users').doc(id).get();
+  if (!snap.exists || snap.data()?.['role'] !== 'admin') { res.status(403).json({ success: false, reason: 'not_admin' }); return; }
   const result = await rotateApiKey(service as string);
   await logAdminAction(id, 'key_rotation', service as string, { rotatedAt: Date.now() });
   res.json({ success: result.success });
-});
+}));
 
-app.post('/wcag-audit', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/wcag-audit', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { violations } = req.body as Record<string, unknown>;
   if (!Array.isArray(violations)) { res.status(400).json({ success: false, reason: 'missing_violations' }); return; }
   res.json({ success: true, ...auditWCAG(violations as Array<{ id: string; impact: string }>) });
-});
+}));
 
-app.post('/check-contrast', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-contrast', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { foreground, background } = req.body as Record<string, unknown>;
   if (!foreground || !background) { res.status(400).json({ success: false, reason: 'missing_colors' }); return; }
   res.json({ success: true, ...checkColorContrast(foreground as string, background as string) });
-});
+}));
 
-app.post('/validate-event', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/validate-event', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { event, signature } = req.body as Record<string, unknown>;
   if (!event || !signature) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   const secret = process.env.ANALYTICS_HMAC_SECRET ?? HMAC_SECRET;
   res.json({ success: true, valid: validateAnalyticsEvent(event as Record<string, unknown>, signature as string, secret) });
-});
+}));
 
-app.post('/check-engagement', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-engagement', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { metrics } = req.body as Record<string, unknown>;
   if (!metrics) { res.status(400).json({ success: false, reason: 'missing_metrics' }); return; }
   const result = detectFakeEngagement(metrics as EngagementMetrics);
   if (result.suspicious) await logAdminAction('system', 'fake_engagement', uid(req), { signals: result.signals });
   res.json({ success: true, ...result });
-});
+}));
 
-app.post('/check-bot', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/check-bot', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const ip = clientIp(req);
   const ua = (req.headers['user-agent'] as string) ?? '';
   res.json({ success: true, ...detectBotTraffic(ip, ua) });
-});
+}));
 
-app.post('/track-conversion', modLimiter, validateOrigin, requireAuth, async (req: Request, res: Response) => {
+app.post('/track-conversion', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id  = uid(req);
   const { eventType, value } = req.body as Record<string, unknown>;
   if (!eventType) { res.status(400).json({ success: false, reason: 'missing_event_type' }); return; }
   const result = detectConversionFraud(id, eventType as string, (value as number) ?? 0);
   if (result.fraudulent) await logAdminAction('system', 'conversion_fraud', id, { eventType, reason: result.reason });
   res.json({ success: true, ...result });
-});
+}));
 
-app.post('/admin/action', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, async (req: Request, res: Response) => {
-  const id  = uid(req);
-  try {
-    const snap = await adminDb.collection('users').doc(id).get();
-    if (!snap.exists || snap.data()?.['role'] !== 'admin') { res.status(403).json({ success: false, reason: 'not_admin' }); return; }
-  } catch { res.status(403).json({ success: false, reason: 'auth_error' }); return; }
+app.post('/admin/action', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
+  const id   = uid(req);
+  const snap = await adminDb.collection('users').doc(id).get();
+  if (!snap.exists || snap.data()?.['role'] !== 'admin') { res.status(403).json({ success: false, reason: 'not_admin' }); return; }
   const { action, target, details } = req.body as Record<string, unknown>;
   if (!action || !target) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   await logAdminAction(id, action as string, target as string, details as Record<string, unknown>);
   res.json({ success: true });
-});
+}));
 
-app.get('/health', (_req: Request, res: Response) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), detectors: 'active', minTLS: TLS_INFO.min, tlsVersions: TLS_INFO.supported });
 });
 
+// ─── Express error boundary ───────────────────────────────
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : 'internal_error';
+  if (!res.headersSent) res.status(500).json({ success: false, reason: message });
+});
+
 const PORT = Number(process.env.PORT ?? 3000);
-app.listen(PORT, () => console.log(`[Server] Listening on port ${PORT}`));
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => { /* local dev only */ });
+}
+
+export default app;

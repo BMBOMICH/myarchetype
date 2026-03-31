@@ -20,78 +20,75 @@ interface Stats {
   averageAge: number;
 }
 
+// ─── Firestore data shape ─────────────────────────────────
+interface UserData {
+  selfieVerified?: boolean;
+  ageVerified?: boolean;
+  hasFullBodyPhoto?: boolean;
+  isBanned?: boolean;
+  warnings?: number;
+  gender?: string;
+  age?: number;
+  height?: { verificationMethod?: string };
+  ratings?: {
+    totalRatings?: number;
+    averagePhotosMatch?: number;
+    heightAccuracyRate?: number;
+    bodyTypeAccuracyRate?: number;
+  };
+}
+
+const EMPTY_STATS: Stats = {
+  totalUsers: 0, selfieVerified: 0, heightVerified: 0, ageVerified: 0,
+  hasFullBodyPhoto: 0, trustedUsers: 0, totalRatings: 0, averageTrustScore: 0,
+  lowRatedUsers: 0, usersWithWarnings: 0, bannedUsers: 0, maleUsers: 0,
+  femaleUsers: 0, averageAge: 0,
+};
+
 export default function AdminStatsScreen() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    selfieVerified: 0,
-    heightVerified: 0,
-    ageVerified: 0,
-    hasFullBodyPhoto: 0,
-    trustedUsers: 0,
-    totalRatings: 0,
-    averageTrustScore: 0,
-    lowRatedUsers: 0,
-    usersWithWarnings: 0,
-    bannedUsers: 0,
-    maleUsers: 0,
-    femaleUsers: 0,
-    averageAge: 0,
-  });
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  useEffect(() => { loadStats(); }, []);
 
   const loadStats = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
 
-      let totalUsers = 0;
-      let selfieVerified = 0;
-      let heightVerified = 0;
-      let ageVerified = 0;
-      let hasFullBodyPhoto = 0;
-      let trustedUsers = 0;
-      let lowRatedUsers = 0;
-      let usersWithWarnings = 0;
-      let bannedUsers = 0;
-      let maleUsers = 0;
-      let femaleUsers = 0;
-      let totalAge = 0;
-      let totalTrustScore = 0;
-      let usersWithRatings = 0;
+      let totalUsers = 0, selfieVerified = 0, heightVerified = 0, ageVerified = 0;
+      let hasFullBodyPhoto = 0, trustedUsers = 0, lowRatedUsers = 0;
+      let usersWithWarnings = 0, bannedUsers = 0, maleUsers = 0, femaleUsers = 0;
+      let totalAge = 0, totalTrustScore = 0, usersWithRatings = 0;
 
       usersSnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
+        const data = docSnap.data() as UserData;
         totalUsers++;
 
-        if (data.selfieVerified) selfieVerified++;
-        if (data.ageVerified) ageVerified++;
+        if (data.selfieVerified)  selfieVerified++;
+        if (data.ageVerified)     ageVerified++;
         if (data.hasFullBodyPhoto) hasFullBodyPhoto++;
-        if (data.isBanned) bannedUsers++;
-        if (data.warnings > 0) usersWithWarnings++;
-        if (data.gender === 'Male') maleUsers++;
+        if (data.isBanned)        bannedUsers++;
+        if ((data.warnings ?? 0) > 0) usersWithWarnings++;
+        if (data.gender === 'Male')   maleUsers++;
         if (data.gender === 'Female') femaleUsers++;
         if (data.age) totalAge += data.age;
 
-        if (typeof data.height === 'object' && data.height.verificationMethod === 'manual-measured') {
+        if (typeof data.height === 'object' && data.height?.verificationMethod === 'manual-measured') {
           heightVerified++;
         }
 
-        if (data.ratings && data.ratings.totalRatings > 0) {
+        if (data.ratings && (data.ratings.totalRatings ?? 0) > 0) {
           usersWithRatings++;
           const trustScore =
-            (data.ratings.averagePhotosMatch / 5) * 100 * 0.4 +
-            data.ratings.heightAccuracyRate * 0.3 +
-            data.ratings.bodyTypeAccuracyRate * 0.3;
+            ((data.ratings.averagePhotosMatch ?? 0) / 5) * 100 * 0.4 +
+            (data.ratings.heightAccuracyRate ?? 0) * 0.3 +
+            (data.ratings.bodyTypeAccuracyRate ?? 0) * 0.3;
           totalTrustScore += trustScore;
 
-          if (data.ratings.totalRatings >= 3 && data.ratings.averagePhotosMatch >= 4) {
+          if ((data.ratings.totalRatings ?? 0) >= 3 && (data.ratings.averagePhotosMatch ?? 0) >= 4) {
             trustedUsers++;
           }
-
-          if (data.ratings.averagePhotosMatch < 3) {
+          if ((data.ratings.averagePhotosMatch ?? 0) < 3) {
             lowRatedUsers++;
           }
         }
@@ -101,23 +98,13 @@ export default function AdminStatsScreen() {
       const totalRatings = ratingsSnapshot.size;
 
       setStats({
-        totalUsers,
-        selfieVerified,
-        heightVerified,
-        ageVerified,
-        hasFullBodyPhoto,
-        trustedUsers,
-        totalRatings,
-        averageTrustScore:
-          usersWithRatings > 0 ? Math.round(totalTrustScore / usersWithRatings) : 0,
-        lowRatedUsers,
-        usersWithWarnings,
-        bannedUsers,
-        maleUsers,
-        femaleUsers,
+        totalUsers, selfieVerified, heightVerified, ageVerified, hasFullBodyPhoto,
+        trustedUsers, totalRatings,
+        averageTrustScore: usersWithRatings > 0 ? Math.round(totalTrustScore / usersWithRatings) : 0,
+        lowRatedUsers, usersWithWarnings, bannedUsers, maleUsers, femaleUsers,
         averageAge: totalUsers > 0 ? Math.round(totalAge / totalUsers) : 0,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading stats:', error);
     } finally {
       setLoading(false);
@@ -128,6 +115,10 @@ export default function AdminStatsScreen() {
     if (stats.totalUsers === 0) return 0;
     return Math.round((value / stats.totalUsers) * 100);
   };
+
+  // ─── Progress bar width helper ────────────────────────
+  // React Native width accepts `${number}%` as DimensionValue
+  const pctWidth = (value: number): `${number}%` => `${getPercent(value)}%`;
 
   if (loading) {
     return (
@@ -171,56 +162,40 @@ export default function AdminStatsScreen() {
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>Selfie Verified</Text>
-            <Text style={styles.progressValue}>
-              {stats.selfieVerified} ({getPercent(stats.selfieVerified)}%)
-            </Text>
+            <Text style={styles.progressValue}>{stats.selfieVerified} ({getPercent(stats.selfieVerified)}%)</Text>
           </View>
           <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFillBlue, { width: `${getPercent(stats.selfieVerified)}%` as any }]}
-            />
+            <View style={[styles.progressFillBlue, { width: pctWidth(stats.selfieVerified) }]} />
           </View>
         </View>
 
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>Height Verified</Text>
-            <Text style={styles.progressValue}>
-              {stats.heightVerified} ({getPercent(stats.heightVerified)}%)
-            </Text>
+            <Text style={styles.progressValue}>{stats.heightVerified} ({getPercent(stats.heightVerified)}%)</Text>
           </View>
           <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFillPurple, { width: `${getPercent(stats.heightVerified)}%` as any }]}
-            />
+            <View style={[styles.progressFillPurple, { width: pctWidth(stats.heightVerified) }]} />
           </View>
         </View>
 
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>Age Verified</Text>
-            <Text style={styles.progressValue}>
-              {stats.ageVerified} ({getPercent(stats.ageVerified)}%)
-            </Text>
+            <Text style={styles.progressValue}>{stats.ageVerified} ({getPercent(stats.ageVerified)}%)</Text>
           </View>
           <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFillOrange, { width: `${getPercent(stats.ageVerified)}%` as any }]}
-            />
+            <View style={[styles.progressFillOrange, { width: pctWidth(stats.ageVerified) }]} />
           </View>
         </View>
 
         <View style={styles.progressItem}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>Full Body Photo</Text>
-            <Text style={styles.progressValue}>
-              {stats.hasFullBodyPhoto} ({getPercent(stats.hasFullBodyPhoto)}%)
-            </Text>
+            <Text style={styles.progressValue}>{stats.hasFullBodyPhoto} ({getPercent(stats.hasFullBodyPhoto)}%)</Text>
           </View>
           <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFillTeal, { width: `${getPercent(stats.hasFullBodyPhoto)}%` as any }]}
-            />
+            <View style={[styles.progressFillTeal, { width: pctWidth(stats.hasFullBodyPhoto) }]} />
           </View>
         </View>
       </View>
@@ -306,13 +281,13 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 14, color: '#eee' },
   progressValue: { fontSize: 14, color: '#888' },
   progressBar: { height: 10, backgroundColor: '#0f3460', borderRadius: 5, overflow: 'hidden' },
-  progressFillBlue: { height: '100%', borderRadius: 5, backgroundColor: '#3498db' },
+  progressFillBlue:   { height: '100%', borderRadius: 5, backgroundColor: '#3498db' },
   progressFillPurple: { height: '100%', borderRadius: 5, backgroundColor: '#9b59b6' },
   progressFillOrange: { height: '100%', borderRadius: 5, backgroundColor: '#e67e22' },
-  progressFillTeal: { height: '100%', borderRadius: 5, backgroundColor: '#1abc9c' },
+  progressFillTeal:   { height: '100%', borderRadius: 5, backgroundColor: '#1abc9c' },
   safetyGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   safetyItem: { flex: 1, backgroundColor: '#16213e', borderRadius: 12, padding: 15, alignItems: 'center', marginHorizontal: 5 },
-  safetyNumberRed: { fontSize: 28, fontWeight: 'bold', color: '#e74c3c' },
+  safetyNumberRed:    { fontSize: 28, fontWeight: 'bold', color: '#e74c3c' },
   safetyNumberOrange: { fontSize: 28, fontWeight: 'bold', color: '#e67e22' },
   safetyLabel: { fontSize: 10, color: '#888', marginTop: 5, textAlign: 'center' },
   summaryCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, borderColor: '#53a8b6' },

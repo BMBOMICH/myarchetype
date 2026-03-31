@@ -4,10 +4,9 @@ import { auth, db } from '../firebaseConfig';
 import { checkIcebreakerAnswer, detectEmojiCodedLanguage, detectEmojiSpam } from './moderation';
 
 // ─── Secure random ────────────────────────────────────────
-
 function secureRandInt(max: number): number {
   const bytes = Crypto.getRandomBytes(4);
-  const val = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  const val = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;
   return val % max;
 }
 
@@ -15,7 +14,7 @@ function secureShuffle<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = secureRandInt(i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
   }
   return shuffled;
 }
@@ -24,7 +23,7 @@ function secureShuffle<T>(array: T[]): T[] {
 // Question Banks
 // ═══════════════════════════════════════════════════════════
 
-export const WOULD_YOU_RATHER_QUESTIONS = [
+export const WOULD_YOU_RATHER_QUESTIONS: WouldYouRatherQuestion[] = [
   { a: 'Travel to the past', b: 'Travel to the future' },
   { a: 'Be able to fly', b: 'Be able to read minds' },
   { a: 'Live in the city', b: 'Live in the countryside' },
@@ -57,7 +56,7 @@ export const WOULD_YOU_RATHER_QUESTIONS = [
   { a: 'Share one dessert', b: 'Get your own desserts' },
 ];
 
-export const THIS_OR_THAT_QUESTIONS = [
+export const THIS_OR_THAT_QUESTIONS: ThisOrThatQuestion[] = [
   { a: '☕ Coffee', b: '🍵 Tea' },
   { a: '🐕 Dogs', b: '🐱 Cats' },
   { a: '🏖️ Beach', b: '🏔️ Mountains' },
@@ -90,7 +89,7 @@ export const THIS_OR_THAT_QUESTIONS = [
   { a: '🧃 Juice', b: '🥤 Smoothie' },
 ];
 
-export const COMPATIBILITY_QUESTIONS = [
+export const COMPATIBILITY_QUESTIONS: CompatibilityQuestion[] = [
   { question: 'How do you handle conflict?', options: ['Talk it out immediately','Take space then discuss','Write down feelings first','Seek a compromise quickly'] },
   { question: 'Ideal weekend looks like...', options: ['Adventure outdoors','Cozy day at home','Social gathering','Mix of both active and chill'] },
   { question: 'Love language?', options: ['Words of affirmation','Quality time','Physical touch','Acts of service','Gifts'] },
@@ -103,7 +102,7 @@ export const COMPATIBILITY_QUESTIONS = [
   { question: 'Morning routine?', options: ['Up early, productive','Slow and relaxed','Snooze 5 times','What routine?'] },
 ];
 
-export const RAPID_FIRE_QUESTIONS = [
+export const RAPID_FIRE_QUESTIONS: string[] = [
   'Biggest green flag in a person?',
   "Song that describes your love life?",
   "Worst date you've been on?",
@@ -127,7 +126,18 @@ export const RAPID_FIRE_QUESTIONS = [
 ];
 
 // ═══════════════════════════════════════════════════════════
-// Types
+// Question types
+// ═══════════════════════════════════════════════════════════
+
+export interface WouldYouRatherQuestion { a: string; b: string; }
+export interface ThisOrThatQuestion     { a: string; b: string; }
+export interface CompatibilityQuestion  { question: string; options: string[]; }
+export interface RapidFireQuestion      { question: string; }
+
+type GameQuestion = WouldYouRatherQuestion | ThisOrThatQuestion | CompatibilityQuestion | RapidFireQuestion;
+
+// ═══════════════════════════════════════════════════════════
+// Game types
 // ═══════════════════════════════════════════════════════════
 
 export interface TwoTruthsGame {
@@ -144,7 +154,8 @@ export interface GameSession {
   matchCount: number; totalQuestions: number;
   createdAt: string; updatedAt: string;
   status: 'active' | 'completed' | 'expired' | 'abandoned';
-  questions?: any[]; compatibilityScore?: number;
+  questions?: GameQuestion[];
+  compatibilityScore?: number;
 }
 
 export interface GameResult {
@@ -159,8 +170,16 @@ export interface RapidFireRound {
   createdAt: string; answeredAt: string | null; moderated: boolean;
 }
 
+// ─── Firestore error shape ────────────────────────────────
+interface FirestoreError { message: string; }
+function getErrorMessage(e: unknown): string {
+  return typeof e === 'object' && e !== null && 'message' in e
+    ? (e as FirestoreError).message
+    : 'Unknown error';
+}
+
 // ═══════════════════════════════════════════════════════════
-// Answer moderation (#070 #053 #168)
+// Answer moderation
 // ═══════════════════════════════════════════════════════════
 
 function moderateGameAnswer(answer: string): { safe: boolean; reason?: string } {
@@ -168,16 +187,16 @@ function moderateGameAnswer(answer: string): { safe: boolean; reason?: string } 
   const emojiSpam = detectEmojiSpam(answer, 0.7);
   if (emojiSpam.isSpam) return { safe: false, reason: 'Too many emojis in answer.' };
   const emojiCoded = detectEmojiCodedLanguage(answer);
-  if (emojiCoded.detected) return { safe: false, reason: `This content is not allowed: ${emojiCoded.matches[0]?.meaning || 'inappropriate content'}.` };
+  if (emojiCoded.detected) return { safe: false, reason: `This content is not allowed: ${emojiCoded.matches[0]?.meaning ?? 'inappropriate content'}.` };
   const textCheck = checkIcebreakerAnswer(answer);
-  if (!textCheck.safe) return { safe: false, reason: textCheck.reason || 'This answer contains inappropriate content.' };
+  if (!textCheck.safe) return { safe: false, reason: textCheck.reason ?? 'This answer contains inappropriate content.' };
   if (answer.length > 500) return { safe: false, reason: 'Answer is too long. Please keep it under 500 characters.' };
   return { safe: true };
 }
 
 function moderateStatements(statements: string[]): { safe: boolean; reason?: string; failedIndex?: number } {
   for (let i = 0; i < statements.length; i++) {
-    const result = moderateGameAnswer(statements[i]);
+    const result = moderateGameAnswer(statements[i]!);
     if (!result.safe) return { safe: false, reason: result.reason, failedIndex: i };
   }
   return { safe: true };
@@ -187,16 +206,21 @@ function moderateStatements(statements: string[]): { safe: boolean; reason?: str
 // Helpers
 // ═══════════════════════════════════════════════════════════
 
-function getQuestionBank(gameType: 'would_you_rather' | 'this_or_that' | 'compatibility'): any[] {
+type StandardGameType = 'would_you_rather' | 'this_or_that' | 'compatibility';
+
+function getQuestionBank(gameType: StandardGameType): GameQuestion[] {
   switch (gameType) {
     case 'would_you_rather': return WOULD_YOU_RATHER_QUESTIONS;
-    case 'this_or_that': return THIS_OR_THAT_QUESTIONS;
-    case 'compatibility': return COMPATIBILITY_QUESTIONS;
-    default: return WOULD_YOU_RATHER_QUESTIONS;
+    case 'this_or_that':     return THIS_OR_THAT_QUESTIONS;
+    case 'compatibility':    return COMPATIBILITY_QUESTIONS;
   }
 }
 
-function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], totalQuestions: number): { matchCount: number; matchPercentage: number; compatibilityScore: number; highlights: string[] } {
+interface CompatibilityResult {
+  matchCount: number; matchPercentage: number; compatibilityScore: number; highlights: string[];
+}
+
+function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], totalQuestions: number): CompatibilityResult {
   let matchCount = 0;
   const highlights: string[] = [];
   const minLen = Math.min(p1Answers.length, p2Answers.length);
@@ -213,11 +237,11 @@ function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], t
   }
   const compatibilityScore = totalWeight > 0 ? Math.round((weightedScore / totalWeight) * 100) : 0;
 
-  if (matchPercentage >= 80) highlights.push('🔥 Incredible compatibility! You two are on the same wavelength.');
+  if (matchPercentage >= 80)      highlights.push('🔥 Incredible compatibility! You two are on the same wavelength.');
   else if (matchPercentage >= 60) highlights.push('✨ Great compatibility! You share many preferences.');
   else if (matchPercentage >= 40) highlights.push('🌟 Good balance! You agree on the important stuff.');
   else if (matchPercentage >= 20) highlights.push('🎭 Opposites attract! You bring different perspectives.');
-  else highlights.push('🌈 Very different tastes — could make for interesting conversations!');
+  else                            highlights.push('🌈 Very different tastes — could make for interesting conversations!');
 
   if (matchCount >= 3) highlights.push(`🤝 You agreed on ${matchCount} out of ${totalQuestions} questions.`);
 
@@ -228,7 +252,7 @@ function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], t
 // Game lifecycle
 // ═══════════════════════════════════════════════════════════
 
-export async function startGame(chatId: string, matchId: string, gameType: 'would_you_rather' | 'this_or_that' | 'compatibility'): Promise<{ success: boolean; gameId?: string; error?: string }> {
+export async function startGame(chatId: string, matchId: string, gameType: StandardGameType): Promise<{ success: boolean; gameId?: string; error?: string }> {
   const user = auth.currentUser;
   if (!user) return { success: false, error: 'Not logged in' };
   try {
@@ -240,9 +264,8 @@ export async function startGame(chatId: string, matchId: string, gameType: 'woul
     const session: GameSession = { id: gameId, chatId, gameType, currentQuestionIndex: 0, player1Id: user.uid, player2Id: matchId, player1Answers: [], player2Answers: [], matchCount: 0, totalQuestions: 10, createdAt: now, updatedAt: now, status: 'active', questions };
     await setDoc(doc(db, 'games', gameId), session);
     return { success: true, gameId };
-  } catch (e: any) {
-    console.error('[icebreakerGames] startGame error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -253,12 +276,16 @@ export async function startRapidFire(chatId: string, matchId: string): Promise<{
     const gameId = `${chatId}_rapid_fire_${Date.now()}`;
     const questions = secureShuffle(RAPID_FIRE_QUESTIONS).slice(0, 10);
     const now = new Date().toISOString();
-    const session: GameSession = { id: gameId, chatId, gameType: 'rapid_fire', currentQuestionIndex: 0, player1Id: user.uid, player2Id: matchId, player1Answers: [], player2Answers: [], matchCount: 0, totalQuestions: 10, createdAt: now, updatedAt: now, status: 'active', questions: questions.map(q => ({ question: q })) };
+    const session: GameSession = {
+      id: gameId, chatId, gameType: 'rapid_fire', currentQuestionIndex: 0,
+      player1Id: user.uid, player2Id: matchId, player1Answers: [], player2Answers: [],
+      matchCount: 0, totalQuestions: 10, createdAt: now, updatedAt: now, status: 'active',
+      questions: questions.map(q => ({ question: q })),
+    };
     await setDoc(doc(db, 'games', gameId), session);
     return { success: true, gameId };
-  } catch (e: any) {
-    console.error('[icebreakerGames] startRapidFire error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -273,39 +300,51 @@ export async function submitAnswer(gameId: string, answer: string): Promise<{ su
     const gameRef = doc(db, 'games', gameId);
     const gameSnap = await getDoc(gameRef);
     if (!gameSnap.exists()) return { success: false, error: 'Game not found' };
-    const game = gameSnap.data() as GameSession & { questions: any[] };
+    const game = gameSnap.data() as GameSession & { questions: GameQuestion[] };
     if (game.status !== 'active') return { success: false, error: 'Game is no longer active' };
     const isPlayer1 = game.player1Id === user.uid;
     const isPlayer2 = game.player2Id === user.uid;
     if (!isPlayer1 && !isPlayer2) return { success: false, error: 'You are not a player in this game' };
-    const myAnswers = isPlayer1 ? game.player1Answers : game.player2Answers;
+    const myAnswers    = isPlayer1 ? game.player1Answers : game.player2Answers;
     const otherAnswers = isPlayer1 ? game.player2Answers : game.player1Answers;
     const questionIndex = myAnswers.length;
     if (questionIndex >= game.totalQuestions) return { success: false, error: 'You have already answered all questions' };
     const newAnswers = [...myAnswers, answer];
-    const updates: Record<string, any> = { [isPlayer1 ? 'player1Answers' : 'player2Answers']: newAnswers, updatedAt: new Date().toISOString() };
+    const updates: Record<string, string | number | string[]> = {
+      [isPlayer1 ? 'player1Answers' : 'player2Answers']: newAnswers,
+      updatedAt: new Date().toISOString(),
+    };
     const bothAnswered = otherAnswers.length > questionIndex;
     let matched = false, gameComplete = false;
     let result: GameResult | undefined;
     if (bothAnswered) {
       matched = answer === otherAnswers[questionIndex];
-      if (matched) updates.matchCount = (game.matchCount ?? 0) + 1;
+      if (matched) updates['matchCount'] = (game.matchCount ?? 0) + 1;
       const newMatchCount = matched ? (game.matchCount ?? 0) + 1 : game.matchCount ?? 0;
       if (questionIndex + 1 >= game.totalQuestions) {
-        updates.status = 'completed'; gameComplete = true;
-        const compatibility = calculateCompatibilityScore(isPlayer1 ? newAnswers : game.player1Answers, isPlayer1 ? game.player2Answers : newAnswers, game.totalQuestions);
-        updates.compatibilityScore = compatibility.compatibilityScore;
-        result = { gameId: game.id, gameType: game.gameType, player1Id: game.player1Id, player2Id: game.player2Id, matchCount: newMatchCount, totalQuestions: game.totalQuestions, matchPercentage: compatibility.matchPercentage, compatibilityScore: compatibility.compatibilityScore, completedAt: new Date().toISOString(), highlights: compatibility.highlights };
+        updates['status'] = 'completed';
+        gameComplete = true;
+        const compatibility = calculateCompatibilityScore(
+          isPlayer1 ? newAnswers : game.player1Answers,
+          isPlayer1 ? game.player2Answers : newAnswers,
+          game.totalQuestions,
+        );
+        updates['compatibilityScore'] = compatibility.compatibilityScore;
+        result = {
+          gameId: game.id, gameType: game.gameType, player1Id: game.player1Id, player2Id: game.player2Id,
+          matchCount: newMatchCount, totalQuestions: game.totalQuestions,
+          matchPercentage: compatibility.matchPercentage, compatibilityScore: compatibility.compatibilityScore,
+          completedAt: new Date().toISOString(), highlights: compatibility.highlights,
+        };
         await setDoc(doc(db, 'gameResults', game.id), result);
       } else {
-        updates.currentQuestionIndex = questionIndex + 1;
+        updates['currentQuestionIndex'] = questionIndex + 1;
       }
     }
     await updateDoc(gameRef, updates);
     return { success: true, bothAnswered, matched, gameComplete, result };
-  } catch (e: any) {
-    console.error('[icebreakerGames] submitAnswer error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -323,17 +362,16 @@ export async function createTwoTruthsGame(matchId: string, statements: string[],
   const modResult = moderateStatements(statements);
   if (!modResult.safe) return { success: false, error: `Statement ${(modResult.failedIndex ?? 0) + 1} is not appropriate: ${modResult.reason}` };
   for (let i = 0; i < statements.length; i++) {
-    if (statements[i].trim().length < 5) return { success: false, error: `Statement ${i + 1} is too short.` };
-    if (statements[i].trim().length > 200) return { success: false, error: `Statement ${i + 1} is too long.` };
+    if (statements[i]!.trim().length < 5)   return { success: false, error: `Statement ${i + 1} is too short.` };
+    if (statements[i]!.trim().length > 200)  return { success: false, error: `Statement ${i + 1} is too long.` };
   }
   try {
     const gameId = `two_truths_${user.uid}_${matchId}_${Date.now()}`;
     const game: TwoTruthsGame = { id: gameId, creatorId: user.uid, matchId, statements: statements.map(s => s.trim()), lieIndex, createdAt: new Date().toISOString(), guessedIndex: null, guessedAt: null, revealed: false };
     await setDoc(doc(db, 'twoTruthsGames', gameId), game);
     return { success: true, gameId };
-  } catch (e: any) {
-    console.error('[icebreakerGames] createTwoTruthsGame error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -350,9 +388,8 @@ export async function guessTwoTruthsLie(gameId: string, guessedIndex: number): P
     if (game.guessedIndex !== null) return { success: false, error: 'You already guessed!' };
     await updateDoc(gameRef, { guessedIndex, guessedAt: new Date().toISOString(), revealed: true });
     return { success: true, correct: guessedIndex === game.lieIndex, actualLieIndex: game.lieIndex };
-  } catch (e: any) {
-    console.error('[icebreakerGames] guessTwoTruthsLie error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -360,7 +397,7 @@ export async function getTwoTruthsGame(gameId: string): Promise<TwoTruthsGame | 
   try {
     const snap = await getDoc(doc(db, 'twoTruthsGames', gameId));
     return snap.exists() ? snap.data() as TwoTruthsGame : null;
-  } catch (e) { console.error('[icebreakerGames] getTwoTruthsGame error:', e); return null; }
+  } catch { return null; }
 }
 
 export async function getTwoTruthsForChat(myId: string, matchId: string): Promise<TwoTruthsGame[]> {
@@ -372,22 +409,22 @@ export async function getTwoTruthsForChat(myId: string, matchId: string): Promis
     snap1.forEach(d => games.push(d.data() as TwoTruthsGame));
     snap2.forEach(d => games.push(d.data() as TwoTruthsGame));
     return games.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } catch (e) { console.error('[icebreakerGames] getTwoTruthsForChat error:', e); return []; }
+  } catch { return []; }
 }
 
 export async function getGameSession(gameId: string): Promise<GameSession | null> {
   try {
     const snap = await getDoc(doc(db, 'games', gameId));
     return snap.exists() ? snap.data() as GameSession : null;
-  } catch (e) { console.error('[icebreakerGames] getGameSession error:', e); return null; }
+  } catch { return null; }
 }
 
 export async function getActiveGameForChat(chatId: string): Promise<GameSession | null> {
   try {
     const q = query(collection(db, 'games'), where('chatId', '==', chatId), where('status', '==', 'active'), limit(1));
     const snap = await getDocs(q);
-    return snap.empty ? null : snap.docs[0].data() as GameSession;
-  } catch (e) { console.error('[icebreakerGames] getActiveGameForChat error:', e); return null; }
+    return snap.empty ? null : snap.docs[0]!.data() as GameSession;
+  } catch { return null; }
 }
 
 export async function getGameHistory(chatId: string, maxResults = 20): Promise<GameSession[]> {
@@ -397,14 +434,14 @@ export async function getGameHistory(chatId: string, maxResults = 20): Promise<G
     const games: GameSession[] = [];
     snap.forEach(d => games.push(d.data() as GameSession));
     return games;
-  } catch (e) { console.error('[icebreakerGames] getGameHistory error:', e); return []; }
+  } catch { return []; }
 }
 
 export async function getGameResult(gameId: string): Promise<GameResult | null> {
   try {
     const snap = await getDoc(doc(db, 'gameResults', gameId));
     return snap.exists() ? snap.data() as GameResult : null;
-  } catch (e) { console.error('[icebreakerGames] getGameResult error:', e); return null; }
+  } catch { return null; }
 }
 
 export async function abandonGame(gameId: string): Promise<{ success: boolean; error?: string }> {
@@ -419,9 +456,8 @@ export async function abandonGame(gameId: string): Promise<{ success: boolean; e
     if (game.status !== 'active') return { success: false, error: 'Game is not active' };
     await updateDoc(gameRef, { status: 'abandoned', updatedAt: new Date().toISOString() });
     return { success: true };
-  } catch (e: any) {
-    console.error('[icebreakerGames] abandonGame error:', e);
-    return { success: false, error: e.message };
+  } catch (e: unknown) {
+    return { success: false, error: getErrorMessage(e) };
   }
 }
 
@@ -439,40 +475,58 @@ export async function expireStaleGames(chatId: string): Promise<number> {
       }
     }
     return expired;
-  } catch (e) { console.error('[icebreakerGames] expireStaleGames error:', e); return 0; }
+  } catch { return 0; }
 }
 
-export async function getGameStats(chatId: string): Promise<{ totalGamesPlayed: number; completedGames: number; overallCompatibility: number; favoriteGameType: string | null; totalMatchedAnswers: number; totalQuestions: number }> {
+interface GameStats {
+  totalGamesPlayed: number; completedGames: number; overallCompatibility: number;
+  favoriteGameType: string | null; totalMatchedAnswers: number; totalQuestions: number;
+}
+
+export async function getGameStats(chatId: string): Promise<GameStats> {
+  const empty: GameStats = { totalGamesPlayed: 0, completedGames: 0, overallCompatibility: 0, favoriteGameType: null, totalMatchedAnswers: 0, totalQuestions: 0 };
   try {
     const history = await getGameHistory(chatId, 50);
     const completed = history.filter(g => g.status === 'completed');
-    if (completed.length === 0) return { totalGamesPlayed: history.length, completedGames: 0, overallCompatibility: 0, favoriteGameType: null, totalMatchedAnswers: 0, totalQuestions: 0 };
+    if (completed.length === 0) return { ...empty, totalGamesPlayed: history.length };
     const totalMatched = completed.reduce((sum, g) => sum + (g.matchCount ?? 0), 0);
-    const totalQ = completed.reduce((sum, g) => sum + g.totalQuestions, 0);
+    const totalQ       = completed.reduce((sum, g) => sum + g.totalQuestions, 0);
     const overallCompatibility = totalQ > 0 ? Math.round((totalMatched / totalQ) * 100) : 0;
     const typeCounts: Record<string, number> = {};
-    for (const g of completed) typeCounts[g.gameType] = (typeCounts[g.gameType] || 0) + 1;
+    for (const g of completed) typeCounts[g.gameType] = (typeCounts[g.gameType] ?? 0) + 1;
     const favoriteGameType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     return { totalGamesPlayed: history.length, completedGames: completed.length, overallCompatibility, favoriteGameType, totalMatchedAnswers: totalMatched, totalQuestions: totalQ };
-  } catch (e) { console.error('[icebreakerGames] getGameStats error:', e); return { totalGamesPlayed: 0, completedGames: 0, overallCompatibility: 0, favoriteGameType: null, totalMatchedAnswers: 0, totalQuestions: 0 }; }
+  } catch { return empty; }
 }
 
-export async function getCurrentQuestion(gameId: string): Promise<{ question: any; questionIndex: number; totalQuestions: number; myAnswer: string | null; theyAnswered: boolean; gameType: string } | null> {
+interface CurrentQuestion {
+  question: GameQuestion; questionIndex: number; totalQuestions: number;
+  myAnswer: string | null; theyAnswered: boolean; gameType: string;
+}
+
+export async function getCurrentQuestion(gameId: string): Promise<CurrentQuestion | null> {
   const user = auth.currentUser;
   if (!user) return null;
   try {
     const game = await getGameSession(gameId);
     if (!game || game.status !== 'active' || !game.questions) return null;
-    const isPlayer1 = game.player1Id === user.uid;
-    const myAnswers = isPlayer1 ? game.player1Answers : game.player2Answers;
+    const isPlayer1  = game.player1Id === user.uid;
+    const myAnswers   = isPlayer1 ? game.player1Answers : game.player2Answers;
     const theirAnswers = isPlayer1 ? game.player2Answers : game.player1Answers;
     const questionIndex = myAnswers.length;
     if (questionIndex >= game.totalQuestions) return null;
-    return { question: game.questions[questionIndex], questionIndex, totalQuestions: game.totalQuestions, myAnswer: myAnswers[questionIndex] ?? null, theyAnswered: theirAnswers.length > questionIndex, gameType: game.gameType };
-  } catch (e) { console.error('[icebreakerGames] getCurrentQuestion error:', e); return null; }
+    return {
+      question: game.questions[questionIndex]!,
+      questionIndex,
+      totalQuestions: game.totalQuestions,
+      myAnswer: myAnswers[questionIndex] ?? null,
+      theyAnswered: theirAnswers.length > questionIndex,
+      gameType: game.gameType,
+    };
+  } catch { return null; }
 }
 
-const ICEBREAKER_PROMPTS = [
+const ICEBREAKER_PROMPTS: string[] = [
   "What's the most adventurous thing on your bucket list? 🌍",
   "If you could have dinner with anyone, dead or alive, who would it be? 🍽️",
   "What's your go-to karaoke song? 🎤",
