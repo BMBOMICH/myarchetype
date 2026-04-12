@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { auth, db } from '../firebaseConfig';
+import { logger } from '../utils/logger';
 
 type WebPushSubscriptionData = Record<string, unknown>;
 
@@ -53,7 +54,7 @@ async function saveUserFields(fields: Record<string, unknown>) {
   try {
     await updateDoc(doc(db, 'users', user.uid), fields);
   } catch (e) {
-    console.error('[notifications] saveUserFields:', e);
+    logger.error('[notifications] saveUserFields:', e);
   }
 }
 
@@ -81,7 +82,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     await saveUserFields({ pushToken: token, pushTokenUpdatedAt: new Date().toISOString() });
     return token;
   } catch (e) {
-    console.error('[notifications] registerForPushNotifications:', e);
+    logger.error('[notifications] registerForPushNotifications:', e);
     return null;
   }
 }
@@ -97,7 +98,7 @@ export async function sendMobilePushNotification({
   try {
     await post('/send-expo-notification', { expoPushToken, title, body, screen });
   } catch (e) {
-    console.error('[notifications] sendMobilePushNotification:', e);
+    logger.error('[notifications] sendMobilePushNotification:', e);
   }
 }
 
@@ -119,7 +120,7 @@ export async function registerWebPush(): Promise<void> {
     storage.set('webPushSubscription', subscriptionJson);
     await saveUserFields({ webPushSubscription: subscriptionJson });
   } catch (e) {
-    console.error('[notifications] registerWebPush:', e);
+    logger.error('[notifications] registerWebPush:', e);
   }
 }
 
@@ -134,7 +135,7 @@ export async function sendWebPushNotification({
   try {
     await post('/send-notification', { subscription, title, body, screen });
   } catch (e) {
-    console.error('[notifications] sendWebPushNotification:', e);
+    logger.error('[notifications] sendWebPushNotification:', e);
   }
 }
 

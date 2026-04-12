@@ -3,6 +3,8 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
@@ -12,20 +14,14 @@
     "moduleResolution": "bundler",
     "module": "esnext",
     "target": "esnext",
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "allowJs": true,
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
+    "paths": { "@/*": ["./*"] },
     "skipLibCheck": true,
     "jsx": "react-native"
   },
@@ -36,31 +32,16 @@
     "expo-env.d.ts"
   ],
   "exclude": [
-    "node_modules",
-    "dist",
-    "web-build",
-    ".expo/metro",
-    ".expo/web",
-    "coverage",
-    "android",
-    "ios",
-    "functions",
-    "scripts",
-    "e2e",
-    ".cache",
-    "tmp",
-    "temp",
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.test.js",
-    "**/*.test.jsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "**/*.spec.js",
-    "**/*.spec.jsx",
-    "*.config.js",
-    "*.config.ts"
+    "node_modules", "dist", "web-build",
+    ".expo/metro", ".expo/web",
+    "coverage", "android", "ios",
+    "functions", "server", "scripts",
+    "e2e", ".cache", "tmp", "temp",
+    "**/__tests__/**", "**/__mocks__/**",
+    "**/*.test.ts", "**/*.test.tsx",
+    "**/*.test.js", "**/*.test.jsx",
+    "**/*.spec.ts", "**/*.spec.tsx",
+    "**/*.spec.js", "**/*.spec.jsx",
+    "*.config.js", "*.config.ts"
   ]
 }

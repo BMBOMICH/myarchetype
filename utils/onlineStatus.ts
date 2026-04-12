@@ -1,5 +1,6 @@
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 // ─── Firestore timestamp shape ────────────────────────────
 interface FirestoreTimestamp {
@@ -33,7 +34,7 @@ export const updateLastSeen = async (): Promise<void> => {
     });
   } catch (error: unknown) {
     if (getFirestoreErrorCode(error) === 'permission-denied') return;
-    console.error('Error updating last seen:', error);
+    logger.error('Error updating last seen:', error);
   }
 };
 
@@ -47,7 +48,7 @@ export const setOffline = async (): Promise<void> => {
     });
   } catch (error: unknown) {
     if (getFirestoreErrorCode(error) === 'permission-denied') return;
-    console.error('Error setting offline:', error);
+    logger.error('Error setting offline:', error);
   }
 };
 

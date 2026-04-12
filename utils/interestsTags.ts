@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export const INTERESTS_CATEGORIES = {
   'Sports & Fitness': [
@@ -50,7 +51,7 @@ export async function getUserInterests(): Promise<string[]> {
 
     return userDoc.data().interests || [];
   } catch (error) {
-    console.error('Error getting interests:', error);
+    logger.error('Error getting interests:', error);
     return [];
   }
 }
@@ -69,7 +70,7 @@ export async function saveUserInterests(interests: string[]): Promise<{ success:
     });
     return { success: true };
   } catch (error) {
-    console.error('Error saving interests:', error);
+    logger.error('Error saving interests:', error);
     return { success: false };
   }
 }

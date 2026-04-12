@@ -1,5 +1,6 @@
 import { arrayRemove, arrayUnion, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface PinnedMessage {
   messageId: string;
@@ -32,7 +33,7 @@ export async function pinMessage(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error pinning message:', error);
+    logger.error('Error pinning message:', error);
     return { success: false, error: error.message };
   }
 }
@@ -60,7 +61,7 @@ export async function unpinMessage(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error unpinning message:', error);
+    logger.error('Error unpinning message:', error);
     return { success: false, error: error.message };
   }
 }
@@ -74,7 +75,7 @@ export async function getPinnedMessages(chatId: string): Promise<PinnedMessage[]
     
     return chatDoc.data().pinnedMessages || [];
   } catch (error) {
-    console.error('Error getting pinned messages:', error);
+    logger.error('Error getting pinned messages:', error);
     return [];
   }
 }

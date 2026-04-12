@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
+import { logger } from '../utils/logger';
   RelationshipStatus,
   calculateRelationshipDuration,
   enterRelationshipMode,
@@ -28,7 +29,7 @@ export default function RelationshipModeScreen() {
       const relationshipStatus = await getRelationshipStatus();
       setStatus(relationshipStatus);
     } catch (error) {
-      console.error('[RelationshipMode] load error:', error);
+      logger.error('[RelationshipMode] load error:', error);
       Alert.alert('Error', 'Failed to load relationship status.');
     } finally {
       setLoading(false);
@@ -51,7 +52,7 @@ export default function RelationshipModeScreen() {
         Alert.alert('Error', result.error || 'Could not activate relationship mode');
       }
     } catch (error) {
-      console.error('[RelationshipMode] enter error:', error);
+      logger.error('[RelationshipMode] enter error:', error);
       Alert.alert('Error', 'Something went wrong while entering relationship mode.');
     } finally {
       setEntering(false);
@@ -84,7 +85,7 @@ export default function RelationshipModeScreen() {
         Alert.alert('Error', result.error || 'Could not exit relationship mode');
       }
     } catch (error) {
-      console.error('[RelationshipMode] exit error:', error);
+      logger.error('[RelationshipMode] exit error:', error);
       Alert.alert('Error', 'Something went wrong while exiting relationship mode.');
     } finally {
       setExiting(false);

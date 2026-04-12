@@ -8,6 +8,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export type DisappearingMode = 'off' | '24h' | '7d' | '30d';
 
@@ -47,7 +48,7 @@ export async function setDisappearingMode(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error setting disappearing mode:', error);
+    logger.error('Error setting disappearing mode:', error);
     return { success: false, error: error?.message ?? 'Unknown error' };
   }
 }
@@ -65,7 +66,7 @@ export async function getDisappearingSettings(
 
     return chatDoc.data().disappearingMessages || null;
   } catch (error) {
-    console.error('Error getting disappearing settings:', error);
+    logger.error('Error getting disappearing settings:', error);
     return null;
   }
 }
@@ -134,7 +135,7 @@ export async function cleanupExpiredMessages(chatId: string): Promise<number> {
 
     return deletedCount;
   } catch (error) {
-    console.error('Error cleaning up messages:', error);
+    logger.error('Error cleaning up messages:', error);
     return 0;
   }
 }

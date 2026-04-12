@@ -5,6 +5,7 @@ import { Linking, Platform } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { scoreMeetingLocation } from './location';
 import { logConsent, writeAuditLog } from './logger';
+import { logger } from './logger';
 
 export interface DatePlan {
   id: string; matchId: string; matchName: string; location: string; locationAddress: string;
@@ -23,7 +24,7 @@ export async function getEmergencyContacts(): Promise<EmergencyContact[]> {
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     return userDoc.exists() ? (userDoc.data().emergencyContacts ?? []) : [];
-  } catch (e) { console.error('[dateSafety] getEmergencyContacts error:', e); return []; }
+  } catch (e) { logger.error('[dateSafety] getEmergencyContacts error:', e); return []; }
 }
 
 export async function saveEmergencyContacts(contacts: EmergencyContact[]): Promise<boolean> {
@@ -33,7 +34,7 @@ export async function saveEmergencyContacts(contacts: EmergencyContact[]): Promi
     await updateDoc(doc(db, 'users', user.uid), { emergencyContacts: contacts });
     await logConsent('emergency_contacts_stored', true);
     return true;
-  } catch (e) { console.error('[dateSafety] saveEmergencyContacts error:', e); return false; }
+  } catch (e) { logger.error('[dateSafety] saveEmergencyContacts error:', e); return false; }
 }
 
 // ── #147: Prevent photo saving (FLAG_SECURE) ─────────────
@@ -85,7 +86,7 @@ export async function createDatePlan(
     if (latitude && longitude) {
       const safetyResult = await scoreMeetingLocation(latitude, longitude);
       locationSafetyScore = safetyResult.score; locationSafetyCategory = safetyResult.category;
-      if (!safetyResult.isSafe) console.warn('[dateSafety] Unsafe meeting location:', safetyResult.reason);
+      if (!safetyResult.isSafe) logger.warn('[dateSafety] Unsafe meeting location:', safetyResult.reason);
     }
     const datePlan: DatePlan = { id: datePlanId, matchId, matchName, location, locationAddress, latitude, longitude, dateTime, duration, trustedContactName, trustedContactPhone, checkInTime: checkInTime.toISOString(), status: 'planned', createdAt: new Date().toISOString(), locationSafetyScore, locationSafetyCategory };
     await setDoc(doc(db, 'datePlans', datePlanId), { userId: user.uid, ...datePlan });
@@ -93,7 +94,7 @@ export async function createDatePlan(
     await notifyTrustedContact(datePlan);
     await writeAuditLog('user.update_profile', { action: 'date_plan_created', matchId, location });
     return datePlan;
-  } catch (e) { console.error('[dateSafety] createDatePlan error:', e); return null; }
+  } catch (e) { logger.error('[dateSafety] createDatePlan error:', e); return null; }
 }
 
 // ── #145: Check-in reminder ──────────────────────────────
@@ -104,7 +105,7 @@ async function scheduleCheckInNotification(datePlan: DatePlan): Promise<void> {
     await Notifications.scheduleNotificationAsync({ content: { title: '⏰ Check-in Time!', body: `Are you safe? Tap to check in from your date with ${datePlan.matchName}`, data: { type: 'check-in', datePlanId: datePlan.id }, sound: true }, trigger: { seconds: Math.floor(trigger / 1000) } });
     const early = trigger - 15 * 60 * 1000;
     if (early > 0) await Notifications.scheduleNotificationAsync({ content: { title: '⚠️ Check-in in 15 minutes', body: `Don't forget to check in from your date with ${datePlan.matchName}`, data: { type: 'check-in-warning', datePlanId: datePlan.id }, sound: false }, trigger: { seconds: Math.floor(early / 1000) } });
-  } catch (e) { console.error('[dateSafety] scheduleCheckInNotification error:', e); }
+  } catch (e) { logger.error('[dateSafety] scheduleCheckInNotification error:', e); }
 }
 
 // ── #146 + #149: Trusted contact notification ────────────
@@ -114,7 +115,7 @@ async function notifyTrustedContact(datePlan: DatePlan): Promise<void> {
     const message = `Hey ${datePlan.trustedContactName}! I'm going on a date.\n\n👤 Meeting: ${datePlan.matchName}\n📍 Location: ${datePlan.location}, ${datePlan.locationAddress}${mapsLink}\n🕐 Time: ${new Date(datePlan.dateTime).toLocaleString()}\n⏱ Duration: ${datePlan.duration} minutes\n\nI'll check in around ${new Date(datePlan.checkInTime).toLocaleTimeString()}. If you don't hear from me, please check on me!\n\n— Sent via MyArchetype Safety Feature`;
     const sep = Platform.OS === 'ios' ? '&' : '?';
     await Linking.openURL(`sms:${datePlan.trustedContactPhone}${sep}body=${encodeURIComponent(message)}`);
-  } catch (e) { console.error('[dateSafety] notifyTrustedContact error:', e); }
+  } catch (e) { logger.error('[dateSafety] notifyTrustedContact error:', e); }
 }
 
 // ── #144: Emergency SOS ──────────────────────────────────
@@ -135,14 +136,14 @@ export async function triggerEmergency(datePlanId: string): Promise<void> {
       const sep = Platform.OS === 'ios' ? '&' : '?';
       setTimeout(() => Linking.openURL(`sms:${c.phone}${sep}body=${encodeURIComponent(msg)}`), i * 2000);
     }
-  } catch (e) { console.error('[dateSafety] triggerEmergency error:', e); }
+  } catch (e) { logger.error('[dateSafety] triggerEmergency error:', e); }
 }
 
 export async function checkInSafe(datePlanId: string): Promise<boolean> {
   const user = auth.currentUser;
   if (!user) return false;
   try { await updateDoc(doc(db, 'datePlans', datePlanId), { status: 'checked-in', checkedInAt: new Date().toISOString() }); await writeAuditLog('user.update_profile', { action: 'date_checkin_safe', datePlanId }); return true; }
-  catch (e) { console.error('[dateSafety] checkInSafe error:', e); return false; }
+  catch (e) { logger.error('[dateSafety] checkInSafe error:', e); return false; }
 }
 
 export async function getActiveDatePlan(): Promise<DatePlan | null> {
@@ -153,7 +154,7 @@ export async function getActiveDatePlan(): Promise<DatePlan | null> {
     if (snap.empty) return null;
     const plans = snap.docs.map(d => d.data() as DatePlan).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return plans[0] ?? null;
-  } catch (e) { console.error('[dateSafety] getActiveDatePlan error:', e); return null; }
+  } catch (e) { logger.error('[dateSafety] getActiveDatePlan error:', e); return null; }
 }
 
 export function shouldShowCheckIn(datePlan: DatePlan): boolean {

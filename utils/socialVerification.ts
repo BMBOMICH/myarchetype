@@ -1,7 +1,7 @@
-// utils/socialVerification.ts
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Linking } from 'react-native';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? process.env.EXPO_PUBLIC_SERVER_URL ?? '';
 
@@ -9,6 +9,10 @@ export interface SocialLinks { instagram?: { username: string; verified: boolean
 export interface SocialValidationResult { valid: boolean; normalized?: string; reason?: string; detector?: string; }
 export interface SafeBrowsingResult { safe: boolean; threats: string[]; reason?: string; }
 export interface RedirectCheckResult { safe: boolean; redirectCount: number; finalUrl: string; suspicious: boolean; reason?: string; }
+
+interface SafeBrowsingMatch { threatType: string; }
+interface SafeBrowsingApiResponse { matches?: SafeBrowsingMatch[]; }
+interface RedirectApiResponse { redirectCount?: number; finalUrl?: string; finalUrlSuspicious?: boolean; isMalicious?: boolean; }
 
 export function validateInstagramUsername(input: string): SocialValidationResult {
   const cleaned = input.replace('@','').trim().toLowerCase();
@@ -71,8 +75,11 @@ export async function checkSafeBrowsing(url: string): Promise<SafeBrowsingResult
       body: JSON.stringify({ client: { clientId: 'myarchetype-app', clientVersion: '1.0.0' }, threatInfo: { threatTypes: ['MALWARE','SOCIAL_ENGINEERING','UNWANTED_SOFTWARE','POTENTIALLY_HARMFUL_APPLICATION'], platformTypes: ['ANY_PLATFORM'], threatEntryTypes: ['URL'], threatEntries: [{ url }] } }),
     });
     if (!response.ok) return { safe: true, threats: [] };
-    const data = await response.json();
-    if (data.matches?.length > 0) { const threats = data.matches.map((m: any) => m.threatType); return { safe: false, threats, reason: `This URL has been flagged as unsafe: ${threats.join(', ')}` }; }
+    const data = await response.json() as SafeBrowsingApiResponse;
+    if (data.matches && data.matches.length > 0) {
+      const threats = data.matches.map(m => m.threatType);
+      return { safe: false, threats, reason: `This URL has been flagged as unsafe: ${threats.join(', ')}` };
+    }
     return { safe: true, threats: [] };
   } catch { return { safe: true, threats: [] }; }
 }
@@ -81,8 +88,8 @@ export async function checkRedirectChain(url: string): Promise<RedirectCheckResu
   try {
     const response = await fetch(`${SERVER_URL}/check-url`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
     if (!response.ok) return { safe: true, redirectCount: 0, finalUrl: url, suspicious: false };
-    const data = await response.json();
-    const suspicious = data.redirectCount > 3 || data.finalUrl !== url || data.finalUrlSuspicious === true;
+    const data = await response.json() as RedirectApiResponse;
+    const suspicious = (data.redirectCount ?? 0) > 3 || data.finalUrl !== url || data.finalUrlSuspicious === true;
     return { safe: !data.isMalicious, redirectCount: data.redirectCount ?? 0, finalUrl: data.finalUrl ?? url, suspicious, reason: suspicious ? `URL redirects ${data.redirectCount} times — possibly deceptive.` : undefined };
   } catch { return { safe: true, redirectCount: 0, finalUrl: url, suspicious: false }; }
 }
@@ -120,14 +127,14 @@ export async function validateSocialLink(platform: 'instagram'|'linkedin'|'spoti
   if (input.startsWith('http')) { redirectCheck = await checkRedirectChain(input); if (redirectCheck.suspicious) reasons.push(redirectCheck.reason ?? 'Suspicious redirect detected.'); }
   let profileExists: boolean | undefined;
   if (platform==='instagram' && formatResult.normalized) { const existsResult = await checkInstagramProfileExists(formatResult.normalized); profileExists = existsResult.exists; if (existsResult.checked && !existsResult.exists) reasons.push('Instagram profile not found.'); }
-  if (displayName && formatResult.normalized) { const c = checkUsernameConsistency(displayName, formatResult.normalized); if (!c.consistent) console.warn(`[socialVerification] Username inconsistent (${c.similarity}% similar)`); }
+  if (displayName && formatResult.normalized) { const c = checkUsernameConsistency(displayName, formatResult.normalized); if (!c.consistent) logger.warn(`[socialVerification] Username inconsistent (${c.similarity}% similar)`); }
   return { valid: reasons.length===0, normalized: formatResult.normalized, formatValid: true, profileExists, safeBrowsing, redirectCheck, reasons };
 }
 
 export async function getSocialLinks(): Promise<SocialLinks> {
   const user = auth.currentUser;
   if (!user) return {};
-  try { const userDoc = await getDoc(doc(db,'users',user.uid)); return userDoc.exists() ? userDoc.data().socialLinks ?? {} : {}; }
+  try { const userDoc = await getDoc(doc(db,'users',user.uid)); return userDoc.exists() ? userDoc.data().socialLinks as SocialLinks ?? {} : {}; }
   catch { return {}; }
 }
 
@@ -140,10 +147,13 @@ export async function linkInstagram(username: string): Promise<{ success: boolea
   if (!safe.safe) return { success: false, error: safe.reason };
   try {
     const userDoc = await getDoc(doc(db,'users',user.uid));
-    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks ?? {} : {};
+    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks as SocialLinks ?? {} : {};
     await updateDoc(doc(db,'users',user.uid), { socialLinks: { ...currentLinks, instagram: { username: validation.normalized, verified: false, linkedAt: new Date().toISOString() } } });
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message ?? 'Failed to link Instagram' }; }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to link Instagram';
+    return { success: false, error: msg };
+  }
 }
 
 export async function linkLinkedIn(profileUrl: string): Promise<{ success: boolean; error?: string }> {
@@ -155,10 +165,13 @@ export async function linkLinkedIn(profileUrl: string): Promise<{ success: boole
   if (!safe.safe) return { success: false, error: safe.reason };
   try {
     const userDoc = await getDoc(doc(db,'users',user.uid));
-    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks ?? {} : {};
+    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks as SocialLinks ?? {} : {};
     await updateDoc(doc(db,'users',user.uid), { socialLinks: { ...currentLinks, linkedin: { profileUrl, verified: false, linkedAt: new Date().toISOString() } } });
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message ?? 'Failed to link LinkedIn' }; }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to link LinkedIn';
+    return { success: false, error: msg };
+  }
 }
 
 export async function linkTikTok(usernameOrUrl: string): Promise<{ success: boolean; error?: string }> {
@@ -168,10 +181,13 @@ export async function linkTikTok(usernameOrUrl: string): Promise<{ success: bool
   if (!validation.valid) return { success: false, error: validation.reason };
   try {
     const userDoc = await getDoc(doc(db,'users',user.uid));
-    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks ?? {} : {};
+    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks as SocialLinks ?? {} : {};
     await updateDoc(doc(db,'users',user.uid), { socialLinks: { ...currentLinks, tiktok: { username: validation.normalized, verified: false, linkedAt: new Date().toISOString() } } });
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message ?? 'Failed to link TikTok' }; }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to link TikTok';
+    return { success: false, error: msg };
+  }
 }
 
 export async function unlinkSocial(platform: 'instagram'|'linkedin'|'spotify'|'tiktok'): Promise<boolean> {
@@ -179,7 +195,7 @@ export async function unlinkSocial(platform: 'instagram'|'linkedin'|'spotify'|'t
   if (!user) return false;
   try {
     const userDoc = await getDoc(doc(db,'users',user.uid));
-    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks ?? {} : {};
+    const currentLinks = userDoc.exists() ? userDoc.data().socialLinks as SocialLinks ?? {} : {};
     delete currentLinks[platform];
     await updateDoc(doc(db,'users',user.uid), { socialLinks: currentLinks });
     return true;

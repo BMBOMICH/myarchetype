@@ -1,5 +1,6 @@
 import { arrayUnion, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface Achievement {
   id: string;
@@ -70,7 +71,7 @@ export async function getUserAchievements(): Promise<Achievement[]> {
       unlockedAt: userDoc.data().achievementDates?.[a.id] || null,
     }));
   } catch (error) {
-    console.error('Error getting achievements:', error);
+    logger.error('Error getting achievements:', error);
     return [];
   }
 }
@@ -87,7 +88,7 @@ export async function getLockedAchievements(): Promise<Achievement[]> {
     
     return ALL_ACHIEVEMENTS.filter(a => !unlockedIds.includes(a.id));
   } catch (error) {
-    console.error('Error getting locked achievements:', error);
+    logger.error('Error getting locked achievements:', error);
     return ALL_ACHIEVEMENTS;
   }
 }
@@ -119,7 +120,7 @@ export async function unlockAchievement(achievementId: string): Promise<{ succes
 
     return { success: true, isNew: true, achievement };
   } catch (error) {
-    console.error('Error unlocking achievement:', error);
+    logger.error('Error unlocking achievement:', error);
     return { success: false, isNew: false };
   }
 }
@@ -217,7 +218,7 @@ export async function checkAndUnlockAchievements(): Promise<Achievement[]> {
 
     return newlyUnlocked;
   } catch (error) {
-    console.error('Error checking achievements:', error);
+    logger.error('Error checking achievements:', error);
     return [];
   }
 }

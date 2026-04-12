@@ -1,41 +1,21 @@
 import { collection, getDocs } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { db } from '../../firebaseConfig';
+import { logger } from '../../utils/logger';
 
 interface Stats {
-  totalUsers: number;
-  selfieVerified: number;
-  heightVerified: number;
-  ageVerified: number;
-  hasFullBodyPhoto: number;
-  trustedUsers: number;
-  totalRatings: number;
-  averageTrustScore: number;
-  lowRatedUsers: number;
-  usersWithWarnings: number;
-  bannedUsers: number;
-  maleUsers: number;
-  femaleUsers: number;
-  averageAge: number;
+  totalUsers: number; selfieVerified: number; heightVerified: number;
+  ageVerified: number; hasFullBodyPhoto: number; trustedUsers: number;
+  totalRatings: number; averageTrustScore: number; lowRatedUsers: number;
+  usersWithWarnings: number; bannedUsers: number; maleUsers: number;
+  femaleUsers: number; averageAge: number;
 }
-
-// ─── Firestore data shape ─────────────────────────────────
 interface UserData {
-  selfieVerified?: boolean;
-  ageVerified?: boolean;
-  hasFullBodyPhoto?: boolean;
-  isBanned?: boolean;
-  warnings?: number;
-  gender?: string;
-  age?: number;
+  selfieVerified?: boolean; ageVerified?: boolean; hasFullBodyPhoto?: boolean;
+  isBanned?: boolean; warnings?: number; gender?: string; age?: number;
   height?: { verificationMethod?: string };
-  ratings?: {
-    totalRatings?: number;
-    averagePhotosMatch?: number;
-    heightAccuracyRate?: number;
-    bodyTypeAccuracyRate?: number;
-  };
+  ratings?: { totalRatings?: number; averagePhotosMatch?: number; heightAccuracyRate?: number; bodyTypeAccuracyRate?: number };
 }
 
 const EMPTY_STATS: Stats = {
@@ -45,80 +25,165 @@ const EMPTY_STATS: Stats = {
   femaleUsers: 0, averageAge: 0,
 };
 
+// ─── Static list data ─────────────────────────────────────
+// Keeps render() pure — no ScrollView with many children warning
+
+interface Section { key: string; render: () => React.ReactElement }
+
 export default function AdminStatsScreen() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
+  const [stats, setStats]     = useState<Stats>(EMPTY_STATS);
 
-  useEffect(() => { loadStats(); }, []);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, 'users'));
-
-      let totalUsers = 0, selfieVerified = 0, heightVerified = 0, ageVerified = 0;
-      let hasFullBodyPhoto = 0, trustedUsers = 0, lowRatedUsers = 0;
-      let usersWithWarnings = 0, bannedUsers = 0, maleUsers = 0, femaleUsers = 0;
-      let totalAge = 0, totalTrustScore = 0, usersWithRatings = 0;
+      let totalUsers = 0, selfieVerified = 0, heightVerified = 0, ageVerified = 0,
+          hasFullBodyPhoto = 0, trustedUsers = 0, lowRatedUsers = 0,
+          usersWithWarnings = 0, bannedUsers = 0, maleUsers = 0, femaleUsers = 0,
+          totalAge = 0, totalTrustScore = 0, usersWithRatings = 0;
 
       usersSnapshot.forEach((docSnap) => {
-        const data = docSnap.data() as UserData;
+        const d = docSnap.data() as UserData;
         totalUsers++;
-
-        if (data.selfieVerified)  selfieVerified++;
-        if (data.ageVerified)     ageVerified++;
-        if (data.hasFullBodyPhoto) hasFullBodyPhoto++;
-        if (data.isBanned)        bannedUsers++;
-        if ((data.warnings ?? 0) > 0) usersWithWarnings++;
-        if (data.gender === 'Male')   maleUsers++;
-        if (data.gender === 'Female') femaleUsers++;
-        if (data.age) totalAge += data.age;
-
-        if (typeof data.height === 'object' && data.height?.verificationMethod === 'manual-measured') {
-          heightVerified++;
-        }
-
-        if (data.ratings && (data.ratings.totalRatings ?? 0) > 0) {
+        if (d.selfieVerified)   selfieVerified++;
+        if (d.ageVerified)      ageVerified++;
+        if (d.hasFullBodyPhoto) hasFullBodyPhoto++;
+        if (d.isBanned)         bannedUsers++;
+        if ((d.warnings ?? 0) > 0) usersWithWarnings++;
+        if (d.gender === 'Male')   maleUsers++;
+        if (d.gender === 'Female') femaleUsers++;
+        if (d.age) totalAge += d.age;
+        if (d.height?.verificationMethod === 'manual-measured') heightVerified++;
+        if (d.ratings && (d.ratings.totalRatings ?? 0) > 0) {
           usersWithRatings++;
-          const trustScore =
-            ((data.ratings.averagePhotosMatch ?? 0) / 5) * 100 * 0.4 +
-            (data.ratings.heightAccuracyRate ?? 0) * 0.3 +
-            (data.ratings.bodyTypeAccuracyRate ?? 0) * 0.3;
-          totalTrustScore += trustScore;
-
-          if ((data.ratings.totalRatings ?? 0) >= 3 && (data.ratings.averagePhotosMatch ?? 0) >= 4) {
-            trustedUsers++;
-          }
-          if ((data.ratings.averagePhotosMatch ?? 0) < 3) {
-            lowRatedUsers++;
-          }
+          const trust =
+            ((d.ratings.averagePhotosMatch ?? 0) / 5) * 100 * 0.4 +
+            (d.ratings.heightAccuracyRate ?? 0) * 0.3 +
+            (d.ratings.bodyTypeAccuracyRate ?? 0) * 0.3;
+          totalTrustScore += trust;
+          if ((d.ratings.totalRatings ?? 0) >= 3 && (d.ratings.averagePhotosMatch ?? 0) >= 4) trustedUsers++;
+          if ((d.ratings.averagePhotosMatch ?? 0) < 3) lowRatedUsers++;
         }
       });
 
       const ratingsSnapshot = await getDocs(collection(db, 'ratings'));
-      const totalRatings = ratingsSnapshot.size;
-
       setStats({
         totalUsers, selfieVerified, heightVerified, ageVerified, hasFullBodyPhoto,
-        trustedUsers, totalRatings,
+        trustedUsers, totalRatings: ratingsSnapshot.size,
         averageTrustScore: usersWithRatings > 0 ? Math.round(totalTrustScore / usersWithRatings) : 0,
         lowRatedUsers, usersWithWarnings, bannedUsers, maleUsers, femaleUsers,
         averageAge: totalUsers > 0 ? Math.round(totalAge / totalUsers) : 0,
       });
-    } catch (error: unknown) {
-      console.error('Error loading stats:', error);
+    } catch (error) {
+      logger.error('[AdminStats] loadStats error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getPercent = (value: number): number => {
-    if (stats.totalUsers === 0) return 0;
-    return Math.round((value / stats.totalUsers) * 100);
-  };
+  useEffect(() => { loadStats(); }, [loadStats]);
 
-  // ─── Progress bar width helper ────────────────────────
-  // React Native width accepts `${number}%` as DimensionValue
-  const pctWidth = (value: number): `${number}%` => `${getPercent(value)}%`;
+  const pct     = useCallback((v: number) => stats.totalUsers === 0 ? 0 : Math.round((v / stats.totalUsers) * 100), [stats.totalUsers]);
+  const pctW    = useCallback((v: number): `${number}%` => `${pct(v)}%`, [pct]);
+  const healthScore = Math.round(pct(stats.selfieVerified) * 0.4 + pct(stats.trustedUsers) * 0.3 + (100 - pct(stats.bannedUsers)) * 0.3);
+
+  const sections: Section[] = [
+    {
+      key: 'overview',
+      render: () => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>User Overview</Text>
+          <View style={styles.statsGrid}>
+            {[
+              { n: stats.totalUsers,  l: 'Total Users', c: '#eee' },
+              { n: stats.maleUsers,   l: 'Male',        c: '#3498db' },
+              { n: stats.femaleUsers, l: 'Female',      c: '#e91e63' },
+              { n: stats.averageAge,  l: 'Avg Age',     c: '#eee' },
+            ].map((item) => (
+              <View key={item.l} style={styles.statCard} accessibilityLabel={`${item.l}: ${item.n}`}>
+                <Text style={[styles.statNumber, { color: item.c }]}>{item.n}</Text>
+                <Text style={styles.statLabel}>{item.l}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ),
+    },
+    {
+      key: 'verification',
+      render: () => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Verification Rates</Text>
+          {[
+            { l: 'Selfie Verified',  v: stats.selfieVerified,   c: '#3498db' },
+            { l: 'Height Verified',  v: stats.heightVerified,   c: '#9b59b6' },
+            { l: 'Age Verified',     v: stats.ageVerified,      c: '#e67e22' },
+            { l: 'Full Body Photo',  v: stats.hasFullBodyPhoto, c: '#1abc9c' },
+          ].map((item) => (
+            <View key={item.l} style={styles.progressItem} accessibilityLabel={`${item.l}: ${item.v} users, ${pct(item.v)} percent`}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>{item.l}</Text>
+                <Text style={styles.progressValue}>{item.v} ({pct(item.v)}%)</Text>
+              </View>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: pctW(item.v), backgroundColor: item.c }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      ),
+    },
+    {
+      key: 'trust',
+      render: () => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Trust System</Text>
+          <View style={styles.statsRow}>
+            {[
+              { n: stats.trustedUsers,    l: 'Trusted Users',    gold: true },
+              { n: stats.totalRatings,    l: 'Total Ratings',    gold: false },
+              { n: stats.averageTrustScore, l: 'Avg Trust Score', gold: false, suffix: '%' },
+            ].map((item) => (
+              <View key={item.l} style={item.gold ? styles.statCardSmallGold : styles.statCardSmall} accessibilityLabel={`${item.l}: ${item.n}${item.suffix ?? ''}`}>
+                <Text style={item.gold ? styles.statNumberSmallGold : styles.statNumberSmall}>{item.n}{item.suffix ?? ''}</Text>
+                <Text style={styles.statLabelSmall}>{item.l}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ),
+    },
+    {
+      key: 'safety',
+      render: () => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Safety</Text>
+          <View style={styles.safetyGrid}>
+            {[
+              { n: stats.bannedUsers,       l: 'Banned Users',         c: '#e74c3c' },
+              { n: stats.usersWithWarnings, l: 'Users with Warnings',  c: '#e67e22' },
+              { n: stats.lowRatedUsers,     l: 'Low-Rated Users',      c: '#e74c3c' },
+            ].map((item) => (
+              <View key={item.l} style={styles.safetyItem} accessibilityLabel={`${item.l}: ${item.n}`}>
+                <Text style={[styles.safetyNumber, { color: item.c }]}>{item.n}</Text>
+                <Text style={styles.safetyLabel}>{item.l}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ),
+    },
+    {
+      key: 'health',
+      render: () => (
+        <View style={styles.summaryCard} accessibilityLabel={`Health score: ${healthScore} percent`}>
+          <Text style={styles.summaryTitle}>Health Score</Text>
+          <Text style={styles.summaryScore}>{healthScore}%</Text>
+          <Text style={styles.summaryDesc}>Based on verification rate, trusted users, and safety record</Text>
+        </View>
+      ),
+    },
+  ];
 
   if (loading) {
     return (
@@ -130,128 +195,17 @@ export default function AdminStatsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <>
       <Text style={styles.title}>Verification Statistics</Text>
       <Text style={styles.subtitle}>Analytics and metrics for MyArchetype</Text>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>User Overview</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.totalUsers}</Text>
-            <Text style={styles.statLabel}>Total Users</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumberBlue}>{stats.maleUsers}</Text>
-            <Text style={styles.statLabel}>Male</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumberPink}>{stats.femaleUsers}</Text>
-            <Text style={styles.statLabel}>Female</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.averageAge}</Text>
-            <Text style={styles.statLabel}>Avg Age</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Verification Rates</Text>
-
-        <View style={styles.progressItem}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Selfie Verified</Text>
-            <Text style={styles.progressValue}>{stats.selfieVerified} ({getPercent(stats.selfieVerified)}%)</Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFillBlue, { width: pctWidth(stats.selfieVerified) }]} />
-          </View>
-        </View>
-
-        <View style={styles.progressItem}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Height Verified</Text>
-            <Text style={styles.progressValue}>{stats.heightVerified} ({getPercent(stats.heightVerified)}%)</Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFillPurple, { width: pctWidth(stats.heightVerified) }]} />
-          </View>
-        </View>
-
-        <View style={styles.progressItem}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Age Verified</Text>
-            <Text style={styles.progressValue}>{stats.ageVerified} ({getPercent(stats.ageVerified)}%)</Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFillOrange, { width: pctWidth(stats.ageVerified) }]} />
-          </View>
-        </View>
-
-        <View style={styles.progressItem}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Full Body Photo</Text>
-            <Text style={styles.progressValue}>{stats.hasFullBodyPhoto} ({getPercent(stats.hasFullBodyPhoto)}%)</Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFillTeal, { width: pctWidth(stats.hasFullBodyPhoto) }]} />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Trust System</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statCardSmallGold}>
-            <Text style={styles.statNumberSmallGold}>{stats.trustedUsers}</Text>
-            <Text style={styles.statLabelSmall}>Trusted Users</Text>
-          </View>
-          <View style={styles.statCardSmall}>
-            <Text style={styles.statNumberSmall}>{stats.totalRatings}</Text>
-            <Text style={styles.statLabelSmall}>Total Ratings</Text>
-          </View>
-          <View style={styles.statCardSmall}>
-            <Text style={styles.statNumberSmall}>{stats.averageTrustScore}%</Text>
-            <Text style={styles.statLabelSmall}>Avg Trust Score</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Safety</Text>
-        <View style={styles.safetyGrid}>
-          <View style={styles.safetyItem}>
-            <Text style={styles.safetyNumberRed}>{stats.bannedUsers}</Text>
-            <Text style={styles.safetyLabel}>Banned Users</Text>
-          </View>
-          <View style={styles.safetyItem}>
-            <Text style={styles.safetyNumberOrange}>{stats.usersWithWarnings}</Text>
-            <Text style={styles.safetyLabel}>Users with Warnings</Text>
-          </View>
-          <View style={styles.safetyItem}>
-            <Text style={styles.safetyNumberRed}>{stats.lowRatedUsers}</Text>
-            <Text style={styles.safetyLabel}>Low-Rated Users</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Health Score</Text>
-        <View style={styles.summaryContent}>
-          <Text style={styles.summaryScore}>
-            {Math.round(
-              getPercent(stats.selfieVerified) * 0.4 +
-              getPercent(stats.trustedUsers) * 0.3 +
-              (100 - getPercent(stats.bannedUsers)) * 0.3
-            )}%
-          </Text>
-          <Text style={styles.summaryDesc}>
-            Based on verification rate, trusted users, and safety record
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+      <FlatList
+        data={sections}
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => item.render()}
+        contentContainerStyle={styles.content}
+        style={styles.container}
+      />
+    </>
   );
 }
 
@@ -260,15 +214,13 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   loadingContainer: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#aaa', marginTop: 15, fontSize: 16 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 5, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#888', marginBottom: 25, textAlign: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 5, textAlign: 'center', marginTop: 20 },
+  subtitle: { fontSize: 14, color: '#888', marginBottom: 10, textAlign: 'center' },
   section: { marginBottom: 25 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#53a8b6', marginBottom: 15 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   statCard: { width: '48%', backgroundColor: '#16213e', borderRadius: 15, padding: 18, marginBottom: 12, alignItems: 'center' },
-  statNumber: { fontSize: 32, fontWeight: 'bold', color: '#eee' },
-  statNumberBlue: { fontSize: 32, fontWeight: 'bold', color: '#3498db' },
-  statNumberPink: { fontSize: 32, fontWeight: 'bold', color: '#e91e63' },
+  statNumber: { fontSize: 32, fontWeight: 'bold' },
   statLabel: { fontSize: 12, color: '#888', marginTop: 5 },
   statsRow: { flexDirection: 'row', gap: 10 },
   statCardSmall: { flex: 1, backgroundColor: '#16213e', borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
@@ -281,18 +233,13 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 14, color: '#eee' },
   progressValue: { fontSize: 14, color: '#888' },
   progressBar: { height: 10, backgroundColor: '#0f3460', borderRadius: 5, overflow: 'hidden' },
-  progressFillBlue:   { height: '100%', borderRadius: 5, backgroundColor: '#3498db' },
-  progressFillPurple: { height: '100%', borderRadius: 5, backgroundColor: '#9b59b6' },
-  progressFillOrange: { height: '100%', borderRadius: 5, backgroundColor: '#e67e22' },
-  progressFillTeal:   { height: '100%', borderRadius: 5, backgroundColor: '#1abc9c' },
+  progressFill: { height: '100%', borderRadius: 5 },
   safetyGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   safetyItem: { flex: 1, backgroundColor: '#16213e', borderRadius: 12, padding: 15, alignItems: 'center', marginHorizontal: 5 },
-  safetyNumberRed:    { fontSize: 28, fontWeight: 'bold', color: '#e74c3c' },
-  safetyNumberOrange: { fontSize: 28, fontWeight: 'bold', color: '#e67e22' },
+  safetyNumber: { fontSize: 28, fontWeight: 'bold' },
   safetyLabel: { fontSize: 10, color: '#888', marginTop: 5, textAlign: 'center' },
-  summaryCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, borderColor: '#53a8b6' },
-  summaryTitle: { fontSize: 16, fontWeight: '600', color: '#53a8b6', textAlign: 'center', marginBottom: 15 },
-  summaryContent: { alignItems: 'center' },
+  summaryCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, borderColor: '#53a8b6', alignItems: 'center' },
+  summaryTitle: { fontSize: 16, fontWeight: '600', color: '#53a8b6', marginBottom: 15 },
   summaryScore: { fontSize: 50, fontWeight: 'bold', color: '#5cb85c' },
   summaryDesc: { fontSize: 12, color: '#888', textAlign: 'center', marginTop: 10 },
 });

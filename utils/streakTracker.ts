@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface StreakData {
   currentStreak: number;
@@ -62,7 +63,7 @@ export async function updateLoginStreak(): Promise<StreakData> {
     if (error?.code === 'permission-denied') {
       return { currentStreak: 0, longestStreak: 0, lastLoginDate: null };
     }
-    console.error('Error updating login streak:', error);
+    logger.error('Error updating login streak:', error);
     return { currentStreak: 0, longestStreak: 0, lastLoginDate: null };
   }
 }

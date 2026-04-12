@@ -27,6 +27,9 @@ interface CloudinaryApiResponse {
   image_metadata?: { Make?: string; Model?: string; DateTimeOriginal?: string; Software?: string; DateTime?: string };
 }
 
+interface SpotifyArtistItem { name: string; genres?: string[]; }
+interface SpotifyTrackItem { name: string; artists?: Array<{ name: string }>; }
+
 function getResType(tag: MediaTag): 'image' | 'video' | 'auto' {
   if (tag === 'story_video') return 'video';
   if (tag === 'chat_media') return 'auto';
@@ -36,7 +39,7 @@ function getResType(tag: MediaTag): 'image' | 'video' | 'auto' {
 function getMime(uri: string, tag: MediaTag): string {
   if (tag === 'story_video') return 'video/mp4';
   const ext = uri.split('.').pop()?.toLowerCase() ?? '';
-  return { png: 'image/png', gif: 'image/gif', webp: 'image/webp', mp4: 'video/mp4', mov: 'video/quicktime' }[ext] ?? 'image/jpeg';
+  return ({ png: 'image/png', gif: 'image/gif', webp: 'image/webp', mp4: 'video/mp4', mov: 'video/quicktime' } as Record<string, string>)[ext] ?? 'image/jpeg';
 }
 
 function dataUriToBlob(d: string): Blob {
@@ -48,7 +51,6 @@ function dataUriToBlob(d: string): Blob {
   return new Blob([arr], { type: mime });
 }
 
-// #13: AI-generated image via EXIF
 export function detectAIGeneratedFromMetadata(meta: { Make?: string; Model?: string; Software?: string; DateTimeOriginal?: string }): { likelyAI: boolean; signals: string[] } {
   const signals: string[] = [];
   const sw = (meta.Software ?? '').toLowerCase();
@@ -58,7 +60,6 @@ export function detectAIGeneratedFromMetadata(meta: { Make?: string; Model?: str
   return { likelyAI: signals.length >= 2, signals };
 }
 
-// #33+#34: EXIF validation
 export function validateExifMetadata(meta: { Make?: string; Model?: string; DateTimeOriginal?: string; DateTime?: string }): { hasCameraMetadata: boolean; hasTimestamp: boolean; photoAge?: number } {
   const hasCam = !!(meta.Make || meta.Model);
   const ts = meta.DateTimeOriginal ?? meta.DateTime;
@@ -67,11 +68,12 @@ export function validateExifMetadata(meta: { Make?: string; Model?: string; Date
   return { hasCameraMetadata: hasCam, hasTimestamp: !!ts, photoAge: age };
 }
 
+interface NativeFileEntry { uri: string; type: string; name: string; }
+
 export async function uploadToCloudinary(fileUri: string, tag: MediaTag = 'profile_photo'): Promise<CloudinaryUploadResult> {
   if (!CLOUD_NAME || !UPLOAD_PRESET) return { success: false, error: 'Cloudinary not configured.' };
   if (!fileUri) return { success: false, error: 'No file URI provided' };
 
-  // #1-4,6: Pre-upload NSFW
   if (tag !== 'story_video') {
     const ctx = ({ profile_photo: 'profile', chat_media: 'chat', edit_profile: 'edit', story_photo: 'story', voice_thumbnail: 'voice_thumbnail' } as const)[tag] ?? 'general';
     const nsfw = await checkImageSafety(fileUri, ctx);
@@ -82,9 +84,15 @@ export async function uploadToCloudinary(fileUri: string, tag: MediaTag = 'profi
     const resType = getResType(tag);
     const body = new FormData();
     const isData = fileUri.startsWith('data:');
-    if (IS_WEB && isData) (body as any).append('file', dataUriToBlob(fileUri), `upload_${Date.now()}.jpg`);
-    else if (IS_WEB) { const r = await fetch(fileUri); (body as any).append('file', await r.blob(), fileUri.split('/').pop()); }
-    else body.append('file', { uri: fileUri, type: getMime(fileUri, tag), name: fileUri.split('/').pop() ?? `upload_${Date.now()}` } as any);
+    if (IS_WEB && isData) {
+      (body as FormData).append('file', dataUriToBlob(fileUri), `upload_${Date.now()}.jpg`);
+    } else if (IS_WEB) {
+      const r = await fetch(fileUri);
+      (body as FormData).append('file', await r.blob(), fileUri.split('/').pop());
+    } else {
+      const nativeFile: NativeFileEntry = { uri: fileUri, type: getMime(fileUri, tag), name: fileUri.split('/').pop() ?? `upload_${Date.now()}` };
+      body.append('file', nativeFile as unknown as Blob);
+    }
 
     body.append('upload_preset', UPLOAD_PRESET);
     body.append('tags', tag);
@@ -94,32 +102,23 @@ export async function uploadToCloudinary(fileUri: string, tag: MediaTag = 'profi
 
     const res = await fetch(`${BASE_URL}/${resType}/upload`, { method: 'POST', body, headers: { Accept: 'application/json' } });
     if (!res.ok) return { success: false, error: `Upload failed (${res.status})` };
-    const data: CloudinaryApiResponse = await res.json();
+    const data: CloudinaryApiResponse = await res.json() as CloudinaryApiResponse;
 
-    // #7: Server backstop
     let modStatus: 'approved' | 'rejected' | 'pending' | undefined;
     if (data.moderation?.length) { const s = data.moderation[0]?.status; if (s === 'approved' || s === 'rejected' || s === 'pending') modStatus = s; }
     if (modStatus === 'rejected') return { success: false, error: 'Image rejected by content moderation.' };
 
     const faces = (data.faces ?? []).map(([x, y, w, h]) => ({ x, y, width: w, height: h }));
 
-    // #9+#10: Face validation
     if (isProfile) {
       const fv = validateFacesFromCloudinary(faces, data.width, data.height);
       if (!fv.hasFace) return { success: false, error: fv.reason ?? 'No face detected.' };
     }
 
-    // #25: Quality
     const q = scorePhotoQuality({ width: data.width, height: data.height, bytes: data.bytes, format: data.format, quality_score: data.quality_analysis?.focus }, faces);
-
-    // #29: Body detection
     const bd = detectFullBodyFromTags(data.tags ?? []);
-
-    // #13: AI detection
     const meta = data.image_metadata ?? {};
     const ai = detectAIGeneratedFromMetadata(meta);
-
-    // #33+#34: EXIF
     const exif = validateExifMetadata(meta);
 
     return {
@@ -129,7 +128,10 @@ export async function uploadToCloudinary(fileUri: string, tag: MediaTag = 'profi
       aiGeneratedWarning: ai.likelyAI, exifTimestamp: meta.DateTimeOriginal ?? meta.DateTime,
       hasCameraMetadata: exif.hasCameraMetadata,
     };
-  } catch (e: any) { return { success: false, error: e?.message ?? 'Upload error' }; }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Upload error';
+    return { success: false, error: msg };
+  }
 }
 
 export const uploadProfilePhoto = (uri: string) => uploadToCloudinary(uri, 'profile_photo');

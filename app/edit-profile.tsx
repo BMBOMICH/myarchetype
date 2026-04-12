@@ -10,23 +10,29 @@ import BodyTypeSelector from '../components/BodyTypeSelector';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
 import { auth, db } from '../firebaseConfig';
 import { requestLocationPermission, saveUserLocation } from '../utils/location';
+import { logger } from '../utils/logger';
 import { checkBioEdit, checkImageSafety } from '../utils/moderation';
 import { validateDisplayName } from '../utils/nameValidation';
 import { deleteVideoProfile } from '../utils/videoProfiles';
 
-const IS_WEB = Platform.OS === 'web';
+const IS_WEB     = Platform.OS === 'web';
 const MAX_PHOTOS = 3, MAX_BIO = 200, MAX_ICE = 150, VIDEO_OLD_DAYS = 180;
 
 // ─── Types ────────────────────────────────────────────────
 
 interface HeightObject { value: number; verificationMethod: string; verifiedAt: string; }
-interface UserRatings { trustScore?: number; }
+
+interface UserRatings {
+  totalRatings?: number; averagePhotosMatch?: number; heightAccuracyRate?: number;
+  bodyTypeAccuracyRate?: number; ageAccuracyRate?: number; averagePersonalityMatch?: number;
+  averageOverall?: number; trustScore?: number;
+}
+
 interface UserLocation { city?: string; country?: string; }
 interface AgeVerification { verified?: boolean; }
 
 interface UserData {
-  name?: string; age?: number;
-  height?: number | HeightObject;
+  name?: string; age?: number; height?: number | HeightObject;
   bodyType?: string; lookingFor?: string; religiousViews?: string; lifestyle?: string;
   relationshipGoal?: string; bio?: string; photos?: string[]; personalityType?: string;
   icebreaker?: string; icebreakerPrompt?: string; videoProfile?: string;
@@ -47,103 +53,212 @@ interface SaveUpdate {
   updatedAt: string; height?: HeightObject;
 }
 
+// ─── State groups ─────────────────────────────────────────
+
+interface LoadingState {
+  loading: boolean; saving: boolean; uploadingPhoto: boolean;
+  deleting: boolean; deletingVideo: boolean; gettingLoc: boolean;
+}
+interface ProfileFieldState {
+  name: string; age: string; height: string; heightVerified: boolean; heightMethod: string;
+  bodyType: string; lookingFor: string; religiousViews: string; lifestyle: string;
+  relationshipGoal: string; bio: string; photos: string[]; personalityType: string;
+  locationCity: string; selfieVerified: boolean; ageVerified: boolean;
+}
+interface MediaState {
+  videoProfile: string | null; videoUploadedAt: string | null; playingVideo: boolean;
+  icebreaker: string; selectedPrompt: string; showPromptPicker: boolean;
+}
+interface UiState {
+  reorderMode: boolean; selectedPhotoIndex: number | null;
+  cameraOpen: boolean; webCamReady: boolean; camError: string | null;
+}
+
 // ─── Constants ────────────────────────────────────────────
 
-const ICEBREAKER_PROMPTS: string[] = ["My perfect Sunday looks like...","The way to my heart is...","I'm looking for someone who...","My most controversial opinion is...","Two truths and a lie about me...","The best trip I ever took was...","I geek out about...","My hidden talent is...","I'll know it's love when...","The key to my heart is...","I'm weirdly attracted to...","My love language is...","On weekends you'll find me...","I'm convinced that...","My friends would describe me as..."];
-const RELIGIOUS_OPTIONS: OptionItem[] = [{ value: 'Traditional', desc: 'Follow religious practices regularly' },{ value: 'Modern', desc: 'Believe but flexible interpretation' },{ value: 'Spiritual', desc: 'Spiritual but not organized religion' },{ value: 'None', desc: 'Not religious or spiritual' }];
-const LIFESTYLE_OPTIONS: OptionItem[] = [{ value: 'Natural', desc: 'Simple, outdoors, minimal' },{ value: 'Fitness', desc: 'Active, gym, health-focused' },{ value: 'Social', desc: 'Outgoing, parties, events' },{ value: 'Homebody', desc: 'Cozy nights in, relaxing' }];
+const ICEBREAKER_PROMPTS: string[] = [
+  "My perfect Sunday looks like...","The way to my heart is...","I'm looking for someone who...",
+  "My most controversial opinion is...","Two truths and a lie about me...",
+  "The best trip I ever took was...","I geek out about...","My hidden talent is...",
+  "I'll know it's love when...","The key to my heart is...","I'm weirdly attracted to...",
+  "My love language is...","On weekends you'll find me...","I'm convinced that...",
+  "My friends would describe me as...",
+];
+
+const RELIGIOUS_OPTIONS: OptionItem[]    = [{ value: 'Traditional', desc: 'Follow religious practices regularly' },{ value: 'Modern', desc: 'Believe but flexible interpretation' },{ value: 'Spiritual', desc: 'Spiritual but not organized religion' },{ value: 'None', desc: 'Not religious or spiritual' }];
+const LIFESTYLE_OPTIONS: OptionItem[]    = [{ value: 'Natural', desc: 'Simple, outdoors, minimal' },{ value: 'Fitness', desc: 'Active, gym, health-focused' },{ value: 'Social', desc: 'Outgoing, parties, events' },{ value: 'Homebody', desc: 'Cozy nights in, relaxing' }];
 const RELATIONSHIP_OPTIONS: OptionItem[] = [{ value: 'Marriage', desc: 'Looking for life partner' },{ value: 'Long-term', desc: 'Serious but not rushing' },{ value: 'Exploring', desc: 'Open to see where it goes' }];
 
 const VIRTUAL_CAM_KW = ['obs','virtual','manycam','snap camera','epoccam','xsplit','mmhmm','camo','iriun','droidcam','streamlabs','fakecam','splitcam','chromacam'];
-function isVirtualCamera(label: string): boolean { return VIRTUAL_CAM_KW.some(k => (label || '').toLowerCase().includes(k)); }
+const isVirtualCamera = (label: string): boolean => VIRTUAL_CAM_KW.some(k => label.toLowerCase().includes(k));
 
 const getVideoAge = (at: string | null): string => {
   if (!at) return '';
-  const d = Math.floor((Date.now() - new Date(at).getTime()) / (1000 * 60 * 60 * 24));
+  const d = Math.floor((Date.now() - new Date(at).getTime()) / (1_000 * 60 * 60 * 24));
   if (d === 0) return 'Today'; if (d === 1) return 'Yesterday';
-  if (d < 30) return `${d} days ago`; if (d < 60) return '1 month ago';
+  if (d < 30)  return `${d} days ago`; if (d < 60) return '1 month ago';
   if (d < 365) return `${Math.floor(d / 30)} months ago`; return 'Over a year ago';
 };
-const isVideoOld = (at: string | null): boolean => { if (!at) return false; return Math.floor((Date.now() - new Date(at).getTime()) / (1000 * 60 * 60 * 24)) > VIDEO_OLD_DAYS; };
-const getHtBadge = (m: string): string => m === 'manual-measured' ? 'Verified' : m === 'ai-estimated' ? 'AI Estimated' : '';
+const isVideoOld  = (at: string | null): boolean => !!at && Math.floor((Date.now() - new Date(at).getTime()) / (1_000 * 60 * 60 * 24)) > VIDEO_OLD_DAYS;
+const getHtBadge  = (m: string): string => m === 'manual-measured' ? 'Verified' : m === 'ai-estimated' ? 'AI Estimated' : '';
+const getErrMsg   = (e: unknown): string => e instanceof Error ? e.message : 'Unknown error';
+const getErrCode  = (e: unknown): string => (e as { code?: string })?.code ?? '';
+
+// ─── Sub-components ───────────────────────────────────────
+
+interface PhotoItemProps {
+  uri: string; index: number; total: number;
+  reorderMode: boolean; selected: boolean;
+  onTap: (i: number) => void;
+  onMoveLeft: (i: number) => void;
+  onMoveRight: (i: number) => void;
+  onRemove: (i: number) => void;
+}
+const PhotoItem = React.memo(function PhotoItem({ uri, index, total, reorderMode, selected, onTap, onMoveLeft, onMoveRight, onRemove }: PhotoItemProps) {
+  const handleTap    = useCallback(() => onTap(index),       [onTap, index]);
+  const handleLeft   = useCallback(() => onMoveLeft(index),  [onMoveLeft, index]);
+  const handleRight  = useCallback(() => onMoveRight(index), [onMoveRight, index]);
+  const handleRemove = useCallback(() => onRemove(index),    [onRemove, index]);
+  return (
+    <View style={styles.photoWrapper}>
+      <TouchableOpacity onPress={handleTap}
+        style={[styles.photoTouchable, reorderMode && styles.photoReorderMode, selected && styles.photoSelected]}
+        accessibilityLabel={`Photo ${index + 1}${index === 0 ? ', main photo' : ''}${reorderMode ? '. Tap to select for reordering.' : ''}`}
+        accessibilityRole="button">
+        <Image source={{ uri }} style={styles.photo} accessibilityLabel={`Profile photo ${index + 1}`} />
+        {index === 0 && <View style={styles.primaryBadge}><Text style={styles.primaryBadgeText}>Main</Text></View>}
+        {reorderMode && <View style={styles.photoIndexBadge}><Text style={styles.photoIndexText}>{index + 1}</Text></View>}
+      </TouchableOpacity>
+      {reorderMode && (
+        <View style={styles.reorderArrows}>
+          {index > 0           && <TouchableOpacity style={styles.arrowButton} onPress={handleLeft}  accessibilityLabel="Move photo left"  accessibilityRole="button"><Text style={styles.arrowText}>←</Text></TouchableOpacity>}
+          {index < total - 1   && <TouchableOpacity style={styles.arrowButton} onPress={handleRight} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={styles.arrowText}>→</Text></TouchableOpacity>}
+        </View>
+      )}
+      {!reorderMode && (
+        <TouchableOpacity style={styles.removeButton} onPress={handleRemove} accessibilityLabel={`Remove photo ${index + 1}`} accessibilityRole="button">
+          <Text style={styles.removeButtonText}>✕</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+
+interface OptionRowProps { option: OptionItem; selected: boolean; onSelect: (v: string) => void; sectionLabel: string; }
+const OptionRow = React.memo(function OptionRow({ option, selected, onSelect }: OptionRowProps) {
+  const handlePress = useCallback(() => onSelect(option.value), [onSelect, option.value]);
+  return (
+    <TouchableOpacity style={[styles.optionRow, selected && styles.optionRowActive]} onPress={handlePress}
+      accessibilityLabel={`${option.value}: ${option.desc}`} accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}>
+      <Text style={[styles.optionRowText, selected && styles.optionRowTextActive]}>{option.value}</Text>
+      <Text style={styles.optionRowDesc}>{option.desc}</Text>
+    </TouchableOpacity>
+  );
+});
+
+interface PromptOptionProps { prompt: string; selected: boolean; onSelect: (p: string) => void; }
+const PromptOption = React.memo(function PromptOption({ prompt, selected, onSelect }: PromptOptionProps) {
+  const handlePress = useCallback(() => onSelect(prompt), [onSelect, prompt]);
+  return (
+    <TouchableOpacity style={[styles.promptOption, selected && styles.promptOptionActive]} onPress={handlePress}
+      accessibilityLabel={prompt} accessibilityRole="radio" accessibilityState={{ checked: selected }}>
+      <Text style={[styles.promptOptionText, selected && styles.promptOptionTextActive]}>{prompt}</Text>
+    </TouchableOpacity>
+  );
+});
+
+interface BeliefsSectionProps { label: string; opts: OptionItem[]; value: string; onSelect: (v: string) => void; }
+const BeliefsSection = React.memo(function BeliefsSection({ label, opts, value, onSelect }: BeliefsSectionProps) {
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.optionsColumn}>
+        {opts.map(o => (
+          <OptionRow key={o.value} option={o} selected={value === o.value} onSelect={onSelect} sectionLabel={label} />
+        ))}
+      </View>
+    </View>
+  );
+});
+
+// ─── Main Component ───────────────────────────────────────
 
 export default function EditProfileScreen() {
-  const router = useRouter();
-  const user = auth.currentUser;
+  const router  = useRouter();
+  const user    = auth.currentUser;
   const cameraRef = useRef<CameraView>(null);
   const streamRef = useRef<MediaStreamTyped | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deletingVideo, setDeletingVideo] = useState(false);
-  const [gettingLoc, setGettingLoc] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [name, setName] = useState('');
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [age, setAge] = useState('');
-  const [height, setHeight] = useState('');
-  const [heightVerified, setHeightVerified] = useState(false);
-  const [heightMethod, setHeightMethod] = useState('');
-  const [bodyType, setBodyType] = useState('');
-  const [lookingFor, setLookingFor] = useState('');
-  const [religiousViews, setReligiousViews] = useState('');
-  const [lifestyle, setLifestyle] = useState('');
-  const [relationshipGoal, setRelationshipGoal] = useState('');
-  const [bio, setBio] = useState('');
-  const [bioError, setBioError] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [personalityType, setPersonalityType] = useState('');
-  const [locationCity, setLocationCity] = useState('');
-  const [selfieVerified, setSelfieVerified] = useState(false);
-  const [ageVerified, setAgeVerified] = useState(false);
-  const [videoProfile, setVideoProfile] = useState<string | null>(null);
-  const [videoUploadedAt, setVideoUploadedAt] = useState<string | null>(null);
-  const [playingVideo, setPlayingVideo] = useState(false);
-  const videoPlayer = useVideoPlayer(videoProfile || '', p => { p.loop = false; });
-  const [icebreaker, setIcebreaker] = useState('');
-  const [selectedPrompt, setSelectedPrompt] = useState('');
-  const [showPromptPicker, setShowPromptPicker] = useState(false);
-  const [reorderMode, setReorderMode] = useState(false);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [webCamReady, setWebCamReady] = useState(false);
-  const [camError, setCamError] = useState<string | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [ls,     setLs]     = useState<LoadingState>({ loading: true, saving: false, uploadingPhoto: false, deleting: false, deletingVideo: false, gettingLoc: false });
+  const [fields, setFields] = useState<ProfileFieldState>({ name: '', age: '', height: '', heightVerified: false, heightMethod: '', bodyType: '', lookingFor: '', religiousViews: '', lifestyle: '', relationshipGoal: '', bio: '', photos: [], personalityType: '', locationCity: '', selfieVerified: false, ageVerified: false });
+  const [media,  setMedia]  = useState<MediaState>({ videoProfile: null, videoUploadedAt: null, playingVideo: false, icebreaker: '', selectedPrompt: '', showPromptPicker: false });
+  const [ui,     setUi]     = useState<UiState>({ reorderMode: false, selectedPhotoIndex: null, cameraOpen: false, webCamReady: false, camError: null });
 
+  const [userData,  setUserData]  = useState<UserData | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [bioError,  setBioError]  = useState('');
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const videoPlayer = useVideoPlayer(media.videoProfile ?? '', p => { p.loop = false; });
+
+  // ── Loading helpers ───────────────────────────────────
+  const setLoading       = useCallback((v: boolean) => setLs(p => ({ ...p, loading:       v })), []);
+  const setSaving        = useCallback((v: boolean) => setLs(p => ({ ...p, saving:        v })), []);
+  const setUploadingPhoto= useCallback((v: boolean) => setLs(p => ({ ...p, uploadingPhoto:v })), []);
+  const setDeleting      = useCallback((v: boolean) => setLs(p => ({ ...p, deleting:      v })), []);
+  const setDeletingVideo = useCallback((v: boolean) => setLs(p => ({ ...p, deletingVideo: v })), []);
+  const setGettingLoc    = useCallback((v: boolean) => setLs(p => ({ ...p, gettingLoc:    v })), []);
+
+  // ── Field setters ─────────────────────────────────────
+  const setName             = useCallback((v: string) => setFields(p => ({ ...p, name:             v })), []);
+  const setAge              = useCallback((v: string) => setFields(p => ({ ...p, age:              v })), []);
+  const setHeight           = useCallback((v: string) => setFields(p => ({ ...p, height:           v })), []);
+  const setBodyType         = useCallback((v: string) => setFields(p => ({ ...p, bodyType:         v })), []);
+  const setLookingFor       = useCallback((v: string) => setFields(p => ({ ...p, lookingFor:       v })), []);
+  const setReligiousViews   = useCallback((v: string) => setFields(p => ({ ...p, religiousViews:   v })), []);
+  const setLifestyle        = useCallback((v: string) => setFields(p => ({ ...p, lifestyle:        v })), []);
+  const setRelationshipGoal = useCallback((v: string) => setFields(p => ({ ...p, relationshipGoal: v })), []);
+  const setBio              = useCallback((v: string) => setFields(p => ({ ...p, bio:              v })), []);
+  const setPhotos = useCallback((v: string[] | ((prev: string[]) => string[])) =>
+    setFields(p => ({ ...p, photos: typeof v === 'function' ? v(p.photos) : v })), []);
+
+  // ── Load ──────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
     if (!user) { setTimeout(() => router.replace('/login'), 100); return; }
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
       if (!snap.exists()) { setTimeout(() => router.replace('/profile-setup'), 100); return; }
       const d = snap.data() as UserData;
-      setUserData(d); setName(d.name || ''); setAge(d.age?.toString() || '');
+      setUserData(d);
+      let htStr = '', htMethod = '', htVerified = false;
       if (typeof d.height === 'object' && d.height !== null) {
         const hObj = d.height as HeightObject;
-        setHeight(hObj.value?.toString() || '');
-        setHeightMethod(hObj.verificationMethod || '');
-        setHeightVerified(hObj.verificationMethod === 'manual-measured');
-      } else {
-        setHeight(typeof d.height === 'number' ? d.height.toString() : '');
+        htStr     = hObj.value?.toString() ?? '';
+        htMethod   = hObj.verificationMethod ?? '';
+        htVerified = hObj.verificationMethod === 'manual-measured';
+      } else if (typeof d.height === 'number') {
+        htStr = d.height.toString();
       }
-      setBodyType(d.bodyType || ''); setLookingFor(d.lookingFor || '');
-      setReligiousViews(d.religiousViews || ''); setLifestyle(d.lifestyle || '');
-      setRelationshipGoal(d.relationshipGoal || ''); setBio(d.bio || '');
-      setPhotos(d.photos || []); setPersonalityType(d.personalityType || '');
-      setIcebreaker(d.icebreaker || ''); setSelectedPrompt(d.icebreakerPrompt || '');
-      setVideoProfile(d.videoProfile || null); setVideoUploadedAt(d.videoProfileUploadedAt || null);
-      if (d.location?.city) setLocationCity(`${d.location.city}, ${d.location.country || ''}`);
-      setSelfieVerified(d.selfieVerified || false);
-      setAgeVerified(d.ageVerification?.verified || false);
-    } catch (e: unknown) {
-      console.error('[EditProfile] loadProfile failed:', e);
-      Alert.alert('Error', 'Error loading profile');
-    } finally { setLoading(false); }
-  }, [user, router]);
+      setFields({
+        name: d.name ?? '', age: d.age?.toString() ?? '',
+        height: htStr, heightVerified: htVerified, heightMethod: htMethod,
+        bodyType: d.bodyType ?? '', lookingFor: d.lookingFor ?? '',
+        religiousViews: d.religiousViews ?? '', lifestyle: d.lifestyle ?? '',
+        relationshipGoal: d.relationshipGoal ?? '', bio: d.bio ?? '',
+        photos: d.photos ?? [], personalityType: d.personalityType ?? '',
+        locationCity: d.location?.city ? `${d.location.city}, ${d.location.country ?? ''}` : '',
+        selfieVerified: d.selfieVerified ?? false,
+        ageVerified: d.ageVerification?.verified ?? false,
+      });
+      setMedia(p => ({ ...p, videoProfile: d.videoProfile ?? null, videoUploadedAt: d.videoProfileUploadedAt ?? null, icebreaker: d.icebreaker ?? '', selectedPrompt: d.icebreakerPrompt ?? '' }));
+    } catch (e) { logger.error('[EditProfile] loadProfile failed:', e); Alert.alert('Error', 'Error loading profile'); }
+    finally { setLoading(false); }
+  }, [user, router, setLoading]);
 
   useEffect(() => { void loadProfile(); }, [loadProfile]);
 
+  // ── Video handlers ────────────────────────────────────
   const handleDeleteVideo = useCallback(() => {
     Alert.alert('Delete Video', 'Delete your video profile?', [
       { text: 'Cancel', style: 'cancel' },
@@ -151,112 +266,120 @@ export default function EditProfileScreen() {
         setDeletingVideo(true);
         try {
           const r = await deleteVideoProfile();
-          if (r.success) { setVideoProfile(null); setVideoUploadedAt(null); Alert.alert('Success', 'Video deleted'); }
-          else Alert.alert('Error', r.error || 'Failed');
-        } catch (e: unknown) {
-          console.error('[EditProfile] deleteVideo failed:', e);
-          Alert.alert('Error', 'Failed to delete video');
-        } finally { setDeletingVideo(false); }
+          if (r.success) { setMedia(p => ({ ...p, videoProfile: null, videoUploadedAt: null })); Alert.alert('Success', 'Video deleted'); }
+          else Alert.alert('Error', r.error ?? 'Failed');
+        } catch (e) { logger.error('[EditProfile] deleteVideo failed:', e); Alert.alert('Error', 'Failed to delete video'); }
+        finally { setDeletingVideo(false); }
       }},
     ]);
-  }, []);
+  }, [setDeletingVideo]);
 
   const handleToggleVideo = useCallback(() => {
-    if (playingVideo) { videoPlayer.pause(); setPlayingVideo(false); }
-    else { videoPlayer.replay(); setPlayingVideo(true); }
-  }, [playingVideo, videoPlayer]);
+    setMedia(p => {
+      if (p.playingVideo) { videoPlayer.pause(); return { ...p, playingVideo: false }; }
+      videoPlayer.replay(); return { ...p, playingVideo: true };
+    });
+  }, [videoPlayer]);
 
   useEffect(() => {
-    if (!playingVideo) return;
-    const t = setInterval(() => { try { if (!videoPlayer.playing) setPlayingVideo(false); } catch { /* ignore */ } }, 1000);
+    if (!media.playingVideo) return;
+    const t = setInterval(() => { try { if (!videoPlayer.playing) setMedia(p => ({ ...p, playingVideo: false })); } catch { /* ignore */ } }, 1_000);
     return () => clearInterval(t);
-  }, [playingVideo, videoPlayer]);
+  }, [media.playingVideo, videoPlayer]);
 
+  // ── Photo handlers ────────────────────────────────────
   const handlePhotoTap = useCallback((i: number) => {
-    if (!reorderMode) return;
-    if (selectedPhotoIndex === null) { setSelectedPhotoIndex(i); }
-    else {
-      const p = [...photos];
-      const temp = p[selectedPhotoIndex]!; p[selectedPhotoIndex] = p[i]!; p[i] = temp;
-      setPhotos(p); setSelectedPhotoIndex(null);
-    }
-  }, [reorderMode, selectedPhotoIndex, photos]);
+    setUi(prev => {
+      if (!prev.reorderMode) return prev;
+      if (prev.selectedPhotoIndex === null) return { ...prev, selectedPhotoIndex: i };
+      setPhotos(p => {
+        const arr  = [...p];
+        const temp = arr[prev.selectedPhotoIndex!]!;
+        arr[prev.selectedPhotoIndex!] = arr[i]!;
+        arr[i] = temp;
+        return arr;
+      });
+      return { ...prev, selectedPhotoIndex: null };
+    });
+  }, [setPhotos]);
 
-  const moveLeft = useCallback((i: number) => { if (!i) return; const p = [...photos]; [p[i - 1]!, p[i]!] = [p[i]!, p[i - 1]!]; setPhotos(p); }, [photos]);
-  const moveRight = useCallback((i: number) => { if (i >= photos.length - 1) return; const p = [...photos]; [p[i + 1]!, p[i]!] = [p[i]!, p[i + 1]!]; setPhotos(p); }, [photos]);
+  const moveLeft  = useCallback((i: number) => { if (!i) return; setPhotos(p => { const a = [...p]; [a[i-1]!, a[i]!] = [a[i]!, a[i-1]!]; return a; }); }, [setPhotos]);
+  const moveRight = useCallback((i: number) => { setPhotos(p => { if (i >= p.length - 1) return p; const a = [...p]; [a[i+1]!, a[i]!] = [a[i]!, a[i+1]!]; return a; }); }, [setPhotos]);
+
   const removePhoto = useCallback((i: number) => {
-    if (photos.length <= 1) { Alert.alert('Error', 'Must have at least 1 photo'); return; }
-    setPhotos(photos.filter((_, j) => j !== i)); setSelectedPhotoIndex(null);
-  }, [photos]);
+    setFields(p => {
+      if (p.photos.length <= 1) { Alert.alert('Error', 'Must have at least 1 photo'); return p; }
+      return { ...p, photos: p.photos.filter((_, j) => j !== i) };
+    });
+    setUi(p => ({ ...p, selectedPhotoIndex: null }));
+  }, []);
 
+  // ── Camera handlers ───────────────────────────────────
   const stopWebCam = useCallback(() => {
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-    setWebCamReady(false);
+    setUi(p => ({ ...p, webCamReady: false }));
   }, []);
 
   const startWebCam = useCallback(async () => {
-    setCamError(null); setWebCamReady(false);
-    if (!navigator.mediaDevices?.getUserMedia) { setCamError('Camera not supported'); return; }
+    setUi(p => ({ ...p, camError: null, webCamReady: false }));
+    if (!navigator.mediaDevices?.getUserMedia) { setUi(p => ({ ...p, camError: 'Camera not supported' })); return; }
     try {
       const devs = await navigator.mediaDevices.enumerateDevices() as MediaDeviceInfoTyped[];
-      for (const d of devs) { if (d.kind === 'videoinput' && isVirtualCamera(d.label)) { setCamError('Virtual cameras are not allowed. Use your real camera.'); return; } }
+      for (const d of devs) {
+        if (d.kind === 'videoinput' && isVirtualCamera(d.label)) {
+          setUi(p => ({ ...p, camError: 'Virtual cameras are not allowed. Use your real camera.' })); return;
+        }
+      }
     } catch { /* ignore enumerate errors */ }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }) as unknown as MediaStreamTyped;
-      const track = stream.getVideoTracks()[0];
-      if (track && isVirtualCamera(track.label)) { stream.getTracks().forEach(t => t.stop()); setCamError('Virtual cameras not allowed.'); return; }
+      const track  = stream.getVideoTracks()[0];
+      if (track && isVirtualCamera(track.label)) { stream.getTracks().forEach(t => t.stop()); setUi(p => ({ ...p, camError: 'Virtual cameras not allowed.' })); return; }
       streamRef.current = stream;
       setTimeout(() => {
         const v = document.getElementById('edit-profile-camera') as HTMLVideoElement | null;
-        if (v) {
-          v.srcObject = stream as unknown as MediaStream;
-          v.onloadedmetadata = () => { void v.play(); setWebCamReady(true); };
-        }
+        if (v) { v.srcObject = stream as unknown as MediaStream; v.onloadedmetadata = () => { void v.play(); setUi(p => ({ ...p, webCamReady: true })); }; }
       }, 100);
-    } catch (e: unknown) {
-      const name = (e as { name?: string })?.name ?? '';
-      setCamError(name === 'NotAllowedError' ? 'Camera blocked' : 'Camera error');
+    } catch (e) {
+      const name = getErrCode(e);
+      setUi(p => ({ ...p, camError: name === 'NotAllowedError' ? 'Camera blocked' : 'Camera error' }));
     }
   }, []);
 
-  const closeCamera = useCallback(() => { stopWebCam(); setCameraOpen(false); setCamError(null); }, [stopWebCam]);
+  const closeCamera = useCallback(() => { stopWebCam(); setUi(p => ({ ...p, cameraOpen: false, camError: null })); }, [stopWebCam]);
 
   const openCamera = useCallback(async () => {
-    if (photos.length >= MAX_PHOTOS) { Alert.alert('Limit', 'Maximum 3 photos'); return; }
+    if (fields.photos.length >= MAX_PHOTOS) { Alert.alert('Limit', 'Maximum 3 photos'); return; }
     if (!IS_WEB && !permission?.granted) {
       const r = await requestPermission();
       if (!r.granted) { Alert.alert('Permission Required', 'Camera permission required'); return; }
     }
-    setCameraOpen(true);
+    setUi(p => ({ ...p, cameraOpen: true }));
     if (IS_WEB) setTimeout(() => { void startWebCam(); }, 200);
-  }, [photos.length, permission, requestPermission, startWebCam]);
+  }, [fields.photos.length, permission, requestPermission, startWebCam]);
 
   const uploadAndVerifyPhoto = useCallback(async (uri: string): Promise<string | null> => {
     try {
       const nsfw = await checkImageSafety(uri, 'edit');
-      if (!nsfw.safe) { Alert.alert('Inappropriate Content', nsfw.reason || 'Photo flagged.'); return null; }
-      const res = await fetch(uri);
+      if (!nsfw.safe) { Alert.alert('Inappropriate Content', nsfw.reason ?? 'Photo flagged.'); return null; }
+      const res  = await fetch(uri);
       const blob = await res.blob();
-      const fd = new FormData();
+      const fd   = new FormData();
       fd.append('file', blob);
       fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-      const up = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
+      const up   = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
       const data = await up.json() as CloudinaryUploadResponse;
       if (!data.secure_url) { Alert.alert('Error', 'Upload failed'); return null; }
       await updateDoc(doc(db, 'users', user!.uid), { lastPhotoUpdate: new Date().toISOString() });
       return data.secure_url;
-    } catch (e: unknown) {
-      console.error('[EditProfile] uploadAndVerifyPhoto failed:', e);
-      Alert.alert('Error', 'Error uploading photo');
-      return null;
-    }
+    } catch (e) { logger.error('[EditProfile] uploadAndVerifyPhoto failed:', e); Alert.alert('Error', 'Error uploading photo'); return null; }
   }, [user]);
 
   const capturePhoto = useCallback(async () => {
     let uri: string | null = null;
     try {
       if (IS_WEB) {
-        if (!webCamReady) return;
+        if (!ui.webCamReady) return;
         const v = document.getElementById('edit-profile-camera') as HTMLVideoElement | null;
         if (!v || v.readyState < 2) return;
         const c = document.createElement('canvas');
@@ -268,71 +391,97 @@ export default function EditProfileScreen() {
       } else {
         if (!cameraRef.current) return;
         const p = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-        uri = p?.uri || null;
+        uri = p?.uri ?? null;
       }
       if (!uri) { Alert.alert('Error', 'Failed to capture'); return; }
       closeCamera(); setUploadingPhoto(true);
       const url = await uploadAndVerifyPhoto(uri);
       if (url) setPhotos(prev => [...prev, url]);
-    } catch (e: unknown) {
-      console.error('[EditProfile] capturePhoto failed:', e);
-      Alert.alert('Error', 'Failed to capture photo');
-    } finally { setUploadingPhoto(false); }
-  }, [webCamReady, closeCamera, uploadAndVerifyPhoto]);
+    } catch (e) { logger.error('[EditProfile] capturePhoto failed:', e); Alert.alert('Error', 'Failed to capture photo'); }
+    finally { setUploadingPhoto(false); }
+  }, [ui.webCamReady, closeCamera, uploadAndVerifyPhoto, setPhotos, setUploadingPhoto]);
 
+  // ── Location ──────────────────────────────────────────
   const handleGetLocation = useCallback(async () => {
     setGettingLoc(true);
     try {
       const loc = await requestLocationPermission();
-      if (loc) { setLocationCity(loc.city ? `${loc.city}, ${loc.country}` : 'Location found'); await saveUserLocation(loc); Alert.alert('Success', 'Location updated!'); }
-      else Alert.alert('Error', 'Could not get location.');
-    } catch (e: unknown) {
-      console.error('[EditProfile] getLocation failed:', e);
-      Alert.alert('Error', 'Could not get location.');
-    } finally { setGettingLoc(false); }
-  }, []);
+      if (loc) {
+        setFields(p => ({ ...p, locationCity: loc.city ? `${loc.city}, ${loc.country ?? ''}` : 'Location found' }));
+        await saveUserLocation(loc);
+        Alert.alert('Success', 'Location updated!');
+      } else Alert.alert('Error', 'Could not get location.');
+    } catch (e) { logger.error('[EditProfile] getLocation failed:', e); Alert.alert('Error', 'Could not get location.'); }
+    finally { setGettingLoc(false); }
+  }, [setGettingLoc]);
 
+  // ── Input handlers ────────────────────────────────────
   const handleNameChange = useCallback((text: string) => {
     const c = text.replace(/[^a-zA-Z\s\-']/g, '');
     setName(c);
-    if (c.length > 0) { const r = validateDisplayName(c); setNameError(r.valid ? null : (r.reason || null)); }
+    if (c.length > 0) { const r = validateDisplayName(c); setNameError(r.valid ? null : (r.reason ?? null)); }
     else setNameError(null);
-  }, []);
+  }, [setName]);
 
   const handleBioChange = useCallback((text: string) => {
     const t = text.slice(0, MAX_BIO);
     setBio(t);
     if (t.length > 20) { const r = checkBioEdit(t); setBioError(r.safe ? '' : r.reason); }
     else setBioError('');
-  }, []);
+  }, [setBio]);
 
+  const handleAgeChange    = useCallback((t: string) => setAge(t.replace(/[^0-9]/g, '')),    [setAge]);
+  const handleHeightChange = useCallback((t: string) => setHeight(t.replace(/[^0-9]/g, '')), [setHeight]);
+  const handleNameBlur     = useCallback(() => { if (fields.name) { const r = validateDisplayName(fields.name); if (r.valid) setName(fields.name.trim()); } }, [fields.name, setName]);
+
+  // ── Modal handlers ────────────────────────────────────
+  const toggleReorderMode      = useCallback(() => setUi(p => ({ ...p, reorderMode: !p.reorderMode, selectedPhotoIndex: null })), []);
+  const openPromptPicker        = useCallback(() => setMedia(p => ({ ...p, showPromptPicker: true })),  []);
+  const closePromptPicker       = useCallback(() => setMedia(p => ({ ...p, showPromptPicker: false })), []);
+  const handleIcebreakerChange  = useCallback((t: string) => setMedia(p => ({ ...p, icebreaker: t.slice(0, MAX_ICE) })), []);
+  const handleSelectPrompt      = useCallback((pr: string) => setMedia(p => ({ ...p, selectedPrompt: pr, showPromptPicker: false })), []);
+
+  // ── Navigation handlers ───────────────────────────────
+  const handleGoSelfieVerification = useCallback(() => router.push('/selfie-verification'),    [router]);
+  const handleGoProfilePreview     = useCallback(() => router.push({ pathname: '/profile-preview', params: { userId: user!.uid } }), [router, user]);
+  const handleGoSocialVerification = useCallback(() => router.push('/social-verification'),    [router]);
+  const handleGoHeightVerification = useCallback(() => router.push('/height-verification'),    [router]);
+  const handleGoVideoRecorder      = useCallback(() => router.push('/video-profile-recorder'), [router]);
+  const handleGoPersonalityQuiz    = useCallback(() => router.push('/personality-quiz'),       [router]);
+  const handleGoPrivacy            = useCallback(() => router.push('/privacy'),                [router]);
+  const handleGoTerms              = useCallback(() => router.push('/terms'),                  [router]);
+  const handleGoBack               = useCallback(() => router.back(),                          [router]);
+
+  // ── Void wrappers ─────────────────────────────────────
+  const handleOpenCamera   = useCallback(() => void openCamera(),        [openCamera]);
+  const handleGetLoc       = useCallback(() => void handleGetLocation(),  [handleGetLocation]);
+  const handleStartWebCam  = useCallback(() => void startWebCam(),       [startWebCam]);
+  const handleCapturePhoto = useCallback(() => void capturePhoto(),      [capturePhoto]);
+
+  // ── Save ──────────────────────────────────────────────
   const handleSave = useCallback(async () => {
+    const { name, age, height, bodyType, lookingFor, religiousViews, lifestyle, relationshipGoal, bio, photos, heightVerified } = fields;
+    const { icebreaker, selectedPrompt } = media;
     const nv = validateDisplayName(name);
-    if (!nv.valid) { Alert.alert('Invalid Name', nv.reason || 'Invalid name'); return; }
-    if (!name || !age || !height || !bodyType || !lookingFor) { Alert.alert('Missing Fields', 'Please fill all required fields'); return; }
-    if (!photos.length) { Alert.alert('No Photos', 'Add at least 1 photo'); return; }
-    if (bioError) { Alert.alert('Bio Issue', bioError); return; }
+    if (!nv.valid)                                                { Alert.alert('Invalid Name',    nv.reason ?? 'Invalid name'); return; }
+    if (!name || !age || !height || !bodyType || !lookingFor)    { Alert.alert('Missing Fields',  'Please fill all required fields'); return; }
+    if (!photos.length)                                          { Alert.alert('No Photos',        'Add at least 1 photo'); return; }
+    if (bioError)                                                { Alert.alert('Bio Issue',        bioError); return; }
     if (!user) return;
     setSaving(true);
     try {
-      const update: SaveUpdate = {
-        name, age: parseInt(age), bodyType, lookingFor, religiousViews, lifestyle,
-        relationshipGoal, bio, photos, icebreaker, icebreakerPrompt: selectedPrompt,
-        updatedAt: new Date().toISOString(),
-      };
-      if (!heightVerified) {
-        update.height = { value: parseInt(height), verificationMethod: 'self-reported', verifiedAt: new Date().toISOString() };
-      }
+      const update: SaveUpdate = { name, age: parseInt(age), bodyType, lookingFor, religiousViews, lifestyle, relationshipGoal, bio, photos, icebreaker, icebreakerPrompt: selectedPrompt, updatedAt: new Date().toISOString() };
+      if (!heightVerified) { update.height = { value: parseInt(height), verificationMethod: 'self-reported', verifiedAt: new Date().toISOString() }; }
       await updateDoc(doc(db, 'users', user.uid), update as Record<string, unknown>);
       Alert.alert('Success', 'Profile updated!');
       router.back();
-    } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message ?? 'Unknown error';
-      console.error('[EditProfile] save failed:', e);
-      Alert.alert('Error', msg);
-    } finally { setSaving(false); }
-  }, [name, age, height, bodyType, lookingFor, religiousViews, lifestyle, relationshipGoal, bio, bioError, photos, icebreaker, selectedPrompt, heightVerified, user, router]);
+    } catch (e) { logger.error('[EditProfile] save failed:', e); Alert.alert('Error', getErrMsg(e)); }
+    finally { setSaving(false); }
+  }, [fields, media, bioError, user, router, setSaving]);
 
+  const handleSavePress = useCallback(() => void handleSave(), [handleSave]);
+
+  // ── Delete account ────────────────────────────────────
   const handleDeleteAccount = useCallback(() => {
     if (!user) return;
     Alert.alert('⚠️ DELETE ACCOUNT', 'This will permanently delete everything. This cannot be undone.', [
@@ -346,51 +495,64 @@ export default function EditProfileScreen() {
               const snap = await getDocs(collection(db, col));
               for (const d of snap.docs) {
                 const dt = d.data() as Record<string, unknown>;
-                if (Object.values(dt).some(v => typeof v === 'string' && v.includes(user.uid))) {
-                  await deleteDoc(doc(db, col, d.id));
-                }
+                if (Object.values(dt).some(v => typeof v === 'string' && v.includes(user.uid))) await deleteDoc(doc(db, col, d.id));
               }
             }
             await deleteDoc(doc(db, 'users', user.uid));
             await deleteUser(user);
             Alert.alert('Deleted', 'Account deleted. Goodbye! 👋');
             router.replace('/');
-          } catch (e: unknown) {
-            const code = (e as { code?: string })?.code;
-            const msg = (e as { message?: string })?.message ?? 'Unknown error';
+          } catch (e) {
+            const code = getErrCode(e);
             if (code === 'auth/requires-recent-login') Alert.alert('Security', 'Please log out and back in, then try again.');
-            else Alert.alert('Error', msg);
+            else Alert.alert('Error', getErrMsg(e));
           } finally { setDeleting(false); }
         }},
       ])},
     ]);
-  }, [user, router]);
+  }, [user, router, setDeleting]);
 
+  // ── Derived values ────────────────────────────────────
   const verificationStatus = useMemo(() => {
-    if (selfieVerified && (userData?.ratings?.trustScore ?? 0) >= 75) return { level: 'Trusted', color: '#f1c40f' };
-    if (selfieVerified) return { level: 'Verified', color: '#3498db' };
+    if (fields.selfieVerified && (userData?.ratings?.trustScore ?? 0) >= 75) return { level: 'Trusted', color: '#f1c40f' };
+    if (fields.selfieVerified) return { level: 'Verified', color: '#3498db' };
     return { level: 'Basic', color: '#888' };
-  }, [selfieVerified, userData?.ratings?.trustScore]);
+  }, [fields.selfieVerified, userData?.ratings?.trustScore]);
 
-  const videoAgeText = useMemo(() => getVideoAge(videoUploadedAt), [videoUploadedAt]);
-  const videoIsOld = useMemo(() => isVideoOld(videoUploadedAt), [videoUploadedAt]);
-  const heightBadge = useMemo(() => getHtBadge(heightMethod), [heightMethod]);
+  const videoAgeText = useMemo(() => getVideoAge(media.videoUploadedAt), [media.videoUploadedAt]);
+  const videoIsOld   = useMemo(() => isVideoOld(media.videoUploadedAt),  [media.videoUploadedAt]);
+  const heightBadge  = useMemo(() => getHtBadge(fields.heightMethod),    [fields.heightMethod]);
 
-  // Verification items typed properly
-  const verificationItems: Array<[string, boolean]> = [
-    ['Identity Verified', selfieVerified],
-    ['Height Verified', heightVerified],
-    ['Age Verified', ageVerified],
-  ];
+  const verificationItems: Array<[string, boolean]> = useMemo(() => [
+    ['Identity Verified', fields.selfieVerified],
+    ['Height Verified',   fields.heightVerified],
+    ['Age Verified',      fields.ageVerified],
+  ], [fields.selfieVerified, fields.heightVerified, fields.ageVerified]);
 
-  // Beliefs sections
-  const beliefsSections: Array<[string, OptionItem[], string, (v: string) => void]> = [
-    ['Religious Views', RELIGIOUS_OPTIONS, religiousViews, setReligiousViews],
-    ['Lifestyle', LIFESTYLE_OPTIONS, lifestyle, setLifestyle],
-    ['Relationship Goal', RELATIONSHIP_OPTIONS, relationshipGoal, setRelationshipGoal],
-  ];
+  if (ls.loading) return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#53a8b6" />
+      <Text style={styles.loadingText}>Loading profile...</Text>
+    </View>
+  );
 
-  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#53a8b6" /><Text style={styles.loadingText}>Loading profile...</Text></View>;
+  const { name, age, height, heightVerified, heightMethod, bodyType, lookingFor, religiousViews, lifestyle, relationshipGoal, bio, photos, personalityType, locationCity, selfieVerified, ageVerified } = fields;
+  const { videoProfile, videoUploadedAt, playingVideo, icebreaker, selectedPrompt, showPromptPicker } = media;
+  const { reorderMode, selectedPhotoIndex, cameraOpen, webCamReady, camError } = ui;
+  const { saving, uploadingPhoto, deleting, deletingVideo, gettingLoc } = ls;
+
+  // ── TrustScoreDisplay ratings — build a safe default so prop is never undefined
+  const trustRatings = userData?.ratings
+    ? {
+        totalRatings:           userData.ratings.totalRatings           ?? 0,
+        averagePhotosMatch:     userData.ratings.averagePhotosMatch     ?? 0,
+        heightAccuracyRate:     userData.ratings.heightAccuracyRate     ?? 0,
+        bodyTypeAccuracyRate:   userData.ratings.bodyTypeAccuracyRate   ?? 0,
+        ageAccuracyRate:        userData.ratings.ageAccuracyRate        ?? 0,
+        averagePersonalityMatch:userData.ratings.averagePersonalityMatch?? 0,
+        averageOverall:         userData.ratings.averageOverall         ?? 0,
+      }
+    : { totalRatings: 0, averagePhotosMatch: 0, heightAccuracyRate: 0, bodyTypeAccuracyRate: 0, ageAccuracyRate: 0, averagePersonalityMatch: 0, averageOverall: 0 };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -411,14 +573,20 @@ export default function EditProfileScreen() {
           ))}
         </View>
         <View style={styles.trustScoreSection}>
-          <TrustScoreDisplay ratings={userData?.ratings} selfieVerified={selfieVerified} ageVerified={ageVerified} heightVerified={heightVerified} size="large" />
+          <TrustScoreDisplay
+            ratings={trustRatings}
+            selfieVerified={selfieVerified}
+            ageVerified={ageVerified}
+            heightVerified={heightVerified}
+            size="large"
+          />
         </View>
         {!selfieVerified
-          ? <TouchableOpacity style={styles.verifySelfieButton} onPress={() => router.push('/selfie-verification')} accessibilityLabel="Verify your identity" accessibilityRole="button"><Text style={styles.verifySelfieButtonText}>Verify Your Identity</Text></TouchableOpacity>
+          ? <TouchableOpacity style={styles.verifySelfieButton} onPress={handleGoSelfieVerification} accessibilityLabel="Verify your identity" accessibilityRole="button"><Text style={styles.verifySelfieButtonText}>Verify Your Identity</Text></TouchableOpacity>
           : <Text style={styles.verifiedNote}>Your identity has been verified ✓</Text>}
       </View>
 
-      <TouchableOpacity style={styles.previewButton} onPress={() => router.push({ pathname: '/profile-preview', params: { userId: user!.uid } })} accessibilityLabel="Preview your profile as others see it" accessibilityRole="button">
+      <TouchableOpacity style={styles.previewButton} onPress={handleGoProfilePreview} accessibilityLabel="Preview your profile as others see it" accessibilityRole="button">
         <Text style={styles.previewButtonIcon}>👁️</Text>
         <View style={styles.previewButtonTextContainer}>
           <Text style={styles.previewButtonText}>Preview Your Profile</Text>
@@ -427,7 +595,7 @@ export default function EditProfileScreen() {
         <Text style={styles.previewButtonArrow}>→</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.socialButton} onPress={() => router.push('/social-verification')} accessibilityLabel="Link social media accounts" accessibilityRole="button">
+      <TouchableOpacity style={styles.socialButton} onPress={handleGoSocialVerification} accessibilityLabel="Link social media accounts" accessibilityRole="button">
         <Text style={styles.socialButtonText}>🔗 Link Social Media</Text>
       </TouchableOpacity>
 
@@ -435,38 +603,19 @@ export default function EditProfileScreen() {
       <Text style={styles.sectionTitle}>📷 Photos</Text>
       <Text style={styles.hint}>CAMERA ONLY — photos are scanned for inappropriate content.</Text>
       <View style={styles.photoControlsRow}>
-        <TouchableOpacity
-          style={[styles.reorderButton, reorderMode && styles.reorderButtonActive]}
-          onPress={() => { setReorderMode(!reorderMode); setSelectedPhotoIndex(null); }}
-          accessibilityLabel={reorderMode ? 'Done reordering photos' : 'Reorder photos'}
-          accessibilityRole="button">
+        <TouchableOpacity style={[styles.reorderButton, reorderMode && styles.reorderButtonActive]} onPress={toggleReorderMode} accessibilityLabel={reorderMode ? 'Done reordering photos' : 'Reorder photos'} accessibilityRole="button">
           <Text style={[styles.reorderButtonText, reorderMode && styles.reorderButtonTextActive]}>{reorderMode ? '✓ Done' : '↔️ Reorder'}</Text>
         </TouchableOpacity>
       </View>
       {uploadingPhoto && <View style={styles.uploadingContainer}><ActivityIndicator size="small" color="#53a8b6" /><Text style={styles.uploadingText}>Uploading...</Text></View>}
       <View style={styles.photosContainer}>
         {photos.map((uri, i) => (
-          <View key={i} style={styles.photoWrapper}>
-            <TouchableOpacity
-              onPress={() => handlePhotoTap(i)}
-              style={[styles.photoTouchable, reorderMode && styles.photoReorderMode, selectedPhotoIndex === i && styles.photoSelected]}
-              accessibilityLabel={`Photo ${i + 1}${i === 0 ? ', main photo' : ''}${reorderMode ? '. Tap to select for reordering.' : ''}`}
-              accessibilityRole="button">
-              <Image source={{ uri }} style={styles.photo} accessibilityLabel={`Profile photo ${i + 1}`} />
-              {i === 0 && <View style={styles.primaryBadge}><Text style={styles.primaryBadgeText}>Main</Text></View>}
-              {reorderMode && <View style={styles.photoIndexBadge}><Text style={styles.photoIndexText}>{i + 1}</Text></View>}
-            </TouchableOpacity>
-            {reorderMode && (
-              <View style={styles.reorderArrows}>
-                {i > 0 && <TouchableOpacity style={styles.arrowButton} onPress={() => moveLeft(i)} accessibilityLabel="Move photo left" accessibilityRole="button"><Text style={styles.arrowText}>←</Text></TouchableOpacity>}
-                {i < photos.length - 1 && <TouchableOpacity style={styles.arrowButton} onPress={() => moveRight(i)} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={styles.arrowText}>→</Text></TouchableOpacity>}
-              </View>
-            )}
-            {!reorderMode && <TouchableOpacity style={styles.removeButton} onPress={() => removePhoto(i)} accessibilityLabel={`Remove photo ${i + 1}`} accessibilityRole="button"><Text style={styles.removeButtonText}>✕</Text></TouchableOpacity>}
-          </View>
+          <PhotoItem key={i} uri={uri} index={i} total={photos.length}
+            reorderMode={reorderMode} selected={selectedPhotoIndex === i}
+            onTap={handlePhotoTap} onMoveLeft={moveLeft} onMoveRight={moveRight} onRemove={removePhoto} />
         ))}
         {photos.length < MAX_PHOTOS && !reorderMode && (
-          <TouchableOpacity style={styles.addPhotoButton} onPress={() => void openCamera()} accessibilityLabel="Add a new photo" accessibilityRole="button">
+          <TouchableOpacity style={styles.addPhotoButton} onPress={handleOpenCamera} accessibilityLabel="Add a new photo" accessibilityRole="button">
             <Text style={styles.addPhotoIcon}>📷</Text>
             <Text style={styles.addPhotoText}>Add Photo</Text>
           </TouchableOpacity>
@@ -489,12 +638,12 @@ export default function EditProfileScreen() {
           <Text style={styles.videoDate}>Uploaded {videoAgeText}</Text>
           {videoIsOld && <Text style={styles.videoOldWarning}>Over 6 months old. Consider re-recording!</Text>}
           <View style={styles.videoButtons}>
-            <TouchableOpacity style={styles.recordVideoButton} onPress={() => router.push('/video-profile-recorder')} accessibilityLabel="Re-record video profile" accessibilityRole="button"><Text style={styles.recordVideoText}>🔄 Re-record</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.recordVideoButton} onPress={handleGoVideoRecorder} accessibilityLabel="Re-record video profile" accessibilityRole="button"><Text style={styles.recordVideoText}>🔄 Re-record</Text></TouchableOpacity>
             <TouchableOpacity style={styles.deleteVideoButton} onPress={handleDeleteVideo} disabled={deletingVideo} accessibilityLabel="Delete video profile" accessibilityRole="button">{deletingVideo ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.deleteVideoText}>🗑️ Delete</Text>}</TouchableOpacity>
           </View>
         </View>
       ) : (
-        <TouchableOpacity style={styles.addVideoButton} onPress={() => router.push('/video-profile-recorder')} accessibilityLabel="Record a video profile" accessibilityRole="button">
+        <TouchableOpacity style={styles.addVideoButton} onPress={handleGoVideoRecorder} accessibilityLabel="Record a video profile" accessibilityRole="button">
           <Text style={styles.addVideoIcon}>🎬</Text>
           <Text style={styles.addVideoText}>Record Video Profile</Text>
           <Text style={styles.addVideoSubtext}>15 seconds to introduce yourself</Text>
@@ -503,21 +652,13 @@ export default function EditProfileScreen() {
 
       {/* Icebreaker */}
       <Text style={styles.sectionTitle}>💬 Icebreaker</Text>
-      <TouchableOpacity style={styles.promptSelector} onPress={() => setShowPromptPicker(true)} accessibilityLabel={selectedPrompt || 'Choose a prompt'} accessibilityRole="button">
+      <TouchableOpacity style={styles.promptSelector} onPress={openPromptPicker} accessibilityLabel={selectedPrompt || 'Choose a prompt'} accessibilityRole="button">
         <Text style={styles.promptSelectorText}>{selectedPrompt || 'Choose a prompt...'}</Text>
         <Text style={styles.promptSelectorArrow}>▼</Text>
       </TouchableOpacity>
       {selectedPrompt && (
         <>
-          <TextInput
-            style={styles.icebreakerInput}
-            placeholder="Your answer..."
-            placeholderTextColor="#666"
-            value={icebreaker}
-            onChangeText={t => setIcebreaker(t.slice(0, MAX_ICE))}
-            multiline
-            accessibilityLabel={`Answer to: ${selectedPrompt}`}
-          />
+          <TextInput style={styles.icebreakerInput} placeholder="Your answer..." placeholderTextColor="#666" value={icebreaker} onChangeText={handleIcebreakerChange} multiline accessibilityLabel={`Answer to: ${selectedPrompt}`} />
           <Text style={styles.charCount}>{icebreaker.length}/{MAX_ICE}</Text>
         </>
       )}
@@ -525,111 +666,69 @@ export default function EditProfileScreen() {
       {/* Basic Info */}
       <Text style={styles.sectionTitle}>Basic Info</Text>
       <Text style={styles.label}>First Name</Text>
-      <TextInput
-        style={[styles.input, nameError && styles.inputError]}
-        value={name}
-        onChangeText={handleNameChange}
-        onBlur={() => { if (name) { const r = validateDisplayName(name); if (r.valid) setName(name.trim()); } }}
-        placeholder="Sarah"
-        placeholderTextColor="#666"
-        maxLength={20}
-        accessibilityLabel="First name"
-      />
+      <TextInput style={[styles.input, !!nameError && styles.inputError]} value={name} onChangeText={handleNameChange} onBlur={handleNameBlur} placeholder="Sarah" placeholderTextColor="#666" maxLength={20} accessibilityLabel="First name" />
       {nameError && <Text style={styles.errorText}>{nameError}</Text>}
 
       <Text style={styles.label}>Age</Text>
-      <TextInput style={styles.input} value={age} onChangeText={t => setAge(t.replace(/[^0-9]/g, ''))} placeholder="25" placeholderTextColor="#666" keyboardType="number-pad" maxLength={2} accessibilityLabel="Age" />
+      <TextInput style={styles.input} value={age} onChangeText={handleAgeChange} placeholder="25" placeholderTextColor="#666" keyboardType="number-pad" maxLength={2} accessibilityLabel="Age" />
 
       <Text style={styles.label}>Height (cm)</Text>
       <View style={styles.heightRow}>
-        <TextInput style={[styles.input, styles.heightInput]} value={height} onChangeText={t => setHeight(t.replace(/[^0-9]/g, ''))} placeholder="170" placeholderTextColor="#666" keyboardType="number-pad" maxLength={3} editable={!heightVerified} accessibilityLabel="Height in centimetres" />
+        <TextInput style={[styles.input, styles.heightInput]} value={height} onChangeText={handleHeightChange} placeholder="170" placeholderTextColor="#666" keyboardType="number-pad" maxLength={3} editable={!heightVerified} accessibilityLabel="Height in centimetres" />
         {heightMethod !== '' && <View style={[styles.heightBadge, heightMethod === 'manual-measured' && styles.heightBadgeVerified]}><Text style={styles.heightBadgeText}>{heightBadge}</Text></View>}
       </View>
-      <TouchableOpacity style={styles.verifyHeightButton} onPress={() => router.push('/height-verification')} accessibilityLabel={heightVerified ? 'Re-verify height' : 'Verify height'} accessibilityRole="button">
+      <TouchableOpacity style={styles.verifyHeightButton} onPress={handleGoHeightVerification} accessibilityLabel={heightVerified ? 'Re-verify height' : 'Verify height'} accessibilityRole="button">
         <Text style={styles.verifyHeightText}>{heightVerified ? '✓ Re-verify Height' : '📏 Verify Height'}</Text>
       </TouchableOpacity>
 
-      <BodyTypeSelector label="Your Body Type" selectedType={bodyType} onSelect={setBodyType} />
-      <BodyTypeSelector label="Body Type Preference" selectedType={lookingFor} onSelect={setLookingFor} showLookingFor />
+      <BodyTypeSelector label="Your Body Type"       selectedType={bodyType}    onSelect={setBodyType} />
+      <BodyTypeSelector label="Body Type Preference" selectedType={lookingFor}  onSelect={setLookingFor} showLookingFor />
 
       <Text style={styles.sectionTitle}>Beliefs and Values</Text>
-      {beliefsSections.map(([label, opts, val, setter]) => (
-        <View key={label}>
-          <Text style={styles.label}>{label}</Text>
-          <View style={styles.optionsColumn}>
-            {opts.map((o) => (
-              <TouchableOpacity
-                key={o.value}
-                style={[styles.optionRow, val === o.value && styles.optionRowActive]}
-                onPress={() => setter(o.value)}
-                accessibilityLabel={`${o.value}: ${o.desc}`}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: val === o.value }}>
-                <Text style={[styles.optionRowText, val === o.value && styles.optionRowTextActive]}>{o.value}</Text>
-                <Text style={styles.optionRowDesc}>{o.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ))}
+      <BeliefsSection label="Religious Views"   opts={RELIGIOUS_OPTIONS}    value={religiousViews}   onSelect={setReligiousViews} />
+      <BeliefsSection label="Lifestyle"         opts={LIFESTYLE_OPTIONS}    value={lifestyle}        onSelect={setLifestyle} />
+      <BeliefsSection label="Relationship Goal" opts={RELATIONSHIP_OPTIONS} value={relationshipGoal} onSelect={setRelationshipGoal} />
 
+      {/* Location */}
       <Text style={styles.sectionTitle}>Location</Text>
-      <TouchableOpacity style={styles.locationButton} onPress={() => void handleGetLocation()} disabled={gettingLoc} accessibilityLabel={locationCity ? `Update location, currently ${locationCity}` : 'Update location'} accessibilityRole="button">
+      <TouchableOpacity style={styles.locationButton} onPress={handleGetLoc} disabled={gettingLoc} accessibilityLabel={locationCity ? `Update location, currently ${locationCity}` : 'Update location'} accessibilityRole="button">
         {gettingLoc ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.locationButtonText}>{locationCity ? `📍 ${locationCity}` : '📍 Update Location'}</Text>}
       </TouchableOpacity>
 
+      {/* Bio */}
       <Text style={styles.sectionTitle}>About Me</Text>
-      <TextInput
-        style={styles.bioInput}
-        placeholder="Tell people about yourself..."
-        placeholderTextColor="#666"
-        value={bio}
-        onChangeText={handleBioChange}
-        multiline
-        numberOfLines={4}
-        maxLength={MAX_BIO}
-        accessibilityLabel="Bio"
-        accessibilityHint="Describe yourself in a few sentences"
-      />
+      <TextInput style={styles.bioInput} placeholder="Tell people about yourself..." placeholderTextColor="#666" value={bio} onChangeText={handleBioChange} multiline numberOfLines={4} maxLength={MAX_BIO} accessibilityLabel="Bio" accessibilityHint="Describe yourself in a few sentences" />
       {bioError ? <Text style={styles.errorText}>{bioError}</Text> : <Text style={styles.charCount}>{bio.length}/{MAX_BIO}</Text>}
 
+      {/* Personality */}
       <Text style={styles.sectionTitle}>Personality</Text>
       <View style={styles.personalityRow}>
         <Text style={styles.personalityLabel}>Current: <Text style={styles.personalityValue}>{personalityType || 'Not taken'}</Text></Text>
-        <TouchableOpacity style={styles.retakeButton} onPress={() => router.push('/personality-quiz')} accessibilityLabel="Retake personality quiz" accessibilityRole="button">
+        <TouchableOpacity style={styles.retakeButton} onPress={handleGoPersonalityQuiz} accessibilityLabel="Retake personality quiz" accessibilityRole="button">
           <Text style={styles.retakeText}>Retake Quiz</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        onPress={() => void handleSave()}
-        disabled={saving || uploadingPhoto}
-        accessibilityLabel={saving ? 'Saving changes' : 'Save changes'}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: saving || uploadingPhoto, busy: saving }}>
+      {/* Save / Cancel */}
+      <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSavePress} disabled={saving || uploadingPhoto} accessibilityLabel={saving ? 'Saving changes' : 'Save changes'} accessibilityRole="button" accessibilityState={{ disabled: saving || uploadingPhoto, busy: saving }}>
         <Text style={styles.saveButtonText}>{saving ? 'Saving...' : '✓ Save Changes'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()} accessibilityLabel="Cancel editing" accessibilityRole="button">
+      <TouchableOpacity style={styles.cancelButton} onPress={handleGoBack} accessibilityLabel="Cancel editing" accessibilityRole="button">
         <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
 
+      {/* Legal */}
       <View style={styles.legalSection}>
-        <TouchableOpacity onPress={() => router.push('/privacy')} accessibilityLabel="Privacy Policy" accessibilityRole="link"><Text style={styles.legalLink}>Privacy Policy</Text></TouchableOpacity>
+        <TouchableOpacity onPress={handleGoPrivacy} accessibilityLabel="Privacy Policy" accessibilityRole="link"><Text style={styles.legalLink}>Privacy Policy</Text></TouchableOpacity>
         <Text style={styles.legalDivider}>•</Text>
-        <TouchableOpacity onPress={() => router.push('/terms')} accessibilityLabel="Terms of Service" accessibilityRole="link"><Text style={styles.legalLink}>Terms of Service</Text></TouchableOpacity>
+        <TouchableOpacity onPress={handleGoTerms} accessibilityLabel="Terms of Service" accessibilityRole="link"><Text style={styles.legalLink}>Terms of Service</Text></TouchableOpacity>
       </View>
 
+      {/* Danger Zone */}
       <View style={styles.dangerZone}>
         <Text style={styles.dangerZoneTitle}>⚠️ Danger Zone</Text>
         <Text style={styles.dangerZoneText}>Permanently delete your account. This cannot be undone.</Text>
-        <TouchableOpacity
-          style={[styles.deleteAccountButton, deleting && styles.deleteAccountButtonDisabled]}
-          onPress={handleDeleteAccount}
-          disabled={deleting}
-          accessibilityLabel={deleting ? 'Deleting account' : 'Delete my account'}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: deleting, busy: deleting }}>
+        <TouchableOpacity style={[styles.deleteAccountButton, deleting && styles.deleteAccountButtonDisabled]} onPress={handleDeleteAccount} disabled={deleting} accessibilityLabel={deleting ? 'Deleting account' : 'Delete my account'} accessibilityRole="button" accessibilityState={{ disabled: deleting, busy: deleting }}>
           <Text style={styles.deleteAccountButtonText}>{deleting ? 'Deleting...' : '🗑️ Delete My Account'}</Text>
         </TouchableOpacity>
       </View>
@@ -641,10 +740,8 @@ export default function EditProfileScreen() {
           {IS_WEB ? (
             <View style={styles.camBox}>
               {camError
-                ? <View style={styles.camErrorBox}><Text style={styles.camErrorText}>{camError}</Text><TouchableOpacity style={styles.retryBtn} onPress={() => void startWebCam()} accessibilityLabel="Retry camera" accessibilityRole="button"><Text style={styles.retryBtnText}>Retry</Text></TouchableOpacity></View>
-                : !webCamReady
-                  ? <View style={styles.loadingBox}><ActivityIndicator size="large" color="#53a8b6" /><Text style={styles.loadingTextCam}>Starting camera...</Text></View>
-                  : null}
+                ? <View style={styles.camErrorBox}><Text style={styles.camErrorText}>{camError}</Text><TouchableOpacity style={styles.retryBtn} onPress={handleStartWebCam} accessibilityLabel="Retry camera" accessibilityRole="button"><Text style={styles.retryBtnText}>Retry</Text></TouchableOpacity></View>
+                : !webCamReady ? <View style={styles.loadingBox}><ActivityIndicator size="large" color="#53a8b6" /><Text style={styles.loadingTextCam}>Starting camera...</Text></View> : null}
               <View style={webCamReady ? styles.videoBox : styles.hidden}>
                 {IS_WEB && React.createElement('video', { id: 'edit-profile-camera', autoPlay: true, playsInline: true, muted: true, style: { width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' } })}
               </View>
@@ -653,13 +750,7 @@ export default function EditProfileScreen() {
             <View style={styles.camBox}><CameraView ref={cameraRef} style={styles.nativeCam} facing="front" /></View>
           )}
           <View style={styles.cameraControls}>
-            <TouchableOpacity
-              style={[styles.captureBtn, IS_WEB && !webCamReady && styles.disabled]}
-              onPress={() => void capturePhoto()}
-              disabled={IS_WEB && !webCamReady}
-              accessibilityLabel="Take photo"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: IS_WEB && !webCamReady }}>
+            <TouchableOpacity style={[styles.captureBtn, IS_WEB && !webCamReady && styles.disabled]} onPress={handleCapturePhoto} disabled={IS_WEB && !webCamReady} accessibilityLabel="Take photo" accessibilityRole="button" accessibilityState={{ disabled: IS_WEB && !webCamReady }}>
               <View style={styles.captureBtnInner} />
             </TouchableOpacity>
           </View>
@@ -670,24 +761,16 @@ export default function EditProfileScreen() {
       </Modal>
 
       {/* Prompt Picker Modal */}
-      <Modal visible={showPromptPicker} animationType="slide" transparent onRequestClose={() => setShowPromptPicker(false)}>
+      <Modal visible={showPromptPicker} animationType="slide" transparent onRequestClose={closePromptPicker}>
         <View style={styles.promptModalOverlay}>
           <View style={styles.promptModal}>
             <Text style={styles.promptModalTitle}>Choose a Prompt</Text>
             <ScrollView style={styles.promptList}>
               {ICEBREAKER_PROMPTS.map((p, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.promptOption, selectedPrompt === p && styles.promptOptionActive]}
-                  onPress={() => { setSelectedPrompt(p); setShowPromptPicker(false); }}
-                  accessibilityLabel={p}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selectedPrompt === p }}>
-                  <Text style={[styles.promptOptionText, selectedPrompt === p && styles.promptOptionTextActive]}>{p}</Text>
-                </TouchableOpacity>
+                <PromptOption key={i} prompt={p} selected={selectedPrompt === p} onSelect={handleSelectPrompt} />
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.promptModalClose} onPress={() => setShowPromptPicker(false)} accessibilityLabel="Cancel" accessibilityRole="button">
+            <TouchableOpacity style={styles.promptModalClose} onPress={closePromptPicker} accessibilityLabel="Cancel" accessibilityRole="button">
               <Text style={styles.promptModalCloseText}>Cancel</Text>
             </TouchableOpacity>
           </View>

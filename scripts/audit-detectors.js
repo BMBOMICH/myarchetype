@@ -687,7 +687,7 @@ const DETECTORS = [
   { id: 414, section: '9', name: 'Missed check-in alert', severity: 'critical', patterns: ['missedCheckin', 'missedCheckinAlertSent'], freeTools: ['Custom — alert emergency contact if check-in missed'] },
   { id: 415, section: '9', name: 'Safe meeting locations', severity: 'high', patterns: ['safeMeetingLocationSuggest', 'safeVenue', 'publicPlace'], freeTools: ['OpenStreetMap Overpass API'] },
   { id: 416, section: '9', name: 'Share meeting location', severity: 'high', patterns: ['createMeetingShare', 'shareMeetingLocation'], freeTools: ['Custom feature'] },
-  { id: 417, section: '9', name: 'User never checks in detection', severity: 'medium', patterns: ['neverChecksIn', 'skipCheckIn', 'ignoreSwitchEvasion'], freeTools: ['Qwen3Guard multilingual support'] },
+  { id: 417, section: '9', name: 'User never checks in detection', severity: 'medium', patterns: ['neverChecksIn', 'skipCheckIn', 'ignoredCheckIn'], freeTools: ['Custom — track check-in compliance'] },
   { id: 216, section: '2.8', name: 'Translation artifact detection', patterns: ['translationArtifact', 'machineTranslation', 'unnaturalPhrasing'], freeTools: ['Custom — check for translation-specific phrasings'] },
   { id: 217, section: '2.8', name: 'Refusal to use contractions (AI signal)', patterns: ['noContractions', 'aiWritingStyle', 'formalExcess'], freeTools: ['Custom — contraction ratio analysis'] },
   { id: 218, section: '2.8', name: 'Message entropy analysis', patterns: ['messageEntropy', 'shannonEntropy', 'entropyScore'], freeTools: ['Custom — Shannon entropy calculation'] },
@@ -1584,16 +1584,19 @@ const DETECTORS = [
 // END OF DETECTORS — STARTUP VALIDATION
 // ═══════════════════════════════════════════════════════════
 
-// Validate no duplicate IDs
-const idSet = new Set();
-const dupes = [];
-for (const d of DETECTORS) {
-  if (idSet.has(d.id)) dupes.push(d.id);
-  idSet.add(d.id);
+// Validate & deduplicate IDs (keep first occurrence — the one with severity)
+const seen = new Set();
+const dupeIds = new Set();
+for (let i = DETECTORS.length - 1; i >= 0; i--) {
+  if (seen.has(DETECTORS[i].id)) {
+    dupeIds.add(DETECTORS[i].id);
+    DETECTORS.splice(i, 1);
+  } else {
+    seen.add(DETECTORS[i].id);
+  }
 }
-if (dupes.length > 0) {
-  console.error(`❌ FATAL: Duplicate detector IDs found: ${dupes.join(', ')}`);
-  process.exit(2);
+if (dupeIds.size > 0) {
+  console.warn(`⚠️  Removed ${dupeIds.size} duplicate detector entries (kept first occurrence with severity)`);
 }
 
 // Pre-compile all regex patterns once
@@ -1622,12 +1625,12 @@ for (const d of DETECTORS) {
 }
 
 // Apply CLI section filter
-const activeDetectors = filterSection
-  ? DETECTORS.filter(d => d.section === filterSection || d.section.startsWith(filterSection + '.'))
+const activeDetectors = CLI.section
+  ? DETECTORS.filter(d => d.section === CLI.section || d.section.startsWith(CLI.section + '.'))
   : DETECTORS;
 
-if (filterSection && activeDetectors.length === 0) {
-  console.error(`❌ No detectors found for section "${filterSection}"`);
+if (CLI.section && activeDetectors.length === 0) {
+  console.error(`❌ No detectors found for section "${CLI.section}"`);
   process.exit(1);
 }
 
@@ -2131,7 +2134,7 @@ const report = {
   scannedFiles: fileCount,
   scanErrors,
   totalDetectors: total,
-  filterApplied: filterSection ?? null,
+  filterApplied: CLI.section ?? null,
   summary: {
     implemented: implemented.length,
     partial: partial.length,

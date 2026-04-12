@@ -1,3 +1,4 @@
+import { logger } from './logger';
 /**
  * Giphy API client
  *
@@ -132,7 +133,7 @@ async function fetchGiphy(
       return [];
     }
     if (__DEV__) {
-      console.warn(`Giphy ${endpoint} request failed:`, error);
+      logger.warn(`Giphy ${endpoint} request failed:`, error);
     }
     return [];
   } finally {

@@ -1,3 +1,4 @@
+import { logger } from './logger';
 /**
  * Height Estimation
  *
@@ -49,13 +50,13 @@ export function estimateHeightFromFaceData(
 
   if (faceRatio > 0.35) {
     // Face takes up too much of the image — not a full body photo
-    console.log('[heightEstimation] Not a full-body photo (face ratio:', faceRatio.toFixed(3), ')');
+    logger.log('[heightEstimation] Not a full-body photo (face ratio:', faceRatio.toFixed(3), ')');
     return null;
   }
 
   if (faceRatio < 0.03) {
     // Person is too far from camera
-    console.log('[heightEstimation] Person too far (face ratio:', faceRatio.toFixed(3), ')');
+    logger.log('[heightEstimation] Person too far (face ratio:', faceRatio.toFixed(3), ')');
     return null;
   }
 
@@ -96,11 +97,11 @@ export function estimateHeightFromFaceData(
 
   // Sanity check
   if (estimatedHeight < 130 || estimatedHeight > 230) {
-    console.log('[heightEstimation] Unreasonable result:', estimatedHeight, 'cm');
+    logger.log('[heightEstimation] Unreasonable result:', estimatedHeight, 'cm');
     return null;
   }
 
-  console.log(
+  logger.log(
     `[heightEstimation] Estimated: ${estimatedHeight}cm (${confidence}% confidence) | ` +
     `Face ratio: ${faceRatio.toFixed(3)}, Faces in body: ${facesInBody.toFixed(1)}`
   );

@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface QuizQuestion {
   id: number;
@@ -81,7 +82,7 @@ export async function startCompatibilityQuiz(
 
     return { success: true, quizId };
   } catch (error) {
-    console.error('Error starting quiz:', error);
+    logger.error('Error starting quiz:', error);
     return { success: false };
   }
 }
@@ -133,7 +134,7 @@ export async function submitQuizAnswers(
 
     return { success: true, bothCompleted: false };
   } catch (error) {
-    console.error('Error submitting quiz answers:', error);
+    logger.error('Error submitting quiz answers:', error);
     return { success: false };
   }
 }
@@ -178,7 +179,7 @@ export async function getQuizSession(quizId: string): Promise<QuizSession | null
     if (!quizDoc.exists()) return null;
     return quizDoc.data() as QuizSession;
   } catch (error) {
-    console.error('Error getting quiz session:', error);
+    logger.error('Error getting quiz session:', error);
     return null;
   }
 }

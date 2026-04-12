@@ -1,5 +1,6 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface ChatSettings {
   wallpaper: string | null;
@@ -36,7 +37,7 @@ export async function getChatSettings(chatId: string): Promise<ChatSettings> {
 
     return { ...DEFAULT_SETTINGS, ...settingsDoc.data() };
   } catch (error) {
-    console.error('Error getting chat settings:', error);
+    logger.error('Error getting chat settings:', error);
     return DEFAULT_SETTINGS;
   }
 }
@@ -65,7 +66,7 @@ export async function updateChatSettings(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error updating chat settings:', error);
+    logger.error('Error updating chat settings:', error);
     return { success: false, error: error?.message ?? 'Unknown error' };
   }
 }

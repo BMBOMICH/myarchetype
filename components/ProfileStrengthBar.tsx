@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
+import { logger } from '../utils/logger';
 
 interface ProfileStrengthBarProps { onPress?: () => void; compact?: boolean; }
 
@@ -16,7 +17,7 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
       const result = await calculateProfileStrength();
       setStrength(result);
     } catch (err) {
-      console.error('[ProfileStrengthBar] Failed to load profile strength:', err);
+      logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
       setError('Could not load profile strength');
     } finally {
       setLoading(false);

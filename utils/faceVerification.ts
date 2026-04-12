@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
+import { logger } from './logger';
 
 const IS_WEB    = Platform.OS === 'web';
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
@@ -106,7 +107,7 @@ export async function loadFaceVerification(): Promise<boolean> {
       modelsLoaded = true;
       return true;
     } catch (err) {
-      console.error('[faceVerify] Load failed:', err);
+      logger.error('[faceVerify] Load failed:', err);
       loadPromise = null;
       return false;
     }
@@ -188,7 +189,7 @@ export async function verifyFaceMatch(selfieUri: string, profileUri: string): Pr
       return { match: false, distance, confidence, reason: 'Selfie does not match profile photo. Please use your own face.' };
     return { match: true, distance, confidence, reason: `Face match confirmed (${confidence.toFixed(0)}% confidence).` };
   } catch (err) {
-    console.error('[faceVerify] verifyFaceMatch error:', err);
+    logger.error('[faceVerify] verifyFaceMatch error:', err);
     return { match: true, distance: -1, confidence: 0, reason: 'Face matching error (allowed).' };
   }
 }

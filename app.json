@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myarchetype",
     "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -15,9 +16,20 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bmbomich.myarchetype",
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "MyArchetype needs camera access to take profile photos and verify your identity.",
-        "NSLocationWhenInUseUsageDescription": "MyArchetype uses your location to find matches near you."
+        "NSMicrophoneUsageDescription": "MyArchetype needs microphone access to record voice and video introductions.",
+        "NSLocationWhenInUseUsageDescription": "MyArchetype uses your location to find matches near you.",
+        "NSPhotoLibraryUsageDescription": "MyArchetype needs photo library access to upload profile photos.",
+        "NSFaceIDUsageDescription": "MyArchetype uses Face ID to keep your account secure."
       }
     },
     "android": {
@@ -28,10 +40,16 @@
         "backgroundColor": "#1a1a2e"
       },
       "package": "com.bmbomich.myarchetype",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",
+        "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
       ]
     },
     "web": {
@@ -39,19 +57,20 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
-      "expo-camera",
-      "expo-location",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#53a8b6"
-        }
-      ],
+      ["expo-camera", { "cameraPermission": "MyArchetype needs camera access to take profile photos and verify your identity." }],
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "MyArchetype uses your location to find matches near you." }],
+      ["expo-notifications", { "icon": "./assets/images/android-icon-monochrome.png", "color": "#53a8b6", "defaultChannel": "default" }],
       "expo-secure-store",
-      "@sentry/react-native"
+      ["@sentry/react-native", { "uploadSourceMaps": true, "url": "https://sentry.io/" }]
     ],
     "experiments": {
       "typedRoutes": true

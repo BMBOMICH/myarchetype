@@ -1,117 +1,77 @@
 import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, Alert, FlatList, Image,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { auth, db } from '../firebaseConfig';
+import { logger } from '../utils/logger';
 
-interface BlockedUser {
-  uid: string;
-  name: string;
-  photos?: string[];
-}
+interface BlockedUser { uid: string; name: string; photos?: string[]; }
 
 export default function BlockedUsersScreen() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]           = useState(true);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
 
-  useEffect(() => {
-    loadBlockedUsers();
-  }, []);
-
-  const loadBlockedUsers = async () => {
+  const loadBlockedUsers = useCallback(async () => {
     const user = auth.currentUser;
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
-
+    if (!user) { router.replace('/login'); return; }
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-
-      if (!userDoc.exists()) {
-        setLoading(false);
-        return;
-      }
-
-      const blockedIds = userDoc.data().blockedUsers || [];
-      const blockedList: BlockedUser[] = [];
-
-      for (const blockedId of blockedIds) {
-        try {
-          const blockedDoc = await getDoc(doc(db, 'users', blockedId));
-          if (blockedDoc.exists()) {
-            const data = blockedDoc.data();
-            blockedList.push({
-              uid: blockedId,
-              name: data.name || 'Unknown User',
-              photos: data.photos || [],
-            });
-          } else {
-            blockedList.push({
-              uid: blockedId,
-              name: 'Deleted User',
-              photos: [],
-            });
+      if (!userDoc.exists()) { setLoading(false); return; }
+      const blockedIds: string[] = userDoc.data().blockedUsers || [];
+      const list: BlockedUser[] = await Promise.all(
+        blockedIds.map(async (id) => {
+          try {
+            const snap = await getDoc(doc(db, 'users', id));
+            if (snap.exists()) {
+              const d = snap.data();
+              return { uid: id, name: d.name || 'Unknown User', photos: d.photos || [] };
+            }
+            return { uid: id, name: 'Deleted User', photos: [] };
+          } catch (e) {
+            logger.error('[BlockedUsers] load single user error:', e);
+            return { uid: id, name: 'Unknown User', photos: [] };
           }
-        } catch (e) {
-          console.error('Error loading blocked user:', e);
-        }
-      }
-
-      setBlockedUsers(blockedList);
+        })
+      );
+      setBlockedUsers(list);
     } catch (error) {
-      console.error('Error loading blocked users:', error);
+      logger.error('[BlockedUsers] loadBlockedUsers error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  const handleUnblock = (blockedUser: BlockedUser) => {
+  useEffect(() => { loadBlockedUsers(); }, [loadBlockedUsers]);
+
+  const handleUnblock = useCallback((blockedUser: BlockedUser) => {
     Alert.alert(
       'Unblock User',
-      'Unblock ' +
-        blockedUser.name +
-        '?\n\nThey will be able to see your profile and send you messages again.',
+      `Unblock ${blockedUser.name}?\n\nThey will be able to see your profile and send you messages again.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unblock',
-          onPress: async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-
-            try {
-              const userDoc = await getDoc(doc(db, 'users', user.uid));
-              const currentBlocked = userDoc.data()?.blockedUsers || [];
-              const newBlocked = currentBlocked.filter(
-                (id: string) => id !== blockedUser.uid
-              );
-
-              await updateDoc(doc(db, 'users', user.uid), {
-                blockedUsers: newBlocked,
-              });
-
-              setBlockedUsers((prev) => prev.filter((u) => u.uid !== blockedUser.uid));
-              Alert.alert('Done', blockedUser.name + ' has been unblocked');
-            } catch (error) {
-              console.error('Error unblocking:', error);
-              Alert.alert('Error', 'Error unblocking user');
-            }
-          },
-        },
+        { text: 'Unblock', onPress: async () => {
+          const user = auth.currentUser;
+          if (!user) return;
+          try {
+            const snap = await getDoc(doc(db, 'users', user.uid));
+            const current: string[] = snap.data()?.blockedUsers || [];
+            await updateDoc(doc(db, 'users', user.uid), {
+              blockedUsers: current.filter(id => id !== blockedUser.uid),
+            });
+            setBlockedUsers(prev => prev.filter(u => u.uid !== blockedUser.uid));
+            Alert.alert('Done', `${blockedUser.name} has been unblocked`);
+          } catch (error) {
+            logger.error('[BlockedUsers] unblock error:', error);
+            Alert.alert('Error', 'Error unblocking user');
+          }
+        }},
       ]
     );
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -128,7 +88,12 @@ export default function BlockedUsersScreen() {
         <Text style={styles.emptyIcon}>✓</Text>
         <Text style={styles.emptyTitle}>No Blocked Users</Text>
         <Text style={styles.emptyText}>You haven't blocked anyone yet.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -141,16 +106,19 @@ export default function BlockedUsersScreen() {
       <Text style={styles.subtitle}>
         {blockedUsers.length} blocked user{blockedUsers.length !== 1 ? 's' : ''}
       </Text>
-
       <FlatList
         data={blockedUsers}
         keyExtractor={(item) => item.uid}
         renderItem={({ item }) => (
           <View style={styles.userCard}>
             {item.photos && item.photos.length > 0 ? (
-              <Image source={{ uri: item.photos[0] }} style={styles.userPhoto} />
+              <Image
+                source={{ uri: item.photos[0] }}
+                style={styles.userPhoto}
+                accessibilityLabel={`Photo of ${item.name}`}
+              />
             ) : (
-              <View style={styles.userPhotoPlaceholder}>
+              <View style={styles.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
                 <Text style={styles.userPhotoText}>?</Text>
               </View>
             )}
@@ -161,6 +129,8 @@ export default function BlockedUsersScreen() {
             <TouchableOpacity
               style={styles.unblockButton}
               onPress={() => handleUnblock(item)}
+              accessibilityLabel={`Unblock ${item.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.unblockButtonText}>Unblock</Text>
             </TouchableOpacity>

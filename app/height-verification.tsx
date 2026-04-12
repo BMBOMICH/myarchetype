@@ -18,6 +18,7 @@ import {
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 import { auth, db } from '../firebaseConfig';
 import { checkImageSafety } from '../utils/moderation';
+import { logger } from '../utils/logger';
 
 interface UploadResult { url: string; faces: number[][]; width: number; height: number; }
 interface AIResult { height: number; confidence: number; }
@@ -112,7 +113,7 @@ export default function HeightVerificationScreen() {
         height: typeof uploadData.height === 'number' ? uploadData.height : 0,
       };
     } catch (e) {
-      console.error('[height] uploadPhoto:', e);
+      logger.error('[height] uploadPhoto:', e);
       Alert.alert('Error', 'Error uploading photo. Check your connection.');
       return null;
     }
@@ -206,7 +207,7 @@ export default function HeightVerificationScreen() {
         setPhotoData(result);
       }
     } catch (e) {
-      console.error('[height] capturePhoto:', e);
+      logger.error('[height] capturePhoto:', e);
       Alert.alert('Error', 'Error capturing photo');
     } finally {
       setUploading(false);
@@ -273,7 +274,7 @@ export default function HeightVerificationScreen() {
       setAiResult({ height: estimatedHeight, confidence });
       setHeight(String(estimatedHeight));
     } catch (e) {
-      console.error('[height] runAIEstimation:', e);
+      logger.error('[height] runAIEstimation:', e);
       Alert.alert('Error', 'AI estimation failed. Try manual measurement instead.');
     } finally {
       setAiEstimating(false);
@@ -303,7 +304,7 @@ export default function HeightVerificationScreen() {
       await updateDoc(doc(db, 'users', user.uid), { height: heightData });
       Alert.alert('Success', 'Height verification saved!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e) {
-      console.error('[height] handleSave:', e);
+      logger.error('[height] handleSave:', e);
       Alert.alert('Error', getErrorMessage(e));
     } finally {
       setSaving(false);

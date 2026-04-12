@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 const PHOTO_FRESHNESS_DAYS = 180; // 6 months
 const REMINDER_COOLDOWN_DAYS = 30; // Don't remind more than once per month
@@ -59,7 +60,7 @@ export async function checkPhotoFreshness(): Promise<PhotoFreshnessResult> {
 
     return { shouldRemind: false, oldestPhotoDays: daysSinceUpdate, message: '' };
   } catch (error) {
-    console.error('Error checking photo freshness:', error);
+    logger.error('Error checking photo freshness:', error);
     return { shouldRemind: false, oldestPhotoDays: 0, message: '' };
   }
 }
@@ -73,7 +74,7 @@ export async function dismissPhotoReminder(): Promise<void> {
       lastPhotoReminder: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error dismissing photo reminder:', error);
+    logger.error('Error dismissing photo reminder:', error);
   }
 }
 
@@ -87,6 +88,6 @@ export async function markPhotosUpdated(): Promise<void> {
       lastPhotoReminder: null,
     });
   } catch (error) {
-    console.error('Error marking photos updated:', error);
+    logger.error('Error marking photos updated:', error);
   }
 }

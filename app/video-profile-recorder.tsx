@@ -13,6 +13,7 @@ import {
 // ✅ FIX: Import NSFW check
 import { checkImageSafety } from '../utils/moderation';
 import { uploadVideoProfile } from '../utils/videoProfiles';
+import { logger } from '../utils/logger';
 
 const MAX_DURATION = 15;
 
@@ -85,7 +86,7 @@ export default function VideoProfileRecorderScreen() {
         setRecordedVideoUri(video.uri);
       }
     } catch (error) {
-      console.error('Error recording video:', error);
+      logger.error('Error recording video:', error);
       Alert.alert('Error', 'Failed to record video');
       setIsRecording(false);
       if (timerRef.current) {
@@ -106,7 +107,7 @@ export default function VideoProfileRecorderScreen() {
       }
       await cameraRef.current.stopRecording();
     } catch (error) {
-      console.error('Error stopping recording:', error);
+      logger.error('Error stopping recording:', error);
     }
   }, []);
 

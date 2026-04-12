@@ -8,6 +8,7 @@ import { detectImpossibleTravel } from './location';
 import { writeAuditLog } from './logger';
 import { checkTextSafety } from './moderation';
 import { analyzeMessageTiming } from './rateLimiter';
+import { logger } from './logger';
 
 export interface DatingStats {
   likesSent: number; likesReceived: number; matchRate: number; totalMatches: number;
@@ -211,7 +212,7 @@ export async function generateBehaviorReport(targetUserId: string): Promise<Beha
       ratingManipulationSignal: ratingCheck.manipulated, geographicAnomalySignal, overallRisk, signals,
     };
   } catch (err) {
-    console.error('[datingStats] generateBehaviorReport error:', err);
+    logger.error('[datingStats] generateBehaviorReport error:', err);
     return { userId: targetUserId, romanceScamScore: 0, unmatchRate: 0, reportRate: 0, isGhostProfile: false, agePredatorSignal: false, escalatesConversationFast: false, refusesVideoCalls: false, botTimingSignal: false, ratingManipulationSignal: false, geographicAnomalySignal: false, overallRisk: 'low', signals: [] };
   }
 }
@@ -252,7 +253,7 @@ export async function calculateDatingStats(): Promise<DatingStats> {
     }
 
     const timingCheck = analyzeMessageTiming(messageTimes);
-    if (timingCheck.isBot) console.warn('[datingStats] Bot-like timing in own messages detected');
+    if (timingCheck.isBot) logger.warn('[datingStats] Bot-like timing in own messages detected');
 
     const peakActivityHour = messageTimes.length > 0 ? (() => {
       const hourCounts = new Array(24).fill(0) as number[];
@@ -282,7 +283,7 @@ export async function calculateDatingStats(): Promise<DatingStats> {
       secondDateRate: meetups > 0 ? Math.round((secondDates / meetups) * 100) : 0,
     };
   } catch (error) {
-    console.error('[datingStats] calculateDatingStats error:', error);
+    logger.error('[datingStats] calculateDatingStats error:', error);
     return getEmptyStats();
   }
 }

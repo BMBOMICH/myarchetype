@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface SuperLike {
   fromUserId: string;
@@ -78,7 +79,7 @@ export async function sendSuperLike(
 
     return { success: true, isMatch: false };
   } catch (error: any) {
-    console.error('Error sending super like:', error);
+    logger.error('Error sending super like:', error);
     return { success: false, error: error.message };
   }
 }
@@ -102,7 +103,7 @@ export async function getSuperLikesReceived(): Promise<SuperLike[]> {
 
     return superLikes;
   } catch (error) {
-    console.error('Error getting super likes:', error);
+    logger.error('Error getting super likes:', error);
     return [];
   }
 }
@@ -116,6 +117,6 @@ export async function markSuperLikeSeen(fromUserId: string): Promise<void> {
       seen: true,
     }, { merge: true });
   } catch (error) {
-    console.error('Error marking super like seen:', error);
+    logger.error('Error marking super like seen:', error);
   }
 }

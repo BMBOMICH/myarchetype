@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import * as webpush from 'web-push';
 
 // ─── Init ─────────────────────────────────────────────────
-admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID });
+admin.initializeApp({ projectId: process.env['FIREBASE_PROJECT_ID'] });
 const adminDb = admin.firestore();
 const app     = express();
 
@@ -23,26 +23,25 @@ const ALLOWED_ORIGINS = new Set([
   'https://myarchetype.vercel.app',
   'https://myarchetype-server.vercel.app',
   'https://staging.myarchetype.app',
-  ...(process.env.NODE_ENV === 'development'
+  ...(process.env['NODE_ENV'] === 'development'
     ? ['http://localhost:8081', 'http://localhost:19006', 'http://localhost:3000']
     : []),
 ]);
 
 const CORS_OPTIONS: cors.CorsOptions = {
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.has(origin)) { cb(null, true); }
-    else { cb(new Error('CORS policy violation')); }
+    if (!origin || ALLOWED_ORIGINS.has(origin)) cb(null, true);
+    else cb(new Error('CORS policy violation'));
   },
-  methods:         ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders:  ['Content-Type', 'Authorization', 'X-Request-Signature', 'X-Request-Timestamp', 'X-Device-Fingerprint', 'X-Session-Id', 'X-App-Check-Token', 'X-Request-ID'],
-  exposedHeaders:  ['X-Request-ID', 'X-RateLimit-Remaining'],
-  credentials:     true,
-  maxAge:          86_400,
+  methods:              ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders:       ['Content-Type', 'Authorization', 'X-Request-Signature', 'X-Request-Timestamp', 'X-Device-Fingerprint', 'X-Session-Id', 'X-App-Check-Token', 'X-Request-ID'],
+  exposedHeaders:       ['X-Request-ID', 'X-RateLimit-Remaining'],
+  credentials:          true,
+  maxAge:               86_400,
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(CORS_OPTIONS));
-app.options('*', cors(CORS_OPTIONS));
 
 // ─── Security headers ─────────────────────────────────────
 app.use((_req, res, next) => {
@@ -69,6 +68,7 @@ const notifLimiter   = limiter(30);
 const modLimiter     = limiter(100);
 const authLimiter    = limiter(10);
 const webhookLimiter = limiter(20);
+const healthLimiter  = limiter(30);
 
 app.use(globalLimiter);
 
@@ -86,7 +86,7 @@ function validateOrigin(req: Request, res: Response, next: NextFunction): void {
 }
 
 // ─── HMAC verification ────────────────────────────────────
-const HMAC_SECRET = process.env.HMAC_SECRET ?? '';
+const HMAC_SECRET = process.env['HMAC_SECRET'] ?? '';
 
 function verifyHMAC(req: Request, res: Response, next: NextFunction): void {
   if (!HMAC_SECRET) { next(); return; }
@@ -103,13 +103,10 @@ function verifyHMAC(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
-// ─── Global error handler ─────────────────────────────────
+// ─── Async handler ────────────────────────────────────────
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : 'internal_error';
-      if (!res.headersSent) res.status(500).json({ success: false, reason: message });
-    });
+    fn(req, res, next).catch((err: unknown) => next(err));
   };
 }
 
@@ -126,7 +123,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) { res.status(401).json({ success: false, reason: 'missing_auth_token' }); return; }
   try {
-    const decoded  = await admin.auth().verifyIdToken(header.slice(7));
+    const decoded = await admin.auth().verifyIdToken(header.slice(7));
     (req as AuthRequest).uid = decoded.uid;
     next();
   } catch { res.status(401).json({ success: false, reason: 'invalid_auth_token' }); }
@@ -151,7 +148,7 @@ function sanitize(value: unknown, max = 200): string | null {
 
 function uid(req: Request): string { return (req as AuthRequest).uid; }
 function clientIp(req: Request): string {
-  return (req.headers['x-forwarded-for'] as string ?? req.socket.remoteAddress ?? '').split(',')[0]!.trim();
+  return ((req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? '').split(',')[0]?.trim() ?? '';
 }
 
 // ─── Disposable email ─────────────────────────────────────
@@ -190,10 +187,10 @@ async function checkMultiAccountDevice(fp: string, userId: string): Promise<{ mu
   try {
     const snap  = await adminDb.collection('deviceFingerprints').doc(fp).get();
     if (!snap.exists) return { multiAccount: false, bannedReuse: false, accounts: [] };
-    const users = (snap.data()!['users'] as string[] ?? []).filter((u) => u !== userId);
+    const users = (snap.data()!['users'] as string[] ?? []).filter(u => u !== userId);
     let bannedReuse = false;
     if (users.length > 0) {
-      const b    = await adminDb.collection('bannedUsers').where('uid', 'in', users.slice(0, 10)).get();
+      const b = await adminDb.collection('bannedUsers').where('uid', 'in', users.slice(0, 10)).get();
       bannedReuse = !b.empty;
     }
     return { multiAccount: users.length > 0, bannedReuse, accounts: users };
@@ -210,12 +207,12 @@ async function detectAccountTakeover(userId: string, fp: string, ip: string): Pr
       await ref.set({ fingerprints: [fp], ips: [ip], lastLogin: now });
       return { suspicious: false };
     }
-    const data       = snap.data()!;
-    const fps: string[] = data['fingerprints'] ?? [];
-    const ips: string[] = data['ips'] ?? [];
+    const data = snap.data()!;
+    const fps: string[]   = data['fingerprints'] ?? [];
+    const ips: string[]   = data['ips'] ?? [];
     const lastLogin: number = data['lastLogin'] ?? now;
-    const newDevice  = !fps.includes(fp);
-    const newIP      = !ips.includes(ip);
+    const newDevice    = !fps.includes(fp);
+    const newIP        = !ips.includes(ip);
     const recentChange = now - lastLogin < 3_600_000;
     if (!fps.includes(fp)) fps.push(fp);
     if (!ips.includes(ip)) ips.push(ip);
@@ -228,7 +225,7 @@ async function detectAccountTakeover(userId: string, fp: string, ip: string): Pr
 // ─── Concurrent sessions ──────────────────────────────────
 async function checkConcurrentSessions(userId: string, sessionId: string): Promise<{ allowed: boolean; activeSessions: number }> {
   const MAX_SESSIONS = 5;
-  const SESSION_TTL  = 30 * 24 * 60 * 60 * 1000;
+  const SESSION_TTL  = 30 * 24 * 60 * 60 * 1_000;
   try {
     const ref  = adminDb.collection('userSessions').doc(userId);
     const snap = await ref.get();
@@ -266,32 +263,27 @@ interface IntegrityResult {
 function checkDeviceIntegrity(info: DeviceInfo): IntegrityResult {
   const flags: string[] = [];
   let isRooted = false, isEmulator = false, isDebug = false, hasFrida = false, hasMockLocation = false;
-
-  if (info.jailbreak || info.isRooted || info.rooted)                       { isRooted = true;   flags.push('rooted'); }
-  if (info.dtTJailbreak || info.RootBeer)                                    { isRooted = true;   flags.push('jailbreak_detected'); }
-
+  if (info.jailbreak || info.isRooted || info.rooted)                        { isRooted = true;      flags.push('rooted'); }
+  if (info.dtTJailbreak || info.RootBeer)                                     { isRooted = true;      flags.push('jailbreak_detected'); }
   const knownEmulators = ['generic','unknown','google_sdk','emulator','android_x86','sdk_gphone'];
-  if (knownEmulators.some((e) => (info.model ?? '').toLowerCase().includes(e))) { isEmulator = true; flags.push('emulator'); }
-  if ((info.fingerprint ?? '').includes('generic'))                          { isEmulator = true; flags.push('generic_fingerprint'); }
-  if (info.isEmulator)                                                       { isEmulator = true; flags.push('emulator_flag'); }
-
-  if (info.debugMode || info.FLAG_DEBUGGABLE || info.isDebug)                { isDebug = true;    flags.push('debug_mode'); }
-  if (info.developerOptions || info.DEVELOPMENT_SETTINGS)                    { flags.push('developer_options'); }
-  if (info.ADB_ENABLED || info.usbDebug || info.adbEnabled)                  { flags.push('adb_enabled'); }
+  if (knownEmulators.some(e => (info.model ?? '').toLowerCase().includes(e))) { isEmulator = true;    flags.push('emulator'); }
+  if ((info.fingerprint ?? '').includes('generic'))                           { isEmulator = true;    flags.push('generic_fingerprint'); }
+  if (info.isEmulator)                                                        { isEmulator = true;    flags.push('emulator_flag'); }
+  if (info.debugMode || info.FLAG_DEBUGGABLE || info.isDebug)                 { isDebug = true;       flags.push('debug_mode'); }
+  if (info.developerOptions || info.DEVELOPMENT_SETTINGS)                     { flags.push('developer_options'); }
+  if (info.ADB_ENABLED || info.usbDebug || info.adbEnabled)                   { flags.push('adb_enabled'); }
   if (info.appSignature && info.expectedSignature && info.appSignature !== info.expectedSignature) { isDebug = true; flags.push('tampered_apk'); }
-
-  if (info.frida || info.fridaDetected || info.hookDetect)                   { hasFrida = true;   flags.push('frida_detected'); }
-  if (info.memoryTamper || info.checksumMemory)                              { flags.push('memory_tamper'); }
-  if (info.ALLOW_MOCK_LOCATION || info.mockLocationApp || info.mockLocation) { hasMockLocation = true; flags.push('mock_location'); }
-  if (info.isCaptured || info.screenRecord)                                  { flags.push('screen_recording'); }
-  if (info.accessibilityAbuse || info.getEnabledAccessibility)               { flags.push('accessibility_abuse'); }
-
+  if (info.frida || info.fridaDetected || info.hookDetect)                    { hasFrida = true;      flags.push('frida_detected'); }
+  if (info.memoryTamper || info.checksumMemory)                               { flags.push('memory_tamper'); }
+  if (info.ALLOW_MOCK_LOCATION || info.mockLocationApp || info.mockLocation)  { hasMockLocation = true; flags.push('mock_location'); }
+  if (info.isCaptured || info.screenRecord)                                   { flags.push('screen_recording'); }
+  if (info.accessibilityAbuse || info.getEnabledAccessibility)                { flags.push('accessibility_abuse'); }
   return { isRooted, isEmulator, isDebug, hasFrida, hasMockLocation, flags };
 }
 
 // ─── Geo helpers ──────────────────────────────────────────
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R    = 6371;
+  const R    = 6_371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a    = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
@@ -336,32 +328,24 @@ const SANCTIONED_COUNTRIES = new Set(['KP', 'IR', 'SY', 'CU', 'RU']);
 const SANCTIONS_NAMES       = ['kim jong', 'ali khamenei', 'bashar al-assad', 'nicolas maduro'];
 
 function isSanctioned(cc: string): boolean          { return SANCTIONED_COUNTRIES.has(cc.toUpperCase()); }
-function screenSanctionsName(name: string): boolean { return SANCTIONS_NAMES.some((s) => name.toLowerCase().includes(s)); }
+function screenSanctionsName(name: string): boolean { return SANCTIONS_NAMES.some(s => name.toLowerCase().includes(s)); }
 
 // ─── Safe Browsing ────────────────────────────────────────
 interface SafeBrowsingResponse { matches?: Array<{ threatType: string }> }
 
 async function checkUrlSafety(url: string): Promise<{ safe: boolean; threat?: string }> {
-  const key = process.env.GOOGLE_SAFE_BROWSING_KEY;
+  const key = process.env['GOOGLE_SAFE_BROWSING_KEY'];
   if (!key) return { safe: true };
   try {
     const res  = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${key}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         client:     { clientId: 'myarchetype', clientVersion: '1.0' },
-        threatInfo: {
-          threatTypes:      ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE'],
-          platformTypes:    ['ANY_PLATFORM'],
-          threatEntryTypes: ['URL'],
-          threatEntries:    [{ url }],
-        },
+        threatInfo: { threatTypes: ['MALWARE','SOCIAL_ENGINEERING','UNWANTED_SOFTWARE'], platformTypes: ['ANY_PLATFORM'], threatEntryTypes: ['URL'], threatEntries: [{ url }] },
       }),
     });
     const data = await res.json() as SafeBrowsingResponse;
-    return data.matches?.length
-      ? { safe: false, threat: data.matches[0]?.threatType }
-      : { safe: true };
+    return data.matches?.length ? { safe: false, threat: data.matches[0]?.threatType } : { safe: true };
   } catch { return { safe: true }; }
 }
 
@@ -399,17 +383,17 @@ async function isPasswordBreached(password: string): Promise<{ breached: boolean
 
 // ─── Text moderation ─────────────────────────────────────
 const HARMFUL_PATTERNS: Array<{ p: RegExp; c: string }> = [
-  { p: /\b(kill\s*(you|ur)|murder\s*you)\b/i,                                        c: 'violence_threat' },
-  { p: /\b(kill\s*your\s*self|kys|go\s*die)\b/i,                                     c: 'self_harm' },
-  { p: /\bn[i1][g9]{1,2}[e3]r/i,                                                     c: 'racial_slur' },
-  { p: /\bf[a@4][g9]{1,2}[o0]t/i,                                                    c: 'homophobic_slur' },
-  { p: /\b(send\s*(me\s*)?(nudes?|dick\s*pics?))\b/i,                                c: 'sexual_solicitation' },
-  { p: /\b(sell(ing)?\s*(weed|meth|coke|heroin|pills?|drugs?))\b/i,                  c: 'drug_dealing' },
-  { p: /\b(i\s*have\s*(your\s*)?(photos?|nudes?)).{0,30}(pay|send\s*money)/i,        c: 'sextortion' },
-  { p: /\b(ssn|social\s*security)\s*:?\s*\d{3}-\d{2}-\d{4}/i,                       c: 'pii' },
-  { p: /\b(looking\s*for\s*(younger|teen|underage|minor))/i,                         c: 'underage' },
-  { p: /\b(preteen|pre-teen|barely\s*legal|jailbait|lolita|shota|ddlg|agere)\b/i,   c: 'underage' },
-  { p: /\b(narco(s)?|traphouse)\b/i,                                                 c: 'drug_dealing' },
+  { p: /\b(kill\s*(you|ur)|murder\s*you)\b/i,                                       c: 'violence_threat' },
+  { p: /\b(kill\s*your\s*self|kys|go\s*die)\b/i,                                    c: 'self_harm' },
+  { p: /\bn[i1][g9]{1,2}[e3]r/i,                                                    c: 'racial_slur' },
+  { p: /\bf[a@4][g9]{1,2}[o0]t/i,                                                   c: 'homophobic_slur' },
+  { p: /\b(send\s*(me\s*)?(nudes?|dick\s*pics?))\b/i,                               c: 'sexual_solicitation' },
+  { p: /\b(sell(ing)?\s*(weed|meth|coke|heroin|pills?|drugs?))\b/i,                 c: 'drug_dealing' },
+  { p: /\b(i\s*have\s*(your\s*)?(photos?|nudes?)).{0,30}(pay|send\s*money)/i,       c: 'sextortion' },
+  { p: /\b(ssn|social\s*security)\s*:?\s*\d{3}-\d{2}-\d{4}/i,                      c: 'pii' },
+  { p: /\b(looking\s*for\s*(younger|teen|underage|minor))/i,                        c: 'underage' },
+  { p: /\b(preteen|pre-teen|barely\s*legal|jailbait|lolita|shota|ddlg|agere)\b/i,  c: 'underage' },
+  { p: /\b(narco(s)?|traphouse)\b/i,                                                c: 'drug_dealing' },
 ];
 
 function serverCheckText(text: string): { safe: boolean; category?: string } {
@@ -434,15 +418,14 @@ interface NcmecResponse { tiplineId?: string; }
 
 async function reportToNCMEC(details: NcmecDetails): Promise<{ success: boolean; tiplineId?: string }> {
   try {
-    const NCMEC_API = process.env.NCMEC_API_KEY;
+    const NCMEC_API = process.env['NCMEC_API_KEY'];
     if (!NCMEC_API) {
       await adminDb.collection('csamReports').add({ ...details, status: 'pending_manual', timestamp: admin.firestore.FieldValue.serverTimestamp() });
       return { success: false };
     }
     const res  = await fetch('https://api.missingkids.org/cybertipline/report', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': NCMEC_API },
-      body:    JSON.stringify({ type: 'CSAM', reporterType: 'ESP', ...details }),
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': NCMEC_API },
+      body: JSON.stringify({ type: 'CSAM', reporterType: 'ESP', ...details }),
     });
     const data = await res.json() as NcmecResponse;
     await adminDb.collection('csamReports').add({ ...details, tiplineId: data.tiplineId, status: 'reported', timestamp: admin.firestore.FieldValue.serverTimestamp() });
@@ -454,7 +437,7 @@ async function reportToNCMEC(details: NcmecDetails): Promise<{ success: boolean;
 async function detectCoordinatedInauthentic(userIds: string[]): Promise<{ detected: boolean; clusterSize: number; reason?: string }> {
   if (userIds.length < 3) return { detected: false, clusterSize: 0 };
   try {
-    const fps   = await Promise.all(userIds.map(async (id) => {
+    const fps    = await Promise.all(userIds.map(async id => {
       const snap = await adminDb.collection('deviceFingerprints').where('users', 'array-contains', id).limit(1).get();
       return snap.docs[0]?.id ?? null;
     }));
@@ -474,7 +457,7 @@ async function enforceAgeGatedContent(userId: string, contentType: string): Prom
     if (!snap.exists) return { allowed: false, reason: 'User not found' };
     const dob: string = snap.data()!['dateOfBirth'] ?? '';
     if (!dob) return { allowed: false, reason: 'Age not verified' };
-    const age    = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    const age    = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1_000));
     const minAge = CONTENT_AGE_GATES[contentType] ?? 18;
     return age < minAge ? { allowed: false, reason: `Must be ${minAge}+ for this content` } : { allowed: true };
   } catch { return { allowed: true }; }
@@ -492,7 +475,7 @@ async function logScreenshotEvent(userId: string, screen: string): Promise<void>
 // ─── Meeting location share ───────────────────────────────
 async function createMeetingLocationShare(userId: string, lat: number, lon: number, trustedContactId: string): Promise<{ shareId: string; expiresAt: number }> {
   const shareId   = crypto.randomBytes(16).toString('hex');
-  const expiresAt = Date.now() + 4 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 4 * 60 * 60 * 1_000;
   try {
     await adminDb.collection('meetingLocationShares').doc(shareId).set({
       uid: userId, lat, lon, trustedContactId, shareId, expiresAt,
@@ -540,7 +523,6 @@ async function checkCrossAccountPDQ(imageUrl: string, userId: string): Promise<{
 }
 
 // ─── A/B testing ──────────────────────────────────────────
-// NOTE: In-memory — resets on cold start. Move to Firestore for persistence.
 const abTestAssignments: Record<string, Record<string, string>> = {};
 
 function assignABTest(userId: string, experimentId: string, variants: string[]): string {
@@ -558,7 +540,6 @@ function validateABTestIntegrity(userId: string, experimentId: string, claimedVa
 }
 
 // ─── API key rotation ─────────────────────────────────────
-// NOTE: In-memory cache — resets on cold start. Keys are persisted to Firestore.
 const API_KEY_CACHE: Record<string, { key: string; rotatedAt: number }> = {};
 
 async function rotateApiKey(service: string): Promise<{ success: boolean }> {
@@ -571,11 +552,11 @@ async function rotateApiKey(service: string): Promise<{ success: boolean }> {
 }
 
 // ─── WCAG audit ───────────────────────────────────────────
-const WCAG_RULES = new Set(['color-contrast', 'image-alt', 'label', 'link-name', 'button-name']);
+const WCAG_RULES = new Set(['color-contrast','image-alt','label','link-name','button-name']);
 
 function auditWCAG(violations: Array<{ id: string; impact: string }>): { passed: boolean; critical: string[]; total: number } {
-  const matched  = violations.filter((v) => WCAG_RULES.has(v.id));
-  const critical = matched.filter((v) => v.impact === 'critical').map((v) => v.id);
+  const matched  = violations.filter(v => WCAG_RULES.has(v.id));
+  const critical = matched.filter(v => v.impact === 'critical').map(v => v.id);
   return { passed: critical.length === 0, critical, total: matched.length };
 }
 
@@ -588,7 +569,7 @@ function checkColorContrast(foreground: string, background: string): { ratio: nu
     const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
   };
-  const l1    = luminance(foreground), l2 = luminance(background);
+  const l1 = luminance(foreground), l2 = luminance(background);
   const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   return { ratio: Math.round(ratio * 100) / 100, wcagAA: ratio >= 4.5, wcagAAA: ratio >= 7 };
 }
@@ -612,7 +593,6 @@ function detectFakeEngagement(metrics: EngagementMetrics): { suspicious: boolean
 }
 
 // ─── Bot detection ────────────────────────────────────────
-// NOTE: In-memory — resets on cold start. Sufficient for rate-burst detection per instance.
 const requestTimestamps: Record<string, number[]> = {};
 const BOT_UA_PATTERNS = ['bot','crawler','spider','headless','phantomjs','puppeteer','selenium','playwright','curl','wget'];
 
@@ -620,23 +600,22 @@ function detectBotTraffic(ip: string, userAgent: string): { isBot: boolean; conf
   const signals: string[] = [];
   const now = Date.now();
   if (!requestTimestamps[ip]) requestTimestamps[ip] = [];
-  requestTimestamps[ip] = requestTimestamps[ip]!.filter((t) => now - t < 1000);
+  requestTimestamps[ip] = requestTimestamps[ip]!.filter(t => now - t < 1_000);
   requestTimestamps[ip]!.push(now);
-  if (requestTimestamps[ip]!.length > 30) signals.push('high_request_rate');
-  if (BOT_UA_PATTERNS.some((p) => userAgent.toLowerCase().includes(p))) signals.push('bot_user_agent');
-  if (!userAgent || userAgent.length < 20) signals.push('suspicious_ua');
+  if (requestTimestamps[ip]!.length > 30)                                              signals.push('high_request_rate');
+  if (BOT_UA_PATTERNS.some(p => userAgent.toLowerCase().includes(p)))                 signals.push('bot_user_agent');
+  if (!userAgent || userAgent.length < 20)                                             signals.push('suspicious_ua');
   return { isBot: signals.length >= 1, confidence: Math.min(signals.length / 3, 1), signals };
 }
 
 // ─── Conversion fraud ─────────────────────────────────────
-// NOTE: In-memory — resets on cold start. Move to Firestore for cross-instance tracking.
 const conversionEvents: Record<string, number[]> = {};
 
 function detectConversionFraud(userId: string, eventType: string, value: number): { fraudulent: boolean; reason?: string } {
   const key = `${userId}_${eventType}`;
   const now = Date.now();
   if (!conversionEvents[key]) conversionEvents[key] = [];
-  conversionEvents[key] = conversionEvents[key]!.filter((t) => now - t < 3_600_000);
+  conversionEvents[key] = conversionEvents[key]!.filter(t => now - t < 3_600_000);
   conversionEvents[key]!.push(now);
   const count = conversionEvents[key]!.length;
   if (count > 10) return { fraudulent: true, reason: `${count} ${eventType} conversions in 1 hour.` };
@@ -647,6 +626,8 @@ function detectConversionFraud(userId: string, eventType: string, value: number)
 // ═══════════════════════════════════════════════════════════
 // Routes
 // ═══════════════════════════════════════════════════════════
+
+app.options('*', cors(CORS_OPTIONS));
 
 app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { subscription, title, body, screen } = req.body as Record<string, unknown>;
@@ -659,7 +640,7 @@ app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, asyncH
   } catch (e) {
     const err = e as { statusCode?: number };
     if (err.statusCode === 410 || err.statusCode === 404) { res.status(410).json({ success: false, reason: 'subscription_expired' }); return; }
-    res.status(500).json({ success: false, reason: 'failed' });
+    res.status(500).json({ success: false, reason: 'notification_failed' });
   }
 }));
 
@@ -668,9 +649,8 @@ app.post('/send-expo-notification', notifLimiter, validateOrigin, requireAuth, a
   const t = sanitize(title), b = sanitize(body);
   if (!isValidExpoToken(expoPushToken) || !t || !b) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   const r = await fetch('https://exp.host/--/api/v2/push/send', {
-    method:  'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ to: expoPushToken, sound: 'default', title: t, body: b, data: { screen: sanitize(screen) ?? 'home' } }),
+    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: expoPushToken, sound: 'default', title: t, body: b, data: { screen: sanitize(screen) ?? 'home' } }),
   });
   res.json({ success: r.ok, data: await r.json() });
 }));
@@ -690,16 +670,16 @@ app.post('/check-password-breach', authLimiter, validateOrigin, requireAuth, asy
 
 app.post('/register-device', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const id = uid(req);
-  const fp = (req.headers['x-device-fingerprint'] as string) ?? (req.body as Record<string, unknown>)['fingerprint'] ?? '';
-  if (!fp || (fp as string).length < 8) { res.status(400).json({ success: false, reason: 'invalid_fingerprint' }); return; }
-  const device = await trackDeviceFingerprint(fp as string, id);
-  const multi  = await checkMultiAccountDevice(fp as string, id);
+  const fp = ((req.headers['x-device-fingerprint'] as string) ?? (req.body as Record<string, unknown>)['fingerprint'] ?? '') as string;
+  if (!fp || fp.length < 8) { res.status(400).json({ success: false, reason: 'invalid_fingerprint' }); return; }
+  const device = await trackDeviceFingerprint(fp, id);
+  const multi  = await checkMultiAccountDevice(fp, id);
   if (multi.bannedReuse) await logAdminAction('system', 'banned_device_reuse', id, { fingerprint: fp, accounts: multi.accounts });
   res.json({ success: true, knownDevice: device.knownDevice, multiAccount: multi.multiAccount, bannedReuse: multi.bannedReuse });
 }));
 
 app.post('/login-track', authLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { sessionId, fingerprint } = req.body as Record<string, unknown>;
   const ip  = clientIp(req);
   const ato = await detectAccountTakeover(id, (fingerprint as string) ?? '', ip);
@@ -717,7 +697,7 @@ app.post('/check-device-integrity', authLimiter, validateOrigin, requireAuth, as
 }));
 
 app.post('/validate-location', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { lat, lon, timestamp, countryCode } = req.body as Record<string, unknown>;
   if (typeof lat !== 'number' || typeof lon !== 'number') { res.status(400).json({ success: false, reason: 'invalid_coordinates' }); return; }
   if (countryCode && isSanctioned(countryCode as string)) { res.status(403).json({ success: false, reason: 'region_not_supported' }); return; }
@@ -740,7 +720,7 @@ app.post('/validate-location', modLimiter, validateOrigin, requireAuth, asyncHan
 }));
 
 app.post('/moderate-text', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const text = sanitize((req.body as Record<string, unknown>)['text'], 5000);
+  const text = sanitize((req.body as Record<string, unknown>)['text'], 5_000);
   if (!text) { res.status(400).json({ success: false, reason: 'missing_text' }); return; }
   const result = serverCheckText(text);
   if (!result.safe) await logAdminAction('system', 'text_flagged', uid(req), { category: result.category, preview: text.slice(0, 100) });
@@ -748,7 +728,7 @@ app.post('/moderate-text', modLimiter, validateOrigin, requireAuth, asyncHandler
 }));
 
 app.post('/scan-csam', modLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { imageUrl } = req.body as Record<string, unknown>;
   if (!imageUrl) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
   const scan = await scanForCSAM(imageUrl as string);
@@ -792,7 +772,7 @@ app.post('/enforce-trust', webhookLimiter, validateOrigin, requireAuth, verifyHM
 }));
 
 app.post('/check-url', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const url = sanitize((req.body as Record<string, unknown>)['url'], 2048);
+  const url = sanitize((req.body as Record<string, unknown>)['url'], 2_048);
   if (!url) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
   res.json({ success: true, ...(await checkUrlSafety(url)) });
 }));
@@ -806,7 +786,7 @@ app.post('/screen-name', modLimiter, validateOrigin, requireAuth, asyncHandler(a
 }));
 
 app.post('/pdq-cross-account', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { photoUrl } = req.body as Record<string, unknown>;
   if (!photoUrl) { res.status(400).json({ success: false, reason: 'missing_url' }); return; }
   const result = await checkCrossAccountPDQ(photoUrl as string, id);
@@ -823,7 +803,7 @@ app.post('/check-cib', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, 
 }));
 
 app.post('/ab-test', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { experimentId, claimedVariant, variants } = req.body as Record<string, unknown>;
   if (!experimentId || !variants) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
   const assigned = assignABTest(id, experimentId as string, variants as string[]);
@@ -832,7 +812,7 @@ app.post('/ab-test', modLimiter, validateOrigin, requireAuth, asyncHandler(async
 }));
 
 app.post('/admin/rotate-key', webhookLimiter, validateOrigin, requireAuth, verifyHMAC, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { service } = req.body as Record<string, unknown>;
   if (!service) { res.status(400).json({ success: false, reason: 'missing_service' }); return; }
   const snap = await adminDb.collection('users').doc(id).get();
@@ -857,7 +837,7 @@ app.post('/check-contrast', modLimiter, validateOrigin, requireAuth, asyncHandle
 app.post('/validate-event', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
   const { event, signature } = req.body as Record<string, unknown>;
   if (!event || !signature) { res.status(400).json({ success: false, reason: 'missing_fields' }); return; }
-  const secret = process.env.ANALYTICS_HMAC_SECRET ?? HMAC_SECRET;
+  const secret = process.env['ANALYTICS_HMAC_SECRET'] ?? HMAC_SECRET;
   res.json({ success: true, valid: validateAnalyticsEvent(event as Record<string, unknown>, signature as string, secret) });
 }));
 
@@ -876,7 +856,7 @@ app.post('/check-bot', modLimiter, validateOrigin, requireAuth, asyncHandler(asy
 }));
 
 app.post('/track-conversion', modLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res) => {
-  const id  = uid(req);
+  const id = uid(req);
   const { eventType, value } = req.body as Record<string, unknown>;
   if (!eventType) { res.status(400).json({ success: false, reason: 'missing_event_type' }); return; }
   const result = detectConversionFraud(id, eventType as string, (value as number) ?? 0);
@@ -894,18 +874,19 @@ app.post('/admin/action', webhookLimiter, validateOrigin, requireAuth, verifyHMA
   res.json({ success: true });
 }));
 
-app.get('/health', (_req, res) => {
+app.get('/health', healthLimiter, (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), detectors: 'active', minTLS: TLS_INFO.min, tlsVersions: TLS_INFO.supported });
 });
 
-// ─── Express error boundary ───────────────────────────────
+// ─── Global error boundary ────────────────────────────────
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = err instanceof Error ? err.message : 'internal_error';
+  console.error('[server error]', err);
   if (!res.headersSent) res.status(500).json({ success: false, reason: message });
 });
 
-const PORT = Number(process.env.PORT ?? 3000);
-if (process.env.NODE_ENV !== 'production') {
+const PORT = Number(process.env['PORT'] ?? 3_000);
+if (process.env['NODE_ENV'] !== 'production') {
   app.listen(PORT, () => { /* local dev only */ });
 }
 

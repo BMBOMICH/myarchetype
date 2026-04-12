@@ -1,4 +1,5 @@
 import type * as Notifications from 'expo-notifications';
+import { logger } from './logger';
 
 // ─── Types ────────────────────────────────────────────────
 export type NotificationType = 'match' | 'message' | 'like' | 'rating_prompt';
@@ -31,14 +32,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
   try {
     // Check browser support
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('[Web Notifications] Not supported in this browser');
+      logger.log('[Web Notifications] Not supported in this browser');
       return null;
     }
 
     // Check/request permission
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.log('[Web Notifications] Permission denied');
+      logger.log('[Web Notifications] Permission denied');
       return null;
     }
 
@@ -47,7 +48,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
       '/service-worker.js'
     );
     await navigator.serviceWorker.ready;
-    console.log('[Web Notifications] Service worker ready');
+    logger.log('[Web Notifications] Service worker ready');
 
     // Check for existing subscription first
     let subscription = await registration.pushManager.getSubscription();
@@ -71,12 +72,12 @@ export async function registerForPushNotifications(): Promise<string | null> {
         webPushSubscription: token,
         webPushUpdatedAt: new Date().toISOString(),
       });
-      console.log('[Web Notifications] Subscription saved to Firebase');
+      logger.log('[Web Notifications] Subscription saved to Firebase');
     }
 
     return token;
   } catch (error) {
-    console.error('[Web Notifications] Registration error:', error);
+    logger.error('[Web Notifications] Registration error:', error);
     return null;
   }
 }
@@ -107,7 +108,7 @@ export async function sendPushNotification(
   _body: string,
   _data?: Record<string, unknown>
 ): Promise<boolean> {
-  console.log('[Web Notifications] Push sending is handled server-side');
+  logger.log('[Web Notifications] Push sending is handled server-side');
   return true;
 }
 
@@ -158,6 +159,6 @@ export async function clearAllNotifications(): Promise<void> {
       notifications.forEach((n) => n.close());
     }
   } catch (error) {
-    console.error('[Web Notifications] Clear error:', error);
+    logger.error('[Web Notifications] Clear error:', error);
   }
 }

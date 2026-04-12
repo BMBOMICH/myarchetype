@@ -8,6 +8,7 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { checkMatchNotes } from './moderation';
+import { logger } from './logger';
 
 export interface MatchNote {
   matchId: string;
@@ -29,7 +30,7 @@ export async function getMatchNote(matchId: string): Promise<string> {
     );
     return noteDoc.exists() ? (noteDoc.data().note ?? '') : '';
   } catch (error) {
-    console.error('[matchNotes] getMatchNote error:', error);
+    logger.error('[matchNotes] getMatchNote error:', error);
     return '';
   }
 }
@@ -71,7 +72,7 @@ export async function saveMatchNote(
 
     return { success: true };
   } catch (error) {
-    console.error('[matchNotes] saveMatchNote error:', error);
+    logger.error('[matchNotes] saveMatchNote error:', error);
     return { success: false, error: 'Failed to save note' };
   }
 }
@@ -88,7 +89,7 @@ export async function deleteMatchNote(matchId: string): Promise<boolean> {
     );
     return true;
   } catch (error) {
-    console.error('[matchNotes] deleteMatchNote error:', error);
+    logger.error('[matchNotes] deleteMatchNote error:', error);
     return false;
   }
 }
@@ -102,7 +103,7 @@ export async function getAllMatchNotes(): Promise<Map<string, string>> {
     // For now return empty map — implement with collection query if needed
     return new Map();
   } catch (error) {
-    console.error('[matchNotes] getAllMatchNotes error:', error);
+    logger.error('[matchNotes] getAllMatchNotes error:', error);
     return new Map();
   }
 }

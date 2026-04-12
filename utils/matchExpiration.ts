@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { writeAuditLog } from './logger';
+import { logger } from './logger';
 
 export interface Match {
   id: string;
@@ -155,7 +156,7 @@ export async function expireStaleMatches(): Promise<number> {
     }
 
     if (expired > 0) {
-      console.log(`[matchExpiration] Expired ${expired} stale matches`);
+      logger.log(`[matchExpiration] Expired ${expired} stale matches`);
       await writeAuditLog('admin.delete_content', {
         reason: 'match_expiration',
         count: expired,
@@ -164,7 +165,7 @@ export async function expireStaleMatches(): Promise<number> {
 
     return expired;
   } catch (err) {
-    console.error('[matchExpiration] Error:', err);
+    logger.error('[matchExpiration] Error:', err);
     return 0;
   }
 }
@@ -185,7 +186,7 @@ export async function extendMatchOnMessage(
       lastMessageAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error('[matchExpiration] extendMatchOnMessage error:', err);
+    logger.error('[matchExpiration] extendMatchOnMessage error:', err);
   }
 }
 
@@ -239,7 +240,7 @@ export async function getExpiringMatches(
 
     return matches;
   } catch (err) {
-    console.error('[matchExpiration] getExpiringMatches error:', err);
+    logger.error('[matchExpiration] getExpiringMatches error:', err);
     return [];
   }
 }

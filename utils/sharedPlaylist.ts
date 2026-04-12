@@ -8,6 +8,7 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export async function getOrCreateSharedPlaylist(
     // Doesn't exist yet → create it
     return createSharedPlaylist(chatId, matchId);
   } catch (error) {
-    console.error('[SharedPlaylist] getOrCreate error:', error);
+    logger.error('[SharedPlaylist] getOrCreate error:', error);
     return { success: false };
   }
 }
@@ -111,7 +112,7 @@ export async function createSharedPlaylist(
     await setDoc(playlistRef(playlistId), playlist);
     return { success: true, playlistId };
   } catch (error) {
-    console.error('[SharedPlaylist] create error:', error);
+    logger.error('[SharedPlaylist] create error:', error);
     return { success: false };
   }
 }
@@ -123,7 +124,7 @@ export async function getSharedPlaylist(
     const snap = await getDoc(playlistRef(playlistId));
     return snap.exists() ? (snap.data() as SharedPlaylist) : null;
   } catch (error) {
-    console.error('[SharedPlaylist] get error:', error);
+    logger.error('[SharedPlaylist] get error:', error);
     return null;
   }
 }
@@ -137,7 +138,7 @@ export function subscribeToPlaylist(
     playlistRef(playlistId),
     (snap) => onUpdate(snap.exists() ? (snap.data() as SharedPlaylist) : null),
     (error) => {
-      console.error('[SharedPlaylist] subscription error:', error);
+      logger.error('[SharedPlaylist] subscription error:', error);
       onUpdate(null);
     }
   );
@@ -163,7 +164,7 @@ export async function addTrackToPlaylist(
 
     return { success: true };
   } catch (error) {
-    console.error('[SharedPlaylist] addTrack error:', error);
+    logger.error('[SharedPlaylist] addTrack error:', error);
     return { success: false };
   }
 }
@@ -182,7 +183,7 @@ export async function removeTrackFromPlaylist(
 
     return { success: true };
   } catch (error) {
-    console.error('[SharedPlaylist] removeTrack error:', error);
+    logger.error('[SharedPlaylist] removeTrack error:', error);
     return { success: false };
   }
 }
@@ -209,7 +210,7 @@ export async function searchSpotifyTracks(
     });
 
     if (!response.ok) {
-      console.error(
+      logger.error(
         `[Spotify] search failed (${response.status}):`,
         await response.text()
       );
@@ -228,7 +229,7 @@ export async function searchSpotifyTracks(
       spotifyUri: item.uri,
     }));
   } catch (error) {
-    console.error('[Spotify] search error:', error);
+    logger.error('[Spotify] search error:', error);
     return [];
   }
 }

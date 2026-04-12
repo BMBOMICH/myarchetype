@@ -23,6 +23,7 @@ import {
 import { Linking, Platform } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { writeAuditLog } from './logger';
+import { logger } from '../utils/logger';
 
 export interface DateCheckin {
   id: string;
@@ -132,7 +133,7 @@ export async function startDateCheckin(
 
     return { success: true, checkinId };
   } catch (error: any) {
-    console.error('[dateCheckin] startDateCheckin error:', error);
+    logger.error('[dateCheckin] startDateCheckin error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -157,7 +158,7 @@ async function scheduleCheckinReminder(
       trigger: { seconds: minutesFromNow * 60 },
     });
   } catch (error) {
-    console.error('[dateCheckin] scheduleCheckinReminder error:', error);
+    logger.error('[dateCheckin] scheduleCheckinReminder error:', error);
   }
 }
 
@@ -192,7 +193,7 @@ async function scheduleMissedCheckinAlert(
       trigger: { seconds: minutesFromNow * 60 },
     });
   } catch (error) {
-    console.error('[dateCheckin] scheduleMissedCheckinAlert error:', error);
+    logger.error('[dateCheckin] scheduleMissedCheckinAlert error:', error);
   }
 }
 
@@ -227,7 +228,7 @@ async function shareLocationWithContact(
 
     await Linking.openURL(smsUrl);
   } catch (error) {
-    console.error('[dateCheckin] shareLocationWithContact error:', error);
+    logger.error('[dateCheckin] shareLocationWithContact error:', error);
   }
 }
 
@@ -321,7 +322,7 @@ export async function performCheckin(
 
     return { success: true };
   } catch (error: any) {
-    console.error('[dateCheckin] performCheckin error:', error);
+    logger.error('[dateCheckin] performCheckin error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -365,7 +366,7 @@ async function triggerSOSAlert(checkin: DateCheckin): Promise<void> {
       setTimeout(() => Linking.openURL(smsUrl), 2000);
     }
   } catch (error) {
-    console.error('[dateCheckin] triggerSOSAlert error:', error);
+    logger.error('[dateCheckin] triggerSOSAlert error:', error);
   }
 }
 
@@ -420,7 +421,7 @@ export async function handleMissedCheckin(checkinId: string): Promise<void> {
       location: checkin.location,
     });
   } catch (error) {
-    console.error('[dateCheckin] handleMissedCheckin error:', error);
+    logger.error('[dateCheckin] handleMissedCheckin error:', error);
   }
 }
 
@@ -454,7 +455,7 @@ export async function getActiveCheckin(): Promise<DateCheckin | null> {
       )[0] ?? null
     );
   } catch (error) {
-    console.error('[dateCheckin] getActiveCheckin error:', error);
+    logger.error('[dateCheckin] getActiveCheckin error:', error);
     return null;
   }
 }
@@ -469,7 +470,7 @@ export async function cancelCheckin(
     await deleteDoc(doc(db, 'dateCheckins', checkinId));
     return { success: true };
   } catch (error) {
-    console.error('[dateCheckin] cancelCheckin error:', error);
+    logger.error('[dateCheckin] cancelCheckin error:', error);
     return { success: false };
   }
 }

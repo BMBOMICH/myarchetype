@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface OpeningLine { text: string; category: string; }
 
@@ -58,7 +59,7 @@ export async function generateOpeningLines(matchUserId: string): Promise<Opening
     }
     return lines.slice(0, 3);
   } catch (error) {
-    console.error('Error generating opening lines:', error);
+    logger.error('Error generating opening lines:', error);
     return getDefaultOpeningLines().slice(0, 3);
   }
 }

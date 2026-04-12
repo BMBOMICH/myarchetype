@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as webpush from 'web-push';
+import { logger } from '../../utils/logger';
 
 admin.initializeApp();
 
@@ -32,7 +33,7 @@ export const sendWebPushNotification = onCall(async (request) => {
     const webPushSubscription = userDoc.data()?.webPushSubscription;
 
     if (!webPushSubscription) {
-      console.log('[Web Push] No subscription found for user');
+      logger.log('[Web Push] No subscription found for user');
       return { success: false, reason: 'no_subscription' };
     }
 
@@ -43,10 +44,10 @@ export const sendWebPushNotification = onCall(async (request) => {
       JSON.stringify({ title, body, data: { screen } })
     );
 
-    console.log('[Web Push] Notification sent to:', recipientUserId);
+    logger.log('[Web Push] Notification sent to:', recipientUserId);
     return { success: true };
   } catch (error) {
-    console.error('[Web Push] Error:', error);
+    logger.error('[Web Push] Error:', error);
     throw new HttpsError('internal', 'Failed to send notification');
   }
 });

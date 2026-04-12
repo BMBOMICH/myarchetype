@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface SkippedProfile {
   odid: string;
@@ -36,7 +37,7 @@ export async function recordSkippedProfile(
 
     await cleanupOldSkippedProfiles(user.uid);
   } catch (error) {
-    console.error('Error recording skipped profile:', error);
+    logger.error('Error recording skipped profile:', error);
   }
 }
 
@@ -61,7 +62,7 @@ async function cleanupOldSkippedProfiles(userId: string): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('Error cleaning up skipped profiles:', error);
+    logger.error('Error cleaning up skipped profiles:', error);
   }
 }
 
@@ -91,7 +92,7 @@ export async function getSkippedProfiles(): Promise<SkippedProfile[]> {
 
     return skipped;
   } catch (error) {
-    console.error('Error getting skipped profiles:', error);
+    logger.error('Error getting skipped profiles:', error);
     return [];
   }
 }
@@ -113,7 +114,7 @@ export async function removeFromSkipped(skippedUserId: string): Promise<void> {
       await deleteDoc(doc(db, 'skippedProfiles', docSnap.id));
     }
   } catch (error) {
-    console.error('Error removing from skipped:', error);
+    logger.error('Error removing from skipped:', error);
   }
 }
 

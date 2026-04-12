@@ -16,6 +16,7 @@ import { Linking, Platform } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { scoreMeetingLocation } from './location';
 import { logConsent, writeAuditLog } from './logger';
+import { logger } from '../utils/logger';
 
 export interface DatePlan {
   id: string;
@@ -55,7 +56,7 @@ export async function getEmergencyContacts(): Promise<EmergencyContact[]> {
     if (!userDoc.exists()) return [];
     return userDoc.data().emergencyContacts ?? [];
   } catch (error) {
-    console.error('[dateSafety] getEmergencyContacts error:', error);
+    logger.error('[dateSafety] getEmergencyContacts error:', error);
     return [];
   }
 }
@@ -76,7 +77,7 @@ export async function saveEmergencyContacts(
 
     return true;
   } catch (error) {
-    console.error('[dateSafety] saveEmergencyContacts error:', error);
+    logger.error('[dateSafety] saveEmergencyContacts error:', error);
     return false;
   }
 }
@@ -116,7 +117,7 @@ export async function createDatePlan(
       locationSafetyCategory = safetyResult.category;
 
       if (!safetyResult.isSafe) {
-        console.warn(
+        logger.warn(
           '[dateSafety] Unsafe meeting location:',
           safetyResult.reason
         );
@@ -163,7 +164,7 @@ export async function createDatePlan(
 
     return datePlan;
   } catch (error) {
-    console.error('[dateSafety] createDatePlan error:', error);
+    logger.error('[dateSafety] createDatePlan error:', error);
     return null;
   }
 }
@@ -204,9 +205,9 @@ async function scheduleCheckInNotification(datePlan: DatePlan): Promise<void> {
       });
     }
 
-    console.log('[dateSafety] Check-in notifications scheduled');
+    logger.log('[dateSafety] Check-in notifications scheduled');
   } catch (error) {
-    console.error('[dateSafety] scheduleCheckInNotification error:', error);
+    logger.error('[dateSafety] scheduleCheckInNotification error:', error);
   }
 }
 
@@ -235,7 +236,7 @@ async function notifyTrustedContact(datePlan: DatePlan): Promise<void> {
 
     await Linking.openURL(smsUrl);
   } catch (error) {
-    console.error('[dateSafety] notifyTrustedContact error:', error);
+    logger.error('[dateSafety] notifyTrustedContact error:', error);
   }
 }
 
@@ -291,7 +292,7 @@ export async function triggerEmergency(datePlanId: string): Promise<void> {
       }, i * 2000);
     }
   } catch (error) {
-    console.error('[dateSafety] triggerEmergency error:', error);
+    logger.error('[dateSafety] triggerEmergency error:', error);
   }
 }
 
@@ -320,7 +321,7 @@ export async function checkInSafe(datePlanId: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('[dateSafety] checkInSafe error:', error);
+    logger.error('[dateSafety] checkInSafe error:', error);
     return false;
   }
 }
@@ -348,7 +349,7 @@ export async function getActiveDatePlan(): Promise<DatePlan | null> {
 
     return plans[0] ?? null;
   } catch (error) {
-    console.error('[dateSafety] getActiveDatePlan error:', error);
+    logger.error('[dateSafety] getActiveDatePlan error:', error);
     return null;
   }
 }

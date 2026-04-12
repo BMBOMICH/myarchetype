@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth } from '../firebaseConfig';
 import {
+import { logger } from '../utils/logger';
   COMPATIBILITY_QUESTIONS,
   getCompatibilityLabel,
   getQuizSession,
@@ -49,7 +50,7 @@ export default function CompatibilityQuizScreen() {
         if (result.success && result.quizId) setQuizId(result.quizId);
       }
     } catch (error) {
-      console.error('[Quiz] init error:', error);
+      logger.error('[Quiz] init error:', error);
       Alert.alert('Error', 'Could not load quiz.');
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ export default function CompatibilityQuizScreen() {
         setWaitingForMatch(true);
       }
     } catch (error) {
-      console.error('[Quiz] submit error:', error);
+      logger.error('[Quiz] submit error:', error);
       Alert.alert('Error', 'Failed to submit your answers. Please try again.');
     } finally {
       setSubmitting(false);

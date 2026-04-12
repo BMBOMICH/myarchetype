@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getUserInterests, INTERESTS_CATEGORIES, saveUserInterests } from '../utils/interestsTags';
+import { logger } from '../utils/logger';
 
 const MAX_INTERESTS = 15;
 
@@ -18,7 +19,7 @@ export default function InterestsScreen() {
       const interests = await getUserInterests();
       setSelectedInterests(interests);
     } catch (error) {
-      console.error('[Interests] load error:', error);
+      logger.error('[Interests] load error:', error);
       Alert.alert('Error', 'Failed to load interests.');
     } finally {
       setLoading(false);
@@ -52,7 +53,7 @@ export default function InterestsScreen() {
         Alert.alert('Error', 'Failed to save interests.');
       }
     } catch (error) {
-      console.error('[Interests] save error:', error);
+      logger.error('[Interests] save error:', error);
       Alert.alert('Error', 'Something went wrong while saving.');
     } finally {
       setSaving(false);

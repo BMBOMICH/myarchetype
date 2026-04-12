@@ -2,6 +2,7 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { deriveVerificationLevel, getVerificationBadgeConfig } from './profileCompletion';
+import { logger } from './logger';
 
 export interface ProfileStrengthResult {
   score: number; maxScore: number; percentage: number;
@@ -89,7 +90,7 @@ export async function calculateProfileStrength(): Promise<ProfileStrengthResult>
     const ghost = detectGhostProfile(data);
     const age = checkAccountAgeGate(data.createdAt);
     return { score, maxScore: 100, percentage: pct, level, color, criteria, recommendations: recs, isGhostProfile: ghost.isGhost, isNewAccount: age.isNew, accountAgeDays: age.ageDays, verificationBadge: getVerificationBadgeConfig(deriveVerificationLevel(data)) };
-  } catch (e) { console.error('[profileStrength] Error:', e); return def; }
+  } catch (e) { logger.error('[profileStrength] Error:', e); return def; }
 }
 
 export function getStrengthMessage(level: string): string {

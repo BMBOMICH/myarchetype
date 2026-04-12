@@ -1,5 +1,6 @@
 import { arrayRemove, arrayUnion, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '😢', '😮'];
 
@@ -60,7 +61,7 @@ export async function addReaction(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error adding reaction:', error);
+    logger.error('Error adding reaction:', error);
     return { success: false, error: error.message };
   }
 }

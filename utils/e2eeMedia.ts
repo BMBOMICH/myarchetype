@@ -6,6 +6,7 @@ import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 import { decryptTextFromSender, encryptTextForRecipient } from './e2ee';
+import { logger } from './logger';
 
 export interface EncryptedMediaUploadResult {
   mediaUrl: string; mediaMimeType: string; mediaSizeBytes: number;
@@ -44,7 +45,7 @@ async function fetchAsBytes(uri: string, fallback = 'application/octet-stream'):
     const blob = await res.blob();
     return { bytes: new Uint8Array(await blob.arrayBuffer()), mimeType: blob.type || fallback };
   } catch (error) {
-    console.error('[e2eeMedia] fetchAsBytes failed:', error);
+    logger.error('[e2eeMedia] fetchAsBytes failed:', error);
     throw error;
   }
 }
@@ -60,7 +61,7 @@ async function wrapKey(key: Uint8Array, recipientId: string) {
     const w = await encryptTextForRecipient(b64E(key), recipientId);
     return { encryptedMediaKey: w.ciphertext, mediaKeyNonce: w.nonce, senderPublicKey: w.senderPublicKey, senderKeyVersion: w.senderKeyVersion };
   } catch (error) {
-    console.error('[e2eeMedia] wrapKey failed:', error);
+    logger.error('[e2eeMedia] wrapKey failed:', error);
     throw error;
   }
 }
@@ -75,7 +76,7 @@ async function uploadEncrypted(encrypted: Uint8Array, mime: string): Promise<{ m
     if (!res.ok || !json.secure_url) throw new Error(json?.error?.message || 'Upload failed');
     return { mediaUrl: json.secure_url, mediaSizeBytes: encrypted.byteLength, mediaMimeType: mime };
   } catch (error) {
-    console.error('[e2eeMedia] uploadEncrypted failed:', error);
+    logger.error('[e2eeMedia] uploadEncrypted failed:', error);
     throw error;
   }
 }
@@ -88,7 +89,7 @@ async function encryptAndUpload(uri: string, recipientId: string, fallbackMime: 
     const upload = await uploadEncrypted(encryptedBytes, mimeType);
     return { ...upload, encryptedMediaKey: wrapped.encryptedMediaKey, mediaKeyNonce: wrapped.mediaKeyNonce, mediaCipherNonce: b64E(mediaCipherNonce), version: VER, senderPublicKey: wrapped.senderPublicKey, senderKeyVersion: wrapped.senderKeyVersion };
   } catch (error) {
-    console.error('[e2eeMedia] encryptAndUpload failed:', error);
+    logger.error('[e2eeMedia] encryptAndUpload failed:', error);
     throw error;
   }
 }
@@ -113,7 +114,7 @@ export async function decryptMediaToRenderableUri(payload: DecryptableMediaPaylo
     if (!opened) throw new Error('Unable to decrypt media — key mismatch or corrupted data');
     return bytesToDataUrl(opened, payload.mediaMimeType || 'application/octet-stream');
   } catch (error) {
-    console.error('[e2eeMedia] decryptMediaToRenderableUri failed:', error);
+    logger.error('[e2eeMedia] decryptMediaToRenderableUri failed:', error);
     throw error;
   }
 }

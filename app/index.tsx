@@ -1,15 +1,17 @@
+import * as Sentry from '@sentry/react-native';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItemInfo, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import {
-  AccessibilityInfo, ActivityIndicator, FlatList,
-  InteractionManager, LayoutAnimation, Platform, Pressable,
-  StyleSheet, Text, UIManager, View, useWindowDimensions,
+    AccessibilityInfo, ActivityIndicator, FlatList,
+    InteractionManager, LayoutAnimation, Platform, Pressable,
+    StyleSheet, Text, UIManager, View, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../firebaseConfig';
 import { getTranslation } from '../utils/i18n';
+import { logger } from '../utils/logger';
 import { appStorage } from '../utils/storage';
 
 if (Platform.OS === 'android') {
@@ -170,7 +172,7 @@ export default function WelcomeScreen() {
         });
       });
     } catch (error) {
-      console.error('[WelcomeScreen] runAuthCheck error:', error);
+      logger.error('[WelcomeScreen] runAuthCheck error:', error);
       clearTimeout(timeoutRef.current);
       if (isMounted.current) { setShowOnboarding(true); setLoading(false); }
     }
@@ -334,6 +336,12 @@ export default function WelcomeScreen() {
     </View>
   );
 }
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enableNative: true,
+  tracesSampleRate: 0.2, // Captures 20% of sessions for performance monitoring
+});
 
 // ─── Styles ───────────────────────────────────────────────
 const styles = StyleSheet.create({

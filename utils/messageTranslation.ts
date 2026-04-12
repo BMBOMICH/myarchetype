@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // Using MyMemory Free Translation API (no API key needed, 10,000 chars/day)
 // https://mymemory.translated.net/doc/spec.php
 
@@ -35,7 +36,7 @@ export async function translateMessage(
       error: data.responseDetails || 'Translation failed',
     };
   } catch (error: any) {
-    console.error('Translation error:', error);
+    logger.error('Translation error:', error);
     return {
       success: false,
       error: error.message || 'Translation failed',

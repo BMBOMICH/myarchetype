@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 "use strict";
 
 /**
@@ -180,7 +181,7 @@ exports.uploadPhoto = onCall(
 
       return { url: data.secure_url };
     } catch (error) {
-      console.error("Cloudinary upload failed:", error?.message || error);
+      logger.error("Cloudinary upload failed:", error?.message || error);
       throw new HttpsError("internal", "Photo upload failed.");
     }
   }
@@ -210,7 +211,7 @@ exports.verifyPhotoNSFW = onCall(
         score: nsfwScore,
       };
     } catch (error) {
-      console.error("NSFW verification failed:", error?.message || error);
+      logger.error("NSFW verification failed:", error?.message || error);
       throw new HttpsError("internal", "Content verification failed.");
     }
   }
@@ -234,7 +235,7 @@ exports.estimateAge = onCall(
         estimatedAge: persons.length > 0 ? persons[0]?.age ?? null : null,
       };
     } catch (error) {
-      console.error("Age estimation failed:", error?.message || error);
+      logger.error("Age estimation failed:", error?.message || error);
       return { estimatedAge: null };
     }
   }
@@ -262,7 +263,7 @@ exports.detectBodyType = onCall(
 
       return { isFullBody };
     } catch (error) {
-      console.error("Body-type detection failed:", error?.message || error);
+      logger.error("Body-type detection failed:", error?.message || error);
       return { isFullBody: false };
     }
   }
@@ -387,7 +388,7 @@ exports.sendNotification = onCall(
           .catch(() => {});
       }
 
-      console.error("FCM send failed:", code || error?.message || error);
+      logger.error("FCM send failed:", code || error?.message || error);
       return { success: false, reason: "send_failed" };
     }
   }
@@ -433,7 +434,7 @@ exports.sendWebPushNotification = onCall(
 
       return { success: true };
     } catch (error) {
-      console.error("[Web Push] Error:", error?.message || error);
+      logger.error("[Web Push] Error:", error?.message || error);
       throw new HttpsError("internal", "Failed to send web push notification.");
     }
   }
@@ -648,7 +649,7 @@ exports.cleanupDeletedUser = functions
         }
       }
     } catch (err) {
-      console.warn("Failed to cleanup rateLimits for user:", userId, err);
+      logger.warn("Failed to cleanup rateLimits for user:", userId, err);
     }
 
     // 5. Delete all chats where user is a participant (including subcollections)
@@ -665,7 +666,7 @@ exports.cleanupDeletedUser = functions
       }
     }
 
-    console.log(
+    logger.log(
       `Cleaned up ${totalDeleted} document group(s) for deleted user ${userId}.`
     );
   });

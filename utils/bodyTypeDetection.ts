@@ -16,6 +16,7 @@
  */
 
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
+import { logger } from './logger';
 
 export interface BodyTypeDetectionResult {
   isFullBody: boolean;
@@ -51,7 +52,7 @@ function analyzeFaceRatio(
   const faceHeightRatio = faceH! / imageHeight;
   const faceCenterY = ((faceY ?? 0) + (faceH ?? 0) / 2) / imageHeight;
 
-  console.log(
+  logger.log(
     `[bodyType] faceHeightRatio: ${faceHeightRatio.toFixed(2)}, ` +
     `faceCenterY: ${faceCenterY.toFixed(2)}`
   );
@@ -115,7 +116,7 @@ export async function detectFullBodyPhoto(
   photoUrl: string
 ): Promise<BodyTypeDetectionResult> {
   try {
-    console.log('[bodyType] Re-uploading photo to get face data...');
+    logger.log('[bodyType] Re-uploading photo to get face data...');
 
     const form = new FormData();
     form.append('file', photoUrl);
@@ -143,7 +144,7 @@ export async function detectFullBodyPhoto(
       faces,
     );
   } catch (error) {
-    console.error('[bodyType] Detection error:', error);
+    logger.error('[bodyType] Detection error:', error);
     return {
       isFullBody: false,
       confidence: 30,

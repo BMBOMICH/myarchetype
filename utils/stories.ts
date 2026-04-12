@@ -7,6 +7,7 @@ import { auth, db } from '../firebaseConfig';
 import { uploadToCloudinary } from './cloudinaryUpload';
 import { checkImageSafety, checkTextSafety, checkVideoFramesSafety, detectEmojiCodedLanguage, detectEmojiSpam, ocrThenModerate } from './moderation';
 import { analyzeMessageTiming } from './rateLimiter';
+import { logger } from './logger';
 
 export const STORY_DURATION_HOURS = 24;
 
@@ -91,7 +92,7 @@ export async function createStory(mediaUri: string, mediaType: 'photo' | 'video'
     };
     const ref = await addDoc(storiesCol(), story);
     return { success: true, storyId: ref.id };
-  } catch (e: any) { console.error('[Stories] create error:', e); return { success: false, error: e.message }; }
+  } catch (e: any) { logger.error('[Stories] create error:', e); return { success: false, error: e.message }; }
 }
 
 export async function getActiveStories(userId: string): Promise<Story[]> {
@@ -103,7 +104,7 @@ export async function getActiveStories(userId: string): Promise<Story[]> {
     snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
     sortStories(stories, userId);
     return stories;
-  } catch (e) { console.error('[Stories] getActive error:', e); return []; }
+  } catch (e) { logger.error('[Stories] getActive error:', e); return []; }
 }
 
 export function subscribeToActiveStories(userId: string, onUpdate: (s: Story[]) => void): () => void {
@@ -145,9 +146,9 @@ export async function markStoryViewed(storyId: string): Promise<void> {
     const timestamps: number[] = [...(data.viewTimestamps ?? []), now];
     if (timestamps.length >= 5) {
       const botCheck = analyzeMessageTiming(timestamps);
-      if (botCheck.isBot) { console.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`); await updateDoc(ref, { flagged: true }).catch(() => {}); }
+      if (botCheck.isBot) { logger.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`); await updateDoc(ref, { flagged: true }).catch(() => {}); }
     }
-  } catch (e) { console.error('[Stories] markViewed error:', e); }
+  } catch (e) { logger.error('[Stories] markViewed error:', e); }
 }
 
 export async function deleteStory(storyId: string): Promise<{ success: boolean; error?: string }> {
@@ -159,7 +160,7 @@ export async function deleteStory(storyId: string): Promise<{ success: boolean; 
     if ((snap.data() as Story).userId !== user.uid) return { success: false, error: "Cannot delete another user's story" };
     await deleteDoc(ref);
     return { success: true };
-  } catch (e: any) { console.error('[Stories] delete error:', e); return { success: false, error: e.message }; }
+  } catch (e: any) { logger.error('[Stories] delete error:', e); return { success: false, error: e.message }; }
 }
 
 export async function cleanupExpiredStories(): Promise<number> {
@@ -173,9 +174,9 @@ export async function cleanupExpiredStories(): Promise<number> {
       await batch.commit();
       deleted += Math.min(500, snap.docs.length - i);
     }
-    if (deleted > 0) console.log(`[Stories] cleaned up ${deleted} expired stories`);
+    if (deleted > 0) logger.log(`[Stories] cleaned up ${deleted} expired stories`);
     return deleted;
-  } catch (e) { console.error('[Stories] cleanup error:', e); return 0; }
+  } catch (e) { logger.error('[Stories] cleanup error:', e); return 0; }
 }
 
 export function detectGhostStories(stories: Story[]): Story[] {

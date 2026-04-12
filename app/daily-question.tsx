@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getQuestionEmoji, getTodaysQuestion, hasAnsweredToday, saveUserAnswer } from '../utils/dailyQuestions';
+import { logger } from '../utils/logger';
 
 export default function DailyQuestionScreen() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function DailyQuestionScreen() {
       const answered = await hasAnsweredToday();
       setAlreadyAnswered(answered);
     } catch (error) {
-      console.error('[DailyQ] Load error:', error);
+      logger.error('[DailyQ] Load error:', error);
     } finally {
       setLoading(false);
     }
@@ -38,7 +39,7 @@ export default function DailyQuestionScreen() {
         Alert.alert('Error', 'Failed to save answer. Please try again.');
       }
     } catch (error) {
-      console.error('[DailyQ] Submit error:', error);
+      logger.error('[DailyQ] Submit error:', error);
       Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       setSaving(false);

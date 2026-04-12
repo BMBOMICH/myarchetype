@@ -1,13 +1,13 @@
 {
   "_meta": {
-    "scannerVersion": "4.0.0",
-    "timestamp": "2026-03-31T11:41:33.058Z",
+    "scannerVersion": "5.1.0",
+    "timestamp": "2026-03-31T23:43:51.141Z",
     "scannedAt": "C:\\Users\\Elxan\\Desktop\\MyArchetype",
     "nodeVersion": "v20.20.2",
     "platform": "win32",
     "arch": "x64"
   },
-  "scanDuration": "14.88s",
+  "scanDuration": "13.05s",
   "project": {
     "name": "myarchetype",
     "version": "1.0.0",
@@ -55,26 +55,44 @@
           "name": "expo-router"
         },
         {
-          "name": "expo-camera"
+          "name": "expo-camera",
+          "config": {
+            "cameraPermission": "MyArchetype needs camera access to take profile photos and verify your identity."
+          }
         },
         {
-          "name": "expo-location"
+          "name": "expo-location",
+          "config": {
+            "locationAlwaysAndWhenInUsePermission": "MyArchetype uses your location to find matches near you."
+          }
         },
         {
           "name": "expo-notifications",
           "config": {
             "icon": "./assets/images/android-icon-monochrome.png",
-            "color": "#53a8b6"
+            "color": "#53a8b6",
+            "defaultChannel": "default"
           }
         },
         {
           "name": "expo-secure-store"
         },
         {
-          "name": "@sentry/react-native"
+          "name": "@sentry/react-native",
+          "config": {
+            "uploadSourceMaps": true,
+            "url": "https://sentry.io/"
+          }
         }
       ],
+      "updates": {
+        "enabled": true,
+        "fallbackToCacheTimeout": 0
+      },
       "extra": [],
+      "runtimeVersion": {
+        "policy": "appVersion"
+      },
       "ios": {
         "bundleIdentifier": "com.bmbomich.myarchetype",
         "supportsTablet": true,
@@ -82,7 +100,10 @@
         "entitlements": [],
         "infoPlistKeys": [
           "NSCameraUsageDescription",
-          "NSLocationWhenInUseUsageDescription"
+          "NSMicrophoneUsageDescription",
+          "NSLocationWhenInUseUsageDescription",
+          "NSPhotoLibraryUsageDescription",
+          "NSFaceIDUsageDescription"
         ],
         "privacyManifests": null,
         "config": []
@@ -91,8 +112,13 @@
         "package": "com.bmbomich.myarchetype",
         "permissions": [
           "CAMERA",
+          "RECORD_AUDIO",
           "ACCESS_FINE_LOCATION",
-          "ACCESS_COARSE_LOCATION"
+          "ACCESS_COARSE_LOCATION",
+          "READ_EXTERNAL_STORAGE",
+          "WRITE_EXTERNAL_STORAGE",
+          "VIBRATE",
+          "RECEIVE_BOOT_COMPLETED"
         ],
         "blockedPermissions": [],
         "intentFilters": [],
@@ -121,22 +147,35 @@
         {
           "name": "development",
           "distribution": "internal",
-          "env": [],
-          "ios": [],
+          "channel": "development",
+          "env": [
+            "NODE_ENV"
+          ],
+          "ios": [
+            "simulator"
+          ],
           "android": []
         },
         {
           "name": "preview",
           "distribution": "internal",
-          "env": [],
+          "channel": "preview",
+          "env": [
+            "NODE_ENV"
+          ],
           "ios": [],
           "android": []
         },
         {
           "name": "production",
-          "env": [],
+          "channel": "production",
+          "env": [
+            "NODE_ENV"
+          ],
           "ios": [],
-          "android": []
+          "android": [
+            "buildType"
+          ]
         }
       ],
       "submit": [
@@ -159,8 +198,8 @@
       "typescript": true,
       "typescriptVersion": "5.9.3",
       "strictMode": true,
-      "noImplicitAny": false,
-      "strictNullChecks": false,
+      "noImplicitAny": true,
+      "strictNullChecks": true,
       "noUncheckedIndexedAccess": true,
       "exactOptionalPropertyTypes": false,
       "jsxRuntime": "react-native",
@@ -188,6 +227,7 @@
         "android",
         "ios",
         "functions",
+        "server",
         "scripts",
         "e2e",
         ".cache",
@@ -253,7 +293,7 @@
         ],
         "securityRules": {
           "firestore": true,
-          "storage": false,
+          "storage": true,
           "database": false
         },
         "indexes": true,
@@ -404,7 +444,7 @@
     },
     "analyticsMonitoring": {
       "sentry": {
-        "used": false,
+        "used": true,
         "version": "7.11.0"
       },
       "amplitude": {
@@ -503,7 +543,7 @@
       "realm": false,
       "sqlite": false,
       "contextCount": 2,
-      "useReducerCount": 10
+      "useReducerCount": 14
     },
     "ui": {
       "nativeWind": false,
@@ -562,14 +602,14 @@
       "argon2": false,
       "helmet": true,
       "csp": true,
-      "certificatePinning": true,
+      "certificatePinning": false,
       "jailbreakDetection": false,
       "rootDetection": true,
       "obfuscation": false,
       "secureRandom": true
     },
     "testing": {
-      "jest": false,
+      "jest": true,
       "jestVersion": "30.3.0",
       "vitest": false,
       "testingLibrary": false,
@@ -581,8 +621,8 @@
       "msw": false,
       "nock": false,
       "supertest": false,
-      "testFiles": 0,
-      "coverageConfig": false,
+      "testFiles": 1,
+      "coverageConfig": true,
       "snapshotFiles": 0
     },
     "buildDeployment": {
@@ -607,11 +647,11 @@
         "dockerIgnore": false
       },
       "metro": {
-        "hasConfig": false,
+        "hasConfig": true,
         "version": "0.83.3"
       },
       "babel": {
-        "hasConfig": false,
+        "hasConfig": true,
         "version": "7.29.0"
       },
       "bundleAnalyzer": false,
@@ -667,15 +707,6 @@
         ]
       },
       {
-        "name": "OpenStreetMap",
-        "url": "overpass-api.de",
-        "category": "Location",
-        "usedIn": [
-          "app\\chat.tsx",
-          "utils\\location.ts"
-        ]
-      },
-      {
         "name": "ip-api",
         "url": "ip-api.com",
         "category": "Location",
@@ -705,21 +736,19 @@
       "faceId": false,
       "bluetooth": false,
       "motion": false,
-      "tracking": false,
-      "speechRecognition": true,
-      "healthKit": false
+      "tracking": false
     }
   },
   "packages": {
     "counts": {
-      "production": 46,
-      "development": 10,
+      "production": 47,
+      "development": 16,
       "peer": 0,
       "optional": 0,
-      "total": 56,
-      "actuallyImported": 49,
+      "total": 63,
+      "actuallyImported": 50,
       "notInstalled": 0,
-      "categories": 13
+      "categories": 14
     },
     "all": [
       {
@@ -729,6 +758,17 @@
         "type": "production",
         "category": "🎨 UI Assets",
         "actuallyImported": true,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@react-native-community/netinfo",
+        "specifiedVersion": "^12.0.1",
+        "installedVersion": "12.0.1",
+        "type": "production",
+        "category": "📦 Other",
+        "actuallyImported": false,
         "isFrameworkInternal": false,
         "installed": true,
         "versionMismatch": false
@@ -772,7 +812,7 @@
         "installedVersion": "7.11.0",
         "type": "production",
         "category": "🐛 Monitoring",
-        "actuallyImported": false,
+        "actuallyImported": true,
         "isFrameworkInternal": false,
         "installed": true,
         "versionMismatch": false
@@ -801,7 +841,7 @@
       },
       {
         "name": "expo-apple-authentication",
-        "specifiedVersion": "^55.0.9",
+        "specifiedVersion": "~55.0.9",
         "installedVersion": "55.0.9",
         "type": "production",
         "category": "📱 Expo",
@@ -1240,6 +1280,28 @@
         "versionMismatch": false
       },
       {
+        "name": "@commitlint/cli",
+        "specifiedVersion": "^20.5.0",
+        "installedVersion": "20.5.0",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "@commitlint/config-conventional",
+        "specifiedVersion": "^20.5.0",
+        "installedVersion": "20.5.0",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
         "name": "@types/jest",
         "specifiedVersion": "^30.0.0",
         "installedVersion": "30.0.0",
@@ -1273,6 +1335,17 @@
         "versionMismatch": false
       },
       {
+        "name": "babel-plugin-transform-remove-console",
+        "specifiedVersion": "^6.9.4",
+        "installedVersion": "6.9.4",
+        "type": "development",
+        "category": "🔧 Build Tools",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
         "name": "eslint",
         "specifiedVersion": "^10.1.0",
         "installedVersion": "10.1.0",
@@ -1295,6 +1368,17 @@
         "versionMismatch": false
       },
       {
+        "name": "husky",
+        "specifiedVersion": "^9.1.7",
+        "installedVersion": "9.1.7",
+        "type": "development",
+        "category": "📦 Other",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
         "name": "jest",
         "specifiedVersion": "^30.3.0",
         "installedVersion": "30.3.0",
@@ -1306,11 +1390,33 @@
         "versionMismatch": false
       },
       {
+        "name": "lint-staged",
+        "specifiedVersion": "^16.4.0",
+        "installedVersion": "16.4.0",
+        "type": "development",
+        "category": "✨ Linting",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
         "name": "prettier",
         "specifiedVersion": "^3.8.1",
         "installedVersion": "3.8.1",
         "type": "development",
         "category": "✨ Linting",
+        "actuallyImported": false,
+        "isFrameworkInternal": false,
+        "installed": true,
+        "versionMismatch": false
+      },
+      {
+        "name": "sharp-cli",
+        "specifiedVersion": "^5.2.0",
+        "installedVersion": "5.2.0",
+        "type": "development",
+        "category": "📦 Other",
         "actuallyImported": false,
         "isFrameworkInternal": false,
         "installed": true,
@@ -1348,6 +1454,41 @@
           "type": "production",
           "category": "🎨 UI Assets",
           "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "📦 Other": [
+        {
+          "name": "@react-native-community/netinfo",
+          "specifiedVersion": "^12.0.1",
+          "installedVersion": "12.0.1",
+          "type": "production",
+          "category": "📦 Other",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "husky",
+          "specifiedVersion": "^9.1.7",
+          "installedVersion": "9.1.7",
+          "type": "development",
+          "category": "📦 Other",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "sharp-cli",
+          "specifiedVersion": "^5.2.0",
+          "installedVersion": "5.2.0",
+          "type": "development",
+          "category": "📦 Other",
+          "actuallyImported": false,
           "isFrameworkInternal": false,
           "installed": true,
           "versionMismatch": false
@@ -1395,7 +1536,7 @@
           "installedVersion": "7.11.0",
           "type": "production",
           "category": "🐛 Monitoring",
-          "actuallyImported": false,
+          "actuallyImported": true,
           "isFrameworkInternal": false,
           "installed": true,
           "versionMismatch": false
@@ -1428,7 +1569,7 @@
         },
         {
           "name": "expo-apple-authentication",
-          "specifiedVersion": "^55.0.9",
+          "specifiedVersion": "~55.0.9",
           "installedVersion": "55.0.9",
           "type": "production",
           "category": "📱 Expo",
@@ -1875,6 +2016,85 @@
           "isFrameworkInternal": true,
           "installed": true,
           "versionMismatch": false
+        },
+        {
+          "name": "babel-plugin-transform-remove-console",
+          "specifiedVersion": "^6.9.4",
+          "installedVersion": "6.9.4",
+          "type": "development",
+          "category": "🔧 Build Tools",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        }
+      ],
+      "✨ Linting": [
+        {
+          "name": "@commitlint/cli",
+          "specifiedVersion": "^20.5.0",
+          "installedVersion": "20.5.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "@commitlint/config-conventional",
+          "specifiedVersion": "^20.5.0",
+          "installedVersion": "20.5.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "eslint",
+          "specifiedVersion": "^10.1.0",
+          "installedVersion": "10.1.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "eslint-config-expo",
+          "specifiedVersion": "~55.0.0",
+          "installedVersion": "55.0.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": true,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "lint-staged",
+          "specifiedVersion": "^16.4.0",
+          "installedVersion": "16.4.0",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
+        },
+        {
+          "name": "prettier",
+          "specifiedVersion": "^3.8.1",
+          "installedVersion": "3.8.1",
+          "type": "development",
+          "category": "✨ Linting",
+          "actuallyImported": false,
+          "isFrameworkInternal": false,
+          "installed": true,
+          "versionMismatch": false
         }
       ],
       "🧪 Testing": [
@@ -1946,45 +2166,10 @@
           "installed": true,
           "versionMismatch": true
         }
-      ],
-      "✨ Linting": [
-        {
-          "name": "eslint",
-          "specifiedVersion": "^10.1.0",
-          "installedVersion": "10.1.0",
-          "type": "development",
-          "category": "✨ Linting",
-          "actuallyImported": true,
-          "isFrameworkInternal": false,
-          "installed": true,
-          "versionMismatch": false
-        },
-        {
-          "name": "eslint-config-expo",
-          "specifiedVersion": "~55.0.0",
-          "installedVersion": "55.0.0",
-          "type": "development",
-          "category": "✨ Linting",
-          "actuallyImported": true,
-          "isFrameworkInternal": false,
-          "installed": true,
-          "versionMismatch": false
-        },
-        {
-          "name": "prettier",
-          "specifiedVersion": "^3.8.1",
-          "installedVersion": "3.8.1",
-          "type": "development",
-          "category": "✨ Linting",
-          "actuallyImported": false,
-          "isFrameworkInternal": false,
-          "installed": true,
-          "versionMismatch": false
-        }
       ]
     },
     "possiblyUnused": [
-      "@sentry/react-native",
+      "@react-native-community/netinfo",
       "expo-apple-authentication",
       "react-native-reanimated-carousel"
     ],
@@ -2000,7 +2185,19 @@
       "nsfwjs"
     ],
     "notInstalled": [],
-    "potentialDuplicates": [],
+    "potentialDuplicates": [
+      {
+        "category": "✨ Linting",
+        "packages": [
+          "@commitlint/cli",
+          "@commitlint/config-conventional",
+          "eslint",
+          "eslint-config-expo",
+          "lint-staged",
+          "prettier"
+        ]
+      }
+    ],
     "resolutions": null,
     "scripts": {
       "start": "expo start",
@@ -2012,7 +2209,8 @@
       "lint": "eslint .",
       "typecheck": "tsc --noEmit",
       "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json}\"",
-      "save": "git add . && git commit -m \"Update\" && git push"
+      "save": "git add . && git commit -m \"Update\" && git push",
+      "prepare": "husky"
     },
     "engines": {}
   },
@@ -2156,6 +2354,14 @@
           "maskedValue": "prod********"
         },
         {
+          "key": "EXPO_PUBLIC_SENTRY_DSN",
+          "hasValue": true,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "http********"
+        },
+        {
           "key": "PORT",
           "hasValue": true,
           "isSecret": false,
@@ -2203,10 +2409,195 @@
           "isExpoPublic": true,
           "maskedValue": "same********"
         }
+      ],
+      ".env.example": [
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_API_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FIREBASE_APP_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_SERVER_URL",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_FUNCTIONS_URL",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_VAPID_PUBLIC_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "VAPID_PUBLIC_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "VAPID_PRIVATE_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "VAPID_EMAIL",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "HMAC_SECRET",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "ANALYTICS_HMAC_SECRET",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "GOOGLE_SAFE_BROWSING_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "NCMEC_API_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "EXPO_PUBLIC_SAFE_BROWSING_API_KEY",
+          "hasValue": false,
+          "isSecret": true,
+          "isPlaceholder": false,
+          "isExpoPublic": true,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "FIREBASE_PROJECT_ID",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "NODE_ENV",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        },
+        {
+          "key": "PORT",
+          "hasValue": false,
+          "isSecret": false,
+          "isPlaceholder": false,
+          "isExpoPublic": false,
+          "maskedValue": "(empty)"
+        }
       ]
     },
     "referencedInCode": [
-      "ANALYTICS_HMAC_SECRET",
       "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
       "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
       "EXPO_PUBLIC_FUNCTIONS_URL",
@@ -2214,12 +2605,7 @@
       "EXPO_PUBLIC_SERVER_URL",
       "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
       "EXPO_PUBLIC_VAPID_PUBLIC_KEY",
-      "FIREBASE_PROJECT_ID",
-      "GOOGLE_SAFE_BROWSING_KEY",
-      "HMAC_SECRET",
-      "NCMEC_API_KEY",
-      "NODE_ENV",
-      "PORT"
+      "NODE_ENV"
     ],
     "expoPublicVars": [
       "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
@@ -2233,526 +2619,58 @@
     "missingFromEnvFiles": [],
     "missingFromMainEnv": [],
     "emptyOrPlaceholder": [
-      "EXPO_PUBLIC_SPOTIFY_CLIENT_ID"
+      "EXPO_PUBLIC_SPOTIFY_CLIENT_ID",
+      "EXPO_PUBLIC_FIREBASE_API_KEY",
+      "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
+      "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+      "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
+      "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+      "EXPO_PUBLIC_FIREBASE_APP_ID",
+      "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
+      "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+      "EXPO_PUBLIC_SERVER_URL",
+      "EXPO_PUBLIC_FUNCTIONS_URL",
+      "EXPO_PUBLIC_VAPID_PUBLIC_KEY",
+      "VAPID_PUBLIC_KEY",
+      "VAPID_PRIVATE_KEY",
+      "VAPID_EMAIL",
+      "HMAC_SECRET",
+      "ANALYTICS_HMAC_SECRET",
+      "GOOGLE_SAFE_BROWSING_KEY",
+      "NCMEC_API_KEY",
+      "EXPO_PUBLIC_SAFE_BROWSING_API_KEY",
+      "FIREBASE_PROJECT_ID",
+      "NODE_ENV",
+      "PORT"
     ],
     "envInGitignore": true,
-    "hasExample": false,
+    "hasExample": true,
     "summary": {
-      "totalFiles": 1,
-      "totalVars": 23,
-      "uniqueVars": 23,
-      "emptyVars": 1,
+      "totalFiles": 2,
+      "totalVars": 47,
+      "uniqueVars": 24,
+      "emptyVars": 24,
       "placeholderVars": 0,
-      "secretVars": 11,
-      "expoPublicVars": 13
+      "secretVars": 22,
+      "expoPublicVars": 27
     }
   },
   "security": {
-    "issueCount": 145,
+    "issueCount": 33,
     "bySeverity": {
       "critical": 0,
-      "high": 1,
+      "high": 0,
       "medium": 0,
-      "low": 69,
-      "info": 75
+      "low": 0,
+      "info": 33
     },
     "issues": [
       {
-        "file": "firebaseConfig.ts",
-        "severity": "high",
-        "message": "Firebase API key ref — ensure env var not hardcoded",
-        "count": 1,
-        "pattern": "FIREBASE_API_KEY"
-      },
-      {
-        "file": "app\\admin\\index.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\admin\\reports.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 9,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\admin\\users.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 9,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\blocked-users.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
         "file": "app\\chat.tsx",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 4,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "app\\chat.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 46,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\compatibility-quiz.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 2,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\daily-question.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 4,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\date-safety.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\date-safety.tsx",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "app\\date-spot-reviews.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 5,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\dating-stats.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 1,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\deal-breakers.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 4,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 27,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\height-verification.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 22,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\home.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\icebreaker-game.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\interests.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 6,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\login.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 1,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\matches.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 9,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\matches.tsx",
-        "severity": "low",
-        "message": "confirm() in code",
-        "count": 1,
-        "pattern": "confirm("
-      },
-      {
-        "file": "app\\my-matches.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\my-matches.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 7,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\personality-quiz.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 9,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\post-date-rating.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\post-date-rating.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\profile-preview.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\profile-setup.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 1,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\profile-views.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\referral.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 2,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\relationship-mode.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 9,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\second-look.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 3,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\selfie-verification.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 2,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\settings.tsx",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "app\\settings.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 18,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\shared-playlist.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 7,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\signup.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 1,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\smart-photos.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 2,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\social-verification.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 13,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\stories.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 7,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\super-likes.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 6,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\video-profile-recorder.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 4,
-        "pattern": "alert("
-      },
-      {
-        "file": "app\\voice-intro-recorder.tsx",
-        "severity": "low",
-        "message": "alert() in code",
-        "count": 6,
-        "pattern": "alert("
-      },
-      {
-        "file": "functions\\index.js",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "functions\\index.js",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "functions\\lib\\sendWebPush.js",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 2,
-        "pattern": "console.log("
-      },
-      {
-        "file": "functions\\src\\sendWebPush.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 2,
-        "pattern": "console.log("
-      },
-      {
-        "file": "server\\src\\index.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "server\\src\\index.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 2,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\bodyTypeDetection.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 2,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\dateSafety.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\datingStats.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\giphyApi.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\heightEstimation.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 4,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\location.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 4,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\location.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 2,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\logger.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 3,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\logger.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 2,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\matchExpiration.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\moderation.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\notifications.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 3,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\notifications.web.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 5,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\profileViews.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\ratingSystem.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\socialVerification.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\stories.ts",
-        "severity": "low",
-        "message": "console.log() in code",
-        "count": 1,
-        "pattern": "console.log("
-      },
-      {
-        "file": "utils\\stories.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 1,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\videoProfiles.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 2,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "utils\\voiceIntro.ts",
-        "severity": "low",
-        "message": "console.warn() in code",
-        "count": 2,
-        "pattern": "console.warn("
-      },
-      {
-        "file": "app\\admin\\stats.tsx",
         "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 4,
-        "pattern": "as any"
+        "message": "ESLint rule disabled",
+        "count": 2,
+        "pattern": "eslint-disable"
       },
       {
         "file": "app\\compatibility-quiz.tsx",
@@ -2766,27 +2684,6 @@
         "severity": "info",
         "message": "TypeScript \"any\" type",
         "count": 3,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\date-spot-reviews.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\date-spot-reviews.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 2,
-        "pattern": "<any>"
-      },
-      {
-        "file": "app\\deal-breakers.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
         "pattern": ": any"
       },
       {
@@ -2804,34 +2701,6 @@
         "pattern": "as any"
       },
       {
-        "file": "app\\icebreaker-game.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" array",
-        "count": 1,
-        "pattern": "any[]"
-      },
-      {
-        "file": "app\\login.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 10,
-        "pattern": "as any"
-      },
-      {
-        "file": "app\\matches.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 1,
-        "pattern": "as any"
-      },
-      {
-        "file": "app\\matches.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 2,
-        "pattern": ": any"
-      },
-      {
         "file": "app\\personality-quiz.tsx",
         "severity": "info",
         "message": "TypeScript \"any\" cast",
@@ -2844,55 +2713,6 @@
         "message": "TypeScript \"any\" type",
         "count": 1,
         "pattern": ": any"
-      },
-      {
-        "file": "app\\post-date-rating.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\profile-preview.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 2,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\profile-preview.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 1,
-        "pattern": "<any>"
-      },
-      {
-        "file": "app\\profile-views.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 2,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\second-look.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 3,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\settings.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 5,
-        "pattern": ": any"
-      },
-      {
-        "file": "app\\signup.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 16,
-        "pattern": "as any"
       },
       {
         "file": "app\\stories.tsx",
@@ -2919,7 +2739,7 @@
         "file": "app\\_layout.tsx",
         "severity": "info",
         "message": "Dev-only code block",
-        "count": 8,
+        "count": 3,
         "pattern": "__DEV__"
       },
       {
@@ -2944,13 +2764,6 @@
         "pattern": ": any"
       },
       {
-        "file": "components\\TrustScoreDisplay.tsx",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 5,
-        "pattern": ": any"
-      },
-      {
         "file": "utils\\achievements.ts",
         "severity": "info",
         "message": "TypeScript \"any\" type",
@@ -2958,42 +2771,7 @@
         "pattern": ": any"
       },
       {
-        "file": "utils\\ageEstimation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 8,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\ageEstimation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\ageEstimation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 1,
-        "pattern": "<any>"
-      },
-      {
         "file": "utils\\chatSettings.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\cloudinaryUpload.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 3,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\cloudinaryUpload.ts",
         "severity": "info",
         "message": "TypeScript \"any\" type",
         "count": 1,
@@ -3028,39 +2806,11 @@
         "pattern": ": any"
       },
       {
-        "file": "utils\\faceComparison.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 2,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\faceComparison.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\faceComparison.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 1,
-        "pattern": "<any>"
-      },
-      {
         "file": "utils\\faceDetection.ts",
         "severity": "info",
         "message": "TypeScript \"any\" type",
         "count": 1,
         "pattern": ": any"
-      },
-      {
-        "file": "utils\\faceDetection.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" array",
-        "count": 1,
-        "pattern": "any[]"
       },
       {
         "file": "utils\\giphyApi.ts",
@@ -3070,46 +2820,18 @@
         "pattern": "__DEV__"
       },
       {
-        "file": "utils\\icebreakerGames.ts",
+        "file": "utils\\logger.ts",
         "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 10,
-        "pattern": ": any"
+        "message": "Dev-only code block",
+        "count": 2,
+        "pattern": "__DEV__"
       },
       {
-        "file": "utils\\icebreakerGames.ts",
+        "file": "utils\\logger.ts",
         "severity": "info",
-        "message": "TypeScript \"any\" array",
+        "message": "console.log/warn() in code",
         "count": 3,
-        "pattern": "any[]"
-      },
-      {
-        "file": "utils\\location.ts",
-        "severity": "info",
-        "message": "Dev-only code block",
-        "count": 6,
-        "pattern": "__DEV__"
-      },
-      {
-        "file": "utils\\location.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 1,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\logger.ts",
-        "severity": "info",
-        "message": "Dev-only code block",
-        "count": 2,
-        "pattern": "__DEV__"
-      },
-      {
-        "file": "utils\\logger.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 2,
-        "pattern": ": any"
+        "pattern": "\\bconsole\\.(log|warn)\\s*\\("
       },
       {
         "file": "utils\\matchExpiration.ts",
@@ -3133,34 +2855,6 @@
         "pattern": ": any"
       },
       {
-        "file": "utils\\moderation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 2,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\moderation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\moderation.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 3,
-        "pattern": "<any>"
-      },
-      {
-        "file": "utils\\onlineStatus.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 4,
-        "pattern": ": any"
-      },
-      {
         "file": "utils\\pinnedMessages.ts",
         "severity": "info",
         "message": "TypeScript \"any\" type",
@@ -3168,28 +2862,7 @@
         "pattern": ": any"
       },
       {
-        "file": "utils\\profileCompletion.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 3,
-        "pattern": ": any"
-      },
-      {
         "file": "utils\\profileStrength.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\ratingSystem.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 3,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\relationshipMode.ts",
         "severity": "info",
         "message": "TypeScript \"any\" type",
         "count": 1,
@@ -3201,20 +2874,6 @@
         "message": "TypeScript \"any\" cast",
         "count": 1,
         "pattern": "as any"
-      },
-      {
-        "file": "utils\\socialVerification.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 4,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\spotifyIntegration.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 4,
-        "pattern": ": any"
       },
       {
         "file": "utils\\stories.ts",
@@ -3236,103 +2895,68 @@
         "message": "TypeScript \"any\" type",
         "count": 1,
         "pattern": ": any"
-      },
-      {
-        "file": "utils\\videoProfiles.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 2,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\videoProfiles.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 2,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\voiceIntro.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" cast",
-        "count": 2,
-        "pattern": "as any"
-      },
-      {
-        "file": "utils\\voiceIntro.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" type",
-        "count": 1,
-        "pattern": ": any"
-      },
-      {
-        "file": "utils\\voiceIntro.ts",
-        "severity": "info",
-        "message": "TypeScript \"any\" generic",
-        "count": 1,
-        "pattern": "<any>"
       }
     ],
     "mostProblematicFiles": [
       {
-        "file": "app\\chat.tsx",
-        "issueCount": 50
+        "file": "utils\\logger.ts",
+        "issueCount": 5
       },
       {
-        "file": "app\\edit-profile.tsx",
-        "issueCount": 27
+        "file": "app\\_layout.tsx",
+        "issueCount": 4
       },
       {
-        "file": "app\\settings.tsx",
-        "issueCount": 24
-      },
-      {
-        "file": "app\\height-verification.tsx",
-        "issueCount": 22
-      },
-      {
-        "file": "app\\signup.tsx",
-        "issueCount": 17
-      },
-      {
-        "file": "app\\matches.tsx",
-        "issueCount": 13
-      },
-      {
-        "file": "app\\social-verification.tsx",
-        "issueCount": 13
-      },
-      {
-        "file": "utils\\icebreakerGames.ts",
-        "issueCount": 13
-      },
-      {
-        "file": "utils\\location.ts",
-        "issueCount": 13
+        "file": "app\\date-checkin.tsx",
+        "issueCount": 3
       },
       {
         "file": "app\\personality-quiz.tsx",
-        "issueCount": 12
+        "issueCount": 3
       },
       {
-        "file": "app\\login.tsx",
-        "issueCount": 11
+        "file": "utils\\dateCheckin.ts",
+        "issueCount": 3
       },
       {
-        "file": "utils\\ageEstimation.ts",
-        "issueCount": 10
+        "file": "app\\chat.tsx",
+        "issueCount": 2
       },
       {
-        "file": "app\\admin\\reports.tsx",
-        "issueCount": 9
+        "file": "app\\voice-intro-recorder.tsx",
+        "issueCount": 2
       },
       {
-        "file": "app\\admin\\users.tsx",
-        "issueCount": 9
+        "file": "utils\\dealBreakers.ts",
+        "issueCount": 2
       },
       {
-        "file": "app\\relationship-mode.tsx",
-        "issueCount": 9
+        "file": "utils\\matchExpiration.ts",
+        "issueCount": 2
+      },
+      {
+        "file": "utils\\pinnedMessages.ts",
+        "issueCount": 2
+      },
+      {
+        "file": "utils\\stories.ts",
+        "issueCount": 2
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "issueCount": 1
+      },
+      {
+        "file": "app\\home.tsx",
+        "issueCount": 1
+      },
+      {
+        "file": "app\\icebreaker-game.tsx",
+        "issueCount": 1
+      },
+      {
+        "file": "app\\stories.tsx",
+        "issueCount": 1
       }
     ],
     "gitignoreChecks": {
@@ -3355,39 +2979,47 @@
     }
   },
   "fileStructure": {
-    "totalFiles": 166,
-    "totalCodeFiles": 126,
+    "totalFiles": 194,
+    "totalCodeFiles": 132,
     "byExtension": {
-      "(none)": 8,
+      "(none)": 25,
+      ".example": 1,
       ".yml": 1,
+      ".sh": 1,
       ".json": 19,
-      ".tsx": 54,
+      ".tsx": 55,
       ".png": 6,
+      ".webp": 2,
+      ".js": 9,
       ".md": 3,
-      ".ts": 67,
-      ".js": 5,
-      ".rules": 1,
+      ".ts": 68,
+      ".rules": 2,
       ".map": 2
     },
     "byDirectory": {
-      "app": 45,
+      "app": 46,
+      "babel.config.js": 1,
       "cloudinaryConfig.ts": 1,
+      "commitlint.config.js": 1,
       "components": 8,
       "eslint.config.js": 1,
       "expo-env.d.ts": 1,
       "firebaseConfig.ts": 1,
       "functions": 3,
+      "jest.config.js": 1,
+      "metro.config.js": 1,
       "public": 1,
       "server": 1,
       "services": 1,
       "utils": 61,
-      "web-push": 2
+      "web-push": 2,
+      "__tests__": 1
     },
     "largestFiles": [
       {
         "file": "app\\chat.tsx",
-        "lines": 1709,
-        "bytes": 109937
+        "lines": 1690,
+        "bytes": 117162
       },
       {
         "file": "app\\profile-setup.tsx",
@@ -3396,18 +3028,13 @@
       },
       {
         "file": "app\\signup.tsx",
-        "lines": 1269,
-        "bytes": 68392
-      },
-      {
-        "file": "app\\settings.tsx",
-        "lines": 1092,
-        "bytes": 34190
+        "lines": 1193,
+        "bytes": 66875
       },
       {
         "file": "app\\login.tsx",
-        "lines": 1073,
-        "bytes": 60352
+        "lines": 1109,
+        "bytes": 61542
       },
       {
         "file": "app\\personality-quiz.tsx",
@@ -3415,19 +3042,19 @@
         "bytes": 77179
       },
       {
-        "file": "app\\my-matches.tsx",
-        "lines": 912,
-        "bytes": 29466
-      },
-      {
         "file": "server\\src\\index.ts",
-        "lines": 902,
-        "bytes": 50593
+        "lines": 893,
+        "bytes": 50620
       },
       {
-        "file": "app\\second-look.tsx",
-        "lines": 799,
-        "bytes": 21679
+        "file": "app\\matches.tsx",
+        "lines": 885,
+        "bytes": 49598
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "lines": 801,
+        "bytes": 60164
       },
       {
         "file": "app\\stories.tsx",
@@ -3440,34 +3067,24 @@
         "bytes": 33577
       },
       {
-        "file": "utils\\moderation.ts",
-        "lines": 784,
-        "bytes": 55133
+        "file": "app\\settings.tsx",
+        "lines": 755,
+        "bytes": 35798
       },
       {
-        "file": "app\\matches.tsx",
+        "file": "app\\home.tsx",
+        "lines": 744,
+        "bytes": 46304
+      },
+      {
+        "file": "utils\\moderation.ts",
         "lines": 722,
-        "bytes": 40190
+        "bytes": 61126
       },
       {
         "file": "utils\\i18n.ts",
         "lines": 719,
         "bytes": 25790
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "lines": 718,
-        "bytes": 51665
-      },
-      {
-        "file": "app\\shared-playlist.tsx",
-        "lines": 713,
-        "bytes": 21844
-      },
-      {
-        "file": "app\\home.tsx",
-        "lines": 691,
-        "bytes": 43499
       },
       {
         "file": "components\\BodyTypeSelector.tsx",
@@ -3476,48 +3093,66 @@
       },
       {
         "file": "functions\\index.js",
-        "lines": 671,
-        "bytes": 20719
+        "lines": 672,
+        "bytes": 20753
       },
       {
         "file": "app\\height-verification.tsx",
-        "lines": 650,
-        "bytes": 29944
+        "lines": 651,
+        "bytes": 29982
       },
       {
-        "file": "app\\referral.tsx",
-        "lines": 537,
-        "bytes": 14512
+        "file": "app\\my-matches.tsx",
+        "lines": 610,
+        "bytes": 31854
+      },
+      {
+        "file": "utils\\icebreakerGames.ts",
+        "lines": 564,
+        "bytes": 28515
       },
       {
         "file": "app\\date-checkin.tsx",
-        "lines": 520,
-        "bytes": 15965
+        "lines": 521,
+        "bytes": 15998
       },
       {
         "file": "utils\\dateCheckin.ts",
-        "lines": 520,
-        "bytes": 15965
+        "lines": 521,
+        "bytes": 15991
       },
       {
-        "file": "utils\\faceComparison.ts",
-        "lines": 513,
-        "bytes": 24503
+        "file": "components\\AdvancedFilters.tsx",
+        "lines": 472,
+        "bytes": 13323
       },
       {
-        "file": "utils\\ratingSystem.ts",
-        "lines": 513,
-        "bytes": 14134
+        "file": "app\\_layout.tsx",
+        "lines": 462,
+        "bytes": 21052
+      },
+      {
+        "file": "app\\video-profile-recorder.tsx",
+        "lines": 447,
+        "bytes": 11785
+      },
+      {
+        "file": "app\\second-look.tsx",
+        "lines": 444,
+        "bytes": 21909
       }
     ],
-    "totalLinesOfCode": 39354,
+    "totalLinesOfCode": 37405,
     "maxDirectoryDepth": 3,
     "emptyFiles": 0,
-    "averageLinesPerFile": 312,
-    "medianLinesPerFile": 197,
-    "longFiles": 43,
+    "averageLinesPerFile": 283,
+    "medianLinesPerFile": 193,
+    "longFiles": 36,
     "configFilesPresent": [
       "tsconfig.json",
+      "babel.config.js",
+      "metro.config.js",
+      "jest.config.js",
       "eslint.config.js",
       ".prettierrc",
       "app.json",
@@ -3525,6 +3160,7 @@
       "firebase.json",
       "firestore.rules",
       "firestore.indexes.json",
+      "storage.rules",
       ".gitignore",
       ".nvmrc",
       "README.md",
@@ -3532,14 +3168,14 @@
       "LICENSE",
       "SECURITY.md",
       ".github/workflows",
-      "vercel.json"
+      "vercel.json",
+      ".husky",
+      "commitlint.config.js",
+      ".env.example"
     ],
     "configFilesMissing": [
-      "babel.config.js",
       "babel.config.ts",
-      "metro.config.js",
       "metro.config.ts",
-      "jest.config.js",
       "jest.config.ts",
       "jest.config.mjs",
       "eslint.config.mjs",
@@ -3554,7 +3190,6 @@
       ".eslintignore",
       "app.config.js",
       "app.config.ts",
-      "storage.rules",
       "Dockerfile",
       "docker-compose.yml",
       "docker-compose.yaml",
@@ -3577,8 +3212,6 @@
       "render.yaml",
       "railway.json",
       "netlify.toml",
-      ".husky",
-      "commitlint.config.js",
       ".commitlintrc",
       "lint-staged.config.js",
       ".lintstagedrc",
@@ -3586,7 +3219,6 @@
       "lerna.json",
       "nx.json",
       "pnpm-workspace.yaml",
-      ".env.example",
       ".env.template",
       "renovate.json",
       ".renovaterc",
@@ -3609,28 +3241,29 @@
       "server",
       "services",
       "utils",
-      "web-push"
+      "web-push",
+      "__tests__"
     ]
   },
   "git": {
     "isGitRepo": true,
     "currentBranch": "main",
-    "lastCommitHash": "60eb0dd2420442f55890074ac7a90567aa72481d",
+    "lastCommitHash": "26d2ec64267a8964b6442ad03826bf9bb27a0138",
     "lastCommitAuthor": "Elxan",
-    "lastCommitDate": "2026-03-27 18:07:44 +0400",
+    "lastCommitDate": "2026-03-31 18:31:13 +0400",
     "lastCommitMessage": "Update",
-    "totalCommits": "44",
-    "firstCommitDate": null,
+    "totalCommits": "46",
+    "firstCommitDate": "2026-03-31 18:31:13 +0400",
     "remoteUrl": "https://github.com/MrBMRBLX/MyArchetype.git",
-    "uncommittedFiles": 88,
+    "uncommittedFiles": 111,
     "stagedFiles": 0,
-    "untrackedFiles": 14,
+    "untrackedFiles": 11,
     "stashCount": 0,
     "hasGitHubActions": true,
     "hasGitIgnore": true,
     "hasGitAttributes": false,
     "topContributors": [
-      "44\tElxan"
+      "46\tElxan"
     ],
     "tags": [],
     "branches": [
@@ -3638,6 +3271,8 @@
       "remotes/origin/main"
     ],
     "recentCommits": [
+      "26d2ec6 Update",
+      "2b6446c Update",
       "60eb0dd Update",
       "8c45f58 Update",
       "3210c08 Update",
@@ -3655,15 +3290,15 @@
       "10f6164 Update",
       "8cce0e2 Update",
       "3fb3ba6 Update",
-      "f3049da Update",
-      "62762cd Update",
-      "08be6c3 Update"
+      "f3049da Update"
     ],
     "mergeConflicts": [],
-    "largeFiles": 0,
-    "gitHooks": {},
+    "largeFiles": 164,
+    "gitHooks": {
+      "pre-commit": "npm test"
+    },
     "commitConventions": {
-      "total": 44,
+      "total": 46,
       "conventional": 0,
       "ratio": "0%"
     },
@@ -3671,27 +3306,27 @@
     "submodules": false
   },
   "codeQuality": {
-    "totalLines": 39354,
-    "codeLines": 33967,
-    "commentLines": 1394,
-    "blankLines": 3993,
-    "commentRatio": "4%",
+    "totalLines": 37405,
+    "codeLines": 32547,
+    "commentLines": 1176,
+    "blankLines": 3682,
+    "commentRatio": "3%",
     "blankRatio": "10%",
     "files": {
-      "total": 126,
-      "test": 0,
-      "component": 54,
+      "total": 132,
+      "test": 1,
+      "component": 55,
       "util": 61,
       "hook": 1,
       "type": 1,
-      "constant": 1
+      "constant": 5
     },
     "issues": {
       "todos": 0,
       "fixmes": 0,
-      "anyTypes": 150,
+      "anyTypes": 36,
       "tsIgnores": 0,
-      "consoleLogs": 333
+      "consoleLogs": 9
     },
     "complexity": {
       "longestFunction": {
@@ -3707,9 +3342,10 @@
     "hasLinter": true,
     "hasFormatter": true,
     "hasEditorConfig": false,
-    "hasLintStaged": false,
-    "hasCommitLint": false,
-    "hasHusky": false
+    "hasLintStaged": true,
+    "hasCommitLint": true,
+    "hasHusky": true,
+    "hasConsoleStripping": true
   },
   "apiEndpoints": {
     "total": 30,
@@ -3722,26 +3358,26 @@
       "OPTIONS": 1,
       "HEAD": 0
     },
-    "withoutAuth": 1,
-    "withoutRateLimit": 1,
+    "withoutAuth": 0,
+    "withoutRateLimit": 0,
     "withoutValidation": 0,
-    "withoutErrorHandler": 26,
+    "withoutErrorHandler": 29,
     "endpoints": [
       {
         "method": "OPTIONS",
         "path": "*",
         "file": "server\\src\\index.ts",
-        "line": 45,
-        "hasAuth": false,
-        "hasRateLimit": false,
-        "hasValidation": false,
+        "line": 630,
+        "hasAuth": true,
+        "hasRateLimit": true,
+        "hasValidation": true,
         "hasErrorHandler": false
       },
       {
         "method": "POST",
         "path": "/send-notification",
         "file": "server\\src\\index.ts",
-        "line": 643,
+        "line": 632,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3751,7 +3387,7 @@
         "method": "POST",
         "path": "/send-expo-notification",
         "file": "server\\src\\index.ts",
-        "line": 658,
+        "line": 647,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3761,7 +3397,7 @@
         "method": "POST",
         "path": "/check-email",
         "file": "server\\src\\index.ts",
-        "line": 672,
+        "line": 658,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3771,7 +3407,7 @@
         "method": "POST",
         "path": "/check-password-breach",
         "file": "server\\src\\index.ts",
-        "line": 679,
+        "line": 665,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3781,7 +3417,7 @@
         "method": "POST",
         "path": "/register-device",
         "file": "server\\src\\index.ts",
-        "line": 685,
+        "line": 671,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3791,7 +3427,7 @@
         "method": "POST",
         "path": "/login-track",
         "file": "server\\src\\index.ts",
-        "line": 695,
+        "line": 681,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3801,7 +3437,7 @@
         "method": "POST",
         "path": "/check-device-integrity",
         "file": "server\\src\\index.ts",
-        "line": 705,
+        "line": 691,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3811,7 +3447,7 @@
         "method": "POST",
         "path": "/validate-location",
         "file": "server\\src\\index.ts",
-        "line": 713,
+        "line": 699,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3821,7 +3457,7 @@
         "method": "POST",
         "path": "/moderate-text",
         "file": "server\\src\\index.ts",
-        "line": 736,
+        "line": 722,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3831,7 +3467,7 @@
         "method": "POST",
         "path": "/scan-csam",
         "file": "server\\src\\index.ts",
-        "line": 744,
+        "line": 730,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3841,7 +3477,7 @@
         "method": "POST",
         "path": "/age-gate-check",
         "file": "server\\src\\index.ts",
-        "line": 757,
+        "line": 743,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3851,17 +3487,17 @@
         "method": "POST",
         "path": "/dmca-takedown",
         "file": "server\\src\\index.ts",
-        "line": 762,
+        "line": 748,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
-        "hasErrorHandler": true
+        "hasErrorHandler": false
       },
       {
         "method": "POST",
         "path": "/log-screenshot",
         "file": "server\\src\\index.ts",
-        "line": 773,
+        "line": 757,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3871,7 +3507,7 @@
         "method": "POST",
         "path": "/share-meeting-location",
         "file": "server\\src\\index.ts",
-        "line": 778,
+        "line": 762,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3881,7 +3517,7 @@
         "method": "POST",
         "path": "/enforce-trust",
         "file": "server\\src\\index.ts",
-        "line": 784,
+        "line": 768,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3891,7 +3527,7 @@
         "method": "POST",
         "path": "/check-url",
         "file": "server\\src\\index.ts",
-        "line": 790,
+        "line": 774,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3901,7 +3537,7 @@
         "method": "POST",
         "path": "/screen-name",
         "file": "server\\src\\index.ts",
-        "line": 796,
+        "line": 780,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3911,7 +3547,7 @@
         "method": "POST",
         "path": "/pdq-cross-account",
         "file": "server\\src\\index.ts",
-        "line": 804,
+        "line": 788,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3921,7 +3557,7 @@
         "method": "POST",
         "path": "/check-cib",
         "file": "server\\src\\index.ts",
-        "line": 813,
+        "line": 797,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3931,7 +3567,7 @@
         "method": "POST",
         "path": "/ab-test",
         "file": "server\\src\\index.ts",
-        "line": 821,
+        "line": 805,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3941,17 +3577,17 @@
         "method": "POST",
         "path": "/admin/rotate-key",
         "file": "server\\src\\index.ts",
-        "line": 830,
+        "line": 814,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
-        "hasErrorHandler": true
+        "hasErrorHandler": false
       },
       {
         "method": "POST",
         "path": "/wcag-audit",
         "file": "server\\src\\index.ts",
-        "line": 843,
+        "line": 825,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3961,7 +3597,7 @@
         "method": "POST",
         "path": "/check-contrast",
         "file": "server\\src\\index.ts",
-        "line": 849,
+        "line": 831,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3971,7 +3607,7 @@
         "method": "POST",
         "path": "/validate-event",
         "file": "server\\src\\index.ts",
-        "line": 855,
+        "line": 837,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3981,7 +3617,7 @@
         "method": "POST",
         "path": "/check-engagement",
         "file": "server\\src\\index.ts",
-        "line": 862,
+        "line": 844,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -3991,7 +3627,7 @@
         "method": "POST",
         "path": "/check-bot",
         "file": "server\\src\\index.ts",
-        "line": 870,
+        "line": 852,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -4001,7 +3637,7 @@
         "method": "POST",
         "path": "/track-conversion",
         "file": "server\\src\\index.ts",
-        "line": 876,
+        "line": 858,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
@@ -4011,19 +3647,19 @@
         "method": "POST",
         "path": "/admin/action",
         "file": "server\\src\\index.ts",
-        "line": 885,
+        "line": 867,
         "hasAuth": true,
         "hasRateLimit": true,
         "hasValidation": true,
-        "hasErrorHandler": true
+        "hasErrorHandler": false
       },
       {
         "method": "GET",
         "path": "/health",
         "file": "server\\src\\index.ts",
-        "line": 897,
+        "line": 877,
         "hasAuth": false,
-        "hasRateLimit": false,
+        "hasRateLimit": true,
         "hasValidation": false,
         "hasErrorHandler": false
       }
@@ -4045,6 +3681,7 @@
     "outdatedCount": null,
     "majorUpdatesAvailable": null,
     "nativeModules": [
+      "@react-native-community/netinfo",
       "@sentry/react-native",
       "axios",
       "expo",
@@ -4079,12 +3716,26 @@
       "react-native-screens",
       "react-native-worklets"
     ],
-    "nativeModuleCount": 33,
+    "nativeModuleCount": 34,
     "autoUpdate": {
       "renovate": false,
       "dependabot": false,
       "hasAny": false
     }
+  },
+  "offlineSupport": {
+    "hasNetInfo": false,
+    "hasOfflineDetection": false,
+    "hasOfflineQueue": false,
+    "hasOptimisticUpdates": false,
+    "hasCacheFirst": false,
+    "hasPersistence": true,
+    "hasOfflineIndicator": true,
+    "hasSyncOnReconnect": false,
+    "hasServiceWorker": true,
+    "hasCaching": true,
+    "hasNetworkStatusHandling": true,
+    "score": 25
   },
   "routes": {
     "type": "expo-router",
@@ -4102,7 +3753,12 @@
     "groups": [],
     "modals": 0,
     "apiRoutes": [],
-    "errorBoundaries": [],
+    "errorBoundaries": [
+      {
+        "file": "app\\+not-found.tsx",
+        "type": "not-found"
+      }
+    ],
     "routes": [
       {
         "file": "app\\achievements.tsx",
@@ -4415,254 +4071,254 @@
     ],
     "navigations": [
       {
+        "file": "app\\+not-found.tsx",
+        "line": 11,
+        "target": "/home"
+      },
+      {
         "file": "app\\achievements.tsx",
-        "line": 67,
+        "line": 94,
         "target": "(dynamic)"
       },
       {
         "file": "app\\admin\\index.tsx",
-        "line": 37,
+        "line": 24,
         "target": "/login"
       },
       {
         "file": "app\\admin\\index.tsx",
-        "line": 45,
+        "line": 26,
         "target": "/home"
       },
       {
         "file": "app\\admin\\index.tsx",
-        "line": 156,
-        "target": "/admin/reports"
-      },
-      {
-        "file": "app\\admin\\index.tsx",
-        "line": 172,
-        "target": "/admin/users"
-      },
-      {
-        "file": "app\\admin\\index.tsx",
-        "line": 184,
-        "target": "/admin/stats"
-      },
-      {
-        "file": "app\\admin\\index.tsx",
-        "line": 196,
+        "line": 108,
         "target": "(dynamic)"
       },
       {
-        "file": "app\\blocked-users.tsx",
+        "file": "app\\admin\\index.tsx",
+        "line": 121,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "line": 39,
+        "target": "/login"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "line": 41,
+        "target": "/home"
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "line": 45,
+        "target": "/home"
+      },
+      {
+        "file": "app\\admin\\users.tsx",
         "line": 34,
         "target": "/login"
       },
       {
+        "file": "app\\admin\\users.tsx",
+        "line": 36,
+        "target": "/home"
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "line": 40,
+        "target": "/home"
+      },
+      {
         "file": "app\\blocked-users.tsx",
-        "line": 131,
+        "line": 20,
+        "target": "/login"
+      },
+      {
+        "file": "app\\blocked-users.tsx",
+        "line": 93,
         "target": "(dynamic)"
       },
       {
         "file": "app\\chat.tsx",
-        "line": 826,
+        "line": 908,
         "target": "/my-matches"
       },
       {
         "file": "app\\chat.tsx",
-        "line": 857,
+        "line": 934,
         "target": "/my-matches"
       },
       {
         "file": "app\\chat.tsx",
-        "line": 966,
-        "target": "/my-matches"
-      },
-      {
-        "file": "app\\chat.tsx",
-        "line": 980,
-        "target": "/my-matches"
-      },
-      {
-        "file": "app\\chat.tsx",
-        "line": 1028,
+        "line": 982,
         "target": "/post-date-rating"
       },
       {
-        "file": "app\\compatibility-quiz.tsx",
-        "line": 106,
-        "target": "(dynamic)"
+        "file": "app\\chat.tsx",
+        "line": 983,
+        "target": "/my-matches"
       },
       {
         "file": "app\\compatibility-quiz.tsx",
-        "line": 116,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\compatibility-quiz.tsx",
-        "line": 123,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\daily-question.tsx",
-        "line": 36,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\daily-question.tsx",
-        "line": 54,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\daily-question.tsx",
-        "line": 72,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-checkin.tsx",
-        "line": 212,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-checkin.tsx",
-        "line": 350,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-checkin.tsx",
-        "line": 398,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-safety.tsx",
-        "line": 219,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-safety.tsx",
-        "line": 273,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\date-spot-reviews.tsx",
         "line": 107,
         "target": "(dynamic)"
       },
       {
-        "file": "app\\dating-stats.tsx",
-        "line": 34,
+        "file": "app\\compatibility-quiz.tsx",
+        "line": 117,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\compatibility-quiz.tsx",
+        "line": 124,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 37,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 55,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\daily-question.tsx",
+        "line": 73,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "line": 220,
         "target": "(dynamic)"
       },
       {
         "file": "app\\dating-stats.tsx",
-        "line": 45,
+        "line": 40,
         "target": "(dynamic)"
       },
       {
-        "file": "app\\deal-breakers.tsx",
-        "line": 36,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\deal-breakers.tsx",
+        "file": "app\\dating-stats.tsx",
         "line": 56,
         "target": "(dynamic)"
       },
       {
-        "file": "app\\edit-profile.tsx",
-        "line": 116,
-        "target": "/login"
+        "file": "app\\deal-breakers.tsx",
+        "line": 193,
+        "target": "(dynamic)"
       },
       {
-        "file": "app\\edit-profile.tsx",
-        "line": 119,
-        "target": "/profile-setup"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "line": 328,
+        "file": "app\\deal-breakers.tsx",
+        "line": 202,
         "target": "(dynamic)"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 357,
-        "target": "/"
+        "line": 228,
+        "target": "/login"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 417,
+        "line": 231,
+        "target": "/profile-setup"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 445,
         "target": "/selfie-verification"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 421,
+        "line": 446,
         "target": "/profile-preview"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 430,
+        "line": 447,
         "target": "/social-verification"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 431,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "line": 492,
-        "target": "/video-profile-recorder"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "line": 497,
-        "target": "/video-profile-recorder"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "line": 548,
+        "line": 448,
         "target": "/height-verification"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 599,
+        "line": 449,
+        "target": "/video-profile-recorder"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 450,
         "target": "/personality-quiz"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 613,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "line": 618,
+        "line": 451,
         "target": "/privacy"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 620,
+        "line": 452,
         "target": "/terms"
       },
       {
+        "file": "app\\edit-profile.tsx",
+        "line": 453,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 477,
+        "target": "(dynamic)"
+      },
+      {
+        "file": "app\\edit-profile.tsx",
+        "line": 504,
+        "target": "/"
+      },
+      {
         "file": "app\\height-verification.tsx",
-        "line": 304,
+        "line": 305,
         "target": "(dynamic)"
       },
       {
         "file": "app\\height-verification.tsx",
-        "line": 502,
+        "line": 503,
         "target": "(dynamic)"
       },
       {
         "file": "app\\home.tsx",
-        "line": 418,
-        "target": "(dynamic)"
-      },
-      {
-        "file": "app\\home.tsx",
-        "line": 420,
+        "line": 438,
         "target": "/login"
       },
       {
         "file": "app\\home.tsx",
-        "line": 460,
+        "line": 475,
         "target": "/profile-setup"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 559,
+        "target": "/my-matches"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 560,
+        "target": "/chat"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 561,
+        "target": "/profile-views"
+      },
+      {
+        "file": "app\\home.tsx",
+        "line": 590,
+        "target": "(dynamic)"
       }
     ],
     "deepLinks": [
@@ -4671,22 +4327,22 @@
         "value": "myarchetype"
       }
     ],
-    "hasNotFound": false,
+    "hasNotFound": true,
     "hasTabNavigation": false,
     "hasStackNavigation": true,
     "hasDrawerNavigation": false
   },
   "components": {
-    "totalComponents": 53,
+    "totalComponents": 54,
     "classComponents": 4,
-    "functionalComponents": 49,
-    "memoizedComponents": 9,
+    "functionalComponents": 50,
+    "memoizedComponents": 15,
     "forwardRefComponents": 0,
-    "averageComponentLines": 475,
+    "averageComponentLines": 431,
     "largestComponents": [
       {
         "file": "app\\chat.tsx",
-        "lines": 1709
+        "lines": 1690
       },
       {
         "file": "app\\profile-setup.tsx",
@@ -4694,27 +4350,23 @@
       },
       {
         "file": "app\\signup.tsx",
-        "lines": 1269
-      },
-      {
-        "file": "app\\settings.tsx",
-        "lines": 1092
+        "lines": 1193
       },
       {
         "file": "app\\login.tsx",
-        "lines": 1073
+        "lines": 1109
       },
       {
         "file": "app\\personality-quiz.tsx",
         "lines": 946
       },
       {
-        "file": "app\\my-matches.tsx",
-        "lines": 912
+        "file": "app\\matches.tsx",
+        "lines": 885
       },
       {
-        "file": "app\\second-look.tsx",
-        "lines": 799
+        "file": "app\\edit-profile.tsx",
+        "lines": 801
       },
       {
         "file": "app\\stories.tsx",
@@ -4723,12 +4375,16 @@
       {
         "file": "app\\selfie-verification.tsx",
         "lines": 788
+      },
+      {
+        "file": "app\\settings.tsx",
+        "lines": 755
       }
     ],
     "componentsWith5PlusState": [
       {
         "file": "app\\chat.tsx",
-        "stateCount": 52
+        "stateCount": 7
       },
       {
         "file": "app\\profile-setup.tsx",
@@ -4739,10 +4395,6 @@
         "stateCount": 5
       },
       {
-        "file": "app\\settings.tsx",
-        "stateCount": 22
-      },
-      {
         "file": "app\\login.tsx",
         "stateCount": 6
       },
@@ -4751,12 +4403,12 @@
         "stateCount": 10
       },
       {
-        "file": "app\\my-matches.tsx",
-        "stateCount": 14
+        "file": "app\\matches.tsx",
+        "stateCount": 10
       },
       {
-        "file": "app\\second-look.tsx",
-        "stateCount": 7
+        "file": "app\\edit-profile.tsx",
+        "stateCount": 8
       },
       {
         "file": "app\\stories.tsx",
@@ -4767,60 +4419,60 @@
         "stateCount": 16
       },
       {
-        "file": "app\\matches.tsx",
-        "stateCount": 10
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "stateCount": 37
-      },
-      {
-        "file": "app\\shared-playlist.tsx",
-        "stateCount": 11
+        "file": "app\\settings.tsx",
+        "stateCount": 6
       },
       {
         "file": "app\\height-verification.tsx",
         "stateCount": 13
       },
       {
-        "file": "app\\referral.tsx",
+        "file": "app\\my-matches.tsx",
+        "stateCount": 14
+      },
+      {
+        "file": "app\\_layout.tsx",
         "stateCount": 6
-      },
-      {
-        "file": "app\\post-date-rating.tsx",
-        "stateCount": 10
-      },
-      {
-        "file": "app\\referral-leaderboard.tsx",
-        "stateCount": 5
       },
       {
         "file": "app\\video-profile-recorder.tsx",
         "stateCount": 5
       },
       {
+        "file": "app\\second-look.tsx",
+        "stateCount": 7
+      },
+      {
         "file": "app\\voice-intro-recorder.tsx",
         "stateCount": 11
-      },
-      {
-        "file": "app\\admin\\reports.tsx",
-        "stateCount": 5
-      },
-      {
-        "file": "app\\profile-views.tsx",
-        "stateCount": 5
       },
       {
         "file": "app\\index.tsx",
         "stateCount": 6
       },
       {
-        "file": "app\\_layout.tsx",
-        "stateCount": 5
+        "file": "app\\date-spot-reviews.tsx",
+        "stateCount": 7
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "stateCount": 11
+      },
+      {
+        "file": "app\\post-date-rating.tsx",
+        "stateCount": 10
+      },
+      {
+        "file": "app\\referral.tsx",
+        "stateCount": 6
       },
       {
         "file": "app\\admin\\users.tsx",
-        "stateCount": 7
+        "stateCount": 8
+      },
+      {
+        "file": "app\\admin\\reports.tsx",
+        "stateCount": 6
       },
       {
         "file": "app\\social-verification.tsx",
@@ -4831,12 +4483,20 @@
         "stateCount": 9
       },
       {
-        "file": "app\\smart-photos.tsx",
+        "file": "app\\referral-leaderboard.tsx",
+        "stateCount": 5
+      },
+      {
+        "file": "app\\profile-views.tsx",
         "stateCount": 5
       },
       {
         "file": "app\\icebreaker-game.tsx",
         "stateCount": 10
+      },
+      {
+        "file": "app\\smart-photos.tsx",
+        "stateCount": 5
       },
       {
         "file": "app\\achievements.tsx",
@@ -4845,10 +4505,6 @@
       {
         "file": "app\\compatibility-quiz.tsx",
         "stateCount": 8
-      },
-      {
-        "file": "app\\date-spot-reviews.tsx",
-        "stateCount": 15
       },
       {
         "file": "app\\daily-question.tsx",
@@ -4873,16 +4529,16 @@
         "count": 2
       },
       {
-        "file": "app\\matches.tsx",
-        "count": 1
-      },
-      {
         "file": "app\\home.tsx",
-        "count": 16
+        "count": 5
       },
       {
         "file": "components\\BodyTypeSelector.tsx",
         "count": 4
+      },
+      {
+        "file": "app\\date-spot-reviews.tsx",
+        "count": 2
       },
       {
         "file": "app\\profile-preview.tsx",
@@ -4894,6 +4550,10 @@
       },
       {
         "file": "app\\relationship-mode.tsx",
+        "count": 1
+      },
+      {
+        "file": "app\\dating-stats.tsx",
         "count": 1
       },
       {
@@ -4909,19 +4569,7 @@
         "count": 1
       },
       {
-        "file": "app\\date-spot-reviews.tsx",
-        "count": 2
-      },
-      {
         "file": "app\\interests.tsx",
-        "count": 2
-      },
-      {
-        "file": "app\\deal-breakers.tsx",
-        "count": 2
-      },
-      {
-        "file": "app\\dating-stats.tsx",
         "count": 2
       },
       {
@@ -4945,14 +4593,14 @@
     "errorBoundaries": 4
   },
   "errorHandling": {
-    "tryCatchBlocks": 455,
-    "catchBlocks": 358,
-    "throwStatements": 49,
+    "tryCatchBlocks": 453,
+    "catchBlocks": 377,
+    "throwStatements": 52,
     "emptyTryCatch": 0,
-    "promiseWithCatch": 49,
+    "promiseWithCatch": 51,
     "errorBoundaries": 4,
-    "consoleErrorCount": 273,
-    "sentryCapture": 0,
+    "consoleErrorCount": 5,
+    "sentryCapture": 5,
     "asyncWithoutTryCatch": [],
     "emptyHandlers": [],
     "globalHandlers": {
@@ -4960,11 +4608,11 @@
       "uncaughtException": true,
       "errorBoundaryWrapper": true,
       "globalCatch": true,
-      "sentryInit": false,
+      "sentryInit": true,
       "crashlytics": false
     },
-    "errorLogging": "console.error only",
-    "score": 70
+    "errorLogging": "Sentry",
+    "score": 100
   },
   "networkCalls": {
     "fetchCalls": 61,
@@ -5020,42 +4668,42 @@
     "fetchDetails": [
       {
         "file": "app\\chat.tsx",
-        "line": 753,
+        "line": 854,
         "url": "https://overpass-api.de/api/interpreter"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 238,
+        "line": 365,
         "url": "(dynamic)"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "line": 243,
+        "line": 370,
         "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
       },
       {
         "file": "app\\height-verification.tsx",
-        "line": 89,
+        "line": 90,
         "url": "(dynamic)"
       },
       {
         "file": "app\\height-verification.tsx",
-        "line": 97,
+        "line": 98,
         "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
       },
       {
         "file": "app\\matches.tsx",
-        "line": 89,
+        "line": 109,
         "url": "${SERVER}/send-expo-notification"
       },
       {
         "file": "app\\second-look.tsx",
-        "line": 163,
+        "line": 146,
         "url": "https://exp.host/--/api/v2/push/send"
       },
       {
         "file": "app\\second-look.tsx",
-        "line": 188,
+        "line": 158,
         "url": "https://exp.host/--/api/v2/push/send"
       },
       {
@@ -5070,87 +4718,87 @@
       },
       {
         "file": "app\\signup.tsx",
-        "line": 256,
+        "line": 297,
         "url": "https://api.pwnedpasswords.com/range/${prefix}"
       },
       {
         "file": "server\\src\\index.ts",
-        "line": 308,
+        "line": 305,
         "url": "https://ip-api.com/json/${ip}?fields=countryCode,lat,lon,status"
       },
       {
         "file": "server\\src\\index.ts",
-        "line": 343,
+        "line": 340,
         "url": "https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${key}"
       },
       {
         "file": "server\\src\\index.ts",
-        "line": 384,
+        "line": 373,
         "url": "https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}"
       },
       {
         "file": "server\\src\\index.ts",
-        "line": 437,
+        "line": 426,
         "url": "https://api.missingkids.org/cybertipline/report"
       },
       {
         "file": "server\\src\\index.ts",
-        "line": 663,
+        "line": 651,
         "url": "https://exp.host/--/api/v2/push/send"
       },
       {
         "file": "services\\notifications.ts",
-        "line": 62,
+        "line": 63,
         "url": "${SERVER_URL}${path}"
       },
       {
         "file": "utils\\bodyTypeDetection.ts",
-        "line": 126,
+        "line": 127,
         "url": "(dynamic)"
       },
       {
         "file": "utils\\cloudinaryUpload.ts",
-        "line": 86,
+        "line": 90,
         "url": "(dynamic)"
       },
       {
         "file": "utils\\cloudinaryUpload.ts",
-        "line": 95,
+        "line": 103,
         "url": "${BASE_URL}/${resType}/upload"
       },
       {
         "file": "utils\\e2eeMedia.ts",
-        "line": 42,
+        "line": 43,
         "url": "(dynamic)"
       },
       {
         "file": "utils\\e2eeMedia.ts",
-        "line": 73,
+        "line": 74,
         "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload"
       },
       {
         "file": "utils\\e2eeMedia.ts",
-        "line": 109,
+        "line": 110,
         "url": "(dynamic)"
       },
       {
         "file": "utils\\faceComparison.ts",
-        "line": 123,
+        "line": 117,
         "url": "${SERVER_URL}/checkPhotoHash"
       },
       {
         "file": "utils\\faceComparison.ts",
-        "line": 132,
+        "line": 126,
         "url": "(dynamic)"
       },
       {
         "file": "utils\\faceComparison.ts",
-        "line": 135,
+        "line": 131,
         "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload"
       },
       {
         "file": "utils\\faceComparison.ts",
-        "line": 465,
+        "line": 291,
         "url": "${SERVER_URL}/catfish-signals"
       },
       {
@@ -5160,24 +4808,24 @@
       },
       {
         "file": "utils\\faceVerification.ts",
-        "line": 277,
+        "line": 278,
         "url": "${SERVER_URL}/getBannedEmbeddings"
       },
       {
         "file": "utils\\faceVerification.ts",
-        "line": 297,
+        "line": 298,
         "url": "${SERVER_URL}/checkCelebrityEmbedding"
       }
     ],
     "axiosDetails": [
       {
         "file": "functions\\index.js",
-        "line": 117,
+        "line": 118,
         "url": "(dynamic)"
       },
       {
         "file": "functions\\index.js",
-        "line": 168,
+        "line": 169,
         "url": "(dynamic)"
       }
     ],
@@ -5190,21 +4838,21 @@
     }
   },
   "accessibility": {
-    "labels": 255,
-    "roles": 196,
-    "hints": 28,
-    "states": 29,
+    "labels": 515,
+    "roles": 377,
+    "hints": 29,
+    "states": 62,
     "accessibleProps": 6,
-    "ariaAttributes": 15,
-    "touchableWithoutLabel": 338,
-    "imageWithoutAlt": 21,
+    "ariaAttributes": 28,
+    "touchableWithoutLabel": 229,
+    "imageWithoutAlt": 3,
     "hasScreenReaderSupport": true,
     "hasDynamicFontSize": true,
     "hasReducedMotion": true,
     "hasVoiceOver": true,
     "issues": [
       {
-        "file": "app\\achievements.tsx",
+        "file": "app\\+not-found.tsx",
         "issue": "Touchable without accessibilityLabel"
       },
       {
@@ -5216,11 +4864,7 @@
         "issue": "Touchable without accessibilityLabel"
       },
       {
-        "file": "app\\admin\\index.tsx",
-        "issue": "Touchable without accessibilityLabel"
-      },
-      {
-        "file": "app\\admin\\index.tsx",
+        "file": "app\\achievements.tsx",
         "issue": "Touchable without accessibilityLabel"
       },
       {
@@ -5238,49 +4882,25 @@
       {
         "file": "app\\admin\\reports.tsx",
         "issue": "Touchable without accessibilityLabel"
-      },
-      {
-        "file": "app\\admin\\reports.tsx",
-        "issue": "Touchable without accessibilityLabel"
-      },
-      {
-        "file": "app\\admin\\reports.tsx",
-        "issue": "Image without accessibilityLabel/alt"
       },
       {
         "file": "app\\admin\\users.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\admin\\users.tsx",
+        "issue": "Touchable without accessibilityLabel"
+      },
+      {
+        "file": "app\\stories.tsx",
         "issue": "Image without accessibilityLabel/alt"
       },
       {
-        "file": "app\\blocked-users.tsx",
+        "file": "app\\stories.tsx",
         "issue": "Image without accessibilityLabel/alt"
       },
       {
-        "file": "app\\date-spot-reviews.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\matches.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\my-matches.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\profile-preview.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\profile-views.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\referral-leaderboard.tsx",
-        "issue": "Image without accessibilityLabel/alt"
-      },
-      {
-        "file": "app\\referral-leaderboard.tsx",
+        "file": "app\\stories.tsx",
         "issue": "Image without accessibilityLabel/alt"
       }
     ],
@@ -5289,28 +4909,18 @@
   "performance": {
     "issues": [
       {
-        "file": "app\\admin\\reports.tsx",
-        "issue": "7 inline arrow functions in JSX",
-        "severity": "medium"
-      },
-      {
-        "file": "app\\admin\\stats.tsx",
-        "issue": "ScrollView with many children — consider FlatList/FlashList",
-        "severity": "high"
-      },
-      {
         "file": "app\\chat.tsx",
-        "issue": "63 inline arrow functions in JSX",
+        "issue": "9 inline arrow functions in JSX",
         "severity": "medium"
       },
       {
         "file": "app\\chat.tsx",
-        "issue": "Component file is 1709 lines — consider splitting",
+        "issue": "Component file is 1690 lines — consider splitting",
         "severity": "low"
       },
       {
         "file": "app\\date-checkin.tsx",
-        "issue": "Component file is 520 lines — consider splitting",
+        "issue": "Component file is 521 lines — consider splitting",
         "severity": "low"
       },
       {
@@ -5319,28 +4929,13 @@
         "severity": "medium"
       },
       {
-        "file": "app\\dating-stats.tsx",
-        "issue": "ScrollView with many children — consider FlatList/FlashList",
-        "severity": "high"
-      },
-      {
-        "file": "app\\deal-breakers.tsx",
-        "issue": "ScrollView with many children — consider FlatList/FlashList",
-        "severity": "high"
-      },
-      {
-        "file": "app\\edit-profile.tsx",
-        "issue": "26 inline arrow functions in JSX",
-        "severity": "medium"
-      },
-      {
         "file": "app\\edit-profile.tsx",
         "issue": "ScrollView with many children — consider FlatList/FlashList",
         "severity": "high"
       },
       {
         "file": "app\\edit-profile.tsx",
-        "issue": "Component file is 718 lines — consider splitting",
+        "issue": "Component file is 801 lines — consider splitting",
         "severity": "low"
       },
       {
@@ -5350,33 +4945,18 @@
       },
       {
         "file": "app\\height-verification.tsx",
-        "issue": "Component file is 650 lines — consider splitting",
+        "issue": "Component file is 651 lines — consider splitting",
         "severity": "low"
       },
       {
         "file": "app\\home.tsx",
-        "issue": "ScrollView with many children — consider FlatList/FlashList",
-        "severity": "high"
-      },
-      {
-        "file": "app\\home.tsx",
-        "issue": "Component file is 691 lines — consider splitting",
-        "severity": "low"
-      },
-      {
-        "file": "app\\home.tsx",
-        "issue": "16 inline style objects — potential re-render cause",
+        "issue": "Component file is 744 lines — consider splitting",
         "severity": "low"
       },
       {
         "file": "app\\login.tsx",
-        "issue": "Component file is 1073 lines — consider splitting",
+        "issue": "Component file is 1109 lines — consider splitting",
         "severity": "low"
-      },
-      {
-        "file": "app\\matches.tsx",
-        "issue": "16 inline arrow functions in JSX",
-        "severity": "medium"
       },
       {
         "file": "app\\matches.tsx",
@@ -5385,17 +4965,17 @@
       },
       {
         "file": "app\\matches.tsx",
-        "issue": "Component file is 722 lines — consider splitting",
+        "issue": "Component file is 885 lines — consider splitting",
         "severity": "low"
       },
       {
         "file": "app\\my-matches.tsx",
-        "issue": "15 inline arrow functions in JSX",
+        "issue": "14 inline arrow functions in JSX",
         "severity": "medium"
       },
       {
         "file": "app\\my-matches.tsx",
-        "issue": "Component file is 912 lines — consider splitting",
+        "issue": "Component file is 610 lines — consider splitting",
         "severity": "low"
       },
       {
@@ -5410,13 +4990,8 @@
       },
       {
         "file": "app\\post-date-rating.tsx",
-        "issue": "20 inline arrow functions in JSX",
+        "issue": "6 inline arrow functions in JSX",
         "severity": "medium"
-      },
-      {
-        "file": "app\\post-date-rating.tsx",
-        "issue": "Component file is 506 lines — consider splitting",
-        "severity": "low"
       },
       {
         "file": "app\\profile-preview.tsx",
@@ -5437,9 +5012,54 @@
         "file": "app\\profile-setup.tsx",
         "issue": "20 inline style objects — potential re-render cause",
         "severity": "low"
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "issue": "6 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\selfie-verification.tsx",
+        "issue": "Component file is 788 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\settings.tsx",
+        "issue": "18 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\settings.tsx",
+        "issue": "ScrollView with many children — consider FlatList/FlashList",
+        "severity": "high"
+      },
+      {
+        "file": "app\\settings.tsx",
+        "issue": "Component file is 755 lines — consider splitting",
+        "severity": "low"
+      },
+      {
+        "file": "app\\shared-playlist.tsx",
+        "issue": "6 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\signup.tsx",
+        "issue": "15 inline arrow functions in JSX",
+        "severity": "medium"
+      },
+      {
+        "file": "app\\signup.tsx",
+        "issue": "Component file is 1193 lines — consider splitting",
+        "severity": "low"
       }
     ],
-    "inlineFunctionsInJSX": 335,
+    "inlineFunctionsInJSX": 229,
     "possiblyMissingKeys": 0,
     "heavyImports": 0,
     "optimizations": {
@@ -5447,9 +5067,9 @@
       "usesFlatList": true,
       "usesSectionList": false,
       "usesVirtualizedList": false,
-      "usesMemo": 58,
-      "usesCallback": 246,
-      "usesReactMemo": 30,
+      "usesMemo": 74,
+      "usesCallback": 504,
+      "usesReactMemo": 67,
       "usesLazy": false,
       "usesSuspense": false,
       "usesInteractionManager": true,
@@ -5464,23 +5084,23 @@
   },
   "assets": {
     "summary": {
-      "totalAssets": 13,
-      "totalSize": "501.5 KB",
-      "totalSizeBytes": 513494,
-      "images": 6,
+      "totalAssets": 17,
+      "totalSize": "1.1 MB",
+      "totalSizeBytes": 1109016,
+      "images": 16,
       "svgs": 0,
       "fonts": 0,
       "videos": 0,
       "audios": 0
     },
     "imageFormats": {
-      "png": 6,
+      "png": 12,
       "jpg": 0,
-      "webp": 0,
+      "webp": 4,
       "gif": 0
     },
     "retina": {
-      "baseImages": 6,
+      "baseImages": 16,
       "@2x": 0,
       "@3x": 0
     },
@@ -5490,7 +5110,14 @@
       "assets\\images\\android-icon-foreground.png",
       "assets\\images\\android-icon-monochrome.png",
       "assets\\images\\favicon.png",
-      "assets\\images\\splash-icon.png"
+      "assets\\images\\splash-icon.png",
+      "assets\\images\\splash-icon.webp",
+      "assets\\images\\android-icon-background.png",
+      "assets\\images\\android-icon-foreground.png",
+      "assets\\images\\android-icon-monochrome.png",
+      "assets\\images\\favicon.png",
+      "assets\\images\\splash-icon.png",
+      "assets\\images\\splash-icon.webp"
     ],
     "appAssets": {
       "icon": "./assets/images/icon.png",
@@ -5505,7 +5132,8 @@
     },
     "fonts": [],
     "recommendations": [
-      "No @2x/@3x image variants detected — may look blurry on high-DPI screens"
+      "No @2x/@3x image variants detected",
+      "12 possibly unused assets"
     ]
   },
   "i18n": {
@@ -5514,7 +5142,7 @@
     "translationFiles": [],
     "detectedLanguages": [],
     "languageCount": 0,
-    "hardcodedStringsEstimate": 603,
+    "hardcodedStringsEstimate": 530,
     "hasRtlSupport": true,
     "hasLocaleDetection": true,
     "hasPluralization": true,
@@ -5535,13 +5163,13 @@
       "hasApiReference": false
     },
     "comments": {
-      "jsdoc": 76,
-      "inline": 1085,
-      "block": 235
+      "jsdoc": 66,
+      "inline": 914,
+      "block": 157
     },
-    "documentedExports": 39,
-    "undocumentedExports": 591,
-    "documentationRatio": "6%",
+    "documentedExports": 31,
+    "undocumentedExports": 595,
+    "documentationRatio": "5%",
     "docsDirectory": false,
     "files": {
       "changelog": true,
@@ -5559,14 +5187,14 @@
   },
   "bundleSize": {
     "sourceCode": {
-      "files": 126,
+      "files": 132,
       "totalSize": "1.8 MB",
-      "bytes": 1836702
+      "bytes": 1901383
     },
     "assets": {
-      "images": "500.6 KB",
+      "images": "541.1 KB",
       "fonts": "0 B",
-      "imagesBytes": 512654,
+      "imagesBytes": 554088,
       "fontsBytes": 0
     },
     "heavyDependencies": [
@@ -5580,28 +5208,28 @@
       "esModules": true,
       "sideEffects": false,
       "barrelFiles": 6,
-      "namedExports": 456,
-      "defaultExports": 51,
+      "namedExports": 460,
+      "defaultExports": 54,
       "wildcardReExports": 0
     },
-    "estimatedBundleSize": "2.2 MB",
+    "estimatedBundleSize": "2.3 MB",
     "recommendations": []
   },
   "typeSafety": {
-    "tsFiles": 121,
-    "jsFiles": 5,
+    "tsFiles": 123,
+    "jsFiles": 9,
     "dtsFiles": 0,
-    "typescriptCoverage": "96%",
-    "anyUsage": 156,
-    "unknownUsage": 60,
+    "typescriptCoverage": "93%",
+    "anyUsage": 36,
+    "unknownUsage": 86,
     "neverUsage": 0,
-    "typeAssertions": 367,
-    "nonNullAssertions": 60,
-    "genericUsage": 141,
-    "typeGuards": 367,
+    "typeAssertions": 486,
+    "nonNullAssertions": 57,
+    "genericUsage": 169,
+    "typeGuards": 6,
     "definitions": {
-      "interfaces": 222,
-      "typeAliases": 60,
+      "interfaces": 344,
+      "typeAliases": 86,
       "enums": 0
     },
     "suppressions": {
@@ -5610,48 +5238,27 @@
       "tsExpectError": 0,
       "total": 0
     },
-    "worstFiles": [
-      {
-        "file": "app\\signup.tsx",
-        "anyCount": 16
-      },
-      {
-        "file": "app\\login.tsx",
-        "anyCount": 10
-      },
-      {
-        "file": "utils\\ageEstimation.ts",
-        "anyCount": 10
-      },
-      {
-        "file": "utils\\icebreakerGames.ts",
-        "anyCount": 10
-      },
-      {
-        "file": "utils\\moderation.ts",
-        "anyCount": 6
-      }
-    ],
+    "worstFiles": [],
     "runtimeValidation": [],
-    "score": 55
+    "score": 85
   },
   "dependencyGraph": {
-    "totalModules": 126,
-    "totalImports": 225,
+    "totalModules": 132,
+    "totalImports": 305,
     "circularDependencies": [],
     "circularCount": 0,
     "mostImportedFiles": [
       {
+        "file": "utils\\logger",
+        "importedBy": 93
+      },
+      {
         "file": "firebaseConfig",
-        "importedBy": 73
+        "importedBy": 72
       },
       {
         "file": "utils\\moderation",
-        "importedBy": 20
-      },
-      {
-        "file": "utils\\logger",
-        "importedBy": 13
+        "importedBy": 19
       },
       {
         "file": "utils\\ageVerification",
@@ -5698,18 +5305,16 @@
         "importedBy": 3
       },
       {
-        "file": "utils\\datingStats",
+        "file": "utils\\nameValidation",
         "importedBy": 3
       }
     ],
     "orphanFiles": [
-      "app\\icebreaker-game.tsx",
       "app\\privacy.tsx",
-      "app\\relationship-mode.tsx",
-      "app\\social-verification.tsx",
       "app\\terms.tsx",
-      "app\\voice-intro-recorder.tsx",
+      "babel.config.js",
       "cloudinaryConfig.ts",
+      "commitlint.config.js",
       "components\\AdvancedFilters.tsx",
       "components\\BodyTypeSelector.tsx",
       "components\\HeightBadge.tsx",
@@ -5719,26 +5324,298 @@
       "eslint.config.js",
       "expo-env.d.ts",
       "firebaseConfig.ts",
-      "functions\\lib\\sendWebPush.js",
-      "functions\\src\\sendWebPush.ts",
+      "jest.config.js",
+      "metro.config.js",
       "public\\service-worker.js",
-      "utils\\accessibility.ts"
+      "utils\\accessibility.ts",
+      "utils\\ageEstimation.ts",
+      "utils\\ageVerification.ts"
     ],
-    "averageImportsPerFile": 1.8
+    "averageImportsPerFile": 2.3
+  },
+  "codeDuplication": {
+    "potentialDuplicates": [],
+    "identicalFiles": 0,
+    "similarFiles": 0,
+    "totalCandidates": 0
+  },
+  "gitSecrets": {
+    "envFilesInHistory": [],
+    "secretsInHistory": [],
+    "trackedEnvFiles": [],
+    "hasIssues": false,
+    "severity": "none"
+  },
+  "dependencyLicenses": {
+    "totalScanned": 47,
+    "licenseCounts": {
+      "MIT": 44,
+      "Apache-2.0": 1,
+      "Unlicense": 2
+    },
+    "issues": [],
+    "hasGPL": false,
+    "hasUnknown": false
+  },
+  "deepLinkValidation": {
+    "scheme": "myarchetype",
+    "associatedDomains": [],
+    "intentFilters": [],
+    "hasLinkingConfig": true,
+    "hasDeepLinkHandler": false,
+    "hasUniversalLinks": false,
+    "hasAppLinks": false,
+    "issues": []
+  },
+  "fontLoading": {
+    "usesExpoFont": false,
+    "hasLoadAsync": false,
+    "hasUseFonts": false,
+    "hasLoadingGate": true,
+    "googleFonts": false,
+    "customFontCount": 0,
+    "fontFiles": [],
+    "properlyLoaded": false,
+    "recommendations": []
+  },
+  "unusedStyles": {
+    "totalStyles": 2485,
+    "usedStyles": 1390,
+    "unusedStyles": [
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "container"
+      },
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "emoji"
+      },
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "title"
+      },
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "subtitle"
+      },
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "button"
+      },
+      {
+        "file": "app\\+not-found.tsx",
+        "style": "buttonText"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "container"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "center"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "content"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "emptyText"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "header"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "backButton"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "title"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressCard"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressStats"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressStat"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressNumber"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressLabel"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressDivider"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressBarContainer"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressBar"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "progressPercent"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "categoryScroll"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "categoryChip"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "categoryChipActive"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "categoryChipText"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "categoryChipTextActive"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "sectionTitle"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "achievementCard"
+      },
+      {
+        "file": "app\\achievements.tsx",
+        "style": "achievementUnlocked"
+      }
+    ],
+    "unusedCount": 1095,
+    "wasteEstimate": "44%"
+  },
+  "firebaseCompleteness": {
+    "used": true,
+    "hasGoogleServicesJson": false,
+    "hasGoogleServiceInfoPlist": false,
+    "hasFirebaseJson": true,
+    "hasFirestoreRules": true,
+    "hasStorageRules": true,
+    "hasAppCheck": false,
+    "hasEmulatorConfig": false,
+    "issues": [
+      "Missing google-services.json for Android",
+      "Missing GoogleService-Info.plist for iOS",
+      "No App Check configured"
+    ]
+  },
+  "pushNotifications": {
+    "used": true,
+    "hasPermissionRequest": true,
+    "hasTokenRegistration": true,
+    "hasForegroundHandler": true,
+    "hasBackgroundHandler": false,
+    "hasResponseHandler": true,
+    "hasChannelConfig": true,
+    "issues": [
+      "No background handler"
+    ],
+    "completeness": 80
+  },
+  "imageOptimization": {
+    "usesCDN": true,
+    "usesExpoImage": true,
+    "usesFastImage": false,
+    "hasCaching": false,
+    "hasPlaceholder": true,
+    "hasResponsiveLoading": true,
+    "hasWebPSupport": false,
+    "hasLazyLoading": false,
+    "score": 60
+  },
+  "buildConfig": {
+    "metro": {
+      "exists": true,
+      "hasTreeShaking": false,
+      "hasCustomResolver": false,
+      "hasCustomTransformer": true
+    },
+    "babel": {
+      "exists": true,
+      "hasReanimated": true,
+      "hasNativeWind": false,
+      "hasModuleResolver": false,
+      "hasConsoleRemoval": true,
+      "plugins": [
+        "],\r\n    plugins: [\r\n      "
+      ]
+    },
+    "eas": {
+      "profiles": [
+        "development",
+        "preview",
+        "production"
+      ],
+      "hasProductionProfile": true,
+      "hasSubmitConfig": true
+    }
+  },
+  "asyncStorageMisuse": {
+    "issues": [],
+    "largeObjectStores": 0,
+    "sensitiveDataInAsync": 0,
+    "hasSensitiveDataIssue": false
+  },
+  "errorRecoveryUI": {
+    "hasRetryButton": true,
+    "hasFallbackUI": true,
+    "hasSkeletonLoader": true,
+    "hasEmptyState": false,
+    "hasLoadingState": true,
+    "hasErrorState": true,
+    "hasPullToRefresh": true,
+    "hasErrorBoundary": true,
+    "score": 75
+  },
+  "consoleUsage": {
+    "totalConsole": 4,
+    "guardedConsole": 3,
+    "ungardedConsole": 1,
+    "hasConsoleStripping": true,
+    "ungardedFiles": [
+      {
+        "file": "utils\\logger.ts",
+        "count": 1
+      }
+    ],
+    "safe": true,
+    "recommendation": "Console stripping configured"
   },
   "healthScore": {
-    "overall": 65,
+    "overall": 78,
     "breakdown": {
-      "security": 90,
-      "codeQuality": 65,
-      "testing": 0,
+      "security": 100,
+      "codeQuality": 95,
+      "testing": 4,
       "documentation": 75,
       "accessibility": 65,
       "performance": 55,
-      "typeSafety": 55,
-      "errorHandling": 70,
+      "typeSafety": 85,
+      "errorHandling": 100,
       "dependencies": 90,
-      "architecture": 90
+      "architecture": 95
     }
   }
 }

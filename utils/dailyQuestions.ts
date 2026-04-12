@@ -2,6 +2,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { checkDailyQuestionAnswer, detectEmojiCodedLanguage, detectEmojiSpam } from './moderation';
+import { logger } from './logger';
 
 export interface DailyQuestion { id: string; question: string; date: string; category: string; }
 export interface UserAnswer { questionId: string; answer: string; answeredAt: string; }
@@ -71,7 +72,7 @@ export async function saveUserAnswer(questionId: string, answer: string): Promis
     await setDoc(doc(db, 'dailyAnswers', `${user.uid}_${questionId}`), { userId: user.uid, questionId, answer: answer.trim(), answeredAt: new Date().toISOString(), date: today });
     await setDoc(doc(db, 'users', user.uid), { dailyQuestion: { questionId, answer: answer.trim(), date: today } }, { merge: true });
     return { success: true };
-  } catch (e) { console.error('[dailyQuestions] saveUserAnswer error:', e); return { success: false, error: 'Failed to save answer' }; }
+  } catch (e) { logger.error('[dailyQuestions] saveUserAnswer error:', e); return { success: false, error: 'Failed to save answer' }; }
 }
 
 export async function hasAnsweredToday(): Promise<boolean> {

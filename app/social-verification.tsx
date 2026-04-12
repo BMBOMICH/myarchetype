@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
+import { logger } from '../utils/logger';
   formatSocialLinkDate,
   getSocialLinks,
   getSocialTrustBonus,
@@ -28,7 +29,7 @@ export default function SocialVerificationScreen() {
       const links = await getSocialLinks();
       setSocialLinks(links);
     } catch (error) {
-      console.error('[SocialVerification] load error:', error);
+      logger.error('[SocialVerification] load error:', error);
       Alert.alert('Error', 'Failed to load social links.');
     } finally {
       setLoading(false);
@@ -51,7 +52,7 @@ export default function SocialVerificationScreen() {
         Alert.alert('Error', result.error || 'Failed to link Instagram');
       }
     } catch (error) {
-      console.error('[SocialVerification] instagram error:', error);
+      logger.error('[SocialVerification] instagram error:', error);
       Alert.alert('Error', 'Something went wrong while linking Instagram.');
     } finally {
       setLinking(null);
@@ -74,7 +75,7 @@ export default function SocialVerificationScreen() {
         Alert.alert('Error', result.error || 'Failed to link LinkedIn');
       }
     } catch (error) {
-      console.error('[SocialVerification] linkedin error:', error);
+      logger.error('[SocialVerification] linkedin error:', error);
       Alert.alert('Error', 'Something went wrong while linking LinkedIn.');
     } finally {
       setLinking(null);
@@ -92,7 +93,7 @@ export default function SocialVerificationScreen() {
         Alert.alert('Error', 'Failed to unlink');
       }
     } catch (error) {
-      console.error('[SocialVerification] unlink error:', error);
+      logger.error('[SocialVerification] unlink error:', error);
       Alert.alert('Error', `Failed to unlink ${platformName}.`);
     }
   };

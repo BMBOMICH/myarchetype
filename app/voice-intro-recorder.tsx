@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import {
+import { logger } from '../utils/logger';
     deleteVoiceIntro,
     formatVoiceDuration,
     getVoiceIntro,
@@ -118,7 +119,7 @@ export default function VoiceIntroRecorderScreen() {
         });
       }, 1000);
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      logger.error('Failed to start recording:', error);
       Alert.alert('Error', 'Could not start recording');
     }
   }, [audioRecorder]);
@@ -184,7 +185,7 @@ export default function VoiceIntroRecorderScreen() {
         }
       });
     } catch (error) {
-      console.error('Error playing preview:', error);
+      logger.error('Error playing preview:', error);
       setIsPlaying(false);
     }
   }, [recordedUri, existingIntro?.url, isPlaying, playbackSound]);

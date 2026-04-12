@@ -1,3 +1,5 @@
+// app/_layout.tsx
+import * as Sentry from '@sentry/react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -6,19 +8,46 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, getDoc, getDocFromCache } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, InteractionManager, Platform,
-  StyleSheet, Text, TouchableOpacity, useColorScheme, View,
+    ActivityIndicator, AppState, type AppStateStatus,
+    InteractionManager, Platform, StyleSheet,
+    Text, TouchableOpacity, useColorScheme, View,
 } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { loadFaceVerification } from '../utils/faceVerification';
-import { LanguageProvider } from '../utils/languageContext';
+import { LanguageProvider } from '../utils/LanguageContext';
 import { logger } from '../utils/logger';
 import { preloadSafetyModel } from '../utils/moderation';
 import { registerForPushNotifications } from '../utils/notifications';
 
+import { AccessibilityInfo } from 'react-native';
+import { verifyLowVisionSupport } from '../utils/accessibility';
+
+// Inside your root component, alongside existing accessibility checks:
+const [isHighContrast, setHighContrast] = React.useState(false);
+
+React.useEffect(() => {
+  verifyLowVisionSupport().then(({ active }) => {
+    setHighContrast(active.highContrast);
+  });
+
+  const sub = AccessibilityInfo.addEventListener('boldTextChanged',   () => verifyLowVisionSupport().then(r => setHighContrast(r.active.highContrast)));
+  // already have reduceMotionChanged listener presumably — add alongside it
+  return () => sub.remove();
+}, []);
+
+// Pass isHighContrast down via context or theme provider you already have
+
+Sentry.init({
+  dsn:              process.env['EXPO_PUBLIC_SENTRY_DSN'] ?? '',
+  enabled:          !__DEV__,
+  tracesSampleRate: 0.2,
+  environment:      __DEV__ ? 'development' : 'production',
+  integrations:     [Sentry.mobileReplayIntegration()],
+});
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-const AUTH_TIMEOUT_MS     = 10_000;
+const AUTH_TIMEOUT_MS      = 10_000;
 const FIRESTORE_TIMEOUT_MS = 8_000;
 
 const COLORS = {
@@ -26,8 +55,8 @@ const COLORS = {
   light: { bg: '#f5f5f7', accent: '#3a8a9a', text: '#1a1a2e' },
 } as const;
 
-const PUBLIC_SCREENS  = new Set(['login', 'signup', 'index', 'terms', 'privacy']);
-const AUTH_SCREENS    = new Set(['login', 'signup', 'index']);
+const PUBLIC_SCREENS = new Set(['login', 'signup', 'index', 'terms', 'privacy']);
+const AUTH_SCREENS   = new Set(['login', 'signup', 'index']);
 
 interface UserProfile {
   name?: string; age?: number; gender?: string;
@@ -47,19 +76,23 @@ if (Platform.OS !== 'web') {
       shouldShowBanner: true, shouldShowList: true,
     }),
   });
+  Notifications.registerTaskAsync('BACKGROUND_NOTIFICATION_TASK').catch(() => {});
 }
 
 if (typeof ErrorUtils !== 'undefined') {
   const prev = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-    console.error('[GlobalError]', isFatal ? 'FATAL' : 'non-fatal', error?.message ?? error);
+    logger.error('[GlobalError]', isFatal ? 'FATAL' : 'non-fatal', error?.message ?? error);
+    Sentry.captureException(error, { extra: { isFatal: isFatal ?? false } });
     prev?.(error, isFatal);
   });
 }
 
+// Module-level: intentionally permanent — global unhandled rejection catcher
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
-    console.error('[UnhandledRejection]', e.reason);
+    logger.error('[UnhandledRejection]', e.reason);
+    Sentry.captureException(e.reason instanceof Error ? e.reason : new Error(String(e.reason)));
   });
 }
 
@@ -69,12 +102,15 @@ function isProfileComplete(data: UserProfile | null): boolean {
   return !!(data.name && data.age && data.gender && data.interestedIn && data.photos?.length);
 }
 
+// FIX: clear the timeout when the promise settles so the timer doesn't leak
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
-  ]);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      v => { clearTimeout(timer); resolve(v); },
+      e => { clearTimeout(timer); reject(e); },
+    );
+  });
 }
 
 async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
@@ -86,15 +122,61 @@ async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
   return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 
-// ─── Error Boundary ───────────────────────────────────────
+const SCREENS: Array<{ name: string; options: Record<string, unknown> }> = [
+  { name: 'index',                  options: { headerShown: false } },
+  { name: 'login',                  options: { title: 'Log In' } },
+  { name: 'signup',                 options: { headerShown: false } },
+  { name: 'profile-setup',          options: { title: 'Create Profile', headerBackVisible: false, gestureEnabled: false } },
+  { name: 'home',                   options: { headerShown: false } },
+  { name: 'matches',                options: { title: 'Find Matches' } },
+  { name: 'my-matches',             options: { title: 'My Matches' } },
+  { name: 'chat',                   options: { headerShown: false } },
+  { name: 'personality-quiz',       options: { title: 'Personality Quiz', headerBackVisible: false } },
+  { name: 'edit-profile',           options: { title: 'Edit Profile' } },
+  { name: 'video-profile-recorder', options: { headerShown: false } },
+  { name: 'height-verification',    options: { title: 'Verify Height' } },
+  { name: 'selfie-verification',    options: { title: 'Verify Identity' } },
+  { name: 'daily-question',         options: { headerShown: false } },
+  { name: 'second-look',            options: { headerShown: false } },
+  { name: 'dating-stats',           options: { headerShown: false } },
+  { name: 'achievements',           options: { headerShown: false } },
+  { name: 'interests',              options: { headerShown: false } },
+  { name: 'deal-breakers',          options: { headerShown: false } },
+  { name: 'icebreaker-game',        options: { headerShown: false } },
+  { name: 'compatibility-quiz',     options: { headerShown: false } },
+  { name: 'voice-intro-recorder',   options: { headerShown: false } },
+  { name: 'smart-photos',           options: { headerShown: false } },
+  { name: 'relationship-mode',      options: { headerShown: false } },
+  { name: 'stories',                options: { headerShown: false } },
+  { name: 'super-likes',            options: { headerShown: false } },
+  { name: 'shared-playlist',        options: { headerShown: false } },
+  { name: 'date-safety',            options: { headerShown: false } },
+  { name: 'date-checkin',           options: { headerShown: false } },
+  { name: 'post-date-rating',       options: { title: 'Rate Experience' } },
+  { name: 'blocked-users',          options: { title: 'Blocked Users' } },
+  { name: 'settings',               options: { title: 'Settings' } },
+  { name: 'referral',               options: { title: 'Invite Friends' } },
+  { name: 'referral-leaderboard',   options: { title: 'Leaderboard' } },
+  { name: 'profile-views',          options: { title: 'Profile Views' } },
+  { name: 'social-verification',    options: { headerShown: false } },
+  { name: 'date-spot-reviews',      options: { headerShown: false } },
+  { name: 'privacy',                options: { title: 'Privacy Policy' } },
+  { name: 'terms',                  options: { title: 'Terms of Service' } },
+  { name: 'admin/index',            options: { title: 'Admin Dashboard' } },
+  { name: 'admin/reports',          options: { title: 'User Reports' } },
+  { name: 'admin/users',            options: { title: 'Manage Users' } },
+  { name: 'admin/stats',            options: { title: 'Statistics' } },
+];
+
 class LayoutErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; error: Error | null }
 > {
-  state = { hasError: false };
-  static override getDerivedStateFromError() { return { hasError: true }; }
+  state = { hasError: false, error: null };
+  static override getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   override componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[LayoutErrorBoundary]', error, info);
+    logger.error('[LayoutErrorBoundary]', error, info);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack ?? '' } });
   }
   override render() {
     if (!this.state.hasError) return this.props.children;
@@ -103,41 +185,41 @@ class LayoutErrorBoundary extends React.Component<
         <Text style={styles.errorEmoji}>😕</Text>
         <Text style={styles.errorText}>Something went wrong</Text>
         <Text style={styles.errorSubtext}>Please restart the app</Text>
+        {__DEV__ && this.state.error && (
+          <Text style={styles.devErrorText}>{(this.state.error as Error).message}</Text>
+        )}
       </View>
     );
   }
 }
 
-// ─── Loading Screen ───────────────────────────────────────
 const LoadingScreen = React.memo(function LoadingScreen({ colorScheme }: { colorScheme: 'light' | 'dark' }) {
   const { bg, accent } = COLORS[colorScheme];
   return (
-    <View style={[styles.loadingContainer, { backgroundColor: bg }]}
-      accessible accessibilityRole="progressbar"
-      accessibilityLabel="Loading application"
-      accessibilityState={{ busy: true }}>
+    <View style={[styles.loadingContainer, { backgroundColor: bg }]} accessible accessibilityRole="progressbar" accessibilityLabel="Loading application" accessibilityState={{ busy: true }}>
       <ActivityIndicator size="large" color={accent} />
     </View>
   );
 });
 
-// ─── Timeout Screen ───────────────────────────────────────
-const TimeoutScreen = React.memo(function TimeoutScreen({
-  colorScheme, onRetry,
-}: { colorScheme: 'light' | 'dark'; onRetry: () => void }) {
+const TimeoutScreen = React.memo(function TimeoutScreen({ colorScheme, onRetry }: { colorScheme: 'light' | 'dark'; onRetry: () => void }) {
   const { bg, accent, text } = COLORS[colorScheme];
   return (
     <View style={[styles.errorContainer, { backgroundColor: bg }]}>
       <Text style={styles.errorEmoji}>⏱️</Text>
       <Text style={[styles.errorText, { color: text }]}>Connection timed out</Text>
       <Text style={styles.errorSubtext}>Check your internet connection</Text>
-      <TouchableOpacity
-        style={[styles.retryButton, { backgroundColor: accent }]}
-        onPress={onRetry}
-        accessibilityLabel="Retry connection"
-        accessibilityRole="button">
+      <TouchableOpacity style={[styles.retryButton, { backgroundColor: accent }]} onPress={onRetry} accessibilityLabel="Retry connection" accessibilityRole="button">
         <Text style={styles.retryButtonText}>Try Again</Text>
       </TouchableOpacity>
+    </View>
+  );
+});
+
+const OfflineBanner = React.memo(function OfflineBanner() {
+  return (
+    <View style={styles.offlineBanner} accessibilityLiveRegion="assertive" accessibilityRole="alert">
+      <Text style={styles.offlineBannerText}>⚠️  No internet connection</Text>
     </View>
   );
 });
@@ -150,72 +232,88 @@ const useScreenOptions = (colorScheme: 'light' | 'dark') =>
     contentStyle:     { backgroundColor: COLORS[colorScheme].bg },
   }), [colorScheme]);
 
-// ─── Root Layout Content ──────────────────────────────────
 function RootLayoutContent() {
-  const router        = useRouter();
-  const segments      = useSegments();
-  const rawScheme     = useColorScheme();
+  const router    = useRouter();
+  const segments  = useSegments();
+  const rawScheme = useColorScheme();
   const colorScheme: 'light' | 'dark' = rawScheme === 'light' ? 'light' : 'dark';
 
   const [isReady,         setIsReady]         = useState(false);
   const [isLoggedIn,      setIsLoggedIn]      = useState(false);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
-  const [authTimedOut,    setAuthTimedOut]    = useState(false);
+  const [authTimedOut,    setAuthTimedOut]     = useState(false);
+  const [isOnline,        setIsOnline]        = useState(true);
 
-  const isMounted           = useRef(true);
-  const notifListener       = useRef<Notifications.EventSubscription>();
-  const responseListener    = useRef<Notifications.EventSubscription>();
-  const pushRegistered      = useRef(false);
-  const authTimeoutRef      = useRef<ReturnType<typeof setTimeout>>();
+  const isMounted        = useRef(true);
+  const notifListener    = useRef<Notifications.EventSubscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
+  const pushRegistered   = useRef(false);
+  const authTimeoutRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const appStateRef      = useRef<AppStateStatus>(AppState.currentState);
 
-  const currentSegment      = segments[0] ?? '';
-  const isPublicScreen      = PUBLIC_SCREENS.has(currentSegment);
+  const currentSegment       = segments[0] ?? '';
+  const isPublicScreen       = PUBLIC_SCREENS.has(currentSegment);
   const isProfileSetupScreen = currentSegment === 'profile-setup';
-  const isAuthScreen        = AUTH_SCREENS.has(currentSegment);
-  const screenOptions       = useScreenOptions(colorScheme);
+  const isAuthScreen         = AUTH_SCREENS.has(currentSegment);
+  const screenOptions        = useScreenOptions(colorScheme);
 
-  const handleRetry = useCallback(() => {
-    setAuthTimedOut(false);
-    setIsReady(false);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        logger.info('[Layout] App foregrounded');
+        auth.currentUser?.reload().catch((err: unknown) => logger.warn('[Layout] reload failed:', err));
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
   }, []);
 
-  // Preload ML models on web
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    preloadSafetyModel()
-      .then((ok) => { if (__DEV__) logger.info('[Layout] NSFW model:', ok ? 'ready' : 'unavailable'); })
-      .catch(() => {});
-    loadFaceVerification()
-      .then((ok) => { if (__DEV__) logger.info('[Layout] Face model:', ok ? 'ready' : 'unavailable'); })
-      .catch(() => {});
+    const handleOnline  = () => { setIsOnline(true);  logger.info('[Layout] Network: online');  };
+    const handleOffline = () => { setIsOnline(false); logger.warn('[Layout] Network: offline'); };
+    window.addEventListener('online',  handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online',  handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleRetry = useCallback(() => { setAuthTimedOut(false); setIsReady(false); }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // FIX: run independent preloads in parallel
+    Promise.all([
+      preloadSafetyModel().then(ok => logger.info('[Layout] NSFW model:', ok ? 'ready' : 'unavailable')).catch((err: unknown) => logger.warn('[Layout] NSFW model failed:', err)),
+      loadFaceVerification().then(ok => logger.info('[Layout] Face model:', ok ? 'ready' : 'unavailable')).catch((err: unknown) => logger.warn('[Layout] Face model failed:', err)),
+    ]);
   }, []);
 
   const processAuthenticatedUser = useCallback(async (user: User) => {
-    if (!user.emailVerified) {
-      setIsLoggedIn(false); setProfileComplete(null); return;
-    }
+    if (!user.emailVerified) { setIsLoggedIn(false); setProfileComplete(null); return; }
     setIsLoggedIn(true);
+    Sentry.setUser({ id: user.uid, email: user.email ?? undefined });
     try {
       const profile = await fetchUserProfile(user.uid);
       if (isMounted.current) setProfileComplete(isProfileComplete(profile));
     } catch (err) {
-      if (__DEV__) logger.error('[Layout] Profile fetch failed:', err);
+      logger.error('[Layout] Profile fetch failed:', err);
+      Sentry.captureException(err instanceof Error ? err : new Error(String(err)));
       if (isMounted.current) setProfileComplete(false);
     }
     if (Platform.OS !== 'web' && !pushRegistered.current) {
       pushRegistered.current = true;
-      registerForPushNotifications()
-        .catch((err) => { if (__DEV__) logger.warn('[Layout] Push registration failed:', err); });
+      registerForPushNotifications().catch((err: unknown) => logger.warn('[Layout] Push registration failed:', err));
     }
-  }, []); // stable — no external deps
+  }, []);
 
-  // Auth listener — isReady intentionally excluded from deps to avoid re-subscribing
   useEffect(() => {
     isMounted.current = true;
-
     authTimeoutRef.current = setTimeout(() => {
       if (isMounted.current && !isReady) {
-        if (__DEV__) logger.warn('[Layout] Auth timed out');
+        logger.warn('[Layout] Auth timed out');
         setAuthTimedOut(true);
         setIsReady(true);
       }
@@ -225,19 +323,20 @@ function RootLayoutContent() {
       if (!isMounted.current) return;
       clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = undefined;
-
       if (user) {
         try {
           await user.reload();
           if (!isMounted.current) return;
           await processAuthenticatedUser(user);
         } catch (error) {
-          const err = error as { code?: string };
-          if (__DEV__) logger.error('[Layout] Auth error:', err.code);
+          const err = error as { code?: string; message?: string };
+          logger.error('[Layout] Auth error:', err.code ?? err.message ?? 'unknown');
+          Sentry.captureException(error instanceof Error ? error : new Error(String(error)));
           if (isMounted.current) { setIsLoggedIn(false); setProfileComplete(null); }
-          await auth.signOut().catch(() => {});
+          await auth.signOut().catch((e: unknown) => logger.error('[Layout] SignOut failed:', e));
         }
       } else {
+        Sentry.setUser(null);
         if (isMounted.current) { setIsLoggedIn(false); setProfileComplete(null); }
       }
       if (isMounted.current) setIsReady(true);
@@ -248,28 +347,31 @@ function RootLayoutContent() {
       clearTimeout(authTimeoutRef.current);
       unsub();
     };
-  }, [processAuthenticatedUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [processAuthenticatedUser]);
 
   useEffect(() => { if (isReady) SplashScreen.hideAsync().catch(() => {}); }, [isReady]);
 
   const handleNotificationRoute = useCallback((data: NotificationData) => {
     if (!data.screen) return;
+    const chatRoute = (): void => {
+      if (data.matchId && data.matchName) {
+        router.push({ pathname: '/chat' as AppRoute, params: { matchId: data.matchId, matchName: data.matchName } });
+      } else router.push('/my-matches' as AppRoute);
+    };
     const routes: Record<string, () => void> = {
-      'my-matches':    () => router.push('/my-matches' as AppRoute),
-      chat:            () => data.matchId && data.matchName
-        ? router.push({ pathname: '/chat' as AppRoute, params: { matchId: data.matchId, matchName: data.matchName } })
-        : router.push('/my-matches' as AppRoute),
-      matches:         () => router.push('/matches' as AppRoute),
+      'my-matches':    () => router.push('/my-matches'    as AppRoute),
+      'chat':          chatRoute,
+      'matches':       () => router.push('/matches'       as AppRoute),
       'profile-views': () => router.push('/profile-views' as AppRoute),
-      'check-in':      () => router.push('/date-safety' as AppRoute),
+      'check-in':      () => router.push('/date-safety'   as AppRoute),
     };
     (routes[data.screen] ?? (() => router.push('/home' as AppRoute)))();
   }, [router]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    notifListener.current = Notifications.addNotificationReceivedListener((n) => {
-      if (__DEV__) logger.info('[Layout] Notification received:', n.request.identifier);
+    notifListener.current    = Notifications.addNotificationReceivedListener((n) => {
+      logger.info('[Layout] Notification received:', n.request.identifier);
     });
     responseListener.current = Notifications.addNotificationResponseReceivedListener((r) => {
       handleNotificationRoute(r.notification.request.content.data as NotificationData);
@@ -281,7 +383,7 @@ function RootLayoutContent() {
     if (!isReady) return;
     const task = InteractionManager.runAfterInteractions(() => {
       if (!isMounted.current) return;
-      if (__DEV__) logger.info('[Layout] Route check:', { isLoggedIn, profileComplete, currentSegment });
+      logger.info('[Layout] Route check:', { isLoggedIn, profileComplete, currentSegment });
       if (isLoggedIn) {
         if (profileComplete === false && !isProfileSetupScreen) router.replace('/profile-setup' as AppRoute);
         else if (profileComplete === true && (isAuthScreen || isProfileSetupScreen)) router.replace('/home' as AppRoute);
@@ -297,57 +399,18 @@ function RootLayoutContent() {
 
   return (
     <>
+      {!isOnline && <OfflineBanner />}
       <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="index"                  options={{ headerShown: false }} />
-        <Stack.Screen name="login"                  options={{ title: 'Log In' }} />
-        <Stack.Screen name="signup"                 options={{ headerShown: false }} />
-        <Stack.Screen name="profile-setup"          options={{ title: 'Create Profile', headerBackVisible: false, gestureEnabled: false }} />
-        <Stack.Screen name="home"                   options={{ headerShown: false }} />
-        <Stack.Screen name="matches"                options={{ title: 'Find Matches' }} />
-        <Stack.Screen name="my-matches"             options={{ title: 'My Matches' }} />
-        <Stack.Screen name="chat"                   options={{ headerShown: false }} />
-        <Stack.Screen name="personality-quiz"       options={{ title: 'Personality Quiz', headerBackVisible: false }} />
-        <Stack.Screen name="edit-profile"           options={{ title: 'Edit Profile' }} />
-        <Stack.Screen name="video-profile-recorder" options={{ headerShown: false }} />
-        <Stack.Screen name="height-verification"    options={{ title: 'Verify Height' }} />
-        <Stack.Screen name="selfie-verification"    options={{ title: 'Verify Identity' }} />
-        <Stack.Screen name="daily-question"         options={{ headerShown: false }} />
-        <Stack.Screen name="second-look"            options={{ headerShown: false }} />
-        <Stack.Screen name="dating-stats"           options={{ headerShown: false }} />
-        <Stack.Screen name="achievements"           options={{ headerShown: false }} />
-        <Stack.Screen name="interests"              options={{ headerShown: false }} />
-        <Stack.Screen name="deal-breakers"          options={{ headerShown: false }} />
-        <Stack.Screen name="icebreaker-game"        options={{ headerShown: false }} />
-        <Stack.Screen name="compatibility-quiz"     options={{ headerShown: false }} />
-        <Stack.Screen name="voice-intro-recorder"   options={{ headerShown: false }} />
-        <Stack.Screen name="smart-photos"           options={{ headerShown: false }} />
-        <Stack.Screen name="relationship-mode"      options={{ headerShown: false }} />
-        <Stack.Screen name="stories"                options={{ headerShown: false }} />
-        <Stack.Screen name="super-likes"            options={{ headerShown: false }} />
-        <Stack.Screen name="shared-playlist"        options={{ headerShown: false }} />
-        <Stack.Screen name="date-safety"            options={{ headerShown: false }} />
-        <Stack.Screen name="date-checkin"           options={{ headerShown: false }} />
-        <Stack.Screen name="post-date-rating"       options={{ title: 'Rate Experience' }} />
-        <Stack.Screen name="blocked-users"          options={{ title: 'Blocked Users' }} />
-        <Stack.Screen name="settings"               options={{ title: 'Settings' }} />
-        <Stack.Screen name="referral"               options={{ title: 'Invite Friends' }} />
-        <Stack.Screen name="referral-leaderboard"   options={{ title: 'Leaderboard' }} />
-        <Stack.Screen name="profile-views"          options={{ title: 'Profile Views' }} />
-        <Stack.Screen name="social-verification"    options={{ headerShown: false }} />
-        <Stack.Screen name="date-spot-reviews"      options={{ headerShown: false }} />
-        <Stack.Screen name="privacy"                options={{ title: 'Privacy Policy' }} />
-        <Stack.Screen name="terms"                  options={{ title: 'Terms of Service' }} />
-        <Stack.Screen name="admin/index"            options={{ title: 'Admin Dashboard' }} />
-        <Stack.Screen name="admin/reports"          options={{ title: 'User Reports' }} />
-        <Stack.Screen name="admin/users"            options={{ title: 'Manage Users' }} />
-        <Stack.Screen name="admin/stats"            options={{ title: 'Statistics' }} />
+        {SCREENS.map(({ name, options }) => (
+          <Stack.Screen key={name} name={name} options={options} />
+        ))}
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   return (
     <LayoutErrorBoundary>
       <LanguageProvider>
@@ -355,14 +418,23 @@ export default function RootLayout() {
       </LanguageProvider>
     </LayoutErrorBoundary>
   );
-}
+});
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enableNative: true,
+  tracesSampleRate: 0.2, // Captures 20% of sessions for performance monitoring
+});
 
 const styles = StyleSheet.create({
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorContainer:   { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e', padding: 32 },
-  errorEmoji:       { fontSize: 48, marginBottom: 16 },
-  errorText:        { fontSize: 20, fontWeight: 'bold', color: '#ffffff', marginBottom: 8 },
-  errorSubtext:     { fontSize: 14, color: '#aaaaaa', marginBottom: 24 },
-  retryButton:      { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 25 },
-  retryButtonText:  { color: '#fff', fontSize: 16, fontWeight: '600' },
+  loadingContainer:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorContainer:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e', padding: 32 },
+  errorEmoji:        { fontSize: 48, marginBottom: 16 },
+  errorText:         { fontSize: 20, fontWeight: 'bold', color: '#ffffff', marginBottom: 8 },
+  errorSubtext:      { fontSize: 14, color: '#aaaaaa', marginBottom: 24 },
+  devErrorText:      { fontSize: 11, color: '#ff6b6b', marginTop: 12, textAlign: 'center', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  retryButton:       { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 25 },
+  retryButtonText:   { color: '#fff', fontSize: 16, fontWeight: '600' },
+  offlineBanner:     { backgroundColor: '#e74c3c', paddingVertical: 8, paddingHorizontal: 16, alignItems: 'center' },
+  offlineBannerText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

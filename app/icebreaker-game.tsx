@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
+import { logger } from '../utils/logger';
   GameSession,
   getGameSession,
   startGame,
@@ -58,7 +59,7 @@ export default function IcebreakerGameScreen() {
       const bank = type === 'would_you_rather' ? WOULD_YOU_RATHER_QUESTIONS : THIS_OR_THAT_QUESTIONS;
       setQuestions(secureShuffle([...bank]).slice(0, 10));
     } catch (error) {
-      console.error('[Icebreaker] init error:', error);
+      logger.error('[Icebreaker] init error:', error);
       Alert.alert('Error', 'Failed to start the game.');
       router.back();
     } finally {
@@ -86,7 +87,7 @@ export default function IcebreakerGameScreen() {
         }
       }, 2000);
     } catch (error) {
-      console.error('[Icebreaker] submit error:', error);
+      logger.error('[Icebreaker] submit error:', error);
       Alert.alert('Error', 'Could not submit your answer.');
       setMyAnswer(null);
       setWaitingForMatch(false);

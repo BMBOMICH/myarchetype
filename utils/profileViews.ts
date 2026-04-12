@@ -21,6 +21,7 @@ import {
 import { auth, db } from '../firebaseConfig';
 import { writeAuditLog } from './logger';
 import { trackProfileView } from './rateLimiter';
+import { logger } from './logger';
 
 export interface ProfileView {
   id: string;
@@ -86,7 +87,7 @@ export async function recordProfileView(
       viewCount: stalkCheck.viewCount,
     }, viewedUserId);
 
-    console.warn('[profileViews] Stalking pattern detected:', stalkingAlert.reason);
+    logger.warn('[profileViews] Stalking pattern detected:', stalkingAlert.reason);
   }
 
   // #175: Block excessive views
@@ -109,7 +110,7 @@ export async function recordProfileView(
 
     return { recorded: true, stalkingAlert };
   } catch (err) {
-    console.error('[profileViews] recordProfileView error:', err);
+    logger.error('[profileViews] recordProfileView error:', err);
     return { recorded: false };
   }
 }
@@ -180,7 +181,7 @@ export async function getProfileViewStats(
       recentViewers,
     };
   } catch (err) {
-    console.error('[profileViews] getStats error:', err);
+    logger.error('[profileViews] getStats error:', err);
     return {
       totalViews: 0,
       uniqueViewers: 0,
@@ -210,7 +211,7 @@ export async function getWhoViewedMe(limitCount = 20): Promise<ProfileView[]> {
       ...d.data(),
     })) as ProfileView[];
   } catch (err) {
-    console.error('[profileViews] getWhoViewedMe error:', err);
+    logger.error('[profileViews] getWhoViewedMe error:', err);
     return [];
   }
 }

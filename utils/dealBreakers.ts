@@ -1,5 +1,6 @@
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { logger } from './logger';
 
 export interface DealBreakers {
   // Must have
@@ -68,7 +69,7 @@ export async function getDealBreakers(): Promise<DealBreakers> {
       ...(data.dealBreakers || {}),
     };
   } catch (error) {
-    console.error('Error getting deal breakers:', error);
+    logger.error('Error getting deal breakers:', error);
     return DEFAULT_DEAL_BREAKERS;
   }
 }
@@ -84,7 +85,7 @@ export async function saveDealBreakers(dealBreakers: DealBreakers): Promise<{ su
     });
     return { success: true };
   } catch (error) {
-    console.error('Error saving deal breakers:', error);
+    logger.error('Error saving deal breakers:', error);
     return { success: false };
   }
 }
