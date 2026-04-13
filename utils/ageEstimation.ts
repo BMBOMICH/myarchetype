@@ -1,165 +1,114 @@
+// utils/ageEstimation.ts
+// Upgraded: face-api.js CDN → InsightFace server endpoint
+// Falls back to face-api.js on web if server unavailable
+
 import { Platform } from 'react-native';
 
 const IS_WEB = Platform.OS === 'web';
-const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+const SERVER_URL = process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? process.env.EXPO_PUBLIC_SERVER_URL ?? '';
+
+// ── Legacy face-api types (web fallback only) ─────────────
 const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+const FACE_API_WEIGHTS = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
 
-// ─── faceapi types ────────────────────────────────────────
-interface FaceApiNet {
-  isLoaded: boolean;
-  loadFromUri: (url: string) => Promise<void>;
-}
-
-interface TinyFaceDetectorOptions {
-  new (opts: { inputSize: number; scoreThreshold: number }): TinyFaceDetectorOptions;
-}
-
-interface FaceDetection {
-  score: number;
-}
-
-interface AgeGenderDetection {
-  age: number;
-  gender: string;
-  genderProbability: number;
-  detection: FaceDetection;
-}
-
+interface FaceApiNet { isLoaded: boolean; loadFromUri(url: string): Promise<void>; }
 interface FaceApiInstance {
-  nets: {
-    ageGenderNet: FaceApiNet;
-    tinyFaceDetector: FaceApiNet;
-  };
-  TinyFaceDetectorOptions: TinyFaceDetectorOptions;
-  detectSingleFace: (
-    img: HTMLImageElement,
-    options: InstanceType<TinyFaceDetectorOptions>
-  ) => {
-    withAgeAndGender: () => Promise<AgeGenderDetection | null>;
-  };
+  nets: { ageGenderNet: FaceApiNet; tinyFaceDetector: FaceApiNet };
+  TinyFaceDetectorOptions: new (o: { inputSize: number; scoreThreshold: number }) => unknown;
+  detectSingleFace(img: HTMLImageElement, opts: unknown): { withAgeAndGender(): Promise<{ age: number; gender: string; genderProbability: number; detection: { score: number } } | null> };
 }
-
-interface GlobalWithFaceApi {
-  faceapi?: FaceApiInstance;
-  document?: Document;
-}
-
-// ─── HTMLImageElement stub for React Native ───────────────
-interface HTMLImageElement {
-  crossOrigin: string;
-  onload: (() => void) | null;
-  onerror: (() => void) | null;
-  src: string;
-}
+interface GlobalWithFaceApi { faceapi?: FaceApiInstance; document?: Document; }
 
 let faceapi: FaceApiInstance | null = null;
 let ageModelLoaded = false;
 let ageLoadPromise: Promise<boolean> | null = null;
 
 export interface AgeEstimationResult {
-  estimatedAge: number;
-  confidence: number;
+  estimatedAge: number; confidence: number;
   ageRange: { min: number; max: number };
-  appearsUnderage: boolean;
-  appearsOver18: boolean;
+  appearsUnderage: boolean; appearsOver18: boolean;
 }
-
 export interface AgeGateResult {
-  allowed: boolean;
-  reason: string;
-  estimatedAge: number | null;
-  statedAge: number;
-  requiresManualReview: boolean;
+  allowed: boolean; reason: string;
+  estimatedAge: number | null; statedAge: number; requiresManualReview: boolean;
 }
 
-async function loadAgeModel(): Promise<boolean> {
+// ── Primary: InsightFace server endpoint ──────────────────
+async function estimateAgeInsightFace(photoUrl: string): Promise<AgeEstimationResult | null> {
+  if (!SERVER_URL) return null;
+  try {
+    const res = await fetch(`${SERVER_URL}/api/estimate-age`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUri: photoUrl, model: 'insightface_age' }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { age: number; age_range: [number, number]; confidence: number };
+    const estimatedAge = data.age;
+    const margin = data.confidence > 0.7 ? 4 : 6;
+    return {
+      estimatedAge, confidence: Math.round(data.confidence * 100),
+      ageRange: { min: Math.max(10, estimatedAge - margin), max: estimatedAge + margin },
+      appearsUnderage: estimatedAge < 18, appearsOver18: estimatedAge >= 18,
+    };
+  } catch { return null; }
+}
+
+// ── Fallback: face-api.js (web only, legacy) ──────────────
+async function loadFaceApiLegacy(): Promise<boolean> {
   if (!IS_WEB) return false;
   if (ageModelLoaded) return true;
   if (ageLoadPromise) return ageLoadPromise;
-
   ageLoadPromise = (async () => {
     try {
       const g = globalThis as GlobalWithFaceApi;
-
-      if (g.faceapi) {
-        faceapi = g.faceapi;
-      } else {
-        const doc = g.document;
-        const existing = doc?.querySelector(`script[src="${FACE_API_CDN}"]`);
-
-        if (existing) {
-          await new Promise<void>((res, rej) => {
-            if (g.faceapi) { faceapi = g.faceapi!; res(); return; }
-            existing.addEventListener('load', () => { faceapi = (globalThis as GlobalWithFaceApi).faceapi!; res(); });
-            existing.addEventListener('error', () => rej(new Error('Script load error')));
-          });
-        } else {
-          await new Promise<void>((res, rej) => {
-            if (!doc) { rej(new Error('No document')); return; }
-            const s = doc.createElement('script');
-            s.src = FACE_API_CDN;
-            s.async = true;
-            s.onload = () => {
-              const loaded = (globalThis as GlobalWithFaceApi).faceapi;
-              if (loaded) { faceapi = loaded; res(); }
-              else rej(new Error('faceapi not found after load'));
-            };
-            s.onerror = () => rej(new Error('CDN load failed'));
-            doc.head.appendChild(s);
-          });
-        }
+      if (g.faceapi) { faceapi = g.faceapi; }
+      else {
+        await new Promise<void>((res, rej) => {
+          const doc = g.document;
+          const ex = doc?.querySelector(`script[src="${FACE_API_CDN}"]`);
+          if (ex) { ex.addEventListener('load', () => { faceapi = (globalThis as GlobalWithFaceApi).faceapi!; res(); }); ex.addEventListener('error', () => rej(new Error('Script error'))); return; }
+          if (!doc) { rej(new Error('No document')); return; }
+          const s = doc.createElement('script'); s.src = FACE_API_CDN; s.async = true;
+          s.onload = () => { const l = (globalThis as GlobalWithFaceApi).faceapi; if (l) { faceapi = l; res(); } else rej(new Error('faceapi missing')); };
+          s.onerror = () => rej(new Error('CDN failed'));
+          doc.head.appendChild(s);
+        });
       }
-
       if (!faceapi) return false;
-
       const toLoad: Promise<void>[] = [];
-      if (!faceapi.nets.ageGenderNet.isLoaded)    toLoad.push(faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL));
-      if (!faceapi.nets.tinyFaceDetector.isLoaded) toLoad.push(faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL));
+      if (!faceapi.nets.ageGenderNet.isLoaded)     toLoad.push(faceapi.nets.ageGenderNet.loadFromUri(FACE_API_WEIGHTS));
+      if (!faceapi.nets.tinyFaceDetector.isLoaded) toLoad.push(faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_WEIGHTS));
       if (toLoad.length) await Promise.all(toLoad);
-
-      ageModelLoaded = true;
-      return true;
-    } catch {
-      ageLoadPromise = null;
-      return false;
-    }
+      ageModelLoaded = true; return true;
+    } catch { ageLoadPromise = null; return false; }
   })();
-
   return ageLoadPromise;
 }
 
-function createImg(uri: string): Promise<HTMLImageElement> {
-  return new Promise((res, rej) => {
-    const doc = (globalThis as GlobalWithFaceApi).document;
-    const img = doc?.createElement?.('img') as HTMLImageElement | undefined;
-    if (!img) { rej(new Error('No img element available')); return; }
-    img.crossOrigin = 'anonymous';
-    img.onload = () => res(img);
-    img.onerror = () => rej(new Error('Image load failed'));
-    img.src = uri;
-  });
-}
-
-export async function estimateAgeFromPhoto(photoUrl: string): Promise<AgeEstimationResult | null> {
-  if (!IS_WEB) return null;
+async function estimateAgeFaceApi(photoUrl: string): Promise<AgeEstimationResult | null> {
+  if (!IS_WEB || !await loadFaceApiLegacy() || !faceapi) return null;
   try {
-    if (!await loadAgeModel() || !faceapi) return null;
-    const img = await createImg(photoUrl);
-    const det = await faceapi
-      .detectSingleFace(img as unknown as Parameters<FaceApiInstance['detectSingleFace']>[0], new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
-      .withAgeAndGender();
+    const doc = (globalThis as GlobalWithFaceApi).document;
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const el = doc?.createElement('img') as HTMLImageElement | undefined;
+      if (!el) { rej(new Error('No img')); return; }
+      el.crossOrigin = 'anonymous'; el.onload = () => res(el); el.onerror = () => rej(new Error('Load failed')); el.src = photoUrl;
+    });
+    const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 })).withAgeAndGender();
     if (!det) return null;
     const estimatedAge = Math.round(det.age);
-    const confidence   = Math.round(((det.detection.score) + (det.genderProbability)) / 2 * 100);
-    const margin       = confidence > 70 ? 4 : 6;
-    return {
-      estimatedAge,
-      confidence,
-      ageRange: { min: Math.max(10, estimatedAge - margin), max: estimatedAge + margin },
-      appearsUnderage: estimatedAge < 18,
-      appearsOver18:   estimatedAge >= 18,
-    };
+    const confidence = Math.round(((det.detection.score) + (det.genderProbability)) / 2 * 100);
+    const margin = confidence > 70 ? 4 : 6;
+    return { estimatedAge, confidence, ageRange: { min: Math.max(10, estimatedAge - margin), max: estimatedAge + margin }, appearsUnderage: estimatedAge < 18, appearsOver18: estimatedAge >= 18 };
   } catch { return null; }
+}
+
+// ── Public API ────────────────────────────────────────────
+export async function estimateAgeFromPhoto(photoUrl: string): Promise<AgeEstimationResult | null> {
+  // Try InsightFace server first (more accurate), fall back to face-api.js
+  const serverResult = await estimateAgeInsightFace(photoUrl);
+  if (serverResult) return serverResult;
+  return estimateAgeFaceApi(photoUrl);
 }
 
 export function validateAge(stated: number, estimated: number, tolerance = 5): { valid: boolean; difference: number } {
@@ -173,34 +122,20 @@ export async function estimateAgeFromMultiplePhotos(urls: string[]): Promise<Age
   const avg  = Math.round(results.reduce((s, r) => s + r.estimatedAge, 0) / results.length);
   const conf = Math.round(results.reduce((s, r) => s + r.confidence, 0) / results.length);
   const margin = conf > 70 ? 4 : 6;
-  return {
-    estimatedAge: avg,
-    confidence:   conf,
-    ageRange: { min: Math.max(10, avg - margin), max: avg + margin },
-    appearsUnderage: avg < 18,
-    appearsOver18:   avg >= 18,
-  };
+  return { estimatedAge: avg, confidence: conf, ageRange: { min: Math.max(10, avg - margin), max: avg + margin }, appearsUnderage: avg < 18, appearsOver18: avg >= 18 };
 }
 
 export async function enforceAgeGate(statedDOB: string, selfieUri?: string): Promise<AgeGateResult> {
-  const dob   = new Date(statedDOB);
-  const today = new Date();
+  const dob = new Date(statedDOB); const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-
   if (age < 18) return { allowed: false, reason: 'You must be 18 or older.', estimatedAge: null, statedAge: age, requiresManualReview: false };
   if (!selfieUri) return { allowed: true, reason: 'Age verified by date of birth.', estimatedAge: null, statedAge: age, requiresManualReview: false };
-
   const est = await estimateAgeFromPhoto(selfieUri);
-  if (!est)  return { allowed: true, reason: 'Age verified by date of birth.', estimatedAge: null, statedAge: age, requiresManualReview: false };
-
-  if (est.estimatedAge < 16 && est.confidence > 70)
-    return { allowed: false, reason: 'Age verification failed. Photo inconsistent with stated age.', estimatedAge: est.estimatedAge, statedAge: age, requiresManualReview: true };
-
+  if (!est) return { allowed: true, reason: 'Age verified by date of birth.', estimatedAge: null, statedAge: age, requiresManualReview: false };
+  if (est.estimatedAge < 16 && est.confidence > 70) return { allowed: false, reason: 'Age verification failed. Photo inconsistent with stated age.', estimatedAge: est.estimatedAge, statedAge: age, requiresManualReview: true };
   const { difference } = validateAge(age, est.estimatedAge, 8);
-  if (difference > 8 && est.confidence > 60)
-    return { allowed: true, reason: 'Age accepted — flagged for review.', estimatedAge: est.estimatedAge, statedAge: age, requiresManualReview: true };
-
+  if (difference > 8 && est.confidence > 60) return { allowed: true, reason: 'Age accepted — flagged for review.', estimatedAge: est.estimatedAge, statedAge: age, requiresManualReview: true };
   return { allowed: true, reason: 'Age verified.', estimatedAge: est.estimatedAge, statedAge: age, requiresManualReview: false };
 }

@@ -1,13 +1,10 @@
 // utils/stories.ts
-import {
-  addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs,
-  increment, onSnapshot, query, updateDoc, where, writeBatch,
-} from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { uploadToCloudinary } from './cloudinaryUpload';
+import { logger } from './logger';
 import { checkImageSafety, checkTextSafety, checkVideoFramesSafety, detectEmojiCodedLanguage, detectEmojiSpam, ocrThenModerate } from './moderation';
 import { analyzeMessageTiming } from './rateLimiter';
-import { logger } from './logger';
 
 export const STORY_DURATION_HOURS = 24;
 
@@ -18,10 +15,7 @@ export interface Story {
   viewCount: number; viewTimestamps?: number[]; flagged?: boolean;
 }
 
-export interface StoryGroup {
-  userId: string; userName: string; userPhoto: string;
-  stories: Story[]; hasUnviewed: boolean; latestAt: string;
-}
+export interface StoryGroup { userId: string; userName: string; userPhoto: string; stories: Story[]; hasUnviewed: boolean; latestAt: string; }
 
 function requireAuth() { const u = auth.currentUser; if (!u) throw new Error('Not authenticated'); return u; }
 function storyRef(id: string) { return doc(db, 'stories', id); }
@@ -29,14 +23,14 @@ function storiesCol() { return collection(db, 'stories'); }
 function computeExpiry(from = new Date()) { return new Date(from.getTime() + STORY_DURATION_HOURS * 3_600_000); }
 
 async function getMatchedUserIds(userId: string): Promise<Set<string>> {
-  const likesCol = collection(db, 'likes');
+  const col = collection(db, 'likes');
   const [fromSnap, toSnap] = await Promise.all([
-    getDocs(query(likesCol, where('fromUserId', '==', userId), where('status', '==', 'matched'))),
-    getDocs(query(likesCol, where('toUserId', '==', userId), where('status', '==', 'matched'))),
+    getDocs(query(col, where('fromUserId', '==', userId), where('status', '==', 'matched'))),
+    getDocs(query(col, where('toUserId', '==', userId), where('status', '==', 'matched'))),
   ]);
   const ids = new Set<string>();
-  fromSnap.forEach(d => ids.add(d.data().toUserId));
-  toSnap.forEach(d => ids.add(d.data().fromUserId));
+  fromSnap.forEach(d => ids.add(d.data().toUserId as string));
+  toSnap.forEach(d => ids.add(d.data().fromUserId as string));
   return ids;
 }
 
@@ -48,7 +42,6 @@ function sortStories(stories: Story[], uid: string) {
   });
 }
 
-// ── Caption safety: #20, #21, #53, #168 ──────────────────
 function checkCaption(caption: string): { safe: boolean; reason?: string } {
   if (!caption?.trim()) return { safe: true };
   const emojiCheck = detectEmojiSpam(caption, 0.6);
@@ -62,14 +55,12 @@ function checkCaption(caption: string): { safe: boolean; reason?: string } {
   return { safe: true };
 }
 
-// ── Create: #4, #5, #20, #21, #53, #168 ─────────────────
 export async function createStory(mediaUri: string, mediaType: 'photo' | 'video', caption?: string): Promise<{ success: boolean; storyId?: string; error?: string }> {
   try {
     const user = requireAuth();
     if (mediaType === 'photo') {
       const safety = await checkImageSafety(mediaUri, 'story');
       if (!safety.safe) return { success: false, error: safety.reason ?? 'Content rejected.' };
-      // #21: OCR hate speech scan on story photos
       const ocrCheck = await ocrThenModerate(mediaUri);
       if (!ocrCheck.safe) return { success: false, error: ocrCheck.reason ?? 'Image contains prohibited text.' };
     }
@@ -92,7 +83,7 @@ export async function createStory(mediaUri: string, mediaType: 'photo' | 'video'
     };
     const ref = await addDoc(storiesCol(), story);
     return { success: true, storyId: ref.id };
-  } catch (e: any) { logger.error('[Stories] create error:', e); return { success: false, error: e.message }; }
+  } catch (e: unknown) { logger.error('[Stories] create error:', e); return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
 }
 
 export async function getActiveStories(userId: string): Promise<Story[]> {
@@ -104,12 +95,11 @@ export async function getActiveStories(userId: string): Promise<Story[]> {
     snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
     sortStories(stories, userId);
     return stories;
-  } catch (e) { logger.error('[Stories] getActive error:', e); return []; }
+  } catch (e: unknown) { logger.error('[Stories] getActive error:', e); return []; }
 }
 
 export function subscribeToActiveStories(userId: string, onUpdate: (s: Story[]) => void): () => void {
-  const now = new Date().toISOString();
-  const q = query(storiesCol(), where('expiresAt', '>', now));
+  const q = query(storiesCol(), where('expiresAt', '>', new Date().toISOString()));
   let matchIds = new Set<string>();
   getMatchedUserIds(userId).then(ids => { matchIds = ids; }).catch(() => {});
   return onSnapshot(q, snap => {
@@ -124,7 +114,10 @@ export function groupStoriesByUser(stories: Story[], currentUserId: string): Sto
   const map = new Map<string, StoryGroup>();
   for (const story of stories) {
     let group = map.get(story.userId);
-    if (!group) { group = { userId: story.userId, userName: story.userId === currentUserId ? 'Your Story' : story.userName, userPhoto: story.userPhoto, stories: [], hasUnviewed: false, latestAt: story.createdAt }; map.set(story.userId, group); }
+    if (!group) {
+      group = { userId: story.userId, userName: story.userId === currentUserId ? 'Your Story' : story.userName, userPhoto: story.userPhoto, stories: [], hasUnviewed: false, latestAt: story.createdAt };
+      map.set(story.userId, group);
+    }
     group.stories.push(story);
     if (!story.views.includes(currentUserId) && story.userId !== currentUserId) group.hasUnviewed = true;
     if (story.createdAt > group.latestAt) group.latestAt = story.createdAt;
@@ -132,7 +125,6 @@ export function groupStoriesByUser(stories: Story[], currentUserId: string): Sto
   return Array.from(map.values()).sort((a, b) => { if (a.userId === currentUserId) return -1; if (b.userId === currentUserId) return 1; return new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime(); });
 }
 
-// ── Mark viewed: #178 bot story view detection ───────────
 export async function markStoryViewed(storyId: string): Promise<void> {
   try {
     const user = requireAuth();
@@ -143,12 +135,12 @@ export async function markStoryViewed(storyId: string): Promise<void> {
     if (data.userId === user.uid || data.views.includes(user.uid)) return;
     const now = Date.now();
     await updateDoc(ref, { views: arrayUnion(user.uid), viewCount: increment(1), viewTimestamps: arrayUnion(now) });
-    const timestamps: number[] = [...(data.viewTimestamps ?? []), now];
+    const timestamps = [...(data.viewTimestamps ?? []), now];
     if (timestamps.length >= 5) {
       const botCheck = analyzeMessageTiming(timestamps);
       if (botCheck.isBot) { logger.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`); await updateDoc(ref, { flagged: true }).catch(() => {}); }
     }
-  } catch (e) { logger.error('[Stories] markViewed error:', e); }
+  } catch (e: unknown) { logger.error('[Stories] markViewed error:', e); }
 }
 
 export async function deleteStory(storyId: string): Promise<{ success: boolean; error?: string }> {
@@ -160,7 +152,7 @@ export async function deleteStory(storyId: string): Promise<{ success: boolean; 
     if ((snap.data() as Story).userId !== user.uid) return { success: false, error: "Cannot delete another user's story" };
     await deleteDoc(ref);
     return { success: true };
-  } catch (e: any) { logger.error('[Stories] delete error:', e); return { success: false, error: e.message }; }
+  } catch (e: unknown) { logger.error('[Stories] delete error:', e); return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
 }
 
 export async function cleanupExpiredStories(): Promise<number> {
@@ -174,9 +166,9 @@ export async function cleanupExpiredStories(): Promise<number> {
       await batch.commit();
       deleted += Math.min(500, snap.docs.length - i);
     }
-    if (deleted > 0) logger.log(`[Stories] cleaned up ${deleted} expired stories`);
+    if (deleted > 0) logger.warn(`[Stories] cleaned up ${deleted} expired stories`);
     return deleted;
-  } catch (e) { logger.error('[Stories] cleanup error:', e); return 0; }
+  } catch (e: unknown) { logger.error('[Stories] cleanup error:', e); return 0; }
 }
 
 export function detectGhostStories(stories: Story[]): Story[] {

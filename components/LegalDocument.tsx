@@ -4,16 +4,22 @@
  * Reusable shell for legal / policy screens (Terms of Service, Privacy
  * Policy, etc.). Accepts a data-driven content array so individual screens
  * contain zero layout or styling code.
+ *
+ * Features:
+ *  - Auto-detects URLs in text and makes them tappable
+ *  - Renders empty strings as clean spacers
+ *  - Bullet groups with optional heading / footer
  */
 
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -46,6 +52,7 @@ const Colors = {
   textPrimary: '#eeeeee',
   textBody: '#cccccc',
   textMuted: '#888888',
+  link: '#6bc5d4',
 } as const;
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 } as const;
@@ -56,12 +63,78 @@ function isBulletGroup(value: string | BulletGroup): value is BulletGroup {
   return typeof value !== 'string' && 'items' in value;
 }
 
+/** Matches http:// or https:// URLs inside a string. */
+const URL_REGEX = /(https?:\/\/[^\s,\.)]+)/g;
+
+/**
+ * Splits a string into text segments and URL segments so URLs can be
+ * rendered as tappable links while preserving surrounding text.
+ */
+function parseSegments(text: string): readonly { readonly url?: string; readonly value: string }[] {
+  const segments: { url?: string; value: string }[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(URL_REGEX)) {
+    const index = match.index!;
+    if (index > lastIndex) {
+      segments.push({ value: text.slice(lastIndex, index) });
+    }
+    segments.push({ url: match[0], value: match[0] });
+    lastIndex = index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ value: text.slice(lastIndex) });
+  }
+
+  return segments;
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
+
+/**
+ * Renders a string that may contain URLs as tappable links.
+ * Falls back to a plain <Text> when no URLs are present (fast path).
+ */
+const RichText = React.memo(function RichText({
+  text,
+  style,
+}: {
+  readonly text: string;
+  readonly style: unknown;
+}) {
+  const segments = parseSegments(text);
+
+  // Fast path — no URLs, just render plain text.
+  if (segments.length <= 1 && !segments[0]?.url) {
+    return <Text style={style as any}>{text}</Text>;
+  }
+
+  return (
+    <Text style={style as any}>
+      {segments.map((seg, i) =>
+        seg.url ? (
+          <Text
+            key={i}
+            style={styles.link}
+            onPress={() => Linking.openURL(seg.url!)}
+            accessibilityRole="link"
+            accessibilityHint={`Open ${seg.url}`}
+          >
+            {seg.value}
+          </Text>
+        ) : (
+          <Text key={i}>{seg.value}</Text>
+        ),
+      )}
+    </Text>
+  );
+});
 
 const BulletList = React.memo(function BulletList({
   group,
 }: {
-  group: BulletGroup;
+  readonly group: BulletGroup;
 }) {
   return (
     <View style={styles.bulletGroup}>
@@ -72,14 +145,12 @@ const BulletList = React.memo(function BulletList({
       {group.items.map((item, i) => (
         <View key={i} style={styles.bulletRow}>
           <Text style={styles.bullet}>•</Text>
-          <Text style={styles.bulletText}>{item}</Text>
+          <RichText text={item} style={styles.bulletText} />
         </View>
       ))}
 
       {group.footer ? (
-        <Text style={[styles.paragraph, styles.bulletFooter]}>
-          {group.footer}
-        </Text>
+        <RichText text={group.footer} style={[styles.paragraph, styles.bulletFooter]} />
       ) : null}
     </View>
   );
@@ -88,19 +159,20 @@ const BulletList = React.memo(function BulletList({
 const Section = React.memo(function Section({
   section,
 }: {
-  section: LegalSection;
+  readonly section: LegalSection;
 }) {
   return (
     <View style={styles.section} accessibilityRole="summary">
       <Text style={styles.sectionTitle}>{section.title}</Text>
 
       {section.paragraphs.map((block, i) =>
-        isBulletGroup(block) ? (
+        block === '' ? (
+          // Empty string → clean vertical spacer
+          <View key={i} style={styles.spacer} />
+        ) : isBulletGroup(block) ? (
           <BulletList key={i} group={block} />
         ) : (
-          <Text key={i} style={styles.paragraph}>
-            {block}
-          </Text>
+          <RichText key={i} text={block} style={styles.paragraph} />
         ),
       )}
     </View>
@@ -231,6 +303,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 6,
   },
+  spacer: {
+    height: 10,
+  },
   bulletGroup: {
     marginTop: 4,
   },
@@ -253,6 +328,10 @@ const styles = StyleSheet.create({
   },
   bulletFooter: {
     marginTop: 8,
+  },
+  link: {
+    color: Colors.link,
+    textDecorationLine: 'underline',
   },
   footer: {
     marginTop: 30,

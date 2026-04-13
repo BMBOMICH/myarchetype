@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, FlatList, Image, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { auth } from '../firebaseConfig';
 import { DateSpotReview, getDateSpotReviews, likeReview, submitDateSpotReview } from '../utils/dateSpotReviews';
 import { logger } from '../utils/logger';
 
@@ -26,13 +27,15 @@ const DEFAULT_FORM: FormState = {
 };
 
 export default function DateSpotReviewsScreen() {
-  const router = useRouter();
-  const [loading, setLoading]     = useState(true);
-  const [reviews, setReviews]     = useState<DateSpotReview[]>([]);
-  const [showCreate, setCreate]   = useState(false);
+  const router  = useRouter();
+  const currentUserId = auth.currentUser?.uid ?? '';
+
+  const [loading, setLoading]       = useState(true);
+  const [reviews, setReviews]       = useState<DateSpotReview[]>([]);
+  const [showCreate, setCreate]     = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [filterType, setFilterType]   = useState<string | null>(null);
-  const [form, setForm]           = useState<FormState>(DEFAULT_FORM);
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [form, setForm]             = useState<FormState>(DEFAULT_FORM);
 
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -90,6 +93,15 @@ export default function DateSpotReviewsScreen() {
     }
   }, [loadReviews]);
 
+  const handleBackFromCreate = useCallback(() => setCreate(false), []);
+  const handleOpenCreate     = useCallback(() => setCreate(true), []);
+  const handleBack           = useCallback(() => router.back(), [router]);
+  const handleFilterAll      = useCallback(() => setFilterType(null), []);
+
+  const handlePlaceNameChange    = useCallback((v: string) => setField('placeName', v), [setField]);
+  const handlePlaceAddressChange = useCallback((v: string) => setField('placeAddress', v), [setField]);
+  const handleReviewTextChange   = useCallback((v: string) => setField('reviewText', v), [setField]);
+
   const renderStars = useCallback((count: number, onPress?: (n: number) => void) => (
     <View style={styles.stars}>
       {[1, 2, 3, 4, 5].map((n) => (
@@ -106,8 +118,70 @@ export default function DateSpotReviewsScreen() {
     </View>
   ), []);
 
+  const renderReviewItem = useCallback(({ item }: { item: DateSpotReview }) => (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewHeader}>
+        <View style={styles.reviewHeaderLeft}>
+          {item.userPhoto && (
+            <Image
+              source={{ uri: item.userPhoto }}
+              style={styles.reviewUserPhoto}
+              accessibilityLabel={`Photo of ${item.userName}`}
+            />
+          )}
+          <View>
+            <Text style={styles.reviewUserName}>{item.userName}</Text>
+            <Text style={styles.reviewDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+        </View>
+        <Text style={styles.reviewPrice}>{item.priceRange}</Text>
+      </View>
+
+      <Text style={styles.reviewPlaceName}>{item.placeName}</Text>
+      <Text style={styles.reviewPlaceAddress}>{item.placeAddress}</Text>
+
+      <View style={styles.reviewRatings}>
+        {renderStars(item.rating)}
+        <Text style={styles.reviewAtmosphere}>Atmosphere: {item.atmosphere}/5</Text>
+      </View>
+
+      <Text style={styles.reviewText}>{item.review}</Text>
+
+      {item.goodFor.length > 0 && (
+        <View style={styles.reviewTags}>
+          {item.goodFor.map((tag, i) => (
+            <View key={i} style={styles.reviewTag}>
+              <Text style={styles.reviewTagText}>{tag.replace('_', ' ')}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={styles.likeButton}
+        onPress={() => handleLike(item.id)}
+        accessibilityLabel={`Like this review, ${item.likes} likes`}
+        accessibilityRole="button"
+      >
+        <Text style={styles.likeButtonText}>
+          {item.likedBy?.includes(currentUserId) ? '❤️' : '🤍'} {item.likes}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  ), [renderStars, handleLike, currentUserId]);
+
+  const renderEmpty = useCallback(() => (
+    <View style={styles.emptyContainer} accessibilityLabel="No reviews yet">
+      <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
+    </View>
+  ), []);
+
   if (loading && reviews.length === 0) {
-    return <View style={styles.container}><ActivityIndicator size="large" color="#53a8b6" /></View>;
+    return (
+      <View style={styles.container} accessibilityLabel="Loading reviews">
+        <ActivityIndicator size="large" color="#53a8b6" />
+      </View>
+    );
   }
 
   // ── Create form ───────────────────────────────────────
@@ -115,34 +189,33 @@ export default function DateSpotReviewsScreen() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setCreate(false)} accessibilityLabel="Go back" accessibilityRole="button">
+          <TouchableOpacity onPress={handleBackFromCreate} accessibilityLabel="Go back" accessibilityRole="button">
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Review a Spot</Text>
-          <View style={{ width: 50 }} />
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Place Name *</Text>
-          <TextInput style={styles.input} placeholder="Restaurant/cafe name" placeholderTextColor="#666" value={form.placeName} onChangeText={(v) => setField('placeName', v)} accessibilityLabel="Place name" />
+          <TextInput
+            style={styles.input} placeholder="Restaurant/cafe name" placeholderTextColor="#666"
+            value={form.placeName} onChangeText={handlePlaceNameChange} accessibilityLabel="Place name"
+          />
         </View>
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Address *</Text>
-          <TextInput style={styles.input} placeholder="Street address or area" placeholderTextColor="#666" value={form.placeAddress} onChangeText={(v) => setField('placeAddress', v)} accessibilityLabel="Place address" />
+          <TextInput
+            style={styles.input} placeholder="Street address or area" placeholderTextColor="#666"
+            value={form.placeAddress} onChangeText={handlePlaceAddressChange} accessibilityLabel="Place address"
+          />
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Type</Text>
           <View style={styles.chipsContainer}>
             {PLACE_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type} style={[styles.chip, form.placeType === type && styles.chipSelected]}
-                onPress={() => setField('placeType', type)}
-                accessibilityLabel={`Place type: ${type}${form.placeType === type ? ', selected' : ''}`}
-                accessibilityRole="button" accessibilityState={{ selected: form.placeType === type }}
-              >
-                <Text style={[styles.chipText, form.placeType === type && styles.chipTextSelected]}>{type}</Text>
-              </TouchableOpacity>
+              <PlaceTypeChip key={type} type={type} selected={form.placeType === type} onPress={setField} />
             ))}
           </View>
         </View>
@@ -160,14 +233,7 @@ export default function DateSpotReviewsScreen() {
           <Text style={styles.inputLabel}>Price Range</Text>
           <View style={styles.chipsContainer}>
             {PRICE_RANGES.map((price) => (
-              <TouchableOpacity
-                key={price} style={[styles.chip, form.priceRange === price && styles.chipSelected]}
-                onPress={() => setField('priceRange', price)}
-                accessibilityLabel={`Price range: ${price}${form.priceRange === price ? ', selected' : ''}`}
-                accessibilityRole="button" accessibilityState={{ selected: form.priceRange === price }}
-              >
-                <Text style={[styles.chipText, form.priceRange === price && styles.chipTextSelected]}>{price}</Text>
-              </TouchableOpacity>
+              <PriceRangeChip key={price} price={price} selected={form.priceRange === price} onPress={setField} />
             ))}
           </View>
         </View>
@@ -175,19 +241,14 @@ export default function DateSpotReviewsScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Good For</Text>
           <View style={styles.chipsContainer}>
-            {GOOD_FOR.map((tag) => {
-              const selected = form.selectedGoodFor.includes(tag);
-              return (
-                <TouchableOpacity
-                  key={tag} style={[styles.chip, selected && styles.chipSelected]}
-                  onPress={() => setField('selectedGoodFor', selected ? form.selectedGoodFor.filter(t => t !== tag) : [...form.selectedGoodFor, tag])}
-                  accessibilityLabel={`${tag.replace('_', ' ')}${selected ? ', selected' : ''}`}
-                  accessibilityRole="button" accessibilityState={{ selected }}
-                >
-                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{tag.replace('_', ' ')}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {GOOD_FOR.map((tag) => (
+              <GoodForChip
+                key={tag} tag={tag}
+                selected={form.selectedGoodFor.includes(tag)}
+                selectedGoodFor={form.selectedGoodFor}
+                onPress={setField}
+              />
+            ))}
           </View>
         </View>
 
@@ -196,7 +257,7 @@ export default function DateSpotReviewsScreen() {
           <TextInput
             style={[styles.input, styles.textArea]} placeholder="Share your experience..."
             placeholderTextColor="#666" value={form.reviewText}
-            onChangeText={(v) => setField('reviewText', v)}
+            onChangeText={handleReviewTextChange}
             multiline numberOfLines={6} accessibilityLabel="Review text"
           />
         </View>
@@ -205,10 +266,11 @@ export default function DateSpotReviewsScreen() {
           style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
           onPress={handleSubmit} disabled={submitting}
           accessibilityLabel="Post review" accessibilityRole="button"
+          accessibilityState={{ disabled: submitting }}
         >
           <Text style={styles.submitButtonText}>{submitting ? 'Posting...' : '✓ Post Review'}</Text>
         </TouchableOpacity>
-        <View style={{ height: 40 }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     );
   }
@@ -217,11 +279,11 @@ export default function DateSpotReviewsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity onPress={handleBack} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>📍 Date Spots</Text>
-        <TouchableOpacity onPress={() => setCreate(true)} accessibilityLabel="Add a review" accessibilityRole="button">
+        <TouchableOpacity onPress={handleOpenCreate} accessibilityLabel="Add a review" accessibilityRole="button">
           <Text style={styles.addButton}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -229,21 +291,14 @@ export default function DateSpotReviewsScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
         <TouchableOpacity
           style={[styles.filterChip, !filterType && styles.filterChipActive]}
-          onPress={() => setFilterType(null)}
+          onPress={handleFilterAll}
           accessibilityLabel="Show all types" accessibilityRole="button"
           accessibilityState={{ selected: !filterType }}
         >
           <Text style={[styles.filterChipText, !filterType && styles.filterChipTextActive]}>All</Text>
         </TouchableOpacity>
         {PLACE_TYPES.map((type) => (
-          <TouchableOpacity
-            key={type} style={[styles.filterChip, filterType === type && styles.filterChipActive]}
-            onPress={() => setFilterType(type)}
-            accessibilityLabel={`Filter by ${type}`} accessibilityRole="button"
-            accessibilityState={{ selected: filterType === type }}
-          >
-            <Text style={[styles.filterChipText, filterType === type && styles.filterChipTextActive]}>{type}</Text>
-          </TouchableOpacity>
+          <FilterChip key={type} type={type} active={filterType === type} onPress={setFilterType} />
         ))}
       </ScrollView>
 
@@ -251,111 +306,136 @@ export default function DateSpotReviewsScreen() {
         data={reviews}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <View style={styles.reviewCard}>
-            <View style={styles.reviewHeader}>
-              <View style={styles.reviewHeaderLeft}>
-                {item.userPhoto && (
-                  <Image
-                    source={{ uri: item.userPhoto }}
-                    style={styles.reviewUserPhoto}
-                    accessibilityLabel={`Photo of ${item.userName}`}
-                  />
-                )}
-                <View>
-                  <Text style={styles.reviewUserName}>{item.userName}</Text>
-                  <Text style={styles.reviewDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-                </View>
-              </View>
-              <Text style={styles.reviewPrice}>{item.priceRange}</Text>
-            </View>
-
-            <Text style={styles.reviewPlaceName}>{item.placeName}</Text>
-            <Text style={styles.reviewPlaceAddress}>{item.placeAddress}</Text>
-
-            <View style={styles.reviewRatings}>
-              {renderStars(item.rating)}
-              <Text style={styles.reviewAtmosphere}>Atmosphere: {item.atmosphere}/5</Text>
-            </View>
-
-            <Text style={styles.reviewText}>{item.review}</Text>
-
-            {item.goodFor.length > 0 && (
-              <View style={styles.reviewTags}>
-                {item.goodFor.map((tag, i) => (
-                  <View key={i} style={styles.reviewTag}>
-                    <Text style={styles.reviewTagText}>{tag.replace('_', ' ')}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.likeButton}
-              onPress={() => handleLike(item.id)}
-              accessibilityLabel={`Like this review, ${item.likes} likes`}
-              accessibilityRole="button"
-            >
-              <Text style={styles.likeButtonText}>
-                {item.likedBy?.includes('current_user_id') ? '❤️' : '🤍'} {item.likes}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        ListEmptyComponent={renderEmpty}
+        renderItem={renderReviewItem}
       />
     </View>
   );
 }
 
+// ── Sub-components to avoid inline functions ──────────────
+
+const PlaceTypeChip = React.memo(({ type, selected, onPress }: {
+  type: PlaceType; selected: boolean; onPress: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+}) => {
+  const handlePress = useCallback(() => onPress('placeType', type), [onPress, type]);
+  return (
+    <TouchableOpacity
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={handlePress}
+      accessibilityLabel={`Place type: ${type}${selected ? ', selected' : ''}`}
+      accessibilityRole="button" accessibilityState={{ selected }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{type}</Text>
+    </TouchableOpacity>
+  );
+});
+PlaceTypeChip.displayName = 'PlaceTypeChip';
+
+const PriceRangeChip = React.memo(({ price, selected, onPress }: {
+  price: PriceRange; selected: boolean; onPress: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+}) => {
+  const handlePress = useCallback(() => onPress('priceRange', price), [onPress, price]);
+  return (
+    <TouchableOpacity
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={handlePress}
+      accessibilityLabel={`Price range: ${price}${selected ? ', selected' : ''}`}
+      accessibilityRole="button" accessibilityState={{ selected }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{price}</Text>
+    </TouchableOpacity>
+  );
+});
+PriceRangeChip.displayName = 'PriceRangeChip';
+
+const GoodForChip = React.memo(({ tag, selected, selectedGoodFor, onPress }: {
+  tag: string; selected: boolean; selectedGoodFor: string[];
+  onPress: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+}) => {
+  const handlePress = useCallback(() => {
+    onPress('selectedGoodFor', selected
+      ? selectedGoodFor.filter(t => t !== tag)
+      : [...selectedGoodFor, tag],
+    );
+  }, [onPress, selected, selectedGoodFor, tag]);
+
+  return (
+    <TouchableOpacity
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={handlePress}
+      accessibilityLabel={`${tag.replace('_', ' ')}${selected ? ', selected' : ''}`}
+      accessibilityRole="button" accessibilityState={{ selected }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{tag.replace('_', ' ')}</Text>
+    </TouchableOpacity>
+  );
+});
+GoodForChip.displayName = 'GoodForChip';
+
+const FilterChip = React.memo(({ type, active, onPress }: {
+  type: string; active: boolean; onPress: (type: string) => void;
+}) => {
+  const handlePress = useCallback(() => onPress(type), [onPress, type]);
+  return (
+    <TouchableOpacity
+      style={[styles.filterChip, active && styles.filterChipActive]}
+      onPress={handlePress}
+      accessibilityLabel={`Filter by ${type}`} accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{type}</Text>
+    </TouchableOpacity>
+  );
+});
+FilterChip.displayName = 'FilterChip';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
-  content: { padding: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, backgroundColor: '#16213e' },
-  backButton: { color: '#53a8b6', fontSize: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#eee' },
-  addButton: { color: '#5cb85c', fontSize: 16, fontWeight: 'bold' },
-  filtersScroll: { paddingHorizontal: 15, paddingVertical: 10, maxHeight: 60 },
-  filterChip: { backgroundColor: '#16213e', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#0f3460' },
-  filterChipActive: { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
-  filterChipText: { color: '#888', fontSize: 14 },
+  container:          { flex: 1, backgroundColor: '#1a1a2e' },
+  content:            { padding: 20 },
+  header:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, backgroundColor: '#16213e' },
+  headerSpacer:       { width: 50 },
+  bottomSpacer:       { height: 40 },
+  backButton:         { color: '#53a8b6', fontSize: 16 },
+  title:              { fontSize: 20, fontWeight: 'bold', color: '#eee' },
+  addButton:          { color: '#5cb85c', fontSize: 16, fontWeight: 'bold' },
+  filtersScroll:      { paddingHorizontal: 15, paddingVertical: 10, maxHeight: 60 },
+  filterChip:         { backgroundColor: '#16213e', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#0f3460' },
+  filterChipActive:   { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
+  filterChipText:     { color: '#888', fontSize: 14 },
   filterChipTextActive: { color: '#fff' },
-  list: { padding: 15, paddingBottom: 40 },
-  reviewCard: { backgroundColor: '#16213e', borderRadius: 15, padding: 15, marginBottom: 15 },
-  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  reviewHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  reviewUserPhoto: { width: 40, height: 40, borderRadius: 20 },
-  reviewUserName: { color: '#eee', fontSize: 14, fontWeight: '600' },
-  reviewDate: { color: '#666', fontSize: 12 },
-  reviewPrice: { color: '#e67e22', fontSize: 16, fontWeight: 'bold' },
-  reviewPlaceName: { fontSize: 18, fontWeight: 'bold', color: '#eee', marginBottom: 4 },
+  list:               { padding: 15, paddingBottom: 40 },
+  reviewCard:         { backgroundColor: '#16213e', borderRadius: 15, padding: 15, marginBottom: 15 },
+  reviewHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  reviewHeaderLeft:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reviewUserPhoto:    { width: 40, height: 40, borderRadius: 20 },
+  reviewUserName:     { color: '#eee', fontSize: 14, fontWeight: '600' },
+  reviewDate:         { color: '#666', fontSize: 12 },
+  reviewPrice:        { color: '#e67e22', fontSize: 16, fontWeight: 'bold' },
+  reviewPlaceName:    { fontSize: 18, fontWeight: 'bold', color: '#eee', marginBottom: 4 },
   reviewPlaceAddress: { fontSize: 14, color: '#888', marginBottom: 10 },
-  reviewRatings: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  reviewAtmosphere: { color: '#888', fontSize: 12 },
-  reviewText: { color: '#aaa', fontSize: 14, lineHeight: 20, marginBottom: 10 },
-  reviewTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  reviewTag: { backgroundColor: '#53a8b6', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
-  reviewTagText: { color: '#fff', fontSize: 11 },
-  likeButton: { alignSelf: 'flex-start' },
-  likeButtonText: { color: '#e74c3c', fontSize: 14 },
-  inputGroup: { marginBottom: 20 },
-  inputLabel: { color: '#888', fontSize: 14, marginBottom: 8 },
-  input: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, color: '#eee', fontSize: 16, borderWidth: 1, borderColor: '#0f3460' },
-  textArea: { height: 120, textAlignVertical: 'top' },
-  chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
-  chipSelected: { backgroundColor: '#53a8b6' },
-  chipText: { color: '#888', fontSize: 14 },
-  chipTextSelected: { color: '#fff' },
-  stars: { flexDirection: 'row', gap: 5 },
-  star: { fontSize: 24 },
-  submitButton: { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center' },
+  reviewRatings:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  reviewAtmosphere:   { color: '#888', fontSize: 12 },
+  reviewText:         { color: '#aaa', fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  reviewTags:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  reviewTag:          { backgroundColor: '#53a8b6', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
+  reviewTagText:      { color: '#fff', fontSize: 11 },
+  likeButton:         { alignSelf: 'flex-start' },
+  likeButtonText:     { color: '#e74c3c', fontSize: 14 },
+  inputGroup:         { marginBottom: 20 },
+  inputLabel:         { color: '#888', fontSize: 14, marginBottom: 8 },
+  input:              { backgroundColor: '#16213e', borderRadius: 12, padding: 14, color: '#eee', fontSize: 16, borderWidth: 1, borderColor: '#0f3460' },
+  textArea:           { height: 120, textAlignVertical: 'top' },
+  chipsContainer:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:               { backgroundColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
+  chipSelected:       { backgroundColor: '#53a8b6' },
+  chipText:           { color: '#888', fontSize: 14 },
+  chipTextSelected:   { color: '#fff' },
+  stars:              { flexDirection: 'row', gap: 5 },
+  star:               { fontSize: 24 },
+  submitButton:         { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center' },
   submitButtonDisabled: { backgroundColor: '#555' },
-  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  emptyContainer: { padding: 40, alignItems: 'center' },
-  emptyText: { color: '#888', fontSize: 14 },
+  submitButtonText:     { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  emptyContainer:     { padding: 40, alignItems: 'center' },
+  emptyText:          { color: '#888', fontSize: 14 },
 });

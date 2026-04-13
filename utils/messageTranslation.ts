@@ -1,64 +1,36 @@
 import { logger } from './logger';
-// Using MyMemory Free Translation API (no API key needed, 10,000 chars/day)
-// https://mymemory.translated.net/doc/spec.php
 
 const TRANSLATE_API = 'https://api.mymemory.translated.net/get';
 
-export interface TranslationResult {
-  success: boolean;
-  translatedText?: string;
-  detectedLanguage?: string;
-  error?: string;
+export interface TranslationResult { success: boolean; translatedText?: string; detectedLanguage?: string; error?: string; }
+
+interface MyMemoryResponse {
+  responseStatus: number;
+  responseData?: { translatedText: string; detectedLanguage?: string };
+  responseDetails?: string;
 }
 
-export async function translateMessage(
-  text: string,
-  targetLang: string = 'en'
-): Promise<TranslationResult> {
+export async function translateMessage(text: string, targetLang = 'en'): Promise<TranslationResult> {
   try {
-    // Auto-detect source language by using 'auto'
-    const response = await fetch(
-      `${TRANSLATE_API}?q=${encodeURIComponent(text)}&langpair=autodetect|${targetLang}`
-    );
-
-    const data = await response.json();
-
+    const res = await fetch(`${TRANSLATE_API}?q=${encodeURIComponent(text)}&langpair=autodetect|${targetLang}`);
+    const data = await res.json() as MyMemoryResponse;
     if (data.responseStatus === 200 && data.responseData) {
-      return {
-        success: true,
-        translatedText: data.responseData.translatedText,
-        detectedLanguage: data.responseData.detectedLanguage,
-      };
+      return { success: true, translatedText: data.responseData.translatedText, detectedLanguage: data.responseData.detectedLanguage };
     }
-
-    return {
-      success: false,
-      error: data.responseDetails || 'Translation failed',
-    };
-  } catch (error: any) {
+    return { success: false, error: data.responseDetails ?? 'Translation failed' };
+  } catch (error: unknown) {
     logger.error('Translation error:', error);
-    return {
-      success: false,
-      error: error.message || 'Translation failed',
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Translation failed' };
   }
 }
 
 export function detectLanguage(text: string): string {
-  // Simple language detection based on character sets
-  const cyrillicRegex = /[\u0400-\u04FF]/;
-  const arabicRegex = /[\u0600-\u06FF]/;
-  const chineseRegex = /[\u4E00-\u9FFF]/;
-  const turkishChars = /[ğĞıİöÖüÜşŞçÇ]/;
-  const azerbaijaniChars = /[əƏ]/;
-
-  if (azerbaijaniChars.test(text)) return 'az';
-  if (cyrillicRegex.test(text)) return 'ru';
-  if (arabicRegex.test(text)) return 'ar';
-  if (chineseRegex.test(text)) return 'zh';
-  if (turkishChars.test(text)) return 'tr';
-  
-  return 'en'; // Default to English
+  if (/[əƏ]/.test(text)) return 'az';
+  if (/[\u0400-\u04FF]/.test(text)) return 'ru';
+  if (/[\u0600-\u06FF]/.test(text)) return 'ar';
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+  if (/[ğĞıİöÖüÜşŞçÇ]/.test(text)) return 'tr';
+  return 'en';
 }
 
 export const SUPPORTED_LANGUAGES = [

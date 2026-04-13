@@ -1,189 +1,113 @@
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import {
-    calculateProfileCompletion,
-    getCompletionColor,
-    getCompletionMessage,
-} from '../utils/profileCompletion';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { logger } from '../utils/logger';
+import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
 
-interface ProfileCompletionCardProps {
-  userData: any;
-  showDetails?: boolean;
-}
+interface ProfileStrengthBarProps { onPress?: () => void; compact?: boolean; }
 
-export default function ProfileCompletionCard({
-  userData,
-  showDetails = true,
-}: ProfileCompletionCardProps) {
-  const router = useRouter();
-  const completion = calculateProfileCompletion(userData);
-  const color = getCompletionColor(completion.percentage);
-  const message = getCompletionMessage(completion.percentage);
+export default function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
+  const [loading,  setLoading]  = useState(true);
+  const [strength, setStrength] = useState<ProfileStrengthResult | null>(null);
+  const [error,    setError]    = useState<string | null>(null);
 
-  if (completion.percentage >= 100 && !showDetails) {
-    return null; // Don't show if complete and not in detail mode
+  const loadStrength = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setStrength(await calculateProfileStrength());
+    } catch (err: unknown) {
+      logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
+      setError('Could not load profile strength');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadStrength(); }, [loadStrength]);
+
+  if (loading) return <View style={styles.container}><ActivityIndicator size="small" color="#53a8b6" /></View>;
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={() => void loadStrength()} accessibilityLabel="Retry loading profile strength" accessibilityRole="button">
+          <Text style={styles.retryText}>Tap to retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!strength) return null;
+
+  const Container = onPress ? TouchableOpacity : View;
+
+  if (compact) {
+    return (
+      <Container style={styles.compactContainer} onPress={onPress} accessibilityLabel={`Profile strength: ${strength.percentage}%`} accessibilityRole={onPress ? 'button' : 'none'}>
+        <View style={styles.compactHeader}>
+          <Text style={styles.compactLabel}>Profile Strength</Text>
+          <Text style={[styles.compactPercentage, { color: strength.color }]}>{strength.percentage}%</Text>
+        </View>
+        <View style={styles.barContainer}>
+          <View style={styles.barBackground}>
+            <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+          </View>
+        </View>
+      </Container>
+    );
   }
 
   return (
-    <View style={styles.container}>
+    <Container style={styles.container} onPress={onPress} accessibilityLabel={`Profile strength: ${strength.level}, ${strength.percentage}%`} accessibilityRole={onPress ? 'button' : 'none'}>
       <View style={styles.header}>
-        <Text style={styles.title}>Profile Completion</Text>
-        <Text style={[styles.percentage, { color }]}>{completion.percentage}%</Text>
-      </View>
-
-      {/* Progress Bar */}
-      <View style={styles.progressBarBg}>
-        <View
-          style={[
-            styles.progressBarFill,
-            { width: `${completion.percentage}%`, backgroundColor: color },
-          ]}
-        />
-      </View>
-
-      <Text style={styles.message}>{message}</Text>
-
-      {/* Missing Items */}
-      {showDetails && completion.missing.length > 0 && (
-        <View style={styles.missingSection}>
-          <Text style={styles.missingTitle}>Missing:</Text>
-          <View style={styles.missingList}>
-            {completion.missing.slice(0, 5).map((item, index) => (
-              <View key={index} style={styles.missingItem}>
-                <Text style={styles.missingDot}>○</Text>
-                <Text style={styles.missingText}>{item}</Text>
-              </View>
-            ))}
-            {completion.missing.length > 5 && (
-              <Text style={styles.moreText}>
-                +{completion.missing.length - 5} more
-              </Text>
-            )}
-          </View>
+        <Text style={styles.title}>Profile Strength</Text>
+        <View style={[styles.levelBadge, { backgroundColor: strength.color }]}>
+          <Text style={styles.levelText}>{strength.level}</Text>
         </View>
-      )}
-
-      {/* Tips */}
-      {showDetails && completion.tips.length > 0 && (
-        <View style={styles.tipsSection}>
-          <Text style={styles.tipsTitle}>💡 Tips:</Text>
-          {completion.tips.map((tip, index) => (
-            <Text key={index} style={styles.tipText}>• {tip}</Text>
+      </View>
+      <View style={styles.scoreRow}>
+        <Text style={styles.scoreText}>{strength.score} / {strength.maxScore} points</Text>
+        <Text style={[styles.percentage, { color: strength.color }]}>{strength.percentage}%</Text>
+      </View>
+      <View style={styles.barContainer}>
+        <View style={styles.barBackground}>
+          <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+        </View>
+      </View>
+      <Text style={styles.message}>{getStrengthMessage(strength.level)}</Text>
+      {strength.recommendations.length > 0 && (
+        <View style={styles.recommendations}>
+          <Text style={styles.recommendationsTitle}>Quick wins:</Text>
+          {strength.recommendations.map((rec, i) => (
+            <Text key={i} style={styles.recommendationText}>• {rec}</Text>
           ))}
         </View>
       )}
-
-      {/* Edit Profile Button */}
-      {completion.percentage < 100 && (
-        <TouchableOpacity
-          style={[styles.editButton, { backgroundColor: color }]}
-          onPress={() => router.push('/edit-profile')}
-        >
-          <Text style={styles.editButtonText}>Complete Profile</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    </Container>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#16213e',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#0f3460',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#eee',
-  },
-  percentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  progressBarBg: {
-    height: 10,
-    backgroundColor: '#0f3460',
-    borderRadius: 5,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressBarFill: {
-    height: 10,
-    borderRadius: 5,
-  },
-  message: {
-    fontSize: 13,
-    color: '#aaa',
-    marginBottom: 15,
-  },
-  missingSection: {
-    marginBottom: 15,
-  },
-  missingTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#d9534f',
-    marginBottom: 8,
-  },
-  missingList: {
-    gap: 4,
-  },
-  missingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  missingDot: {
-    color: '#888',
-    marginRight: 8,
-    fontSize: 12,
-  },
-  missingText: {
-    color: '#888',
-    fontSize: 13,
-  },
-  moreText: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  tipsSection: {
-    backgroundColor: '#0f3460',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 15,
-  },
-  tipsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e67e22',
-    marginBottom: 8,
-  },
-  tipText: {
-    color: '#ccc',
-    fontSize: 13,
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  editButton: {
-    paddingVertical: 12,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  container:            { backgroundColor: '#16213e', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#0f3460' },
+  compactContainer:     { backgroundColor: '#16213e', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#0f3460' },
+  header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  compactHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  title:                { fontSize: 16, fontWeight: '600', color: '#eee' },
+  compactLabel:         { fontSize: 14, fontWeight: '600', color: '#eee' },
+  levelBadge:           { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12 },
+  levelText:            { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  scoreRow:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  scoreText:            { color: '#888', fontSize: 13 },
+  percentage:           { fontSize: 20, fontWeight: 'bold' },
+  compactPercentage:    { fontSize: 16, fontWeight: 'bold' },
+  barContainer:         { marginBottom: 12 },
+  barBackground:        { height: 8, backgroundColor: '#0f3460', borderRadius: 4, overflow: 'hidden' },
+  barFill:              { height: '100%', borderRadius: 4 },
+  message:              { color: '#aaa', fontSize: 13, marginBottom: 12, lineHeight: 18 },
+  recommendations:      { backgroundColor: '#0f3460', borderRadius: 10, padding: 12 },
+  recommendationsTitle: { color: '#53a8b6', fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  recommendationText:   { color: '#888', fontSize: 12, marginBottom: 4, lineHeight: 18 },
+  errorText:            { color: '#d9534f', fontSize: 13, textAlign: 'center', marginBottom: 8 },
+  retryText:            { color: '#53a8b6', fontSize: 13, textAlign: 'center', fontWeight: '600' },
 });

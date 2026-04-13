@@ -20,7 +20,6 @@ function createStorage(): SimpleStorage {
       set: (key, value) => { if (typeof window !== 'undefined') window.localStorage?.setItem(key, value); },
     };
   }
-
   try {
     const { MMKV } = require('react-native-mmkv') as { MMKV: new (opts: { id: string }) => SimpleStorage };
     return new MMKV({ id: 'notifications' });
@@ -44,7 +43,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
     const token = await auth.currentUser?.getIdToken();
     if (token) headers.Authorization = `Bearer ${token}`;
-  } catch {}
+  } catch (e) {
+    logger.warn('[notifications] Failed to get auth token:', e);
+  }
   return headers;
 }
 
@@ -70,13 +71,11 @@ async function post(path: string, body: Record<string, unknown>) {
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
-
   try {
     const current = await Notifications.getPermissionsAsync();
     let status = current.status;
     if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
     if (status !== 'granted') return null;
-
     const token = (await Notifications.getExpoPushTokenAsync()).data;
     storage.set('expoPushToken', token);
     await saveUserFields({ pushToken: token, pushTokenUpdatedAt: new Date().toISOString() });
@@ -105,17 +104,14 @@ export async function sendMobilePushNotification({
 export async function registerWebPush(): Promise<void> {
   if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
   try {
     const vapidKey = process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidKey || vapidKey === 'your-new-public-key') return;
-
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: toUint8Array(vapidKey),
     });
-
     const subscriptionJson = JSON.stringify(subscription);
     storage.set('webPushSubscription', subscriptionJson);
     await saveUserFields({ webPushSubscription: subscriptionJson });
@@ -140,11 +136,7 @@ export async function sendWebPushNotification({
 }
 
 export async function sendPushNotification({
-  title,
-  body,
-  screen,
-  expoPushToken,
-  webSubscription,
+  title, body, screen, expoPushToken, webSubscription,
 }: {
   title: string;
   body: string;

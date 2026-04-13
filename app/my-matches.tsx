@@ -14,10 +14,7 @@ import { app, auth, db } from '../firebaseConfig';
 import type { AgeVerification } from '../utils/ageVerification';
 import { getAgeVerificationLevel } from '../utils/ageVerification';
 import { logger } from '../utils/logger';
-import {
-  checkIfChatHasMessages, cleanupExpiredMatches,
-  formatExpiryWarning, getMatchExpiryInfo,
-} from '../utils/matchExpiration';
+import { checkIfChatHasMessages, cleanupExpiredMatches, formatExpiryWarning, getMatchExpiryInfo } from '../utils/matchExpiration';
 import { getMatchNote, saveMatchNote } from '../utils/matchNotes';
 import type { OpeningLine } from '../utils/openingLines';
 import { generateOpeningLines } from '../utils/openingLines';
@@ -36,7 +33,6 @@ interface Match {
   };
   daysRemaining?: number; isExpired?: boolean; isWarning?: boolean; hasMessages?: boolean;
 }
-
 interface FirestoreMatchData {
   name?: string; age?: number; bodyType?: string; photos?: string[];
   personalityType?: string;
@@ -44,7 +40,6 @@ interface FirestoreMatchData {
   selfieVerified?: boolean; ageVerified?: boolean;
   ageVerification?: AgeVerification; ratings?: Match['ratings'];
 }
-
 interface MatchCardProps {
   item: Match; ratingPrompts: Set<string>; matchNotes: Map<string, string>;
   unmatchingId: string | null;
@@ -160,19 +155,19 @@ export default function MyMatchesScreen() {
   const router    = useRouter();
   const functions = useMemo(() => getFunctions(app, 'europe-west1'), []);
 
-  const [matches, setMatches]                         = useState<Match[]>([]);
-  const [loading, setLoading]                         = useState(true);
-  const [refreshing, setRefreshing]                   = useState(false);
-  const [ratingPrompts, setRatingPrompts]             = useState<Set<string>>(new Set());
-  const [showPhotoReminder, setShowPhotoReminder]     = useState(false);
+  const [matches,              setMatches]              = useState<Match[]>([]);
+  const [loading,              setLoading]              = useState(true);
+  const [refreshing,           setRefreshing]           = useState(false);
+  const [ratingPrompts,        setRatingPrompts]        = useState<Set<string>>(new Set());
+  const [showPhotoReminder,    setShowPhotoReminder]    = useState(false);
   const [photoReminderMessage, setPhotoReminderMessage] = useState('');
-  const [showOpeningLines, setShowOpeningLines]       = useState<string | null>(null);
-  const [openingLines, setOpeningLines]               = useState<OpeningLine[]>([]);
-  const [showNoteModal, setShowNoteModal]             = useState<string | null>(null);
-  const [currentNote, setCurrentNote]                 = useState('');
-  const [savingNote, setSavingNote]                   = useState(false);
-  const [matchNotes, setMatchNotes]                   = useState<Map<string, string>>(new Map());
-  const [unmatchingId, setUnmatchingId]               = useState<string | null>(null);
+  const [showOpeningLines,     setShowOpeningLines]     = useState<string | null>(null);
+  const [openingLines,         setOpeningLines]         = useState<OpeningLine[]>([]);
+  const [showNoteModal,        setShowNoteModal]        = useState<string | null>(null);
+  const [currentNote,          setCurrentNote]          = useState('');
+  const [savingNote,           setSavingNote]           = useState(false);
+  const [matchNotes,           setMatchNotes]           = useState<Map<string, string>>(new Map());
+  const [unmatchingId,         setUnmatchingId]         = useState<string | null>(null);
 
   const loadMatches = useCallback(async () => {
     try {
@@ -180,7 +175,7 @@ export default function MyMatchesScreen() {
       if (!user) { setTimeout(() => router.replace('/login'), 100); return; }
 
       const removedCount = await cleanupExpiredMatches(user.uid);
-      if (removedCount > 0) logger.log(`[MyMatches] Removed ${removedCount} expired matches`);
+      if (removedCount > 0) logger.info(`[MyMatches] Removed ${removedCount} expired matches`);
 
       const [snap1, snap2] = await Promise.all([
         getDocs(query(collection(db, 'likes'), where('fromUserId', '==', user.uid), where('status', '==', 'matched'))),
@@ -188,38 +183,55 @@ export default function MyMatchesScreen() {
       ]);
 
       const matchedUsers = new Map<string, string>();
-      snap1.forEach(d => { const data = d.data(); matchedUsers.set(String(data.toUserId ?? ''), String(data.matchedAt ?? data.createdAt ?? '')); });
-      snap2.forEach(d => { const data = d.data(); if (!matchedUsers.has(String(data.fromUserId ?? ''))) matchedUsers.set(String(data.fromUserId ?? ''), String(data.matchedAt ?? data.createdAt ?? '')); });
+      snap1.forEach(d => { const data = d.data(); matchedUsers.set(String(data['toUserId']   ?? ''), String(data['matchedAt'] ?? data['createdAt'] ?? '')); });
+      snap2.forEach(d => { const data = d.data(); if (!matchedUsers.has(String(data['fromUserId'] ?? ''))) matchedUsers.set(String(data['fromUserId'] ?? ''), String(data['matchedAt'] ?? data['createdAt'] ?? '')); });
 
-      const matchDetails: Match[] = [];
-      const promptsToShow         = new Set<string>();
-      const notesMap              = new Map<string, string>();
+      // Fetch all user docs + chat statuses in parallel per match
+      const entries = [...matchedUsers.entries()];
+      const matchResults = await Promise.all(
+        entries.map(async ([matchId, matchedAt]) => {
+          const [userDoc, hasMessages] = await Promise.all([
+            getDoc(doc(db, 'users', matchId)),
+            checkIfChatHasMessages(user.uid, matchId),
+          ]);
+          if (!userDoc.exists()) return null;
+          const userData   = userDoc.data() as FirestoreMatchData;
+          const expiryInfo = getMatchExpiryInfo(matchedAt, hasMessages);
+          if (expiryInfo.isExpired) return null;
+          return {
+            matchId, matchedAt, userData, hasMessages,
+            daysRemaining: expiryInfo.daysRemaining,
+            isWarning: expiryInfo.isWarning,
+            isExpired: expiryInfo.isExpired,
+          };
+        })
+      );
 
-      for (const [matchId, matchedAt] of matchedUsers) {
-        const userDoc = await getDoc(doc(db, 'users', matchId));
-        if (!userDoc.exists()) continue;
-        const userData    = userDoc.data() as FirestoreMatchData;
-        const hasMessages = await checkIfChatHasMessages(user.uid, matchId);
-        const expiryInfo  = getMatchExpiryInfo(matchedAt, hasMessages);
-        if (expiryInfo.isExpired) continue;
+      // Filter nulls then fetch rating/note data in parallel
+      const validMatches = matchResults.filter((r): r is NonNullable<typeof r> => r !== null);
+      const metaResults  = await Promise.all(
+        validMatches.map(({ matchId }) =>
+          Promise.all([shouldPromptForRating(user.uid, matchId), getMatchNote(matchId)])
+        )
+      );
 
+      const matchDetails: Match[]    = [];
+      const promptsToShow            = new Set<string>();
+      const notesMap                 = new Map<string, string>();
+
+      validMatches.forEach(({ matchId, matchedAt, userData, hasMessages, daysRemaining, isWarning, isExpired }, i) => {
         matchDetails.push({
           uid: matchId, name: userData.name ?? 'Unknown', age: userData.age ?? 0,
           bodyType: userData.bodyType ?? '', matchedAt, photos: userData.photos ?? [],
           personalityType: userData.personalityType ?? '', height: userData.height,
           selfieVerified: userData.selfieVerified ?? false, ageVerified: userData.ageVerified ?? false,
           ageVerification: userData.ageVerification, ratings: userData.ratings,
-          daysRemaining: expiryInfo.daysRemaining, isWarning: expiryInfo.isWarning,
-          isExpired: expiryInfo.isExpired, hasMessages,
+          daysRemaining, isWarning, isExpired, hasMessages,
         });
-
-        const [shouldPrompt, note] = await Promise.all([
-          shouldPromptForRating(user.uid, matchId),
-          getMatchNote(matchId),
-        ]);
+        const [shouldPrompt, note] = metaResults[i]!;
         if (shouldPrompt) promptsToShow.add(matchId);
         if (note) notesMap.set(matchId, note);
-      }
+      });
 
       matchDetails.sort((a, b) => {
         if (a.isWarning && !b.isWarning) return -1;
@@ -340,28 +352,24 @@ export default function MyMatchesScreen() {
 
   const keyExtractor = useCallback((item: Match) => item.uid, []);
 
-  if (loading) {
-    return (
-      <View style={s.container}>
-        <ActivityIndicator size="large" color="#53a8b6" />
-        <Text style={s.loadingText}>Loading your matches...</Text>
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={s.container}>
+      <ActivityIndicator size="large" color="#53a8b6" />
+      <Text style={s.loadingText}>Loading your matches...</Text>
+    </View>
+  );
 
-  if (matches.length === 0) {
-    return (
-      <View style={s.container}>
-        <Text style={s.emptyIcon} accessibilityElementsHidden>💔</Text>
-        <Text style={s.emptyTitle} accessibilityRole="header">No Matches Yet</Text>
-        <Text style={s.emptyText}>{"Start browsing profiles and like people.\nWhen they like you back, they'll appear here!"}</Text>
-        <TouchableOpacity style={s.button} onPress={() => router.push('/matches')}
-          accessibilityLabel="Find matches" accessibilityRole="button">
-          <Text style={s.buttonText}>Find Matches</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (matches.length === 0) return (
+    <View style={s.container}>
+      <Text style={s.emptyIcon} accessibilityElementsHidden>💔</Text>
+      <Text style={s.emptyTitle} accessibilityRole="header">No Matches Yet</Text>
+      <Text style={s.emptyText}>{"Start browsing profiles and like people.\nWhen they like you back, they'll appear here!"}</Text>
+      <TouchableOpacity style={s.button} onPress={() => router.push('/matches')}
+        accessibilityLabel="Find matches" accessibilityRole="button">
+        <Text style={s.buttonText}>Find Matches</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={s.container}>

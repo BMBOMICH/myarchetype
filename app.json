@@ -7,12 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myarchetype",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+        "experiments": {
+      "reactCompiler": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#1a1a2e"
     },
+    
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bmbomich.myarchetype",
@@ -37,6 +39,7 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png",
+          "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "INTERNET"],
         "backgroundColor": "#1a1a2e"
       },
       "package": "com.bmbomich.myarchetype",
@@ -59,19 +62,24 @@
     },
     "updates": {
       "enabled": true,
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 3000
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "plugins": [
-      "expo-router",
-      ["expo-camera", { "cameraPermission": "MyArchetype needs camera access to take profile photos and verify your identity." }],
-      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "MyArchetype uses your location to find matches near you." }],
-      ["expo-notifications", { "icon": "./assets/images/android-icon-monochrome.png", "color": "#53a8b6", "defaultChannel": "default" }],
-      "expo-secure-store",
-      ["@sentry/react-native", { "uploadSourceMaps": true, "url": "https://sentry.io/" }]
-    ],
+"plugins": [
+  "expo-router",
+  ["expo-camera", { "cameraPermission": "MyArchetype needs camera access to take profile photos and verify your identity." }],
+  ["expo-location", { "locationAlwaysAndWhenInUsePermission": "MyArchetype uses your location to find matches near you." }],
+  ["expo-notifications", { "icon": "./assets/images/android-icon-monochrome.png", "color": "#53a8b6", "defaultChannel": "default" }],
+  "expo-secure-store",
+  ["@sentry/react-native", {
+    "organization": "YOUR_ACTUAL_ORG_SLUG",
+    "project": "YOUR_ACTUAL_PROJECT_SLUG",
+    "uploadSourceMaps": true,
+    "url": "https://sentry.io/"
+  }]
+],
     "experiments": {
       "typedRoutes": true
     }

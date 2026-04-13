@@ -1,31 +1,93 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, Alert, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
 
+// ── Pure helpers (outside component) ──────────────────────
+function getStarLabel(value: number | null): string {
+  if (value === null) return ' ';
+  return ['', 'Very poor', 'Poor', 'Average', 'Good', 'Excellent'][value] ?? ' ';
+}
+
+// ── StarRow (stable, no closure needed) ───────────────────
+const StarRow = React.memo(({ value, onPress }: {
+  value: number | null;
+  onPress: (s: number) => void;
+}) => (
+  <View style={s.starRow}>
+    {[1, 2, 3, 4, 5].map((star) => (
+      <StarButton key={star} star={star} active={(value ?? 0) >= star} onPress={onPress} />
+    ))}
+  </View>
+));
+StarRow.displayName = 'StarRow';
+
+const StarButton = React.memo(({ star, active, onPress }: {
+  star: number; active: boolean; onPress: (s: number) => void;
+}) => {
+  const handlePress = useCallback(() => onPress(star), [onPress, star]);
+  return (
+    <TouchableOpacity
+      style={s.starButton} onPress={handlePress}
+      accessibilityLabel={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={active ? s.starActive : s.star}>★</Text>
+    </TouchableOpacity>
+  );
+});
+StarButton.displayName = 'StarButton';
+
+// ── AccuracyBtn (stable) ───────────────────────────────────
+const AccuracyBtn = React.memo(({ label, val, current, activeStyle, onPress }: {
+  label: string; val: string; current: string;
+  activeStyle: object; onPress: (v: string) => void;
+}) => {
+  const handlePress = useCallback(() => onPress(val), [onPress, val]);
+  const isSelected = current === val;
+  return (
+    <TouchableOpacity
+      style={[s.accuracyBtn, isSelected && activeStyle]}
+      onPress={handlePress}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+    >
+      <Text style={[s.accuracyText, isSelected && s.accuracyTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+});
+AccuracyBtn.displayName = 'AccuracyBtn';
+
+// ── Screen ────────────────────────────────────────────────
 export default function PostDateRatingScreen() {
-  const router = useRouter();
+  const router  = useRouter();
   const { matchId, matchName } = useLocalSearchParams();
   const user = auth.currentUser;
 
-  const [loading, setLoading]                     = useState(false);
-  const [step, setStep]                           = useState<'ask' | 'rate' | 'done'>('ask');
-  const [photosMatch, setPhotosMatch]             = useState<number | null>(null);
-  const [heightAccurate, setHeightAccurate]       = useState('');
-  const [bodyTypeAccurate, setBodyTypeAccurate]   = useState('');
-  const [ageAccurate, setAgeAccurate]             = useState('');
-  const [personalityMatch, setPersonalityMatch]   = useState<number | null>(null);
+  const [loading, setLoading]                   = useState(false);
+  const [step, setStep]                         = useState<'ask' | 'rate' | 'done'>('ask');
+  const [photosMatch, setPhotosMatch]           = useState<number | null>(null);
+  const [heightAccurate, setHeightAccurate]     = useState('');
+  const [bodyTypeAccurate, setBodyTypeAccurate] = useState('');
+  const [ageAccurate, setAgeAccurate]           = useState('');
+  const [personalityMatch, setPersonalityMatch] = useState<number | null>(null);
   const [overallExperience, setOverallExperience] = useState<number | null>(null);
-  const [comments, setComments]                   = useState('');
+  const [comments, setComments]                 = useState('');
 
-  const isStarActive = useCallback((val: number | null, star: number) => val !== null && val >= star, []);
+  const handleGoToRate   = useCallback(() => setStep('rate'), []);
+  const handleBackToAsk  = useCallback(() => setStep('ask'), []);
+  const handleBack       = useCallback(() => router.back(), [router]);
 
-  const getStarLabel = (value: number | null): string => {
-    if (value === null) return ' ';
-    return ['', 'Very poor', 'Poor', 'Average', 'Good', 'Excellent'][value] ?? ' ';
-  };
+  const handleCommentChange = useCallback((text: string) => {
+    setComments(text.slice(0, 300));
+  }, []);
 
   const handleDidNotMeet = useCallback(async () => {
     if (!user || !matchId) return;
@@ -44,8 +106,10 @@ export default function PostDateRatingScreen() {
 
   const handleSubmit = useCallback(async () => {
     if (!user || !matchId) return;
-    if (photosMatch === null || !heightAccurate || !bodyTypeAccurate ||
-        !ageAccurate || personalityMatch === null || overallExperience === null) {
+    if (
+      photosMatch === null || !heightAccurate || !bodyTypeAccurate ||
+      !ageAccurate || personalityMatch === null || overallExperience === null
+    ) {
       Alert.alert('Incomplete', 'Please answer all questions');
       return;
     }
@@ -68,12 +132,12 @@ export default function PostDateRatingScreen() {
           averagePersonalityMatch: 0, averageOverall: 0,
         };
         const total = cur.totalRatings + 1;
-        const avg = (prev: number, next: number) => ((prev * cur.totalRatings) + next) / total;
-        const rate = (val: string, key: string) => ((cur[key] * cur.totalRatings) + (val === 'accurate' ? 100 : 0)) / total;
+        const avg   = (prev: number, next: number) => ((prev * cur.totalRatings) + next) / total;
+        const rate  = (val: string, key: string) => ((cur[key] * cur.totalRatings) + (val === 'accurate' ? 100 : 0)) / total;
 
         await setDoc(doc(db, 'users', matchId as string), {
           ratings: {
-            totalRatings: total,
+            totalRatings:            total,
             averagePhotosMatch:      Math.round(avg(cur.averagePhotosMatch, photosMatch) * 10) / 10,
             averagePersonalityMatch: Math.round(avg(cur.averagePersonalityMatch, personalityMatch) * 10) / 10,
             averageOverall:          Math.round(avg(cur.averageOverall ?? 0, overallExperience) * 10) / 10,
@@ -98,36 +162,6 @@ export default function PostDateRatingScreen() {
     }
   }, [user, matchId, matchName, photosMatch, heightAccurate, bodyTypeAccurate, ageAccurate, personalityMatch, overallExperience, comments]);
 
-  const StarRow = useCallback(({ value, onPress }: { value: number | null; onPress: (s: number) => void }) => (
-    <View style={s.starRow}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <TouchableOpacity
-          key={star} style={s.starButton} onPress={() => onPress(star)}
-          accessibilityLabel={`Rate ${star} star${star !== 1 ? 's' : ''}`}
-          accessibilityRole="button"
-          accessibilityState={{ selected: isStarActive(value, star) }}
-        >
-          <Text style={isStarActive(value, star) ? s.starActive : s.star}>★</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  ), [isStarActive]);
-
-  const AccuracyBtn = useCallback(({ label, val, current, activeStyle, onPress }: {
-    label: string; val: string; current: string;
-    activeStyle: object; onPress: (v: string) => void;
-  }) => (
-    <TouchableOpacity
-      style={[s.accuracyBtn, current === val && activeStyle]}
-      onPress={() => onPress(val)}
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ selected: current === val }}
-    >
-      <Text style={[s.accuracyText, current === val && s.accuracyTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  ), []);
-
   if (step === 'ask') {
     return (
       <View style={s.container}>
@@ -137,13 +171,13 @@ export default function PostDateRatingScreen() {
           <Text style={s.askText}>Your honest rating helps build trust and catches fake profiles.</Text>
           <Text style={s.askNote}>Ratings are anonymous — they only see aggregated scores.</Text>
         </View>
-        <TouchableOpacity style={s.yesBtn} onPress={() => setStep('rate')} accessibilityLabel="Yes, we met" accessibilityRole="button">
+        <TouchableOpacity style={s.yesBtn} onPress={handleGoToRate} accessibilityLabel="Yes, we met" accessibilityRole="button">
           <Text style={s.yesBtnText}>Yes, we met!</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.noBtn} onPress={handleDidNotMeet} accessibilityLabel="We have not met yet" accessibilityRole="button">
           <Text style={s.noBtnText}>Not yet</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity style={s.backBtn} onPress={handleBack} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={s.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -169,13 +203,7 @@ export default function PostDateRatingScreen() {
           <Text style={s.question}>Was their height accurate?</Text>
           <Text style={s.questionHint}>Compared to what they stated on their profile</Text>
           <View style={s.accuracyRow}>
-            {[
-              { label: 'Much shorter', val: 'much-less',     style: s.accuracyBtnRed    },
-              { label: 'Bit shorter',  val: 'slightly-less', style: s.accuracyBtnOrange },
-              { label: 'Accurate',     val: 'accurate',      style: s.accuracyBtnGreen  },
-              { label: 'Bit taller',   val: 'slightly-more', style: s.accuracyBtnOrange },
-              { label: 'Much taller',  val: 'much-more',     style: s.accuracyBtnRed    },
-            ].map(({ label, val, style }) => (
+            {HEIGHT_OPTIONS.map(({ label, val, style }) => (
               <AccuracyBtn key={val} label={label} val={val} current={heightAccurate} activeStyle={style} onPress={setHeightAccurate} />
             ))}
           </View>
@@ -185,11 +213,7 @@ export default function PostDateRatingScreen() {
           <Text style={s.question}>Was their body type accurate?</Text>
           <Text style={s.questionHint}>Did it match what they selected on their profile?</Text>
           <View style={s.accuracyRow}>
-            {[
-              { label: 'Very different', val: 'very-different',     style: s.accuracyBtnRed    },
-              { label: 'A bit off',      val: 'slightly-different', style: s.accuracyBtnOrange },
-              { label: 'Accurate',       val: 'accurate',           style: s.accuracyBtnGreen  },
-            ].map(({ label, val, style }) => (
+            {BODY_TYPE_OPTIONS.map(({ label, val, style }) => (
               <AccuracyBtn key={val} label={label} val={val} current={bodyTypeAccurate} activeStyle={style} onPress={setBodyTypeAccurate} />
             ))}
           </View>
@@ -198,13 +222,7 @@ export default function PostDateRatingScreen() {
         <View style={s.questionCard}>
           <Text style={s.question}>Did they look the age they stated?</Text>
           <View style={s.accuracyRow}>
-            {[
-              { label: 'Much older',   val: 'much-older',   style: s.accuracyBtnRed    },
-              { label: 'Bit older',    val: 'bit-older',    style: s.accuracyBtnOrange },
-              { label: 'Accurate',     val: 'accurate',     style: s.accuracyBtnGreen  },
-              { label: 'Bit younger',  val: 'bit-younger',  style: s.accuracyBtnOrange },
-              { label: 'Much younger', val: 'much-younger', style: s.accuracyBtnRed    },
-            ].map(({ label, val, style }) => (
+            {AGE_OPTIONS.map(({ label, val, style }) => (
               <AccuracyBtn key={val} label={label} val={val} current={ageAccurate} activeStyle={style} onPress={setAgeAccurate} />
             ))}
           </View>
@@ -229,7 +247,7 @@ export default function PostDateRatingScreen() {
             placeholder="Anything else you want to share..."
             placeholderTextColor="#666"
             value={comments}
-            onChangeText={(text) => setComments(text.slice(0, 300))}
+            onChangeText={handleCommentChange}
             multiline numberOfLines={4} maxLength={300}
             accessibilityLabel="Additional comments"
           />
@@ -242,10 +260,13 @@ export default function PostDateRatingScreen() {
           accessibilityLabel="Submit rating" accessibilityRole="button"
           accessibilityState={{ disabled: loading }}
         >
-          {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.submitButtonText}>Submit Rating</Text>}
+          {loading
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={s.submitButtonText}>Submit Rating</Text>
+          }
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.backBtn} onPress={() => setStep('ask')} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity style={s.backBtn} onPress={handleBackToAsk} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={s.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -258,7 +279,7 @@ export default function PostDateRatingScreen() {
         <View style={s.doneIcon}><Text style={s.doneIconText}>✓</Text></View>
         <Text style={s.doneTitle}>Thank You!</Text>
         <Text style={s.doneText}>Your rating helps build trust in the MyArchetype community.</Text>
-        <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity style={s.doneBtn} onPress={handleBack} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={s.doneBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -267,6 +288,29 @@ export default function PostDateRatingScreen() {
 
   return null;
 }
+
+// ── Static option arrays (outside component) ──────────────
+const HEIGHT_OPTIONS = [
+  { label: 'Much shorter', val: 'much-less',     style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
+  { label: 'Bit shorter',  val: 'slightly-less', style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },
+  { label: 'Accurate',     val: 'accurate',      style: { backgroundColor: '#1a5c3a', borderColor: '#5cb85c' } },
+  { label: 'Bit taller',   val: 'slightly-more', style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },
+  { label: 'Much taller',  val: 'much-more',     style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
+] as const;
+
+const BODY_TYPE_OPTIONS = [
+  { label: 'Very different', val: 'very-different',     style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
+  { label: 'A bit off',      val: 'slightly-different', style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },
+  { label: 'Accurate',       val: 'accurate',           style: { backgroundColor: '#1a5c3a', borderColor: '#5cb85c' } },
+] as const;
+
+const AGE_OPTIONS = [
+  { label: 'Much older',   val: 'much-older',   style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
+  { label: 'Bit older',    val: 'bit-older',    style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },
+  { label: 'Accurate',     val: 'accurate',     style: { backgroundColor: '#1a5c3a', borderColor: '#5cb85c' } },
+  { label: 'Bit younger',  val: 'bit-younger',  style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },
+  { label: 'Much younger', val: 'much-younger', style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
+] as const;
 
 const s = StyleSheet.create({
   container:            { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center', padding: 20 },
@@ -295,9 +339,6 @@ const s = StyleSheet.create({
   starLabel:            { fontSize: 12, color: '#888', textAlign: 'center', marginTop: 8, height: 16 },
   accuracyRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 10 },
   accuracyBtn:          { backgroundColor: '#0f3460', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 15, borderWidth: 1, borderColor: '#0f3460' },
-  accuracyBtnGreen:     { backgroundColor: '#1a5c3a', borderColor: '#5cb85c' },
-  accuracyBtnOrange:    { backgroundColor: '#5c3a1a', borderColor: '#e67e22' },
-  accuracyBtnRed:       { backgroundColor: '#5c1a1a', borderColor: '#d9534f' },
   accuracyText:         { color: '#888', fontSize: 13 },
   accuracyTextActive:   { color: '#fff', fontWeight: '600' },
   commentInput:         { backgroundColor: '#0f3460', color: '#fff', padding: 12, borderRadius: 10, fontSize: 14, height: 80, textAlignVertical: 'top', marginTop: 10 },

@@ -1,4 +1,3 @@
-// app/admin/index.tsx
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -10,7 +9,7 @@ interface Stats {
   totalUsers: number; verifiedUsers: number; totalMatches: number;
   pendingReports: number; totalReports: number; activeToday: number;
 }
-const EMPTY_STATS: Stats = { totalUsers:0, verifiedUsers:0, totalMatches:0, pendingReports:0, totalReports:0, activeToday:0 };
+const EMPTY_STATS: Stats = { totalUsers: 0, verifiedUsers: 0, totalMatches: 0, pendingReports: 0, totalReports: 0, activeToday: 0 };
 interface Section { key: string; render: () => React.ReactElement }
 
 export default function AdminDashboard() {
@@ -28,7 +27,6 @@ export default function AdminDashboard() {
         logger.log('[Admin] Not an admin'); router.replace('/home'); return;
       }
       setIsAdmin(true);
-
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const usersSnap = await getDocs(collection(db, 'users'));
       let verifiedUsers = 0, activeToday = 0;
@@ -37,20 +35,16 @@ export default function AdminDashboard() {
         if (data.selfieVerified) verifiedUsers++;
         if (data.lastSeen) {
           const raw = data.lastSeen as { toDate?: () => Date } | string | number;
-          const ls  = typeof raw === 'object' && typeof raw.toDate === 'function'
-            ? raw.toDate()
-            : new Date(raw as string | number);
+          const ls  = typeof raw === 'object' && typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw as string | number);
           if (ls >= today) activeToday++;
         }
       });
-
       const [matchesSnap, reportsSnap] = await Promise.all([
         getDocs(query(collection(db, 'likes'), where('status', '==', 'matched'))),
         getDocs(collection(db, 'reports')),
       ]);
       let pendingReports = 0;
       reportsSnap.forEach((d) => { if (d.data().status === 'pending') pendingReports++; });
-
       setStats({
         totalUsers: usersSnap.size, verifiedUsers, activeToday,
         totalMatches: Math.floor(matchesSnap.size / 2),
@@ -64,6 +58,14 @@ export default function AdminDashboard() {
   }, [router]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const handleBack    = useCallback(() => router.back(), [router]);
+  const handleReports = useCallback(() => router.push('/admin/reports'), [router]);
+  const handleUsers   = useCallback(() => router.push('/admin/users'), [router]);
+  const handleStats   = useCallback(() => router.push('/admin/stats'), [router]);
+
+  const renderSection = useCallback(({ item }: { item: Section }) => item.render(), []);
+  const keyExtractor  = useCallback((item: Section) => item.key, []);
 
   if (loading) {
     return (
@@ -85,9 +87,9 @@ export default function AdminDashboard() {
   ];
 
   const actions = [
-    { key:'reports', icon:'🚨', title:'Review Reports',  subtitle: stats.pendingReports > 0 ? `${stats.pendingReports} pending reports need attention` : 'No pending reports', route:'/admin/reports' as const, alert: stats.pendingReports > 0 },
-    { key:'users',   icon:'👥', title:'Manage Users',    subtitle:'View, verify, or ban users',      route:'/admin/users'   as const, alert: false },
-    { key:'stats',   icon:'📊', title:'View Statistics', subtitle:'Detailed analytics and insights', route:'/admin/stats'   as const, alert: false },
+    { key: 'reports', icon: '🚨', title: 'Review Reports',  subtitle: stats.pendingReports > 0 ? `${stats.pendingReports} pending reports need attention` : 'No pending reports', onPress: handleReports, alert: stats.pendingReports > 0 },
+    { key: 'users',   icon: '👥', title: 'Manage Users',    subtitle: 'View, verify, or ban users',      onPress: handleUsers,   alert: false },
+    { key: 'stats',   icon: '📊', title: 'View Statistics', subtitle: 'Detailed analytics and insights', onPress: handleStats,   alert: false },
   ];
 
   const sections: Section[] = [
@@ -111,10 +113,8 @@ export default function AdminDashboard() {
         <>
           <Text style={s.sectionTitle} accessibilityRole="header">Quick Actions</Text>
           {actions.map((item) => (
-            <TouchableOpacity
-              key={item.key}
-              style={[s.actionButton, item.alert && s.actionButtonAlert]}
-              onPress={() => router.push(item.route)}
+            <TouchableOpacity key={item.key} style={[s.actionButton, item.alert && s.actionButtonAlert]}
+              onPress={item.onPress}
               accessibilityLabel={`${item.title}: ${item.subtitle}`}
               accessibilityRole="button"
               accessibilityHint={`Navigate to ${item.title}`}>
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
               <Text style={s.actionArrow} accessibilityElementsHidden>→</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={s.backButton} onPress={() => router.back()}
+          <TouchableOpacity style={s.backButton} onPress={handleBack}
             accessibilityLabel="Go back to home" accessibilityRole="button">
             <Text style={s.backButtonText}>← Back to Home</Text>
           </TouchableOpacity>
@@ -140,8 +140,8 @@ export default function AdminDashboard() {
       <Text style={s.title} accessibilityRole="header">👮 Admin Dashboard</Text>
       <FlatList
         data={sections}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => item.render()}
+        keyExtractor={keyExtractor}
+        renderItem={renderSection}
         contentContainerStyle={s.content}
       />
     </View>
@@ -149,25 +149,25 @@ export default function AdminDashboard() {
 }
 
 const s = StyleSheet.create({
-  center:           { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  container:        { flex: 1, backgroundColor: '#1a1a2e' },
-  content:          { padding: 20, paddingBottom: 40 },
-  loadingText:      { color: '#aaa', marginTop: 15, fontSize: 16 },
-  errorText:        { color: '#d9534f', fontSize: 18 },
-  title:            { fontSize: 28, fontWeight: 'bold', color: '#eee', textAlign: 'center', marginTop: 20, paddingHorizontal: 20 },
-  statsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30 },
-  statCard:         { backgroundColor: '#16213e', borderRadius: 15, padding: 20, width: '48%', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
-  statCardAlert:    { borderColor: '#d9534f', borderWidth: 2 },
-  statNumber:       { fontSize: 32, fontWeight: 'bold', marginBottom: 5 },
-  statLabel:        { fontSize: 12, color: '#888', textAlign: 'center' },
-  sectionTitle:     { fontSize: 18, fontWeight: 'bold', color: '#53a8b6', marginBottom: 15 },
-  actionButton:     { backgroundColor: '#16213e', borderRadius: 15, padding: 20, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
-  actionButtonAlert:{ borderColor: '#d9534f', borderWidth: 2 },
-  actionIcon:       { fontSize: 30, marginRight: 15 },
-  actionContent:    { flex: 1 },
-  actionTitle:      { fontSize: 16, fontWeight: '600', color: '#eee', marginBottom: 4 },
-  actionSubtitle:   { fontSize: 12, color: '#888' },
-  actionArrow:      { fontSize: 20, color: '#53a8b6' },
-  backButton:       { marginTop: 20, paddingVertical: 15, alignItems: 'center' },
-  backButtonText:   { color: '#53a8b6', fontSize: 16 },
+  center:            { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  container:         { flex: 1, backgroundColor: '#1a1a2e' },
+  content:           { padding: 20, paddingBottom: 40 },
+  loadingText:       { color: '#aaa', marginTop: 15, fontSize: 16 },
+  errorText:         { color: '#d9534f', fontSize: 18 },
+  title:             { fontSize: 28, fontWeight: 'bold', color: '#eee', textAlign: 'center', marginTop: 20, paddingHorizontal: 20 },
+  statsGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30 },
+  statCard:          { backgroundColor: '#16213e', borderRadius: 15, padding: 20, width: '48%', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
+  statCardAlert:     { borderColor: '#d9534f', borderWidth: 2 },
+  statNumber:        { fontSize: 32, fontWeight: 'bold', marginBottom: 5 },
+  statLabel:         { fontSize: 12, color: '#888', textAlign: 'center' },
+  sectionTitle:      { fontSize: 18, fontWeight: 'bold', color: '#53a8b6', marginBottom: 15 },
+  actionButton:      { backgroundColor: '#16213e', borderRadius: 15, padding: 20, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
+  actionButtonAlert: { borderColor: '#d9534f', borderWidth: 2 },
+  actionIcon:        { fontSize: 30, marginRight: 15 },
+  actionContent:     { flex: 1 },
+  actionTitle:       { fontSize: 16, fontWeight: '600', color: '#eee', marginBottom: 4 },
+  actionSubtitle:    { fontSize: 12, color: '#888' },
+  actionArrow:       { fontSize: 20, color: '#53a8b6' },
+  backButton:        { marginTop: 20, paddingVertical: 15, alignItems: 'center' },
+  backButtonText:    { color: '#53a8b6', fontSize: 16 },
 });

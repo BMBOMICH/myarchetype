@@ -1,8 +1,3 @@
-// app/login.tsx
-// Detectors: #81 email-verify gate, #86 device fingerprint, #87 multi-account,
-// #88 banned user check, #90 ATO detection, #91 concurrent sessions,
-// #95 App Check, #128 E2EE identity init
-
 type WebMediaEvent = { matches: boolean };
 type WebMediaQuery = {
   matches: boolean;
@@ -37,6 +32,7 @@ import { auth } from '../firebaseConfig';
 import { ensureMyE2EEIdentity, getLocalE2EEKeypair } from '../utils/e2ee';
 import { writeAuditLog } from '../utils/logger';
 import { checkDeviceMultiAccount, checkUserBanned, recordDeviceLogin } from '../utils/rateLimiter';
+import { checkLogin } from '../utils/safetyMiddleware';
 
 const IS_WEB = Platform.OS === 'web';
 const IS_IOS = Platform.OS === 'ios';
@@ -44,18 +40,17 @@ const IS_RTL = I18nManager.isRTL;
 const nativeDriver = !IS_WEB;
 
 const ROUTES = { HOME: '/home' as const, SIGNUP: '/signup' as const };
-const SUCCESS_NAV_DELAY_MS = 1000;
-const LOCKOUT_DURATION_MS = 60_000;
-const TYPING_PAUSE_MS = 3000;
-const RESIZE_DEBOUNCE_MS = 150;
+const SUCCESS_NAV_DELAY_MS  = 1000;
+const LOCKOUT_DURATION_MS   = 60_000;
+const RESIZE_DEBOUNCE_MS    = 150;
 const FOCUS_RETURN_DELAY_MS = 100;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_EMAIL_LENGTH = 254;
-const MAX_PASSWORD_LENGTH = 128;
-const MAX_LOGIN_ATTEMPTS = 5;
-const MAX_RESEND_ATTEMPTS = 3;
-const MAX_FORGOT_ATTEMPTS = 3;
+const RATE_LIMIT_WINDOW_MS  = 60_000;
+const EMAIL_REGEX           = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LENGTH      = 254;
+const MAX_PASSWORD_LENGTH   = 128;
+const MAX_LOGIN_ATTEMPTS    = 5;
+const MAX_RESEND_ATTEMPTS   = 3;
+const MAX_FORGOT_ATTEMPTS   = 3;
 
 const getErrorCode = (error: unknown): string | undefined =>
   typeof error === 'object' && error !== null && 'code' in error
@@ -85,9 +80,11 @@ const getReducedMotion = () => IS_WEB ? !!window.matchMedia?.('(prefers-reduced-
 let prefersReducedMotion = getReducedMotion();
 const getAnimDuration = (ms: number) => (prefersReducedMotion ? 0 : ms);
 
-function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout>;
-  return ((...args: Parameters<T>) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }) as T;
+  const debounced = ((...args: Parameters<T>) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }) as T & { cancel: () => void };
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
 }
 
 const darkTokens = {
@@ -112,26 +109,17 @@ const lightTokens = {
 
 type Tokens = typeof darkTokens;
 
-// ─── Web-only prop types ──────────────────────────────────
 type WebAriaProps = {
-  'aria-live'?: 'assertive' | 'polite' | 'off';
-  'aria-atomic'?: 'true' | 'false';
-  id?: string;
-  role?: string;
-  'aria-modal'?: 'true' | 'false';
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: 'true' | 'false';
-  'aria-required'?: 'true' | 'false';
+  'aria-live'?: 'assertive' | 'polite' | 'off'; 'aria-atomic'?: 'true' | 'false';
+  id?: string; role?: string; 'aria-modal'?: 'true' | 'false'; 'aria-label'?: string;
+  'aria-describedby'?: string; 'aria-invalid'?: 'true' | 'false'; 'aria-required'?: 'true' | 'false';
 };
-
-type WebInputProps = { name?: string };
-type WebStyleProps = {
+type WebInputProps  = { name?: string };
+type WebStyleProps  = {
   outline?: string; outlineWidth?: number; boxShadow?: string; border?: string;
   WebkitTextFillColor?: string; caretColor?: string; backgroundColor?: string;
   paddingTop?: number; paddingBottom?: number; paddingLeft?: number;
-  flex?: number; fontSize?: number; letterSpacing?: number; color?: string;
-  direction?: 'ltr' | 'rtl';
+  flex?: number; fontSize?: number; letterSpacing?: number; color?: string; direction?: 'ltr' | 'rtl';
 };
 
 const CSS_ID = 'login-screen-styles';
@@ -158,30 +146,25 @@ const injectWebStyles = (C: Tokens, theme: 'dark' | 'light') => {
     *::-webkit-scrollbar{width:6px}*::-webkit-scrollbar-thumb{background:${C.inputBorder};border-radius:3px}
   `;
   document.head?.appendChild?.(style);
-
   if (!document.getElementById?.(META_ID)) {
     const m = document.createElement?.('meta');
     if (m) { m.id = META_ID; document.head?.appendChild?.(m); }
     document.title = 'Log In – MyArchetype';
     if (document.documentElement) { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
     let vp = document.querySelector?.('meta[name="viewport"]');
-    if (!vp) {
-      vp = document.createElement?.('meta') ?? null;
-      vp?.setAttribute?.('name', 'viewport');
-      if (vp) document.head?.appendChild?.(vp);
-    }
+    if (!vp) { vp = document.createElement?.('meta') ?? null; vp?.setAttribute?.('name', 'viewport'); if (vp) document.head?.appendChild?.(vp); }
     vp?.setAttribute?.('content', 'width=device-width,initial-scale=1');
   }
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
-  'auth/invalid-credential': 'Invalid email or password. Please try again.',
-  'auth/user-not-found': 'Invalid email or password. Please try again.',
-  'auth/wrong-password': 'Invalid email or password. Please try again.',
-  'auth/too-many-requests': 'Too many failed attempts. Please wait or reset your password.',
+  'auth/invalid-credential':     'Invalid email or password. Please try again.',
+  'auth/user-not-found':         'Invalid email or password. Please try again.',
+  'auth/wrong-password':         'Invalid email or password. Please try again.',
+  'auth/too-many-requests':      'Too many failed attempts. Please wait or reset your password.',
   'auth/network-request-failed': 'Network error. Please check your connection.',
-  'auth/user-disabled': 'This account has been disabled. Please contact support.',
-  'auth/invalid-email': 'Please enter a valid email address.',
+  'auth/user-disabled':          'This account has been disabled. Please contact support.',
+  'auth/invalid-email':          'Please enter a valid email address.',
 };
 const getErrorMessage = (code?: string) => (code && ERROR_MESSAGES[code]) ?? 'An unexpected error occurred.';
 
@@ -199,7 +182,7 @@ const triggerHaptic = async (type: 'success' | 'error' | 'light') => {
 };
 
 const validators = {
-  email: (v: string) => !v ? 'Email is required' : v.length > MAX_EMAIL_LENGTH ? `Email must be under ${MAX_EMAIL_LENGTH} chars` : !EMAIL_REGEX.test(v) ? 'Invalid email format' : '',
+  email:    (v: string) => !v ? 'Email is required' : v.length > MAX_EMAIL_LENGTH ? `Email must be under ${MAX_EMAIL_LENGTH} chars` : !EMAIL_REGEX.test(v) ? 'Invalid email format' : '',
   password: (v: string) => !v ? 'Password is required' : v.length > MAX_PASSWORD_LENGTH ? 'Password too long' : v.length < 6 ? 'At least 6 characters' : '',
 };
 
@@ -224,32 +207,32 @@ const initialFormState: FormState = {
 
 function formReducer(state: FormState, action: FormAction): FormState {
   switch (action.type) {
-    case 'SET_EMAIL': return { ...state, email: action.payload };
-    case 'SET_PASSWORD': return { ...state, password: action.payload };
-    case 'SET_EMAIL_ERROR': return { ...state, emailError: action.payload };
-    case 'SET_PASSWORD_ERROR': return { ...state, passwordError: action.payload };
-    case 'TOGGLE_PASSWORD': return { ...state, showPassword: !state.showPassword };
-    case 'SET_EMAIL_FOCUSED': return { ...state, emailFocused: action.payload };
+    case 'SET_EMAIL':            return { ...state, email: action.payload };
+    case 'SET_PASSWORD':         return { ...state, password: action.payload };
+    case 'SET_EMAIL_ERROR':      return { ...state, emailError: action.payload };
+    case 'SET_PASSWORD_ERROR':   return { ...state, passwordError: action.payload };
+    case 'TOGGLE_PASSWORD':      return { ...state, showPassword: !state.showPassword };
+    case 'SET_EMAIL_FOCUSED':    return { ...state, emailFocused: action.payload };
     case 'SET_PASSWORD_FOCUSED': return { ...state, passwordFocused: action.payload };
-    case 'SET_LOADING': return { ...state, loading: action.payload };
-    case 'SET_LOCKOUT_SECONDS': return { ...state, lockoutSeconds: action.payload };
-    case 'SET_CAPS_LOCK': return { ...state, capsLockOn: action.payload };
-    case 'CLEAR_ERRORS': return { ...state, emailError: '', passwordError: '' };
-    case 'CLEAR_PASSWORD': return { ...state, password: '' };
-    case 'HIDE_PASSWORD': return { ...state, showPassword: false };
-    case 'WIPE_SENSITIVE': return { ...state, password: '' };
-    case 'RESET': return { ...initialFormState, email: state.email };
-    default: return state;
+    case 'SET_LOADING':          return { ...state, loading: action.payload };
+    case 'SET_LOCKOUT_SECONDS':  return { ...state, lockoutSeconds: action.payload };
+    case 'SET_CAPS_LOCK':        return { ...state, capsLockOn: action.payload };
+    case 'CLEAR_ERRORS':         return { ...state, emailError: '', passwordError: '' };
+    case 'CLEAR_PASSWORD':       return { ...state, password: '' };
+    case 'HIDE_PASSWORD':        return { ...state, showPassword: false };
+    case 'WIPE_SENSITIVE':       return { ...state, password: '' };
+    case 'RESET':                return { ...initialFormState, email: state.email };
+    default:                     return state;
   }
 }
 
 const AnimatedError = React.memo(({ message, inputId, C }: { message: string; inputId: string; C: Tokens }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
+  const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-8)).current;
   useEffect(() => {
     if (message) {
       Animated.parallel([
-        Animated.spring(opacity, { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 0 }),
+        Animated.spring(opacity,    { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 0 }),
         Animated.spring(translateY, { toValue: 0, useNativeDriver: nativeDriver, speed: 20, bounciness: 4 }),
       ]).start(() => { if (!IS_WEB) AccessibilityInfo.announceForAccessibility(message); });
     } else {
@@ -258,11 +241,7 @@ const AnimatedError = React.memo(({ message, inputId, C }: { message: string; in
     }
   }, [message, opacity, translateY]);
   if (!message) return null;
-
-  const webProps: WebAriaProps = IS_WEB
-    ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` }
-    : {};
-
+  const webProps: WebAriaProps = IS_WEB ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` } : {};
   return (
     <Animated.View style={[s.errorRow, { opacity, transform: [{ translateY }] }]} accessibilityLiveRegion="assertive" {...webProps}>
       <Ionicons name="alert-circle" size={14} color={C.error} accessibilityElementsHidden importantForAccessibility="no" />
@@ -277,7 +256,7 @@ const BrandLogo = React.memo(({ C, paused }: { C: Tokens; paused: boolean }) => 
     if (prefersReducedMotion || paused) { scale.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(scale, { toValue: 1.04, duration: getAnimDuration(2400), useNativeDriver: nativeDriver }),
-      Animated.timing(scale, { toValue: 1, duration: getAnimDuration(2400), useNativeDriver: nativeDriver }),
+      Animated.timing(scale, { toValue: 1,    duration: getAnimDuration(2400), useNativeDriver: nativeDriver }),
     ]));
     const task = InteractionManager.runAfterInteractions(() => loop.start());
     return () => { task.cancel(); loop.stop(); };
@@ -292,11 +271,11 @@ const BrandLogo = React.memo(({ C, paused }: { C: Tokens; paused: boolean }) => 
 });
 
 type ModalButton = { label: string; onPress?: () => void | Promise<void>; primary?: boolean; danger?: boolean };
-type ModalConfig = { title: string; message: string; buttons: ModalButton[] };
+type ModalConfig  = { title: string; message: string; buttons: ModalButton[] };
 
 const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; onClose: () => void; C: Tokens }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.92)).current;
+  const opacity   = useRef(new Animated.Value(0)).current;
+  const scale     = useRef(new Animated.Value(0.92)).current;
   const isClosing = useRef(false);
 
   const doClose = useCallback(async (btn?: ModalButton) => {
@@ -311,7 +290,7 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(200), useNativeDriver: nativeDriver }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 4 }),
+      Animated.spring(scale,   { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 4 }),
     ]).start();
     if (!IS_WEB) return;
     const h = (e: unknown) => {
@@ -323,7 +302,6 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
   }, [opacity, scale, doClose, config.buttons]);
 
   const webDialogProps: WebAriaProps = IS_WEB ? { role: 'dialog', 'aria-modal': 'true' } : {};
-
   return (
     <Animated.View style={[s.modalOverlay, { backgroundColor: C.overlay, opacity }]} {...webDialogProps} accessibilityViewIsModal>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={() => void doClose(config.buttons.find(b => !b.primary && !b.danger))} accessibilityLabel="Close dialog" />
@@ -350,28 +328,27 @@ const useShake = () => {
     if (prefersReducedMotion) return;
     shakeAnim.setValue(0);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(shakeAnim, { toValue:  10, duration: 60, useNativeDriver: nativeDriver }),
       Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: nativeDriver }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: nativeDriver }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: nativeDriver }),
-      Animated.timing(shakeAnim, { toValue: 4, duration: 60, useNativeDriver: nativeDriver }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(shakeAnim, { toValue:   8, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(shakeAnim, { toValue:  -8, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(shakeAnim, { toValue:   4, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(shakeAnim, { toValue:   0, duration: 60, useNativeDriver: nativeDriver }),
     ]).start();
   }, [shakeAnim]);
   return { shakeAnim, shake };
 };
 
 const GradientButton = React.memo(({ onPress, disabled, loading, label, C }: { onPress: () => void; disabled: boolean; loading: boolean; label: string; C: Tokens }) => {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale      = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
-  const handlePressIn = useCallback(() => {
+  const handlePressIn  = useCallback(() => {
     if (isDisabled) return;
     Animated.spring(scale, { toValue: 0.97, useNativeDriver: nativeDriver, speed: 50 }).start();
     void triggerHaptic('light');
   }, [scale, isDisabled]);
   const handlePressOut = useCallback(() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 50 }).start(), [scale]);
   const gradColors = useMemo(() => (isDisabled ? [C.disabledBg, C.disabledBg] : [C.buttonGradStart, C.buttonGradEnd]) as [string, string], [isDisabled, C]);
-
   return (
     <Animated.View style={[s.buttonOuter, { shadowColor: isDisabled ? 'transparent' : C.accent, transform: [{ scale }] }]}>
       <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut} disabled={isDisabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: isDisabled, busy: loading }}>
@@ -413,16 +390,15 @@ const InputField = React.memo(({
   editable?: boolean; accessibilityLabel: string; inputId: string; C: Tokens; onKeyPress?: (e: TextKeyPressLike) => void;
 }) => {
   const borderAnim = useRef(new Animated.Value(0)).current;
-  const hasError = !!error;
-  const webStyle = useMemo(() => buildWebInputStyle(C), [C]);
+  const hasError   = !!error;
+  const webStyle   = useMemo(() => buildWebInputStyle(C), [C]);
 
   useEffect(() => {
     Animated.timing(borderAnim, { toValue: focused ? 1 : 0, duration: getAnimDuration(200), useNativeDriver: false }).start();
   }, [focused, borderAnim]);
 
   const borderColor = borderAnim.interpolate({ inputRange: [0, 1], outputRange: [hasError ? C.error : C.inputBorder, hasError ? C.error : C.accent] });
-
-  const webNameProp: WebInputProps = webInputName ? { name: webInputName } : {};
+  const webNameProp: WebInputProps  = webInputName ? { name: webInputName } : {};
   const webErrorProps: WebAriaProps = hasError
     ? { 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' }
     : { 'aria-required': 'true' };
@@ -433,58 +409,22 @@ const InputField = React.memo(({
       <Animated.View style={[s.inputWrapper, { borderColor, backgroundColor: hasError ? C.errorGlow : C.inputBg }, focused && [s.inputWrapperFocused, { shadowColor: C.inputShadow }]]}>
         <Ionicons name={icon} size={20} color={hasError ? C.error : focused ? C.accent : C.textMuted} style={s.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
         {IS_WEB ? (
-          <TextInput
-            ref={inputRef}
-            nativeID={inputId}
-            {...webNameProp}
-            style={webStyle as WebStyleProps}
-            placeholder={placeholder}
-            placeholderTextColor={C.textMuted}
-            value={value}
-            onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry && !showPassword}
-            keyboardType={keyboardType ?? 'default'}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete={(webAutoComplete ?? autoComplete) as TextInput['props']['autoComplete']}
-            textContentType={textContentType}
-            editable={editable !== false}
-            returnKeyType={returnKeyType}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress}
-            accessibilityLabel={accessibilityLabel}
-            selectionColor={C.accent}
-            {...webErrorProps}
-          />
+          <TextInput ref={inputRef} nativeID={inputId} {...webNameProp} style={webStyle as WebStyleProps}
+            placeholder={placeholder} placeholderTextColor={C.textMuted} value={value} onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry && !showPassword} keyboardType={keyboardType ?? 'default'}
+            autoCapitalize="none" autoCorrect={false} autoComplete={(webAutoComplete ?? autoComplete) as TextInput['props']['autoComplete']}
+            textContentType={textContentType} editable={editable !== false} returnKeyType={returnKeyType}
+            onFocus={onFocus} onBlur={onBlur} onSubmitEditing={onSubmitEditing} onKeyPress={onKeyPress}
+            accessibilityLabel={accessibilityLabel} selectionColor={C.accent} {...webErrorProps} />
         ) : (
-          <TextInput
-            ref={inputRef}
-            nativeID={inputId}
-            style={[s.inputNative, { color: C.textPrimary }]}
-            placeholder={placeholder}
-            placeholderTextColor={C.textMuted}
-            value={value}
-            onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry && !showPassword}
-            keyboardType={keyboardType ?? 'default'}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete={autoComplete}
-            textContentType={textContentType}
-            editable={editable !== false}
-            returnKeyType={returnKeyType}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityHint={hasError ? error : undefined}
-            selectionColor={C.accent}
-            allowFontScaling
-            maxFontSizeMultiplier={1.1}
-          />
+          <TextInput ref={inputRef} nativeID={inputId} style={[s.inputNative, { color: C.textPrimary }]}
+            placeholder={placeholder} placeholderTextColor={C.textMuted} value={value} onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry && !showPassword} keyboardType={keyboardType ?? 'default'}
+            autoCapitalize="none" autoCorrect={false} autoComplete={autoComplete} textContentType={textContentType}
+            editable={editable !== false} returnKeyType={returnKeyType} onFocus={onFocus} onBlur={onBlur}
+            onSubmitEditing={onSubmitEditing} onKeyPress={onKeyPress} accessibilityLabel={accessibilityLabel}
+            accessibilityHint={hasError ? error : undefined} selectionColor={C.accent}
+            allowFontScaling maxFontSizeMultiplier={1.1} />
         )}
         {onTogglePassword && (
           <Pressable onPress={onTogglePassword} hitSlop={12} style={s.eyeButton} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
@@ -505,14 +445,14 @@ const LockoutBanner = React.memo(({ seconds, C }: { seconds: number; C: Tokens }
 ));
 
 const SuccessOverlay = React.memo(({ C, secondsLeft }: { C: Tokens; secondsLeft: number }) => {
-  const scale = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const scale     = useRef(new Animated.Value(0)).current;
+  const opacity   = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
         Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(200), useNativeDriver: nativeDriver }),
-        Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 14, bounciness: 8 }),
+        Animated.spring(scale,   { toValue: 1, useNativeDriver: nativeDriver, speed: 14, bounciness: 8 }),
       ]),
       Animated.spring(iconScale, { toValue: 1, useNativeDriver: nativeDriver, speed: 10, bounciness: 12 }),
     ]).start();
@@ -527,7 +467,7 @@ const SuccessOverlay = React.memo(({ C, secondsLeft }: { C: Tokens; secondsLeft:
           </View>
         </Animated.View>
         <Text style={[s.successTitle, { color: C.textPrimary }]}>Welcome back!</Text>
-        <Text style={[s.successSub, { color: C.textSecondary }]}>Redirecting in {secondsLeft}…</Text>
+        <Text style={[s.successSub,   { color: C.textSecondary }]}>Redirecting in {secondsLeft}…</Text>
         <ActivityIndicator size="small" color={C.accent} style={{ marginTop: 4 }} />
       </Animated.View>
     </Animated.View>
@@ -545,7 +485,7 @@ class LoginErrorBoundary extends React.Component<{ children: React.ReactNode }, 
         <View style={[s.errorFallback, { backgroundColor: C.bg }]}>
           <Ionicons name="warning-outline" size={48} color={C.error} />
           <Text style={[s.errorFallbackTitle, { color: C.textPrimary }]}>Something went wrong</Text>
-          <Text style={[s.errorFallbackSub, { color: C.textSecondary }]}>Please restart the app.</Text>
+          <Text style={[s.errorFallbackSub,   { color: C.textSecondary }]}>Please restart the app.</Text>
           <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={[s.retryButton, { borderColor: C.accent }]}>
             <Text style={[s.retryText, { color: C.accent }]}>Try Again</Text>
           </TouchableOpacity>
@@ -557,59 +497,60 @@ class LoginErrorBoundary extends React.Component<{ children: React.ReactNode }, 
 }
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const router      = useRouter();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme !== 'light';
-  const C: Tokens = isDark ? darkTokens : lightTokens;
+  const isDark      = colorScheme !== 'light';
+  const C: Tokens   = isDark ? darkTokens : lightTokens;
 
   useEffect(() => { injectWebStyles(C, isDark ? 'dark' : 'light'); }, [C, isDark]);
+
   useEffect(() => {
     if (!IS_WEB) return;
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const h = (e: WebMediaEvent) => { prefersReducedMotion = e.matches; };
+    const h  = (e: WebMediaEvent) => { prefersReducedMotion = e.matches; };
     mq?.addEventListener?.('change', h);
     return () => mq?.removeEventListener?.('change', h);
   }, []);
 
-  const [state, dispatch] = useReducer(formReducer, initialFormState);
-  const [screenData, setSD] = useState(getScreenData);
+  const [state, dispatch]         = useReducer(formReducer, initialFormState);
+  const [screenData, setSD]       = useState(getScreenData);
   const [showSuccess, setSuccess] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(Math.ceil(SUCCESS_NAV_DELAY_MS / 1000));
-  const [modal, setModal] = useState<ModalConfig | null>(null);
+  const [modal,     setModal]     = useState<ModalConfig | null>(null);
   const [appActive, setAppActive] = useState(true);
 
-  const isMounted = useRef(true);
-  const loginAttempts = useRef(0);
-  const lockoutUntil = useRef(0);
-  const lockoutTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const successTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const emailRef = useRef<TextInput>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resendAttempts = useRef(0);
+  const isMounted       = useRef(true);
+  const loginAttempts   = useRef(0);
+  const lockoutUntil    = useRef(0);
+  const lockoutTimer    = useRef<ReturnType<typeof setInterval>  | null>(null);
+  const navTimeout      = useRef<ReturnType<typeof setTimeout>   | null>(null);
+  const successTimer    = useRef<ReturnType<typeof setInterval>  | null>(null);
+  const focusTimeout    = useRef<ReturnType<typeof setTimeout>   | null>(null);
+  const passwordRef     = useRef<TextInput>(null);
+  const emailRef        = useRef<TextInput>(null);
+  const scrollRef       = useRef<ScrollView>(null);
+  const resendAttempts  = useRef(0);
   const resendLockUntil = useRef(0);
-  const forgotAttempts = useRef(0);
+  const forgotAttempts  = useRef(0);
   const forgotLockUntil = useRef(0);
 
   const { shakeAnim, shake } = useShake();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(prefersReducedMotion ? 0 : 40)).current;
-  const headerFade = useRef(new Animated.Value(0)).current;
+  const fadeAnim    = useRef(new Animated.Value(0)).current;
+  const slideAnim   = useRef(new Animated.Value(prefersReducedMotion ? 0 : 40)).current;
+  const headerFade  = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(prefersReducedMotion ? 0 : 20)).current;
-  const formFade = useRef(new Animated.Value(0)).current;
-  const formSlide = useRef(new Animated.Value(prefersReducedMotion ? 0 : 20)).current;
-  const footerFade = useRef(new Animated.Value(0)).current;
+  const formFade    = useRef(new Animated.Value(0)).current;
+  const formSlide   = useRef(new Animated.Value(prefersReducedMotion ? 0 : 20)).current;
+  const footerFade  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
       if (lockoutTimer.current) clearInterval(lockoutTimer.current);
-      if (navTimeout.current) clearTimeout(navTimeout.current);
-      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (navTimeout.current)   clearTimeout(navTimeout.current);
       if (successTimer.current) clearInterval(successTimer.current);
+      if (focusTimeout.current) clearTimeout(focusTimeout.current);
       dispatch({ type: 'WIPE_SENSITIVE' });
     };
   }, []);
@@ -618,12 +559,12 @@ export default function LoginScreen() {
     if (!IS_WEB) return;
     const h = debounce(() => setSD(getScreenData()), RESIZE_DEBOUNCE_MS);
     window.addEventListener?.('resize', h);
-    return () => window.removeEventListener?.('resize', h);
+    return () => { window.removeEventListener?.('resize', h); h.cancel(); };
   }, []);
 
   useEffect(() => {
     if (IS_WEB) return;
-    const sub = AppState.addEventListener('change', (s: AppStateStatus) => setAppActive(s === 'active'));
+    const sub = AppState.addEventListener('change', (st: AppStateStatus) => setAppActive(st === 'active'));
     return () => sub.remove();
   }, []);
 
@@ -637,15 +578,15 @@ export default function LoginScreen() {
     const task = InteractionManager.runAfterInteractions(() => {
       if (!isMounted.current) return;
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: getAnimDuration(300), useNativeDriver: nativeDriver }),
+        Animated.timing(fadeAnim,  { toValue: 1, duration: getAnimDuration(300), useNativeDriver: nativeDriver }),
         Animated.timing(slideAnim, { toValue: 0, duration: getAnimDuration(400), useNativeDriver: nativeDriver }),
         Animated.stagger(getAnimDuration(150), [
           Animated.parallel([
-            Animated.timing(headerFade, { toValue: 1, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
+            Animated.timing(headerFade,  { toValue: 1, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
             Animated.timing(headerSlide, { toValue: 0, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
           ]),
           Animated.parallel([
-            Animated.timing(formFade, { toValue: 1, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
+            Animated.timing(formFade,  { toValue: 1, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
             Animated.timing(formSlide, { toValue: 0, duration: getAnimDuration(500), useNativeDriver: nativeDriver }),
           ]),
           Animated.timing(footerFade, { toValue: 1, duration: getAnimDuration(400), useNativeDriver: nativeDriver }),
@@ -681,17 +622,15 @@ export default function LoginScreen() {
     }, 1000);
   }, []);
 
-  const openModal = useCallback((cfg: ModalConfig) => setModal(cfg), []);
+  const openModal  = useCallback((cfg: ModalConfig) => setModal(cfg), []);
   const closeModal = useCallback(() => setModal(null), []);
 
   const showAppAlert = useCallback((title: string, message: string, buttons?: AlertBtn[]) => {
     if (IS_WEB) {
       openModal({
-        title,
-        message,
+        title, message,
         buttons: (buttons ?? [{ text: 'OK' }]).map((b, _, arr) => ({
-          label: b.text,
-          onPress: b.onPress,
+          label: b.text, onPress: b.onPress,
           primary: b.style !== 'cancel' && arr.length > 1,
           danger: b.style === 'destructive',
         })),
@@ -704,50 +643,41 @@ export default function LoginScreen() {
     dispatch({ type: 'SET_CAPS_LOCK', payload: e.nativeEvent.getModifierState?.('CapsLock') ?? false });
   }, []);
 
-  const handleTypingActivity = useCallback(() => {
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => {}, TYPING_PAUSE_MS);
-  }, []);
-
   const canSubmit = useMemo(() => !!(
     state.email.trim() && state.password && !state.emailError && !state.passwordError && !state.loading && state.lockoutSeconds === 0
   ), [state.email, state.password, state.emailError, state.passwordError, state.loading, state.lockoutSeconds]);
 
-  const onEmailFocus = useCallback(() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: true }), []);
-  const onEmailBlur = useCallback(() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: false }), []);
-  const onPasswordFocus = useCallback(() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true }), []);
-  const onPasswordBlur = useCallback(() => { dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false }); dispatch({ type: 'HIDE_PASSWORD' }); }, []);
-  const togglePassword = useCallback(() => dispatch({ type: 'TOGGLE_PASSWORD' }), []);
+  const onEmailFocus    = useCallback(() => dispatch({ type: 'SET_EMAIL_FOCUSED',    payload: true }),  []);
+  const onEmailBlur     = useCallback(() => dispatch({ type: 'SET_EMAIL_FOCUSED',    payload: false }), []);
+  const onPasswordFocus = useCallback(() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true }),  []);
+  const onPasswordBlur  = useCallback(() => { dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false }); dispatch({ type: 'HIDE_PASSWORD' }); }, []);
+  const togglePassword  = useCallback(() => dispatch({ type: 'TOGGLE_PASSWORD' }), []);
 
   const validateEmail = useCallback((text: string) => {
     const s = text.trimStart().slice(0, MAX_EMAIL_LENGTH + 1).replace(/[\n\r]/g, '');
     dispatch({ type: 'SET_EMAIL', payload: s });
-    handleTypingActivity();
     if (s.length < 3) return dispatch({ type: 'SET_EMAIL_ERROR', payload: '' });
     dispatch({ type: 'SET_EMAIL_ERROR', payload: validators.email(s) });
-  }, [handleTypingActivity]);
+  }, []);
 
   const validatePassword = useCallback((text: string) => {
     const s = text.slice(0, MAX_PASSWORD_LENGTH + 1);
     dispatch({ type: 'SET_PASSWORD', payload: s });
-    handleTypingActivity();
     if (!s) return dispatch({ type: 'SET_PASSWORD_ERROR', payload: '' });
     dispatch({ type: 'SET_PASSWORD_ERROR', payload: validators.password(s) });
-  }, [handleTypingActivity]);
+  }, []);
 
   const dismissKeyboard = useCallback(() => { if (!IS_WEB) Keyboard.dismiss(); }, []);
 
   const handleLogin = useCallback(async () => {
     dismissKeyboard();
     dispatch({ type: 'CLEAR_ERRORS' });
-
-    const email = state.email.trim().toLowerCase();
+    const email    = state.email.trim().toLowerCase();
     const password = state.password;
     const emailErr = validators.email(email);
-    const passErr = validators.password(password);
-
-    if (emailErr) { dispatch({ type: 'SET_EMAIL_ERROR', payload: emailErr }); shake(); return; }
-    if (passErr) { dispatch({ type: 'SET_PASSWORD_ERROR', payload: passErr }); shake(); return; }
+    const passErr  = validators.password(password);
+    if (emailErr) { dispatch({ type: 'SET_EMAIL_ERROR',    payload: emailErr }); shake(); return; }
+    if (passErr)  { dispatch({ type: 'SET_PASSWORD_ERROR', payload: passErr  }); shake(); return; }
     if (Date.now() < lockoutUntil.current) { startLockoutCountdown(); shake(); return; }
 
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -755,28 +685,40 @@ export default function LoginScreen() {
 
     try {
       const fp = await getDeviceFingerprint();
-
       if (fp) {
         const multiCheck = await checkDeviceMultiAccount(fp);
         if (multiCheck.suspicious) {
           dispatch({ type: 'SET_LOADING', payload: false });
           showAppAlert('Account Restricted', 'Multiple accounts detected from this device. Please contact support.');
-          shake();
-          return;
+          shake(); return;
         }
       }
-
       const bannedCheck = await checkUserBanned(email);
       if (bannedCheck.banned) {
         dispatch({ type: 'SET_LOADING', payload: false });
         showAppAlert('Account Suspended', bannedCheck.reason ?? 'This account has been suspended. Contact support.');
-        shake();
-        return;
+        shake(); return;
       }
 
-      const hadLocalKeys = !!(await getLocalE2EEKeypair());
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      // ── Safety middleware check ──
+      try {
+        const loginSafety = await checkLogin(email, password, '', {
+          serverUrl: '', enableLoginCheck: true, enableMessageCheck: false,
+          enablePhotoCheck: false, enableRegistrationCheck: false, enableProfileCheck: false,
+          autoBlockCritical: true, logAllChecks: false,
+        });
+        if (!loginSafety.allowed) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+          showAppAlert('Access Denied', loginSafety.reasons.join('\n') || 'Login blocked by safety system.');
+          shake(); return;
+        }
+      } catch (safetyErr) {
+        // Safety middleware failure should not block login — log and continue
+        console.warn('[Login] Safety middleware check failed, continuing:', safetyErr);
+      }
 
+      const hadLocalKeys    = !!(await getLocalE2EEKeypair());
+      const { user }        = await signInWithEmailAndPassword(auth, email, password);
       if (!user.emailVerified) {
         await auth.signOut();
         if (!isMounted.current) return;
@@ -785,12 +727,9 @@ export default function LoginScreen() {
         showAppAlert('Email Not Verified', 'Please verify your email before logging in.\n\nCheck your inbox (and spam folder).', [{ text: 'OK' }]);
         return;
       }
-
       if (fp) await recordDeviceLogin(user.uid, fp, email);
-
-      const e2eeResult = await ensureMyE2EEIdentity();
+      const e2eeResult   = await ensureMyE2EEIdentity();
       const hasKeysAfter = !!(await getLocalE2EEKeypair());
-
       await writeAuditLog('user.login', {
         uid: user.uid,
         maskedEmail: email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => `${a}${'*'.repeat(Math.min(String(b).length, 6))}${c}`),
@@ -798,19 +737,15 @@ export default function LoginScreen() {
         deviceFingerprint: fp,
         e2eeInitialized: e2eeResult.success,
       });
-
       loginAttempts.current = 0;
       if (lockoutTimer.current) { clearInterval(lockoutTimer.current); lockoutTimer.current = null; }
-
       await triggerHaptic('success');
       dispatch({ type: 'CLEAR_PASSWORD' });
       if (!isMounted.current) return;
       dispatch({ type: 'SET_LOADING', payload: false });
-
       if (!hadLocalKeys && hasKeysAfter) {
         showAppAlert('Encrypted Chats Reset', 'A new encryption key was created for this device. Older encrypted chats may not be readable here.', [{ text: 'Continue' }]);
       }
-
       setSuccess(true);
       startSuccessCountdown();
       navTimeout.current = setTimeout(() => { if (isMounted.current) router.replace(ROUTES.HOME); }, getAnimDuration(SUCCESS_NAV_DELAY_MS));
@@ -818,21 +753,19 @@ export default function LoginScreen() {
       const code = getErrorCode(error);
       loginAttempts.current += 1;
       if (loginAttempts.current >= MAX_LOGIN_ATTEMPTS) {
-        lockoutUntil.current = Date.now() + LOCKOUT_DURATION_MS;
+        lockoutUntil.current  = Date.now() + LOCKOUT_DURATION_MS;
         loginAttempts.current = 0;
         startLockoutCountdown();
       }
       await triggerHaptic('error');
       shake();
       if (!isMounted.current) return;
-
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         dispatch({ type: 'CLEAR_PASSWORD' });
-        setTimeout(() => passwordRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
+        focusTimeout.current = setTimeout(() => passwordRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
       } else if (code === 'auth/invalid-email') {
-        setTimeout(() => emailRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
+        focusTimeout.current = setTimeout(() => emailRef.current?.focus(), FOCUS_RETURN_DELAY_MS);
       }
-
       showAppAlert('Login Failed', getErrorMessage(code));
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -840,23 +773,21 @@ export default function LoginScreen() {
 
   const handleResendVerification = useCallback(async () => {
     dismissKeyboard();
-    const email = state.email.trim();
+    const email    = state.email.trim();
     const password = state.password;
-    if (!email) return showAppAlert('Email Required', 'Please enter your email address first.');
-    if (!password) return showAppAlert('Password Required', 'Please enter your password to verify identity.');
-    if (validators.email(email)) return showAppAlert('Invalid Email', 'Please enter a valid email address.');
+    if (!email)                    return showAppAlert('Email Required',    'Please enter your email address first.');
+    if (!password)                 return showAppAlert('Password Required', 'Please enter your password to verify identity.');
+    if (validators.email(email))   return showAppAlert('Invalid Email',     'Please enter a valid email address.');
     if (Date.now() < resendLockUntil.current) {
       const secs = Math.ceil((resendLockUntil.current - Date.now()) / 1000);
       return showAppAlert('Please Wait', `You can resend again in ${secs} seconds.`);
     }
-
     resendAttempts.current += 1;
     if (resendAttempts.current > MAX_RESEND_ATTEMPTS) {
       resendLockUntil.current = Date.now() + RATE_LIMIT_WINDOW_MS;
-      resendAttempts.current = 0;
+      resendAttempts.current  = 0;
       return showAppAlert('Too Many Requests', 'Please wait 60 seconds before requesting another email.');
     }
-
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const { user } = await signInWithEmailAndPassword(auth, email.toLowerCase(), password);
@@ -878,20 +809,18 @@ export default function LoginScreen() {
   const handleForgotPassword = useCallback(() => {
     dismissKeyboard();
     const email = state.email.trim();
-    if (!email) return showAppAlert('Email Required', 'Please enter your email address above, then try again.');
+    if (!email)                  return showAppAlert('Email Required', 'Please enter your email address above, then try again.');
     if (validators.email(email)) { dispatch({ type: 'SET_EMAIL_ERROR', payload: 'Please enter a valid email' }); return; }
     if (Date.now() < forgotLockUntil.current) {
       const secs = Math.ceil((forgotLockUntil.current - Date.now()) / 1000);
       return showAppAlert('Please Wait', `You can request another reset in ${secs} seconds.`);
     }
-
     forgotAttempts.current += 1;
     if (forgotAttempts.current > MAX_FORGOT_ATTEMPTS) {
       forgotLockUntil.current = Date.now() + RATE_LIMIT_WINDOW_MS;
-      forgotAttempts.current = 0;
+      forgotAttempts.current  = 0;
       return showAppAlert('Too Many Requests', 'Please wait 60 seconds before requesting another reset.');
     }
-
     showAppAlert('Reset Password', `Send password reset email to:\n${email}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -911,17 +840,20 @@ export default function LoginScreen() {
     ]);
   }, [state.email, dismissKeyboard, showAppAlert]);
 
-  const handleSignUp = useCallback(() => { if (!state.loading) router.push(ROUTES.SIGNUP); }, [state.loading, router]);
+  const handleSignUp      = useCallback(() => { if (!state.loading) router.push(ROUTES.SIGNUP); }, [state.loading, router]);
   const handleEmailSubmit = useCallback(() => passwordRef.current?.focus(), []);
-  const IS_SMALL = screenData.isSmall;
-  const logoPaused = state.emailFocused || state.passwordFocused || state.loading || !appActive;
+  const IS_SMALL          = screenData.isSmall;
+  const logoPaused        = state.emailFocused || state.passwordFocused || state.loading || !appActive;
 
   const innerContentProps: InnerContentProps = useMemo(() => ({
     C, state, IS_SMALL, fadeAnim, slideAnim, headerFade, headerSlide, formFade, formSlide, footerFade,
     emailRef, passwordRef, canSubmit, shakeAnim, logoPaused, validateEmail, validatePassword,
     onEmailFocus, onEmailBlur, onPasswordFocus, onPasswordBlur, togglePassword, handleLogin,
     handleEmailSubmit, handleForgotPassword, handleResendVerification, handleSignUp, handleKeyPress,
-  }), [C, state, IS_SMALL, fadeAnim, slideAnim, headerFade, headerSlide, formFade, formSlide, footerFade, emailRef, passwordRef, canSubmit, shakeAnim, logoPaused, validateEmail, validatePassword, onEmailFocus, onEmailBlur, onPasswordFocus, onPasswordBlur, togglePassword, handleLogin, handleEmailSubmit, handleForgotPassword, handleResendVerification, handleSignUp, handleKeyPress]);
+  }), [C, state, IS_SMALL, fadeAnim, slideAnim, headerFade, headerSlide, formFade, formSlide, footerFade,
+    emailRef, passwordRef, canSubmit, shakeAnim, logoPaused, validateEmail, validatePassword,
+    onEmailFocus, onEmailBlur, onPasswordFocus, onPasswordBlur, togglePassword, handleLogin,
+    handleEmailSubmit, handleForgotPassword, handleResendVerification, handleSignUp, handleKeyPress]);
 
   return (
     <LoginErrorBoundary>
@@ -943,7 +875,6 @@ export default function LoginScreen() {
                 </ScrollView>
               </Pressable>
             )}
-
             {state.loading && !showSuccess && (
               <View style={[s.loadingOverlay, { backgroundColor: C.overlay }]} pointerEvents="box-only" accessibilityViewIsModal accessibilityLiveRegion="polite">
                 <View style={[s.loadingCard, { backgroundColor: C.card, borderColor: C.cardBorder }]} accessibilityRole="alert">
@@ -952,9 +883,8 @@ export default function LoginScreen() {
                 </View>
               </View>
             )}
-
             {showSuccess && <SuccessOverlay C={C} secondsLeft={successCountdown} />}
-            {modal && IS_WEB && <CustomModal config={modal} onClose={() => setModal(null)} C={C} />}
+            {modal && IS_WEB && <CustomModal config={modal} onClose={closeModal} C={C} />}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </View>
@@ -982,7 +912,6 @@ const InnerContent = React.memo(({
   handleEmailSubmit, handleForgotPassword, handleResendVerification, handleSignUp, handleKeyPress,
 }: InnerContentProps) => {
   const webFormProps: WebAriaProps = IS_WEB ? { role: 'form', 'aria-label': 'Login form' } : {};
-
   return (
     <Animated.View style={[s.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }], maxWidth: 440 }]}>
       <Animated.View style={[s.headerContainer, { opacity: headerFade, transform: [{ translateY: headerSlide }], marginBottom: IS_SMALL ? 28 : 40 }]}>
@@ -990,9 +919,7 @@ const InnerContent = React.memo(({
         <Text style={[s.title, { color: C.textPrimary, fontSize: IS_SMALL ? 28 : 36 }]} accessibilityRole="header">Welcome Back</Text>
         <Text style={[s.subtitle, { color: C.textSecondary, fontSize: IS_SMALL ? 14 : 16 }]}>Log in to find your perfect match</Text>
       </Animated.View>
-
       <LockoutBanner seconds={state.lockoutSeconds} C={C} />
-
       <Animated.View style={[s.formCard, { opacity: formFade, transform: [{ translateX: shakeAnim }, { translateY: formSlide }], backgroundColor: C.card, borderColor: C.cardBorder, padding: IS_SMALL ? 24 : 34 }]} {...webFormProps}>
         <InputField
           inputId="login-email" label="Email address" icon="mail-outline" placeholder="you@example.com"
@@ -1000,44 +927,36 @@ const InnerContent = React.memo(({
           onFocus={onEmailFocus} onBlur={onEmailBlur} keyboardType="email-address" autoComplete="email"
           webAutoComplete="username" webInputName="username" textContentType="emailAddress"
           returnKeyType="next" onSubmitEditing={handleEmailSubmit} inputRef={emailRef}
-          editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress}
-        />
+          editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress} />
         <InputField
           inputId="login-password" label="Password" icon="lock-closed-outline" placeholder="Enter your password"
           value={state.password} onChangeText={validatePassword} error={state.passwordError} focused={state.passwordFocused}
           onFocus={onPasswordFocus} onBlur={onPasswordBlur} secureTextEntry showPassword={state.showPassword}
           onTogglePassword={togglePassword} autoComplete="current-password" webAutoComplete="current-password"
           webInputName="password" textContentType="password" returnKeyType="go" onSubmitEditing={handleLogin}
-          inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress}
-        />
-
+          inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress} />
         {IS_WEB && state.capsLockOn && state.passwordFocused && (
           <View style={[s.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]} accessibilityLiveRegion="polite">
             <Ionicons name="warning-outline" size={14} color={C.warn} />
             <Text style={[s.capsLockText, { color: C.warn }]}>Caps Lock is on</Text>
           </View>
         )}
-
         <Pressable onPress={handleForgotPassword} disabled={state.loading} style={s.forgotRow} accessibilityRole="link" accessibilityLabel="Forgot password" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={[s.forgotText, { color: C.warn }]}>Forgot Password?</Text>
         </Pressable>
-
         <View style={s.buttonSpacer} />
         <GradientButton onPress={handleLogin} disabled={!canSubmit} loading={state.loading} label="Log In" C={C} />
       </Animated.View>
-
       <Animated.View style={[s.footer, { opacity: footerFade }]}>
         <Pressable onPress={handleResendVerification} disabled={state.loading} style={[s.resendButton, { borderColor: C.separator, backgroundColor: C.accentGlow }]} accessibilityRole="button" accessibilityLabel="Resend verification email">
           <Ionicons name="mail-unread-outline" size={16} color={C.accent} accessibilityElementsHidden importantForAccessibility="no" />
           <Text style={[s.resendText, { color: C.accent }]}>Resend Verification Email</Text>
         </Pressable>
-
         <View style={s.separatorRow} accessibilityElementsHidden importantForAccessibility="no">
           <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
           <Text style={[s.separatorText, { color: C.textMuted }]}>or</Text>
           <View style={[s.separatorLine, { backgroundColor: C.separator }]} />
         </View>
-
         <Pressable onPress={handleSignUp} disabled={state.loading} style={({ pressed }) => [s.signUpButton, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Create a new account">
           <Text style={[s.signUpText, { color: C.textSecondary }]}>Don't have an account? <Text style={[s.signUpLink, { color: C.accent }]}>Sign Up</Text></Text>
         </Pressable>

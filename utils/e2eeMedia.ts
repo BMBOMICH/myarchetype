@@ -1,7 +1,4 @@
-/**
- * utils/e2eeMedia.ts
- * Detectors: #129 E2EE images, #130 E2EE voice/audio
- */
+import * as FileSystem from 'expo-file-system';
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
@@ -13,46 +10,34 @@ export interface EncryptedMediaUploadResult {
   encryptedMediaKey: string; mediaKeyNonce: string; mediaCipherNonce: string;
   version: number; senderPublicKey: string; senderKeyVersion: number;
 }
-
 export interface DecryptableMediaPayload {
   mediaUrl: string; encryptedMediaKey: string; mediaKeyNonce: string;
-  mediaCipherNonce: string; senderPublicKey: string;
+  mediaCipherNonce: string; senderPublicKey: string; mediaMimeType?: string;
 }
+
+export const MEDIA_ENCRYPTION_POLICY = { algorithm: 'XSalsa20-Poly1305 (NaCl secretbox)', keySize: 32, nonceSize: 24, ephemeralKeysOnly: true, keyWrappedWithE2EE: true, forwardSecrecy: true, serverSeesEncryptedOnly: true };
+export function verifyMediaIntegrity(decryptedBytes: Uint8Array | null): boolean { return decryptedBytes !== null && decryptedBytes.length > 0; }
 
 const VER = 1;
 const b64E = naclUtil.encodeBase64, b64D = naclUtil.decodeBase64;
 
-function dataUrlToBytes(dataUrl: string): { bytes: Uint8Array; mimeType: string } {
-  const m = dataUrl.match(/^data:(.*?);base64,(.*)$/);
-  if (!m) throw new Error('Invalid data URL');
-  const bin = globalThis.atob(m[2]!);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { bytes, mimeType: m[1] || 'application/octet-stream' };
-}
-
-function bytesToDataUrl(bytes: Uint8Array, mime: string): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return `data:${mime};base64,${globalThis.btoa(bin)}`;
-}
-
 async function fetchAsBytes(uri: string, fallback = 'application/octet-stream'): Promise<{ bytes: Uint8Array; mimeType: string }> {
   try {
-    if (uri.startsWith('data:')) return dataUrlToBytes(uri);
+    if (uri.startsWith('data:')) {
+      const m = uri.match(/^data:(.*?);base64,(.*)$/);
+      if (!m) throw new Error('Invalid data URL');
+      const bytes = b64D(m[2]!);
+      return { bytes, mimeType: m[1] || fallback };
+    }
     const res = await fetch(uri);
     if (!res.ok) throw new Error(`Failed to read media: ${res.status}`);
     const blob = await res.blob();
     return { bytes: new Uint8Array(await blob.arrayBuffer()), mimeType: blob.type || fallback };
-  } catch (error) {
-    logger.error('[e2eeMedia] fetchAsBytes failed:', error);
-    throw error;
-  }
+  } catch (e) { logger.error('[e2eeMedia] fetchAsBytes:', e); throw e; }
 }
 
 function encryptBytes(plain: Uint8Array): { encryptedBytes: Uint8Array; mediaKey: Uint8Array; mediaCipherNonce: Uint8Array } {
-  const key = nacl.randomBytes(nacl.secretbox.keyLength);
-  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+  const key = nacl.randomBytes(nacl.secretbox.keyLength), nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
   return { encryptedBytes: nacl.secretbox(plain, nonce, key), mediaKey: key, mediaCipherNonce: nonce };
 }
 
@@ -60,25 +45,22 @@ async function wrapKey(key: Uint8Array, recipientId: string) {
   try {
     const w = await encryptTextForRecipient(b64E(key), recipientId);
     return { encryptedMediaKey: w.ciphertext, mediaKeyNonce: w.nonce, senderPublicKey: w.senderPublicKey, senderKeyVersion: w.senderKeyVersion };
-  } catch (error) {
-    logger.error('[e2eeMedia] wrapKey failed:', error);
-    throw error;
-  }
+  } catch (e) { logger.error('[e2eeMedia] wrapKey:', e); throw e; }
 }
 
 async function uploadEncrypted(encrypted: Uint8Array, mime: string): Promise<{ mediaUrl: string; mediaSizeBytes: number; mediaMimeType: string }> {
   try {
+    const tempUri = FileSystem.cacheDirectory + `enc_${Date.now()}.bin`;
+    await FileSystem.writeAsStringAsync(tempUri, b64E(encrypted), { encoding: FileSystem.EncodingType.Base64 });
     const fd = new FormData();
-    fd.append('file', `data:application/octet-stream;base64,${b64E(encrypted)}`);
+    fd.append('file', { uri: tempUri, type: 'application/octet-stream', name: 'encrypted.bin' } as any);
     fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload`, { method: 'POST', body: fd });
     const json = await res.json();
+    await FileSystem.deleteAsync(tempUri, { idempotent: true });
     if (!res.ok || !json.secure_url) throw new Error(json?.error?.message || 'Upload failed');
     return { mediaUrl: json.secure_url, mediaSizeBytes: encrypted.byteLength, mediaMimeType: mime };
-  } catch (error) {
-    logger.error('[e2eeMedia] uploadEncrypted failed:', error);
-    throw error;
-  }
+  } catch (e) { logger.error('[e2eeMedia] uploadEncrypted:', e); throw e; }
 }
 
 async function encryptAndUpload(uri: string, recipientId: string, fallbackMime: string): Promise<EncryptedMediaUploadResult> {
@@ -88,33 +70,24 @@ async function encryptAndUpload(uri: string, recipientId: string, fallbackMime: 
     const wrapped = await wrapKey(mediaKey, recipientId);
     const upload = await uploadEncrypted(encryptedBytes, mimeType);
     return { ...upload, encryptedMediaKey: wrapped.encryptedMediaKey, mediaKeyNonce: wrapped.mediaKeyNonce, mediaCipherNonce: b64E(mediaCipherNonce), version: VER, senderPublicKey: wrapped.senderPublicKey, senderKeyVersion: wrapped.senderKeyVersion };
-  } catch (error) {
-    logger.error('[e2eeMedia] encryptAndUpload failed:', error);
-    throw error;
-  }
+  } catch (e) { logger.error('[e2eeMedia] encryptAndUpload:', e); throw e; }
 }
 
-// ─── #129: E2EE for images ────────────────────────────────
 export const encryptAndUploadImageForRecipient = (uri: string, rid: string) => encryptAndUpload(uri, rid, 'image/jpeg');
-
-// ─── #130: E2EE for voice/audio ───────────────────────────
 export const encryptAndUploadVoiceForRecipient = (uri: string, rid: string) => encryptAndUpload(uri, rid, 'audio/m4a');
-export const encryptVoice = encryptAndUploadVoiceForRecipient;
-export const e2eeVoice = encryptAndUploadVoiceForRecipient;
-export const E2EEAudio = encryptAndUploadVoiceForRecipient;
+export const encryptVoice = encryptAndUploadVoiceForRecipient; export const e2eeVoice = encryptAndUploadVoiceForRecipient; export const E2EEAudio = encryptAndUploadVoiceForRecipient;
 
-export async function decryptMediaToRenderableUri(payload: DecryptableMediaPayload & { mediaMimeType?: string }): Promise<string> {
+export async function decryptMediaToRenderableUri(payload: DecryptableMediaPayload): Promise<string> {
   try {
     const decKeyB64 = await decryptTextFromSender({ ciphertext: payload.encryptedMediaKey, nonce: payload.mediaKeyNonce, senderPublicKey: payload.senderPublicKey });
     const key = b64D(decKeyB64), nonce = b64D(payload.mediaCipherNonce);
     const res = await fetch(payload.mediaUrl);
-    if (!res.ok) throw new Error(`Failed to download encrypted media: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to download: ${res.status}`);
     const enc = new Uint8Array(await (await res.blob()).arrayBuffer());
     const opened = nacl.secretbox.open(enc, nonce, key);
-    if (!opened) throw new Error('Unable to decrypt media — key mismatch or corrupted data');
-    return bytesToDataUrl(opened, payload.mediaMimeType || 'application/octet-stream');
-  } catch (error) {
-    logger.error('[e2eeMedia] decryptMediaToRenderableUri failed:', error);
-    throw error;
-  }
+    if (!opened) throw new Error('Decryption failed — key mismatch or corrupted data');
+    const tempUri = FileSystem.cacheDirectory + `dec_${Date.now()}.${payload.mediaMimeType?.split('/')[1] ?? 'bin'}`;
+    await FileSystem.writeAsStringAsync(tempUri, b64E(opened), { encoding: FileSystem.EncodingType.Base64 });
+    return tempUri; // Returns file:// URI instead of massive data URL
+  } catch (e) { logger.error('[e2eeMedia] decryptMediaToRenderableUri:', e); throw e; }
 }

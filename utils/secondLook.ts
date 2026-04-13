@@ -1,3 +1,4 @@
+// utils/secondLook.ts
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { logger } from './logger';
@@ -8,33 +9,23 @@ export interface SkippedProfile {
   skippedAt: string;
 }
 
-const MAX_SKIPPED_STORED = 50;
+const MAX_SKIPPED_STORED      = 50;
 const DAILY_SECOND_LOOK_LIMIT = 5;
 
-export async function recordSkippedProfile(
-  skippedUserId: string,
-  skippedUserName: string
-): Promise<void> {
+export async function recordSkippedProfile(skippedUserId: string, skippedUserName: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) return;
-
   try {
-    const existingQuery = query(
+    const existing = await getDocs(query(
       collection(db, 'skippedProfiles'),
       where('userId', '==', user.uid),
       where('skippedUserId', '==', skippedUserId)
-    );
-    
-    const existing = await getDocs(existingQuery);
+    ));
     if (!existing.empty) return;
-
     await addDoc(collection(db, 'skippedProfiles'), {
-      userId: user.uid,
-      skippedUserId: skippedUserId,
-      skippedUserName: skippedUserName,
+      userId: user.uid, skippedUserId, skippedUserName,
       skippedAt: new Date().toISOString(),
     });
-
     await cleanupOldSkippedProfiles(user.uid);
   } catch (error) {
     logger.error('Error recording skipped profile:', error);
@@ -43,24 +34,14 @@ export async function recordSkippedProfile(
 
 async function cleanupOldSkippedProfiles(userId: string): Promise<void> {
   try {
-    const q = query(
+    const snapshot = await getDocs(query(
       collection(db, 'skippedProfiles'),
       where('userId', '==', userId),
       orderBy('skippedAt', 'asc')
-    );
-
-    const snapshot = await getDocs(q);
-
-    if (snapshot.size > MAX_SKIPPED_STORED) {
-      const toDelete = snapshot.size - MAX_SKIPPED_STORED;
-      let deleted = 0;
-
-      for (const docSnap of snapshot.docs) {
-        if (deleted >= toDelete) break;
-        await deleteDoc(doc(db, 'skippedProfiles', docSnap.id));
-        deleted++;
-      }
-    }
+    ));
+    if (snapshot.size <= MAX_SKIPPED_STORED) return;
+    const toDelete = snapshot.docs.slice(0, snapshot.size - MAX_SKIPPED_STORED);
+    await Promise.all(toDelete.map((d) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
   } catch (error) {
     logger.error('Error cleaning up skipped profiles:', error);
   }
@@ -69,28 +50,17 @@ async function cleanupOldSkippedProfiles(userId: string): Promise<void> {
 export async function getSkippedProfiles(): Promise<SkippedProfile[]> {
   const user = auth.currentUser;
   if (!user) return [];
-
   try {
-    const q = query(
+    const snapshot = await getDocs(query(
       collection(db, 'skippedProfiles'),
       where('userId', '==', user.uid),
       orderBy('skippedAt', 'desc'),
       limit(DAILY_SECOND_LOOK_LIMIT)
-    );
-
-    const snapshot = await getDocs(q);
-    const skipped: SkippedProfile[] = [];
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      skipped.push({
-        odid: data.skippedUserId,
-        odidName: data.skippedUserName,
-        skippedAt: data.skippedAt,
-      });
+    ));
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return { odid: data.skippedUserId, odidName: data.skippedUserName, skippedAt: data.skippedAt };
     });
-
-    return skipped;
   } catch (error) {
     logger.error('Error getting skipped profiles:', error);
     return [];
@@ -100,34 +70,26 @@ export async function getSkippedProfiles(): Promise<SkippedProfile[]> {
 export async function removeFromSkipped(skippedUserId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) return;
-
   try {
-    const q = query(
+    const snapshot = await getDocs(query(
       collection(db, 'skippedProfiles'),
       where('userId', '==', user.uid),
       where('skippedUserId', '==', skippedUserId)
-    );
-
-    const snapshot = await getDocs(q);
-
-    for (const docSnap of snapshot.docs) {
-      await deleteDoc(doc(db, 'skippedProfiles', docSnap.id));
-    }
+    ));
+    await Promise.all(snapshot.docs.map((d) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
   } catch (error) {
     logger.error('Error removing from skipped:', error);
   }
 }
 
 export function formatSkippedTime(skippedAt: string): string {
-  const skipped = new Date(skippedAt);
-  const now = new Date();
-  const diffMs = now.getTime() - skipped.getTime();
+  const skipped  = new Date(skippedAt);
+  const diffMs   = Date.now() - skipped.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
+  const diffHrs  = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHrs / 24);
   if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffHrs  < 24) return `${diffHrs}h ago`;
+  if (diffDays <  7) return `${diffDays}d ago`;
   return skipped.toLocaleDateString();
 }

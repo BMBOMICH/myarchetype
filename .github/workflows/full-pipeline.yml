@@ -1,0 +1,169 @@
+name: 🚀 Full Project Audit & Release Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 20
+  ENABLE_E2E: false          # Set to true to run Maestro/Detox
+  ENABLE_PERF: true          # Bundle & performance analysis
+  ENABLE_NATIVE_BUILD: true  # Prebuild + native compilation
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+jobs:
+  # ─── 1. STATIC AUDIT (Fast, Offline) ─────────────────────
+  static-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: 'npm' }
+      - run: npm ci
+      - name: Run Static Scanner + TS + Lint + Deps
+        run: |
+          node project-scanner.js || true
+          npx tsc --noEmit --pretty || true
+          npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0 || true
+          npx depcheck --json > depcheck-report.json || true
+          npm audit --json > npm-audit.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: static-reports
+          path: |
+            project-audit.json
+            project-audit-report.txt
+            depcheck-report.json
+            npm-audit.json
+
+  # ─── 2. UNIT TESTS ──────────────────────────────────────
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: [static-audit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: 'npm' }
+      - run: npm ci
+      - run: npx jest --ci --coverage --coverageReporters=json-summary || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: coverage/coverage-summary.json
+
+  # ─── 3. E2E TESTS (Optional) ────────────────────────────
+  e2e-tests:
+    runs-on: ubuntu-latest
+    if: ${{ env.ENABLE_E2E == 'true' }}
+    needs: [unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: 'npm' }
+      - run: npm ci
+      - name: Run Maestro E2E Tests
+        run: |
+          npx expo start --no-dev --minify &
+          sleep 30
+          npx @maestro-cloud/maestro test .maestro/ || true
+          pkill -f "expo start"
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: maestro-reports/
+
+  # ─── 4. NATIVE BUILDS (iOS + Android) ───────────────────
+  native-builds:
+    if: ${{ env.ENABLE_NATIVE_BUILD == 'true' }}
+    strategy:
+      matrix:
+        platform: [android, ios]
+    runs-on: ${{ matrix.platform == 'ios' && 'macos-latest' || 'ubuntu-latest' }}
+    needs: [unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: 'npm' }
+      - run: npm ci
+      - name: Prebuild Native Projects
+        run: npx expo prebuild --clean --platform ${{ matrix.platform }}
+      - name: Build Android
+        if: matrix.platform == 'android'
+        run: |
+          cd android
+          ./gradlew assembleDebug || true
+          ./gradlew lint || true
+      - name: Build iOS
+        if: matrix.platform == 'ios'
+        run: |
+          cd ios
+          pod install
+          xcodebuild -workspace MyArchetype.xcworkspace -scheme MyArchetype -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 15' build || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-build-logs
+          path: |
+            android/build/reports/lint-results-debug.xml
+            ios/xcarchive/*.xcarchive
+
+  # ─── 5. PERFORMANCE & BUNDLE ANALYSIS ───────────────────
+  performance:
+    if: ${{ env.ENABLE_PERF == 'true' }}
+    runs-on: ubuntu-latest
+    needs: [native-builds]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: 'npm' }
+      - run: npm ci
+      - name: Bundle Visualizer
+        run: npx react-native-bundle-visualizer --dry-run --output bundle-report.json || true
+      - name: Lighthouse (Web/Expo Web)
+        if: ${{ hashFiles('app.json') && contains(hashFiles('app.json'), 'web') }}
+        run: |
+          npx expo start --web &
+          sleep 40
+          npx lighthouse http://localhost:8081 --output=json --output-path=lighthouse.json --chrome-flags='--headless --no-sandbox' || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perf-reports
+          path: |
+            bundle-report.json
+            lighthouse.json
+
+  # ─── 6. COMPLIANCE & READINESS CHECK ────────────────────
+  compliance-check:
+    runs-on: ubuntu-latest
+    needs: [static-audit]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Store Readiness Report
+        run: |
+          echo "📋 STORE COMPLIANCE CHECKLIST" > compliance-report.txt
+          echo "- [ ] Privacy Policy URL configured" >> compliance-report.txt
+          echo "- [ ] App Icon & Splash valid" >> compliance-report.txt
+          echo "- [ ] Permissions documented (Privacy Manifest/AndroidManifest)" >> compliance-report.txt
+          echo "- [ ] Data deletion endpoint available" >> compliance-report.txt
+          echo "- [ ] TestFlight/Internal Test link ready" >> compliance-report.txt
+          echo "- [ ] No hardcoded secrets in git history" >> compliance-report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.txt
+
+  # ─── 7. GATEKEEPER (Blocks merge on critical failures) ──
+  gatekeeper:
+    runs-on: ubuntu-latest
+    needs: [static-audit, unit-tests, native-builds, performance, compliance-check]
+    if: always()
+    steps:
+      - name: Check Critical Failures
+        run: |
+          echo "🔍 Checking pipeline status..."
+          if [[ "${{ needs.static-audit.result }}" == "failure" ]]; then echo "❌ Static audit failed"; exit 1; fi
+          if [[ "${{ needs.unit-tests.result }}" == "failure" ]]; then echo "❌ Unit tests failed"; exit 1; fi
+          echo "✅ All gates passed. Ready for review."

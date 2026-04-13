@@ -1,4 +1,3 @@
-// app/admin/users.tsx
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -32,9 +31,7 @@ export default function AdminUsersScreen() {
       const user = auth.currentUser;
       if (!user) { router.replace('/login'); return; }
       const snap = await getDoc(doc(db, 'users', user.uid));
-      if (!snap.exists() || !(snap.data().isAdmin as boolean | undefined)) {
-        router.replace('/home'); return;
-      }
+      if (!snap.exists() || !(snap.data().isAdmin as boolean | undefined)) { router.replace('/home'); return; }
       setIsAdmin(true);
     } catch (error) {
       logger.error('[AdminUsers] admin check failed:', error);
@@ -52,11 +49,11 @@ export default function AdminUsersScreen() {
         return {
           uid: d.id, name: String(data.name ?? 'Unknown'), email: String(data.email ?? ''),
           age: Number(data.age ?? 0), gender: String(data.gender ?? ''),
-          photos: data.photos as string[] | undefined ?? [],
-          selfieVerified: data.selfieVerified as boolean | undefined ?? false,
-          isBanned:       data.isBanned       as boolean | undefined ?? false,
-          isAdmin:        data.isAdmin        as boolean | undefined ?? false,
-          warnings:       data.warnings       as number  | undefined ?? 0,
+          photos:         data.photos         as string[]      ?? [],
+          selfieVerified: data.selfieVerified  as boolean       ?? false,
+          isBanned:       data.isBanned        as boolean       ?? false,
+          isAdmin:        data.isAdmin         as boolean       ?? false,
+          warnings:       data.warnings        as number        ?? 0,
           createdAt: String(data.createdAt ?? ''),
         };
       });
@@ -79,9 +76,9 @@ export default function AdminUsersScreen() {
       result = result.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
     }
     switch (filter) {
-      case 'verified':   result = result.filter(u => u.selfieVerified); break;
+      case 'verified':   result = result.filter(u => u.selfieVerified);  break;
       case 'unverified': result = result.filter(u => !u.selfieVerified); break;
-      case 'banned':     result = result.filter(u => u.isBanned); break;
+      case 'banned':     result = result.filter(u => u.isBanned);        break;
     }
     setFiltered(result);
   }, [users, searchQuery, filter]);
@@ -90,58 +87,107 @@ export default function AdminUsersScreen() {
 
   const handleBan = useCallback((user: User) => {
     const label = user.isBanned ? 'Unban' : 'Ban';
+    const onConfirm = async () => {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          isBanned: !user.isBanned,
+          bannedAt: user.isBanned ? null : new Date().toISOString(),
+        });
+        Alert.alert('Done', `${user.name} has been ${user.isBanned ? 'unbanned' : 'banned'}`);
+        void loadUsers();
+      } catch (error) {
+        logger.error('[AdminUsers] ban error:', error);
+        Alert.alert('Error', 'Error updating user');
+      }
+    };
     Alert.alert(`${label} User`, `${label} ${user.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: label, style: 'destructive', onPress: async () => {
-        try {
-          await updateDoc(doc(db, 'users', user.uid), {
-            isBanned: !user.isBanned,
-            bannedAt: user.isBanned ? null : new Date().toISOString(),
-          });
-          Alert.alert('Done', `${user.name} has been ${user.isBanned ? 'unbanned' : 'banned'}`);
-          void loadUsers();
-        } catch (error) {
-          logger.error('[AdminUsers] ban error:', error);
-          Alert.alert('Error', 'Error updating user');
-        }
-      }},
+      { text: label, style: 'destructive', onPress: onConfirm },
     ]);
   }, [loadUsers]);
 
   const handleVerify = useCallback((user: User) => {
+    const onConfirm = async () => {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          selfieVerified: true, selfieVerifiedAt: new Date().toISOString(), manuallyVerified: true,
+        });
+        Alert.alert('Done', `${user.name} has been verified`);
+        void loadUsers();
+      } catch (error) {
+        logger.error('[AdminUsers] verify error:', error);
+        Alert.alert('Error', 'Error verifying user');
+      }
+    };
     Alert.alert('Verify User', `Manually verify ${user.name}?\nThis gives them a verified badge without selfie verification.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Verify', onPress: async () => {
-        try {
-          await updateDoc(doc(db, 'users', user.uid), {
-            selfieVerified: true, selfieVerifiedAt: new Date().toISOString(), manuallyVerified: true,
-          });
-          Alert.alert('Done', `${user.name} has been verified`);
-          void loadUsers();
-        } catch (error) {
-          logger.error('[AdminUsers] verify error:', error);
-          Alert.alert('Error', 'Error verifying user');
-        }
-      }},
+      { text: 'Verify', onPress: onConfirm },
     ]);
   }, [loadUsers]);
 
   const handleMakeAdmin = useCallback((user: User) => {
     const label = user.isAdmin ? 'Remove Admin' : 'Make Admin';
+    const onConfirm = async () => {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { isAdmin: !user.isAdmin });
+        Alert.alert('Done', `${user.name} ${user.isAdmin ? 'is no longer an admin' : 'is now an admin'}`);
+        void loadUsers();
+      } catch (error) {
+        logger.error('[AdminUsers] makeAdmin error:', error);
+        Alert.alert('Error', 'Error updating user');
+      }
+    };
     Alert.alert(label, user.isAdmin ? `Remove admin from ${user.name}?` : `Make ${user.name} an admin?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: label, onPress: async () => {
-        try {
-          await updateDoc(doc(db, 'users', user.uid), { isAdmin: !user.isAdmin });
-          Alert.alert('Done', `${user.name} ${user.isAdmin ? 'is no longer an admin' : 'is now an admin'}`);
-          void loadUsers();
-        } catch (error) {
-          logger.error('[AdminUsers] makeAdmin error:', error);
-          Alert.alert('Error', 'Error updating user');
-        }
-      }},
+      { text: label, onPress: onConfirm },
     ]);
   }, [loadUsers]);
+
+  const renderItem = useCallback(({ item }: { item: User }) => (
+    <View style={[s.userCard, item.isBanned && s.userCardBanned]}
+      accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}>
+      <View style={s.userHeader}>
+        {item.photos && item.photos.length > 0 ? (
+          <Image source={{ uri: item.photos[0] }} style={s.userPhoto} accessibilityLabel={`Photo of ${item.name}`} />
+        ) : (
+          <View style={s.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
+            <Text style={s.userPhotoText}>?</Text>
+          </View>
+        )}
+        <View style={s.userInfo}>
+          <View style={s.userNameRow}>
+            <Text style={s.userName}>{item.name}</Text>
+            {item.selfieVerified && <Text style={s.verifiedBadge} accessibilityLabel="Verified">✓</Text>}
+            {item.isAdmin  && <Text style={s.adminBadge}>Admin</Text>}
+            {item.isBanned && <Text style={s.bannedBadge}>Banned</Text>}
+          </View>
+          <Text style={s.userEmail}>{item.email}</Text>
+          <Text style={s.userDetails}>
+            {item.age} y/o {item.gender}{item.warnings ? ` • ${item.warnings} warnings` : ''}
+          </Text>
+        </View>
+      </View>
+      <View style={s.userActions}>
+        {!item.selfieVerified && (
+          <TouchableOpacity style={s.verifyButton} onPress={() => handleVerify(item)}
+            accessibilityLabel={`Verify ${item.name}`} accessibilityRole="button">
+            <Text style={s.verifyButtonText}>Verify</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={item.isBanned ? s.unbanButton : s.banButton} onPress={() => handleBan(item)}
+          accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`} accessibilityRole="button">
+          <Text style={s.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.adminButton} onPress={() => handleMakeAdmin(item)}
+          accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`} accessibilityRole="button">
+          <Text style={s.adminButtonText}>{item.isAdmin ? 'Remove Admin' : 'Make Admin'}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ), [handleBan, handleVerify, handleMakeAdmin]);
+
+  const keyExtractor = useCallback((item: User) => item.uid, []);
+  const handleFilter = useCallback((f: FilterType) => () => setFilter(f), []);
 
   if (!isAdmin || loading) {
     return (
@@ -156,17 +202,15 @@ export default function AdminUsersScreen() {
     <View style={s.container}>
       <Text style={s.title} accessibilityRole="header">Manage Users</Text>
       <Text style={s.subtitle}>{users.length} total users</Text>
-
       <TextInput
         style={s.searchInput} placeholder="Search by name or email..."
         placeholderTextColor="#666" value={searchQuery} onChangeText={setSearchQuery}
         accessibilityLabel="Search users" autoCapitalize="none" autoCorrect={false}
       />
-
       <View style={s.filterTabs} accessibilityRole="tablist">
         {(['all', 'verified', 'unverified', 'banned'] as const).map((f) => (
           <TouchableOpacity key={f} style={[s.filterTab, filter === f && s.filterTabActive]}
-            onPress={() => setFilter(f)} accessibilityLabel={`Filter by ${f}`}
+            onPress={handleFilter(f)} accessibilityLabel={`Filter by ${f}`}
             accessibilityRole="tab" accessibilityState={{ selected: filter === f }}>
             <Text style={[s.filterTabText, filter === f && s.filterTabTextActive]}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -174,65 +218,22 @@ export default function AdminUsersScreen() {
           </TouchableOpacity>
         ))}
       </View>
-
       <Text style={s.resultsCount} accessibilityLiveRegion="polite">
         Showing {filteredUsers.length} of {users.length} users
       </Text>
-
       <FlatList
         data={filteredUsers}
-        keyExtractor={(item) => item.uid}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#53a8b6" />}
         ListEmptyComponent={<View style={s.emptyContainer}><Text style={s.emptyText}>No users found</Text></View>}
-        renderItem={({ item }) => (
-          <View style={[s.userCard, item.isBanned && s.userCardBanned]}
-            accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}>
-            <View style={s.userHeader}>
-              {item.photos && item.photos.length > 0 ? (
-                <Image source={{ uri: item.photos[0] }} style={s.userPhoto} accessibilityLabel={`Photo of ${item.name}`} />
-              ) : (
-                <View style={s.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
-                  <Text style={s.userPhotoText}>?</Text>
-                </View>
-              )}
-              <View style={s.userInfo}>
-                <View style={s.userNameRow}>
-                  <Text style={s.userName}>{item.name}</Text>
-                  {item.selfieVerified && <Text style={s.verifiedBadge} accessibilityLabel="Verified">✓</Text>}
-                  {item.isAdmin  && <Text style={s.adminBadge}>Admin</Text>}
-                  {item.isBanned && <Text style={s.bannedBadge}>Banned</Text>}
-                </View>
-                <Text style={s.userEmail}>{item.email}</Text>
-                <Text style={s.userDetails}>
-                  {item.age} y/o {item.gender}{item.warnings ? ` • ${item.warnings} warnings` : ''}
-                </Text>
-              </View>
-            </View>
-            <View style={s.userActions}>
-              {!item.selfieVerified && (
-                <TouchableOpacity style={s.verifyButton} onPress={() => handleVerify(item)}
-                  accessibilityLabel={`Verify ${item.name}`} accessibilityRole="button">
-                  <Text style={s.verifyButtonText}>Verify</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={item.isBanned ? s.unbanButton : s.banButton} onPress={() => handleBan(item)}
-                accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`} accessibilityRole="button">
-                <Text style={s.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.adminButton} onPress={() => handleMakeAdmin(item)}
-                accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`} accessibilityRole="button">
-                <Text style={s.adminButtonText}>{item.isAdmin ? 'Remove Admin' : 'Make Admin'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container:            { flex: 1, backgroundColor: '#1a1a2e', padding: 20 },
+  container:            { flex: 1, backgroundColor: '#1a1a2e', padding: 20, paddingTop: 60 },
   loadingContainer:     { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
   loadingText:          { color: '#aaa', marginTop: 15, fontSize: 16 },
   title:                { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 5, textAlign: 'center' },

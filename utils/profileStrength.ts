@@ -1,8 +1,7 @@
-// utils/profileStrength.ts
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-import { deriveVerificationLevel, getVerificationBadgeConfig } from './profileCompletion';
 import { logger } from './logger';
+import { deriveVerificationLevel, getVerificationBadgeConfig } from './profileCompletion';
 
 export interface ProfileStrengthResult {
   score: number; maxScore: number; percentage: number;
@@ -12,17 +11,19 @@ export interface ProfileStrengthResult {
   accountAgeDays: number; verificationBadge: ReturnType<typeof getVerificationBadgeConfig>;
 }
 
-// ── #102: Ghost profile detection ────────────────────────
-export function detectGhostProfile(data: { lastSeen?: any; photos?: string[]; bio?: string }): { isGhost: boolean; daysSinceActive: number } {
-  const lastMs = data.lastSeen?.toMillis?.() ?? (data.lastSeen ? new Date(data.lastSeen).getTime() : 0);
+// #102: Ghost profile detection
+export function detectGhostProfile(data: { lastSeen?: { toMillis?: () => number } | string; photos?: string[]; bio?: string }): { isGhost: boolean; daysSinceActive: number } {
+  const lastMs = typeof data.lastSeen === 'object' && data.lastSeen !== null && typeof data.lastSeen.toMillis === 'function'
+    ? data.lastSeen.toMillis()
+    : data.lastSeen ? new Date(data.lastSeen as string).getTime() : 0;
   const days = lastMs ? Math.floor((Date.now() - lastMs) / 86_400_000) : 9999;
   const minimal = (!data.photos || data.photos.length === 0) || (!data.bio || data.bio.length < 10);
   return { isGhost: days > 30 && minimal, daysSinceActive: days };
 }
 
-// ── #174: Account age gate ───────────────────────────────
+// #174: Account age gate
 export function checkAccountAgeGate(createdAt?: string | number, action?: string): { allowed: boolean; isNew: boolean; ageDays: number; hoursRemaining: number; restrictions: string[] } {
-  const created = typeof createdAt === 'number' ? createdAt : (createdAt ? new Date(createdAt).getTime() : Date.now());
+  const created = typeof createdAt === 'number' ? createdAt : createdAt ? new Date(createdAt).getTime() : Date.now();
   const ageMs = Date.now() - created;
   const ageDays = Math.floor(ageMs / 86_400_000);
   const ageHours = ageMs / 3_600_000;
@@ -37,13 +38,12 @@ export function checkAccountAgeGate(createdAt?: string | number, action?: string
   const allowed = ageHours >= minHours;
   return { allowed, isNew: ageDays < 7, ageDays, hoursRemaining: allowed ? 0 : Math.ceil(minHours - ageHours), restrictions };
 }
-// Alias for audit pattern
 export const accountAgeGate = checkAccountAgeGate;
 
-// ── #155: Trust score decay ──────────────────────────────
+// #155: Trust score decay
 export function applyTrustDecay(currentScore: number, violations: Array<{ timestamp: string; severity: 'low' | 'medium' | 'high' | 'critical' }>, windowDays = 30): number {
   const cutoff = Date.now() - windowDays * 86_400_000;
-  const rates = { low: 2, medium: 5, high: 15, critical: 30 };
+  const rates: Record<string, number> = { low: 2, medium: 5, high: 15, critical: 30 };
   let decay = 0;
   for (const v of violations) { if (new Date(v.timestamp).getTime() > cutoff) decay += rates[v.severity] ?? 5; }
   return Math.max(0, currentScore - decay);
@@ -51,7 +51,15 @@ export function applyTrustDecay(currentScore: number, violations: Array<{ timest
 export const trustDecay = applyTrustDecay;
 export const scoreDecay = applyTrustDecay;
 
-// ── Main strength calculator ─────────────────────────────
+interface UserData {
+  photos?: string[]; videoProfile?: unknown; bio?: string; icebreaker?: unknown;
+  dailyQuestion?: { date?: string }; personalityType?: unknown; selfieVerified?: boolean;
+  height?: { verificationMethod?: string }; ageVerification?: { verified?: boolean };
+  lastSeen?: { toMillis?: () => number } | string; lastPhotoUpdate?: string;
+  violations?: Array<{ timestamp: string; severity: 'low' | 'medium' | 'high' | 'critical' }>;
+  createdAt?: string;
+}
+
 export async function calculateProfileStrength(): Promise<ProfileStrengthResult> {
   const user = auth.currentUser;
   const def: ProfileStrengthResult = { score: 0, maxScore: 100, percentage: 0, level: 'Weak', color: '#d9534f', criteria: [], recommendations: ['Please log in'], isGhostProfile: false, isNewAccount: false, accountAgeDays: 0, verificationBadge: getVerificationBadgeConfig('none') };
@@ -59,7 +67,7 @@ export async function calculateProfileStrength(): Promise<ProfileStrengthResult>
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) return { ...def, recommendations: ['Profile not found'] };
-    const data = userDoc.data();
+    const data = userDoc.data() as UserData;
     const criteria: ProfileStrengthResult['criteria'] = [];
     let score = 0;
     const add = (completed: boolean, label: string, points: number, icon: string, tip?: string) => { criteria.push({ completed, label, points, icon, tip }); if (completed) score += points; };
@@ -73,7 +81,7 @@ export async function calculateProfileStrength(): Promise<ProfileStrengthResult>
     add(!!data.selfieVerified, 'Selfie verified', 10, '✓', 'Verify with a selfie');
     add(typeof data.height === 'object' && data.height?.verificationMethod === 'manual-measured', 'Height verified', 8, '📏', 'Verify your height');
     add(!!data.ageVerification?.verified, 'Age verified', 7, '🎂', 'Verify your age');
-    const lastMs = data.lastSeen?.toMillis?.() ?? 0;
+    const lastMs = typeof data.lastSeen === 'object' && data.lastSeen !== null && typeof data.lastSeen.toMillis === 'function' ? data.lastSeen.toMillis() : 0;
     add(Date.now() - lastMs < 7 * 86_400_000, 'Active in 7 days', 5, '🟢', 'Stay active');
     const photoAge = data.lastPhotoUpdate ? (Date.now() - new Date(data.lastPhotoUpdate).getTime()) / 86_400_000 : 999;
     add(photoAge < 180, 'Photos updated recently', 5, '🔄', 'Update photos every 6 months');
@@ -90,10 +98,10 @@ export async function calculateProfileStrength(): Promise<ProfileStrengthResult>
     const ghost = detectGhostProfile(data);
     const age = checkAccountAgeGate(data.createdAt);
     return { score, maxScore: 100, percentage: pct, level, color, criteria, recommendations: recs, isGhostProfile: ghost.isGhost, isNewAccount: age.isNew, accountAgeDays: age.ageDays, verificationBadge: getVerificationBadgeConfig(deriveVerificationLevel(data)) };
-  } catch (e) { logger.error('[profileStrength] Error:', e); return def; }
+  } catch (e: unknown) { logger.error('[profileStrength] Error:', e); return def; }
 }
 
 export function getStrengthMessage(level: string): string {
-  const msgs: Record<string, string> = { Excellent: "🌟 Outstanding! Maximum visibility!", Strong: '💪 Great profile! Just a few tweaks.', Good: '👍 Solid! Add more to stand out.', Basic: '📝 Getting there! Complete more sections.', Weak: '⚠️ Needs work! Fill out your profile.' };
+  const msgs: Record<string, string> = { Excellent: '🌟 Outstanding! Maximum visibility!', Strong: '💪 Great profile! Just a few tweaks.', Good: '👍 Solid! Add more to stand out.', Basic: '📝 Getting there! Complete more sections.', Weak: '⚠️ Needs work! Fill out your profile.' };
   return msgs[level] ?? '';
 }

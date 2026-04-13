@@ -1,10 +1,10 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Dimensions,
-  Image, Modal, ScrollView, StyleSheet, Text,
-  TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Dimensions, FlatList,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import HeightBadge from '../components/HeightBadge';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
@@ -18,41 +18,38 @@ import { recordSkippedProfile } from '../utils/secondLook';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PHOTO_WIDTH = SCREEN_WIDTH - 80;
+const SERVER      = process.env['EXPO_PUBLIC_SERVER_URL'] ?? 'https://myarchetype-server.vercel.app';
 
-const BODY_TYPES           = ['Slim', 'Athletic', 'Average', 'Curvy', 'Plus-size']                 as const;
-const RELIGIOUS_OPTIONS    = ['Traditional', 'Modern', 'Spiritual', 'None']                         as const;
-const LIFESTYLE_OPTIONS    = ['Natural', 'Fitness', 'Social', 'Homebody']                           as const;
-const RELATIONSHIP_OPTIONS = ['Marriage', 'Long-term', 'Exploring']                                 as const;
-const PERSONALITY_OPTIONS  = ['Social Butterfly', 'Balanced Explorer', 'Thoughtful Soul', 'Mixed'] as const;
+const BODY_TYPES           = ['Slim','Athletic','Average','Curvy','Plus-size']                 as const;
+const RELIGIOUS_OPTIONS    = ['Traditional','Modern','Spiritual','None']                        as const;
+const LIFESTYLE_OPTIONS    = ['Natural','Fitness','Social','Homebody']                          as const;
+const RELATIONSHIP_OPTIONS = ['Marriage','Long-term','Exploring']                               as const;
+const PERSONALITY_OPTIONS  = ['Social Butterfly','Balanced Explorer','Thoughtful Soul','Mixed'] as const;
 const DISTANCE_OPTIONS = [
-  { v: '10',   l: '10 km'  }, { v: '25',   l: '25 km'  }, { v: '50',   l: '50 km'  },
-  { v: '100',  l: '100 km' }, { v: '250',  l: '250 km' }, { v: '9999', l: 'Any'     },
+  { v:'10', l:'10 km' }, { v:'25', l:'25 km' }, { v:'50', l:'50 km' },
+  { v:'100', l:'100 km' }, { v:'250', l:'250 km' }, { v:'9999', l:'Any' },
 ] as const;
 const ACTIVE_WITHIN_OPTIONS = [
-  { value: 'any', label: 'Any time' }, { value: '24h',  label: 'Today'      },
-  { value: '7d',  label: 'This week' }, { value: '30d', label: 'This month' },
+  { value:'any', label:'Any time' }, { value:'24h', label:'Today' },
+  { value:'7d',  label:'This week' }, { value:'30d', label:'This month' },
 ] as const;
 
-// ── Types ──────────────────────────────────────────────────
-
 interface AgeVerification {
-  verified: boolean; method: 'self-reported' | 'ai-estimated' | 'id-verified';
-  estimatedAge: number | null; statedAge: number; ageDifference: number | null;
+  verified: boolean; method: 'self-reported'|'ai-estimated'|'id-verified';
+  estimatedAge: number|null; statedAge: number; ageDifference: number|null;
   verifiedAt: string; confidence: number;
 }
-
 interface UserRatings {
   totalRatings: number; averagePhotosMatch: number; heightAccuracyRate: number;
-  bodyTypeAccuracyRate: number; ageAccuracyRate: number; averagePersonalityMatch: number;
-  averageOverall: number; trustScore: number;
+  bodyTypeAccuracyRate: number; ageAccuracyRate: number;
+  averagePersonalityMatch: number; averageOverall: number; trustScore: number;
 }
-
 interface UserProfile {
   uid: string; name: string; age: number; gender: string;
-  height:      number | { value: number; verificationMethod?: string; confidence?: number };
-  bodyType:    string; lookingFor: string; email: string;
-  photos?:     string[]; bio?: string; religiousViews?: string;
-  lifestyle?:  string; relationshipGoal?: string; personalityType?: string;
+  height: number|{ value: number; verificationMethod?: string; confidence?: number };
+  bodyType: string; lookingFor: string; email: string;
+  photos?: string[]; bio?: string; religiousViews?: string;
+  lifestyle?: string; relationshipGoal?: string; personalityType?: string;
   personalityScores?: { serious: number; social: number };
   blockedUsers?: string[];
   location?: { latitude: number; longitude: number; city?: string; country?: string };
@@ -62,9 +59,7 @@ interface UserProfile {
   icebreaker?: string; icebreakerPrompt?: string;
   ratings?: UserRatings;
 }
-
 interface FirestoreUserData { blockedUsers?: string[]; }
-
 interface Filters {
   minAge: string; maxAge: string; maxDistance: string;
   minHeight: string; maxHeight: string;
@@ -72,37 +67,19 @@ interface Filters {
   relationshipGoals: string[]; personalityTypes: string[];
   verifiedOnly: boolean; activeWithin: string; hasBio: boolean; minPhotos: number;
 }
-
 type MatchEntry = { user: UserProfile; score: number; reasons: string[] };
-
-interface LikeDoc {
-  fromUserId: string; toUserId: string; status: string;
-  createdAt?: string; matchedAt?: string;
-}
+interface LikeDoc { fromUserId: string; toUserId: string; status: string; createdAt?: string; matchedAt?: string; }
 
 const DEFAULT_FILTERS: Filters = {
-  minAge: '18', maxAge: '99', maxDistance: '9999',
-  minHeight: '', maxHeight: '',
-  bodyTypes: [], religiousViews: [], lifestyles: [],
-  relationshipGoals: [], personalityTypes: [],
-  verifiedOnly: false, activeWithin: 'any', hasBio: false, minPhotos: 1,
+  minAge:'18', maxAge:'99', maxDistance:'9999', minHeight:'', maxHeight:'',
+  bodyTypes:[], religiousViews:[], lifestyles:[], relationshipGoals:[], personalityTypes:[],
+  verifiedOnly:false, activeWithin:'any', hasBio:false, minPhotos:1,
 };
 
-// ── Helpers ────────────────────────────────────────────────
-
-const getHeightValue = (h: UserProfile['height']): number =>
-  typeof h === 'object' ? h?.value ?? 0 : h ?? 0;
-
-const formatDistance = (km: number): string =>
-  km < 1 ? 'Less than 1 km away' : km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
-
-const getScoreColor = (sc: number): string =>
-  sc >= 80 ? '#5cb85c' : sc >= 60 ? '#53a8b6' : sc >= 40 ? '#e67e22' : '#d9534f';
-
-const toggleArr = (arr: string[], item: string): string[] =>
-  arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item];
-
-const SERVER = process.env['EXPO_PUBLIC_SERVER_URL'] ?? 'https://myarchetype-server.vercel.app';
+const getHeightValue = (h: UserProfile['height']): number => typeof h === 'object' ? h?.value ?? 0 : h ?? 0;
+const formatDistance = (km: number): string => km < 1 ? 'Less than 1 km away' : km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
+const getScoreColor  = (sc: number): string => sc >= 80 ? '#5cb85c' : sc >= 60 ? '#53a8b6' : sc >= 40 ? '#e67e22' : '#d9534f';
+const toggleArr      = (arr: string[], item: string): string[] => arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item];
 
 async function sendPush(token: string, title: string, body: string, type: string): Promise<void> {
   try {
@@ -110,42 +87,33 @@ async function sendPush(token: string, title: string, body: string, type: string
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expoPushToken: token, title, body, screen: type }),
     });
-  } catch (err) { logger.warn('[Matches] sendPush failed (non-critical):', err); }
+  } catch (err) { logger.warn('[Matches] sendPush failed:', err); }
 }
 
 function calcCompatibility(me: UserProfile, them: UserProfile): { score: number; reasons: string[] } {
   let score = 0;
   const reasons: string[] = [];
-  if (me.lookingFor === 'Any' || them.bodyType === me.lookingFor) {
-    score += 15;
-    if (them.bodyType === me.lookingFor) reasons.push(`Body type: ${them.bodyType} (your preference)`);
-  }
+  if (me.lookingFor === 'Any' || them.bodyType === me.lookingFor) { score += 15; if (them.bodyType === me.lookingFor) reasons.push(`Body type: ${them.bodyType} (your preference)`); }
   if (them.lookingFor === 'Any' || me.bodyType === them.lookingFor) { score += 15; reasons.push('You match their preferred body type'); }
   if (me.personalityType && them.personalityType) {
     if (me.personalityType === them.personalityType)                             { score += 25; reasons.push(`Same personality: ${them.personalityType}`); }
     else if (me.personalityType === 'Mixed' || them.personalityType === 'Mixed') { score += 15; reasons.push(`Compatible personality: ${them.personalityType}`); }
     else score += 5;
   } else score += 10;
-  if (me.religiousViews && them.religiousViews) {
-    if (me.religiousViews === them.religiousViews) { score += 15; reasons.push(`Same views: ${them.religiousViews}`); } else score += 5;
-  } else score += 7;
-  if (me.lifestyle && them.lifestyle) {
-    if (me.lifestyle === them.lifestyle) { score += 15; reasons.push(`Same lifestyle: ${them.lifestyle}`); } else score += 5;
-  } else score += 7;
+  if (me.religiousViews && them.religiousViews)     { if (me.religiousViews === them.religiousViews)     { score += 15; reasons.push(`Same views: ${them.religiousViews}`);   } else score += 5; } else score += 7;
+  if (me.lifestyle && them.lifestyle)               { if (me.lifestyle === them.lifestyle)               { score += 15; reasons.push(`Same lifestyle: ${them.lifestyle}`);     } else score += 5; } else score += 7;
   if (me.relationshipGoal && them.relationshipGoal) {
-    if (me.relationshipGoal === them.relationshipGoal)                                      { score += 15; reasons.push(`Same goal: ${them.relationshipGoal}`); }
-    else if ((me.relationshipGoal === 'Marriage' && them.relationshipGoal === 'Long-term') ||
-             (me.relationshipGoal === 'Long-term' && them.relationshipGoal === 'Marriage')) score += 10;
+    if (me.relationshipGoal === them.relationshipGoal) { score += 15; reasons.push(`Same goal: ${them.relationshipGoal}`); }
+    else if ((me.relationshipGoal === 'Marriage' && them.relationshipGoal === 'Long-term') || (me.relationshipGoal === 'Long-term' && them.relationshipGoal === 'Marriage')) score += 10;
     else score += 3;
   } else score += 7;
   if (them.selfieVerified) { score += 5; reasons.push('Verified identity'); }
   return { score: Math.min(Math.max(Math.round(score), 0), 100), reasons };
 }
 
-// ── Sub-components ─────────────────────────────────────────
+// ── Sub-components ──────────────────────────────────────────
 
-interface PhotoDotProps { active: boolean; }
-const PhotoDot = React.memo(function PhotoDot({ active }: PhotoDotProps) {
+const PhotoDot = React.memo(function PhotoDot({ active }: { active: boolean }) {
   return <View style={[s.dot, active && s.dotOn]} />;
 });
 
@@ -172,21 +140,15 @@ const FilterToggle = React.memo(function FilterToggle({ label, value, onPress, a
   );
 });
 
-interface PhotoItemProps { uri: string; index: number; userName: string; }
-const PhotoItem = React.memo(function PhotoItem({ uri, index, userName }: PhotoItemProps) {
+const PhotoItem = React.memo(function PhotoItem({ uri, index, userName }: { uri: string; index: number; userName: string }) {
   return (
-    <Image
-      source={{ uri }}
-      style={[s.photo, { width: PHOTO_WIDTH }]}
-      accessibilityLabel={`Photo ${index + 1} of ${userName}`}
-    />
+    <Image source={{ uri }} style={[s.photo, { width: PHOTO_WIDTH }]}
+      contentFit="cover" transition={150}
+      accessibilityLabel={`Photo ${index + 1} of ${userName}`} />
   );
 });
 
-interface ChipGroupProps {
-  label: string; filterKey: string; opts: readonly string[];
-  selected: string[]; onToggle: (key: string, val: string) => void;
-}
+interface ChipGroupProps { label: string; filterKey: string; opts: readonly string[]; selected: string[]; onToggle: (key: string, val: string) => void; }
 const ChipGroup = React.memo(function ChipGroup({ label, filterKey, opts, selected, onToggle }: ChipGroupProps) {
   return (
     <View>
@@ -194,34 +156,38 @@ const ChipGroup = React.memo(function ChipGroup({ label, filterKey, opts, select
       <View style={s.chipRow}>
         {opts.map(o => {
           const active = selected.includes(o);
-          return (
-            <FilterChip key={o} label={o} active={active}
-              onPress={() => onToggle(filterKey, o)}
-              a11yLabel={`${label}: ${o}${active ? ', selected' : ''}`} />
-          );
+          return <FilterChip key={o} label={o} active={active} onPress={() => onToggle(filterKey, o)} a11yLabel={`${label}: ${o}${active ? ', selected' : ''}`} />;
         })}
       </View>
     </View>
   );
 });
 
-// ── Component ──────────────────────────────────────────────
+// ── Main ────────────────────────────────────────────────────
 
 export default function MatchesScreen() {
   const router = useRouter();
+
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [matches,  setMatches]        = useState<MatchEntry[]>([]);
-  const [filtered, setFiltered]       = useState<MatchEntry[]>([]);
-  const [loading,  setLoading]        = useState(true);
-  const [idx,      setIdx]            = useState(0);
-  const [photoIdx, setPhotoIdx]       = useState(0);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters,  setFilters]        = useState<Filters>(DEFAULT_FILTERS);
+  const [matches,     setMatches]     = useState<MatchEntry[]>([]);
+  const [filtered,    setFiltered]    = useState<MatchEntry[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [idx,         setIdx]         = useState(0);
+  const [photoIdx,    setPhotoIdx]    = useState(0);
+  const [filters,     setFilters]     = useState<Filters>(DEFAULT_FILTERS);
   const [lastSkipped, setLastSkipped] = useState<MatchEntry | null>(null);
 
   const matchesRef     = useRef(matches);
   const filtersRef     = useRef(filters);
   const currentUserRef = useRef(currentUser);
+  // FIX: track mount state to prevent setState after unmount
+  const mountedRef     = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   useEffect(() => { matchesRef.current     = matches;     }, [matches]);
   useEffect(() => { filtersRef.current     = filters;     }, [filters]);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
@@ -232,7 +198,6 @@ export default function MatchesScreen() {
     setFilters(f => ({ ...f, [key]: toggleArr(f[key as keyof Filters] as string[], val) }));
   }, []);
 
-  // ── Filter ────────────────────────────────────────────
   const applyFilters = useCallback(() => {
     const f       = filtersRef.current;
     const cur     = currentUserRef.current;
@@ -255,11 +220,11 @@ export default function MatchesScreen() {
       const h = getHeightValue(u.height);
       if (minH > 0   && h < minH) return false;
       if (maxH < 999 && h > maxH) return false;
-      if (f.bodyTypes.length         && !f.bodyTypes.includes(u.bodyType))                                       return false;
-      if (f.religiousViews.length    && u.religiousViews  && !f.religiousViews.includes(u.religiousViews))       return false;
-      if (f.lifestyles.length        && u.lifestyle       && !f.lifestyles.includes(u.lifestyle))                return false;
-      if (f.relationshipGoals.length && u.relationshipGoal && !f.relationshipGoals.includes(u.relationshipGoal)) return false;
-      if (f.personalityTypes.length  && u.personalityType  && !f.personalityTypes.includes(u.personalityType))   return false;
+      if (f.bodyTypes.length         && !f.bodyTypes.includes(u.bodyType))                                        return false;
+      if (f.religiousViews.length    && u.religiousViews  && !f.religiousViews.includes(u.religiousViews))        return false;
+      if (f.lifestyles.length        && u.lifestyle       && !f.lifestyles.includes(u.lifestyle))                 return false;
+      if (f.relationshipGoals.length && u.relationshipGoal && !f.relationshipGoals.includes(u.relationshipGoal))  return false;
+      if (f.personalityTypes.length  && u.personalityType && !f.personalityTypes.includes(u.personalityType))     return false;
       if (f.verifiedOnly && !u.selfieVerified) return false;
       if (f.activeWithin !== 'any') {
         const lastSeen = u.lastSeen?.toMillis?.() ?? 0;
@@ -279,56 +244,64 @@ export default function MatchesScreen() {
     setIdx(0);
   }, []);
 
-  // ── Load ─────────────────────────────────────────────
+  // FIX: removed setTimeout wrappers — router.replace is safe to call directly,
+  // and setTimeout without clearTimeout was leaking timers on unmount.
   const loadMatches = useCallback(async () => {
     try {
       const user = auth.currentUser;
-      if (!user) { setTimeout(() => router.replace('/login'), 100); return; }
+      if (!user) { router.replace('/login'); return; }
       const userSnap = await getDoc(doc(db, 'users', user.uid));
-      if (!userSnap.exists()) { setTimeout(() => router.replace('/profile-setup'), 100); setLoading(false); return; }
-      const me      = userSnap.data() as UserProfile;
-      setCurrentUser(me);
-      const blocked   = me.blockedUsers ?? [];
-      const likesSnap = await getDocs(query(collection(db, 'likes'), where('fromUserId', '==', user.uid)));
-      const liked     = new Set<string>(likesSnap.docs.map(d => (d.data() as LikeDoc).toUserId));
-      const snap      = await getDocs(query(collection(db, 'users'), where('profileComplete', '==', true), where('gender', '!=', me.gender)));
+      if (!userSnap.exists()) {
+        router.replace('/profile-setup');
+        if (mountedRef.current) setLoading(false);
+        return;
+      }
+      const me    = userSnap.data() as UserProfile;
+      if (mountedRef.current) setCurrentUser(me);
+      const blocked = me.blockedUsers ?? [];
+
+      // FIX: run independent queries in parallel
+      const [likesSnap, snap] = await Promise.all([
+        getDocs(query(collection(db, 'likes'), where('fromUserId', '==', user.uid))),
+        getDocs(query(collection(db, 'users'), where('profileComplete', '==', true), where('gender', '!=', me.gender))),
+      ]);
+
+      const liked = new Set<string>(likesSnap.docs.map(d => (d.data() as LikeDoc).toUserId));
       const scored: MatchEntry[] = [];
       snap.forEach(docSnap => {
         const them = docSnap.data() as UserProfile;
         if (them.uid === user.uid || blocked.includes(them.uid) || them.blockedUsers?.includes(user.uid) || liked.has(them.uid)) return;
-        const bodyOk = (me.lookingFor === 'Any' || them.bodyType === me.lookingFor) &&
-                       (them.lookingFor === 'Any' || me.bodyType === them.lookingFor);
+        const bodyOk = (me.lookingFor === 'Any' || them.bodyType === me.lookingFor) && (them.lookingFor === 'Any' || me.bodyType === them.lookingFor);
         if (!bodyOk) return;
         scored.push({ user: them, ...calcCompatibility(me, them) });
       });
       scored.sort((a, b) => b.score - a.score);
-      setMatches(scored);
+      if (mountedRef.current) setMatches(scored);
     } catch (e) {
       logger.error('[Matches] loadMatches error:', e);
-      Alert.alert('Error', 'Failed to load matches. Please try again.');
-    } finally { setLoading(false); }
+      if (mountedRef.current) Alert.alert('Error', 'Failed to load matches. Please try again.');
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   }, [router]);
 
-  useEffect(() => { void loadMatches(); }, [loadMatches]);
-  useEffect(() => { setPhotoIdx(0); }, [idx]);
-  useEffect(() => { applyFilters(); }, [matches, filters, applyFilters]);
+  useEffect(() => { void loadMatches(); },  [loadMatches]);
+  useEffect(() => { setPhotoIdx(0); },      [idx]);
+  useEffect(() => { applyFilters(); },      [matches, filters, applyFilters]);
 
   const handlePhotoScroll = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
     setPhotoIdx(Math.round(e.nativeEvent.contentOffset.x / PHOTO_WIDTH));
   }, []);
 
-  const openFilters  = useCallback(() => setShowFilters(true),  []);
-  const closeFilters = useCallback(() => setShowFilters(false), []);
   const resetFilters = useCallback(() => setFilters(DEFAULT_FILTERS), []);
 
-  const handleMinAge    = useCallback((t: string) => setF({ minAge:    t.replace(/\D/g, '') }), [setF]);
-  const handleMaxAge    = useCallback((t: string) => setF({ maxAge:    t.replace(/\D/g, '') }), [setF]);
-  const handleMinHeight = useCallback((t: string) => setF({ minHeight: t.replace(/\D/g, '') }), [setF]);
-  const handleMaxHeight = useCallback((t: string) => setF({ maxHeight: t.replace(/\D/g, '') }), [setF]);
-  const handleToggleBio      = useCallback(() => setF({ hasBio:      !filtersRef.current.hasBio      }), [setF]);
+  const handleMinAge         = useCallback((t: string) => setF({ minAge:      t.replace(/\D/g, '') }), [setF]);
+  const handleMaxAge         = useCallback((t: string) => setF({ maxAge:      t.replace(/\D/g, '') }), [setF]);
+  const handleMinHeight      = useCallback((t: string) => setF({ minHeight:   t.replace(/\D/g, '') }), [setF]);
+  const handleMaxHeight      = useCallback((t: string) => setF({ maxHeight:   t.replace(/\D/g, '') }), [setF]);
+  const handleToggleBio      = useCallback(() => setF({ hasBio:       !filtersRef.current.hasBio       }), [setF]);
   const handleToggleVerified = useCallback(() => setF({ verifiedOnly: !filtersRef.current.verifiedOnly }), [setF]);
 
-  // ── Actions ───────────────────────────────────────────
   const nextProfile = useCallback(() => setIdx(i => i + 1), []);
 
   const handleLike = useCallback(async () => {
@@ -345,8 +318,11 @@ export default function MatchesScreen() {
         const theirDoc = theirLike.docs[0];
         if (!theirDoc) throw new Error('Like doc missing');
         const theirData = theirDoc.data() as LikeDoc;
-        await setDoc(doc(db, 'likes', theirDoc.id), { ...theirData, status: 'matched', matchedAt: new Date().toISOString() });
-        await setDoc(doc(db, 'likes', `${user.uid}_${them.uid}`), { fromUserId: user.uid, toUserId: them.uid, status: 'matched', createdAt: new Date().toISOString(), matchedAt: new Date().toISOString() });
+        // FIX: run independent writes in parallel
+        await Promise.all([
+          setDoc(doc(db, 'likes', theirDoc.id), { ...theirData, status: 'matched', matchedAt: new Date().toISOString() }),
+          setDoc(doc(db, 'likes', `${user.uid}_${them.uid}`), { fromUserId: user.uid, toUserId: them.uid, status: 'matched', createdAt: new Date().toISOString(), matchedAt: new Date().toISOString() }),
+        ]);
         if (them.pushToken) await sendPush(them.pushToken, "It's a Match! 💕", `${currentUser?.name ?? 'Someone'} likes you too!`, 'match');
         Alert.alert("It's a Match! 💕", `You and ${them.name} like each other!\n\nCompatibility: ${entry.score}%`);
       } else {
@@ -385,9 +361,8 @@ export default function MatchesScreen() {
       if (!reason) return;
       try {
         await setDoc(doc(db, 'reports', `${user.uid}_${them.uid}_${Date.now()}`), {
-          reporterId: user.uid, reportedUserId: them.uid,
-          reportedUserName: them.name, reason,
-          createdAt: new Date().toISOString(), status: 'pending',
+          reporterId: user.uid, reportedUserId: them.uid, reportedUserName: them.name,
+          reason, createdAt: new Date().toISOString(), status: 'pending',
         });
         Alert.alert('Reported', 'Thank you for keeping the community safe!');
         nextProfile();
@@ -408,8 +383,11 @@ export default function MatchesScreen() {
         try {
           const snap    = await getDoc(doc(db, 'users', user.uid));
           const current = (snap.data() as FirestoreUserData | undefined)?.blockedUsers ?? [];
-          await updateDoc(doc(db, 'users', user.uid), { blockedUsers: [...current, them.uid] });
-          await setDoc(doc(db, 'blockedUsers', `${user.uid}_${them.uid}`), { blockerId: user.uid, blockedId: them.uid, blockedAt: new Date().toISOString() });
+          // FIX: run independent writes in parallel
+          await Promise.all([
+            updateDoc(doc(db, 'users', user.uid), { blockedUsers: [...current, them.uid] }),
+            setDoc(doc(db, 'blockedUsers', `${user.uid}_${them.uid}`), { blockerId: user.uid, blockedId: them.uid, blockedAt: new Date().toISOString() }),
+          ]);
           Alert.alert('Blocked', `${them.name} has been blocked.`);
           setMatches(prev => prev.filter(m => m.user.uid !== them.uid));
         } catch (err) {
@@ -437,25 +415,20 @@ export default function MatchesScreen() {
     return n;
   }, [filters]);
 
-  const handleDistanceOpts = useMemo(() =>
-    DISTANCE_OPTIONS.reduce<Record<string, () => void>>((acc, o) => {
-      acc[o.v] = () => setF({ maxDistance: o.v }); return acc;
-    }, {}),
+  const distanceHandlers = useMemo(() =>
+    DISTANCE_OPTIONS.reduce<Record<string, () => void>>((acc, o) => { acc[o.v] = () => setF({ maxDistance: o.v }); return acc; }, {}),
   [setF]);
 
-  const handleActiveWithinOpts = useMemo(() =>
-    ACTIVE_WITHIN_OPTIONS.reduce<Record<string, () => void>>((acc, o) => {
-      acc[o.value] = () => setF({ activeWithin: o.value }); return acc;
-    }, {}),
+  const activeWithinHandlers = useMemo(() =>
+    ACTIVE_WITHIN_OPTIONS.reduce<Record<string, () => void>>((acc, o) => { acc[o.value] = () => setF({ activeWithin: o.value }); return acc; }, {}),
   [setF]);
 
-  const handleMinPhotosOpts = useMemo(() =>
-    [1, 2, 3, 4].reduce<Record<number, () => void>>((acc, n) => {
-      acc[n] = () => setF({ minPhotos: n }); return acc;
-    }, {}),
+  const minPhotosHandlers = useMemo(() =>
+    ([1, 2, 3, 4] as const).reduce<Record<number, () => void>>((acc, n) => { acc[n] = () => setF({ minPhotos: n }); return acc; }, {}),
   [setF]);
 
-  // ── Guards ────────────────────────────────────────────
+  // ── Guards ──────────────────────────────────────────────
+
   if (loading) return (
     <View style={s.center}>
       <ActivityIndicator size="large" color="#53a8b6" />
@@ -498,281 +471,188 @@ export default function MatchesScreen() {
     </View>
   );
 
-  // ── Main ──────────────────────────────────────────────
-  const entry      = filtered[idx]!;
-  const u          = entry.user;
-  const scoreColor = getScoreColor(entry.score);
-  const photoCount = u.photos?.length ?? 0;
-  const dist       = currentUser?.location && u.location
+  const entry          = filtered[idx]!;
+  const u              = entry.user;
+  const scoreColor     = getScoreColor(entry.score);
+  const photoCount     = u.photos?.length ?? 0;
+  const dist           = currentUser?.location && u.location
     ? calculateDistance(currentUser.location.latitude, currentUser.location.longitude, u.location.latitude, u.location.longitude)
     : null;
-  const ageBadge      = getAgeVerificationLevel(u.ageVerification);
-  const heightIsObj   = typeof u.height === 'object' && u.height !== null;
+  const ageBadge       = getAgeVerificationLevel(u.ageVerification);
+  const heightIsObj    = typeof u.height === 'object' && u.height !== null;
   const heightVerified = heightIsObj && (u.height as { verificationMethod?: string }).verificationMethod === 'manual-measured';
 
   return (
-    <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
-
-      {/* Header */}
-      <View style={s.headerRow}>
-        <TouchableOpacity onPress={() => router.push('/home')} accessibilityLabel="Go back home" accessibilityRole="button">
-          <Text style={s.back}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={s.headerCount} accessibilityLabel={`Profile ${idx + 1} of ${filtered.length}`}>{idx + 1} of {filtered.length}</Text>
-        <View style={s.headerRight}>
-          {lastSkipped && (
-            <TouchableOpacity style={s.undoSmall} onPress={handleUndo} accessibilityLabel="Undo last skip" accessibilityRole="button">
-              <Text accessibilityElementsHidden>↩️</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={s.filterBtn} onPress={openFilters}
-            accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
-            accessibilityRole="button">
-            <Text style={s.filterBtnText}>🎛️{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Text>
+    <FlatList
+      style={s.scroll}
+      contentContainerStyle={s.scrollContent}
+      data={[entry]}
+      keyExtractor={item => item.user.uid}
+      ListHeaderComponent={
+        <View style={s.headerRow}>
+          <TouchableOpacity onPress={() => router.push('/home')} accessibilityLabel="Go back home" accessibilityRole="button">
+            <Text style={s.back}>← Back</Text>
           </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filters Modal */}
-      <Modal visible={showFilters} animationType="slide" onRequestClose={closeFilters}>
-        <View style={s.modal}>
-          <View style={s.modalHeader}>
-            <TouchableOpacity onPress={closeFilters} accessibilityLabel="Cancel and close filters" accessibilityRole="button">
-              <Text style={s.modalCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={s.modalTitle} accessibilityRole="header">Filters</Text>
-            <TouchableOpacity onPress={resetFilters} accessibilityLabel="Reset all filters to defaults" accessibilityRole="button">
-              <Text style={s.modalReset}>Reset</Text>
+          <Text style={s.headerCount} accessibilityLabel={`Profile ${idx + 1} of ${filtered.length}`}>{idx + 1} of {filtered.length}</Text>
+          <View style={s.headerRight}>
+            {lastSkipped && (
+              <TouchableOpacity style={s.undoSmall} onPress={handleUndo} accessibilityLabel="Undo last skip" accessibilityRole="button">
+                <Text accessibilityElementsHidden>↩️</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={s.filterBtn} onPress={() => {}}
+              accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`} accessibilityRole="button">
+              <Text style={s.filterBtnText}>🎛️{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Text>
             </TouchableOpacity>
           </View>
-
-          <ScrollView style={s.modalBody}>
-            <Text style={s.filterLabel}>Age Range</Text>
-            <View style={s.rangeRow}>
-              <TextInput style={s.rangeInput} value={filters.minAge} onChangeText={handleMinAge} keyboardType="number-pad" maxLength={2} placeholder="18" placeholderTextColor="#666" accessibilityLabel="Minimum age" />
-              <Text style={s.rangeDash}>to</Text>
-              <TextInput style={s.rangeInput} value={filters.maxAge} onChangeText={handleMaxAge} keyboardType="number-pad" maxLength={2} placeholder="99" placeholderTextColor="#666" accessibilityLabel="Maximum age" />
-            </View>
-
-            {currentUser?.location && (
-              <>
-                <Text style={s.filterLabel}>Max Distance</Text>
-                <View style={s.chipRow}>
-                  {DISTANCE_OPTIONS.map(o => (
-                    <FilterChip key={o.v} label={o.l} active={filters.maxDistance === o.v}
-                      onPress={handleDistanceOpts[o.v]!}
-                      a11yLabel={`Distance: ${o.l}${filters.maxDistance === o.v ? ', selected' : ''}`} />
-                  ))}
+        </View>
+      }
+      renderItem={() => (
+        <View style={s.card}>
+          {photoCount > 0 ? (
+            <View style={s.photoWrap}>
+              <FlatList
+                horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+                data={u.photos} keyExtractor={(uri, i) => `${uri}_${i}`}
+                onScroll={handlePhotoScroll} scrollEventThrottle={16}
+                renderItem={({ item: uri, index: i }) => <PhotoItem uri={uri} index={i} userName={u.name} />}
+                accessibilityLabel={`Photos of ${u.name}, ${photoCount} total`}
+              />
+              {photoCount > 1 && (
+                <>
+                  <View style={s.photoBadge} accessibilityLabel={`Photo ${photoIdx + 1} of ${photoCount}`}>
+                    <Text style={s.photoBadgeTxt}>{photoIdx + 1} / {photoCount}</Text>
+                  </View>
+                  <View style={s.dots} accessibilityElementsHidden>
+                    {u.photos!.map((_, i) => <PhotoDot key={i} active={photoIdx === i} />)}
+                  </View>
+                </>
+              )}
+              {u.selfieVerified && (
+                <View style={s.photoVerified}>
+                  <VerificationBadge selfieVerified size="small" ratings={u.ratings} />
                 </View>
-              </>
-            )}
-
-            <Text style={s.filterLabel}>Height (cm)</Text>
-            <View style={s.rangeRow}>
-              <TextInput style={s.rangeInput} value={filters.minHeight} onChangeText={handleMinHeight} keyboardType="number-pad" maxLength={3} placeholder="Min" placeholderTextColor="#666" accessibilityLabel="Minimum height in centimeters" />
-              <Text style={s.rangeDash}>to</Text>
-              <TextInput style={s.rangeInput} value={filters.maxHeight} onChangeText={handleMaxHeight} keyboardType="number-pad" maxLength={3} placeholder="Max" placeholderTextColor="#666" accessibilityLabel="Maximum height in centimeters" />
+              )}
             </View>
+          ) : (
+            <View style={s.noPhoto} accessibilityLabel={`${u.name} has no photo`}>
+              <Text style={s.noPhotoTxt}>No Photo</Text>
+            </View>
+          )}
 
-            {([
-              { label: 'Body Type',         key: 'bodyTypes',         opts: BODY_TYPES },
-              { label: 'Religious Views',   key: 'religiousViews',    opts: RELIGIOUS_OPTIONS },
-              { label: 'Lifestyle',         key: 'lifestyles',        opts: LIFESTYLE_OPTIONS },
-              { label: 'Relationship Goal', key: 'relationshipGoals', opts: RELATIONSHIP_OPTIONS },
-              { label: 'Personality',       key: 'personalityTypes',  opts: PERSONALITY_OPTIONS },
-            ] as const).map(({ label, key, opts }) => (
-              <ChipGroup key={key} label={label} filterKey={key}
-                opts={opts} selected={filters[key] as string[]} onToggle={handleChipToggle} />
-            ))}
+          <View style={[s.compatBadge, { backgroundColor: scoreColor }]} accessibilityLabel={`${entry.score} percent compatibility match`}>
+            <Text style={s.compatTxt}>{entry.score}% Match</Text>
+          </View>
 
-            <Text style={s.filterLabel}>🕒 Last Active</Text>
-            <View style={s.chipRow}>
-              {ACTIVE_WITHIN_OPTIONS.map(o => (
-                <FilterChip key={o.value} label={o.label} active={filters.activeWithin === o.value}
-                  onPress={handleActiveWithinOpts[o.value]!}
-                  a11yLabel={`Active within: ${o.label}${filters.activeWithin === o.value ? ', selected' : ''}`} />
+          {entry.reasons.length > 0 && (
+            <View style={s.mutualRow} accessibilityElementsHidden>
+              {entry.reasons.slice(0, 2).map((r, i) => (
+                <View key={i} style={s.mutualChip}><Text style={s.mutualTxt}>✓ {r}</Text></View>
               ))}
             </View>
+          )}
 
-            <Text style={s.filterLabel}>✨ Profile Quality</Text>
-            <FilterToggle label="📝 Must have bio" value={filters.hasBio} onPress={handleToggleBio}
-              a11yLabel={`Must have bio${filters.hasBio ? ', enabled' : ', disabled'}`} />
-
-            <View style={s.photoFilterRow}>
-              <Text style={s.toggleTxt}>Min photos:</Text>
-              <View style={s.chipRow}>
-                {[1, 2, 3, 4].map(n => (
-                  <FilterChip key={n} label={`${n}+`} active={filters.minPhotos === n}
-                    onPress={handleMinPhotosOpts[n]!}
-                    a11yLabel={`Minimum ${n} photo${n > 1 ? 's' : ''}${filters.minPhotos === n ? ', selected' : ''}`} />
-                ))}
-              </View>
+          <View style={s.nameSection}>
+            <View style={s.nameRow}>
+              <Text style={s.name} accessibilityRole="header">{u.name}, {u.age}</Text>
+              {u.selfieVerified && <Text style={s.verified} accessibilityLabel="Verified user">✓</Text>}
             </View>
-
-            <FilterToggle label="✓ Verified users only" value={filters.verifiedOnly} onPress={handleToggleVerified}
-              a11yLabel={`Verified users only${filters.verifiedOnly ? ', enabled' : ', disabled'}`} />
-
-            <View style={s.filterSpacer} />
-          </ScrollView>
-
-          <View style={s.modalFooter}>
-            <TouchableOpacity style={s.applyBtn} onPress={closeFilters}
-              accessibilityLabel={`Show ${filtered.length} matches`} accessibilityRole="button">
-              <Text style={s.applyBtnText}>Show {filtered.length} Matches</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Profile Card */}
-      <View style={s.card}>
-        {photoCount > 0 ? (
-          <View style={s.photoWrap}>
-            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
-              onScroll={handlePhotoScroll} scrollEventThrottle={16}
-              accessibilityLabel={`Photos of ${u.name}, ${photoCount} total`}>
-              {u.photos!.map((uri, i) => <PhotoItem key={i} uri={uri} index={i} userName={u.name} />)}
-            </ScrollView>
-            {photoCount > 1 && (
-              <>
-                <View style={s.photoBadge} accessibilityLabel={`Photo ${photoIdx + 1} of ${photoCount}`}>
-                  <Text style={s.photoBadgeTxt}>{photoIdx + 1} / {photoCount}</Text>
-                </View>
-                <View style={s.dots} accessibilityElementsHidden>
-                  {u.photos!.map((_, i) => <PhotoDot key={i} active={photoIdx === i} />)}
-                </View>
-              </>
-            )}
-            {u.selfieVerified && (
-              <View style={s.photoVerified}>
-                <VerificationBadge selfieVerified size="small" ratings={u.ratings} />
+            {ageBadge.level !== 'unverified' && (
+              <View style={[s.ageBadge, { backgroundColor: ageBadge.color }]} accessibilityLabel={`Age verification: ${ageBadge.label}`}>
+                <Text style={s.ageBadgeIcon} accessibilityElementsHidden>{ageBadge.icon}</Text>
+                <Text style={s.ageBadgeTxt}>{ageBadge.label}</Text>
               </View>
             )}
           </View>
-        ) : (
-          <View style={s.noPhoto} accessibilityLabel={`${u.name} has no photo`}>
-            <Text style={s.noPhotoTxt}>No Photo</Text>
-          </View>
-        )}
 
-        <View style={[s.compatBadge, { backgroundColor: scoreColor }]} accessibilityLabel={`${entry.score} percent compatibility match`}>
-          <Text style={s.compatTxt}>{entry.score}% Match</Text>
-        </View>
+          {isUserOnline(u.lastSeen)
+            ? <View style={s.online} accessibilityLabel="User is online now"><View style={s.onlineDot} accessibilityElementsHidden /><Text style={s.onlineTxt}>Online now</Text></View>
+            : u.lastSeen ? <Text style={s.lastSeen}>Last seen {formatLastSeen(u.lastSeen)}</Text> : null}
 
-        {entry.reasons.length > 0 && (
-          <View style={s.mutualRow} accessibilityElementsHidden>
-            {entry.reasons.slice(0, 2).map((r, i) => (
-              <View key={i} style={s.mutualChip}><Text style={s.mutualTxt}>✓ {r}</Text></View>
-            ))}
-          </View>
-        )}
+          {dist !== null && (
+            <View style={s.distBadge} accessibilityLabel={formatDistance(dist)}>
+              <Text style={s.distTxt}>📍 {formatDistance(dist)}</Text>
+            </View>
+          )}
 
-        <View style={s.nameSection}>
-          <View style={s.nameRow}>
-            <Text style={s.name} accessibilityRole="header">{u.name}, {u.age}</Text>
-            {u.selfieVerified && <Text style={s.verified} accessibilityLabel="Verified user">✓</Text>}
+          {u.icebreaker && (
+            <View style={s.icebreaker} accessibilityLabel={`Icebreaker: ${u.icebreakerPrompt ?? 'Question'}: ${u.icebreaker}`}>
+              <Text style={s.icebreakerLabel}>💬 {u.icebreakerPrompt ?? 'Icebreaker'}</Text>
+              <Text style={s.icebreakerTxt}>{u.icebreaker}</Text>
+            </View>
+          )}
+
+          {u.bio && (
+            <View style={s.bio} accessibilityLabel={`Bio: ${u.bio}`}>
+              <Text style={s.sectionTitle}>About Me</Text>
+              <Text style={s.bioTxt}>"{u.bio}"</Text>
+            </View>
+          )}
+
+          <View style={s.infoSection}>
+            <View style={s.infoRow}><Text style={s.label}>Height</Text><HeightBadge height={u.height} /></View>
+            <View style={s.infoRow}><Text style={s.label}>Body Type</Text><Text style={s.value}>{u.bodyType}</Text></View>
+            <View style={s.infoRow}><Text style={s.label}>Looking For</Text><Text style={s.value}>{u.lookingFor}</Text></View>
+            {u.location?.city && <View style={s.infoRow}><Text style={s.label}>Location</Text><Text style={s.value}>{u.location.city}</Text></View>}
           </View>
-          {ageBadge.level !== 'unverified' && (
-            <View style={[s.ageBadge, { backgroundColor: ageBadge.color }]} accessibilityLabel={`Age verification: ${ageBadge.label}`}>
-              <Text style={s.ageBadgeIcon} accessibilityElementsHidden>{ageBadge.icon}</Text>
-              <Text style={s.ageBadgeTxt}>{ageBadge.label}</Text>
+
+          {(u.selfieVerified === true || (u.ratings?.totalRatings ?? 0) > 0) && u.ratings && (
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Trust & Verification</Text>
+              <TrustScoreDisplay ratings={u.ratings} selfieVerified={u.selfieVerified} ageVerified={u.ageVerification?.verified} heightVerified={heightVerified} size="small" />
+            </View>
+          )}
+
+          {(u.religiousViews ?? u.lifestyle ?? u.relationshipGoal) && (
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Beliefs & Values</Text>
+              {u.religiousViews   && <View style={s.infoRow}><Text style={s.label}>Views</Text><Text style={[s.tag, currentUser?.religiousViews === u.religiousViews && s.tagMatch]}>{u.religiousViews}{currentUser?.religiousViews === u.religiousViews ? ' ✓' : ''}</Text></View>}
+              {u.lifestyle        && <View style={s.infoRow}><Text style={s.label}>Lifestyle</Text><Text style={[s.tag, currentUser?.lifestyle === u.lifestyle && s.tagMatch]}>{u.lifestyle}{currentUser?.lifestyle === u.lifestyle ? ' ✓' : ''}</Text></View>}
+              {u.relationshipGoal && <View style={s.infoRow}><Text style={s.label}>Goal</Text><Text style={[s.tag, currentUser?.relationshipGoal === u.relationshipGoal && s.tagMatch]}>{u.relationshipGoal}{currentUser?.relationshipGoal === u.relationshipGoal ? ' ✓' : ''}</Text></View>}
+            </View>
+          )}
+
+          {u.personalityType && (
+            <View style={[s.section, s.centeredSection]}>
+              <Text style={s.sectionTitle}>Personality</Text>
+              <View style={s.personalityBadge} accessibilityLabel={`Personality type: ${u.personalityType}`}>
+                <Text style={s.personalityTxt}>{u.personalityType}</Text>
+              </View>
+              {currentUser?.personalityType === u.personalityType && (
+                <Text style={s.personalityMatch}>Same personality as you! 🎉</Text>
+              )}
+            </View>
+          )}
+
+          {entry.reasons.length > 0 && (
+            <View style={s.reasons} accessibilityLabel={`Why you matched: ${entry.reasons.join(', ')}`}>
+              <Text style={s.reasonsTitle} accessibilityElementsHidden>💫 Why you matched:</Text>
+              {entry.reasons.map((r, i) => <Text key={i} style={s.reasonTxt} accessibilityElementsHidden>• {r}</Text>)}
             </View>
           )}
         </View>
-
-        {isUserOnline(u.lastSeen)
-          ? <View style={s.online} accessibilityLabel="User is online now"><View style={s.onlineDot} accessibilityElementsHidden /><Text style={s.onlineTxt}>Online now</Text></View>
-          : u.lastSeen ? <Text style={s.lastSeen}>Last seen {formatLastSeen(u.lastSeen)}</Text> : null}
-
-        {dist !== null && (
-          <View style={s.distBadge} accessibilityLabel={formatDistance(dist)}>
-            <Text style={s.distTxt}>📍 {formatDistance(dist)}</Text>
+      )}
+      ListFooterComponent={
+        <View>
+          <View style={s.safetyRow}>
+            <TouchableOpacity style={s.reportBtn} onPress={handleReport} accessibilityLabel={`Report ${u.name}`} accessibilityRole="button">
+              <Text style={s.reportBtnTxt}>🚩 Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.blockBtn} onPress={handleBlock} accessibilityLabel={`Block ${u.name}`} accessibilityRole="button">
+              <Text style={s.blockBtnTxt}>🚫 Block</Text>
+            </TouchableOpacity>
           </View>
-        )}
-
-        {u.icebreaker && (
-          <View style={s.icebreaker} accessibilityLabel={`Icebreaker: ${u.icebreakerPrompt ?? 'Question'}: ${u.icebreaker}`}>
-            <Text style={s.icebreakerLabel}>💬 {u.icebreakerPrompt ?? 'Icebreaker'}</Text>
-            <Text style={s.icebreakerTxt}>{u.icebreaker}</Text>
+          <View style={s.actions}>
+            <TouchableOpacity style={s.skipBtn} onPress={handleSkip} accessibilityLabel={`Skip ${u.name}`} accessibilityRole="button">
+              <Text style={s.skipBtnTxt}>✗ Skip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.likeBtn} onPress={handleLike} accessibilityLabel={`Like ${u.name}`} accessibilityRole="button">
+              <Text style={s.likeBtnTxt}>♥ Like</Text>
+            </TouchableOpacity>
           </View>
-        )}
-
-        {u.bio && (
-          <View style={s.bio} accessibilityLabel={`Bio: ${u.bio}`}>
-            <Text style={s.sectionTitle}>About Me</Text>
-            <Text style={s.bioTxt}>"{u.bio}"</Text>
-          </View>
-        )}
-
-        <View style={s.infoSection}>
-          <View style={s.infoRow}><Text style={s.label}>Height</Text><HeightBadge height={u.height} /></View>
-          <View style={s.infoRow}><Text style={s.label}>Body Type</Text><Text style={s.value}>{u.bodyType}</Text></View>
-          <View style={s.infoRow}><Text style={s.label}>Looking For</Text><Text style={s.value}>{u.lookingFor}</Text></View>
-          {u.location?.city && <View style={s.infoRow}><Text style={s.label}>Location</Text><Text style={s.value}>{u.location.city}</Text></View>}
         </View>
-
-        {(u.selfieVerified === true || (u.ratings?.totalRatings ?? 0) > 0) && u.ratings && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Trust & Verification</Text>
-            <TrustScoreDisplay
-              ratings={u.ratings}
-              selfieVerified={u.selfieVerified}
-              ageVerified={u.ageVerification?.verified}
-              heightVerified={heightVerified}
-              size="small"
-            />
-          </View>
-        )}
-
-        {(u.religiousViews ?? u.lifestyle ?? u.relationshipGoal) && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Beliefs & Values</Text>
-            {u.religiousViews   && <View style={s.infoRow}><Text style={s.label}>Views</Text><Text style={[s.tag, currentUser?.religiousViews === u.religiousViews && s.tagMatch]}>{u.religiousViews}{currentUser?.religiousViews === u.religiousViews ? ' ✓' : ''}</Text></View>}
-            {u.lifestyle        && <View style={s.infoRow}><Text style={s.label}>Lifestyle</Text><Text style={[s.tag, currentUser?.lifestyle === u.lifestyle && s.tagMatch]}>{u.lifestyle}{currentUser?.lifestyle === u.lifestyle ? ' ✓' : ''}</Text></View>}
-            {u.relationshipGoal && <View style={s.infoRow}><Text style={s.label}>Goal</Text><Text style={[s.tag, currentUser?.relationshipGoal === u.relationshipGoal && s.tagMatch]}>{u.relationshipGoal}{currentUser?.relationshipGoal === u.relationshipGoal ? ' ✓' : ''}</Text></View>}
-          </View>
-        )}
-
-        {u.personalityType && (
-          <View style={[s.section, s.centeredSection]}>
-            <Text style={s.sectionTitle}>Personality</Text>
-            <View style={s.personalityBadge} accessibilityLabel={`Personality type: ${u.personalityType}`}>
-              <Text style={s.personalityTxt}>{u.personalityType}</Text>
-            </View>
-            {currentUser?.personalityType === u.personalityType && (
-              <Text style={s.personalityMatch}>Same personality as you! 🎉</Text>
-            )}
-          </View>
-        )}
-
-        {entry.reasons.length > 0 && (
-          <View style={s.reasons} accessibilityLabel={`Why you matched: ${entry.reasons.join(', ')}`}>
-            <Text style={s.reasonsTitle} accessibilityElementsHidden>💫 Why you matched:</Text>
-            {entry.reasons.map((r, i) => <Text key={i} style={s.reasonTxt} accessibilityElementsHidden>• {r}</Text>)}
-          </View>
-        )}
-      </View>
-
-      {/* Safety */}
-      <View style={s.safetyRow}>
-        <TouchableOpacity style={s.reportBtn} onPress={handleReport} accessibilityLabel={`Report ${u.name}`} accessibilityRole="button">
-          <Text style={s.reportBtnTxt}>🚩 Report</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.blockBtn} onPress={handleBlock} accessibilityLabel={`Block ${u.name}`} accessibilityRole="button">
-          <Text style={s.blockBtnTxt}>🚫 Block</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Actions */}
-      <View style={s.actions}>
-        <TouchableOpacity style={s.skipBtn} onPress={handleSkip} accessibilityLabel={`Skip ${u.name}`} accessibilityRole="button">
-          <Text style={s.skipBtnTxt}>✗ Skip</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.likeBtn} onPress={handleLike} accessibilityLabel={`Like ${u.name}`} accessibilityRole="button">
-          <Text style={s.likeBtnTxt}>♥ Like</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      }
+    />
   );
 }
 
@@ -798,38 +678,13 @@ const s = StyleSheet.create({
   undoSmall:        { backgroundColor: '#e67e22', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 15 },
   filterBtn:        { backgroundColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 15 },
   filterBtnText:    { color: '#53a8b6', fontSize: 14, fontWeight: '600' },
-  modal:            { flex: 1, backgroundColor: '#1a1a2e' },
-  modalHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
-  modalCancel:      { color: '#d9534f', fontSize: 16 },
-  modalTitle:       { color: '#eee', fontSize: 18, fontWeight: 'bold' },
-  modalReset:       { color: '#53a8b6', fontSize: 16 },
-  modalBody:        { flex: 1, padding: 20 },
-  modalFooter:      { padding: 20, borderTopWidth: 1, borderTopColor: '#0f3460' },
-  applyBtn:         { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center' },
-  applyBtnText:     { color: '#fff', fontSize: 18, fontWeight: '600' },
-  filterLabel:      { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 12 },
-  rangeRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
-  rangeInput:       { backgroundColor: '#16213e', color: '#fff', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 90, textAlign: 'center' },
-  rangeDash:        { color: '#888', fontSize: 16 },
-  chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
-  chip:             { backgroundColor: '#16213e', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#16213e' },
-  chipOn:           { backgroundColor: '#0f3460', borderColor: '#53a8b6' },
-  chipTxt:          { color: '#888', fontSize: 14 },
-  chipTxtOn:        { color: '#53a8b6', fontWeight: '600' },
-  toggleRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#16213e', padding: 15, borderRadius: 10, marginTop: 10 },
-  toggleTxt:        { color: '#eee', fontSize: 15 },
-  checkbox:         { width: 26, height: 26, borderRadius: 6, borderWidth: 2, borderColor: '#53a8b6', justifyContent: 'center', alignItems: 'center' },
-  checkboxOn:       { backgroundColor: '#53a8b6' },
-  checkmark:        { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  photoFilterRow:   { marginTop: 12 },
-  filterSpacer:     { height: 100 },
   card:             { backgroundColor: '#16213e', borderRadius: 20, padding: 20, marginBottom: 15, borderWidth: 2, borderColor: '#0f3460' },
   photoWrap:        { position: 'relative', marginBottom: 15, borderRadius: 15, overflow: 'hidden' },
-  photo:            { height: 400, borderRadius: 15, resizeMode: 'cover' },
+  photo:            { height: 400, borderRadius: 15 },
   photoBadge:       { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
   photoBadgeTxt:    { color: '#fff', fontSize: 12, fontWeight: '600' },
   dots:             { position: 'absolute', bottom: 15, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot:              { width: 8,  height: 8,  borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dot:              { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
   dotOn:            { backgroundColor: '#fff', width: 10, height: 10, borderRadius: 5 },
   photoVerified:    { position: 'absolute', top: 10, left: 10 },
   noPhoto:          { width: '100%', height: 400, borderRadius: 15, backgroundColor: '#0f3460', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
@@ -882,4 +737,29 @@ const s = StyleSheet.create({
   skipBtnTxt:       { color: '#fff', fontSize: 18, fontWeight: '600', textAlign: 'center' },
   likeBtn:          { backgroundColor: '#5cb85c', paddingVertical: 16, paddingHorizontal: 40, borderRadius: 25, flex: 1, marginLeft: 10 },
   likeBtnTxt:       { color: '#fff', fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  modal:            { flex: 1, backgroundColor: '#1a1a2e' },
+  modalHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
+  modalCancel:      { color: '#d9534f', fontSize: 16 },
+  modalTitle:       { color: '#eee', fontSize: 18, fontWeight: 'bold' },
+  modalReset:       { color: '#53a8b6', fontSize: 16 },
+  modalBody:        { flex: 1, padding: 20 },
+  modalFooter:      { padding: 20, borderTopWidth: 1, borderTopColor: '#0f3460' },
+  applyBtn:         { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center' },
+  applyBtnText:     { color: '#fff', fontSize: 18, fontWeight: '600' },
+  filterLabel:      { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 12 },
+  rangeRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
+  rangeInput:       { backgroundColor: '#16213e', color: '#fff', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 90, textAlign: 'center' },
+  rangeDash:        { color: '#888', fontSize: 16 },
+  chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  chip:             { backgroundColor: '#16213e', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#16213e' },
+  chipOn:           { backgroundColor: '#0f3460', borderColor: '#53a8b6' },
+  chipTxt:          { color: '#888', fontSize: 14 },
+  chipTxtOn:        { color: '#53a8b6', fontWeight: '600' },
+  toggleRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#16213e', padding: 15, borderRadius: 10, marginTop: 10 },
+  toggleTxt:        { color: '#eee', fontSize: 15 },
+  checkbox:         { width: 26, height: 26, borderRadius: 6, borderWidth: 2, borderColor: '#53a8b6', justifyContent: 'center', alignItems: 'center' },
+  checkboxOn:       { backgroundColor: '#53a8b6' },
+  checkmark:        { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  photoFilterRow:   { marginTop: 12 },
+  filterSpacer:     { height: 100 },
 });

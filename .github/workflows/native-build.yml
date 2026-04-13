@@ -1,0 +1,13 @@
+# .github/workflows/native-build.yml
+name: 📱 Native Build & Test
+on: push
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npx expo prebuild --clean --platform ios
+      - run: cd ios && pod install && cd ..
+      - run: npx fastlane ios build_test
+      - run: ./gradlew assembleDebug  # Android

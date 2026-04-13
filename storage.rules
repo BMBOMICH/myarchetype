@@ -2,22 +2,70 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // ── User profile media ──────────────────────────────────
-    match /users/{userId}/{allPaths=**} {
-      allow read:  if request.auth != null;
+    // ── Profile photos — public read, owner write ──────────
+    match /profiles/{userId}/{photoId} {
+      allow read: if true;
       allow write: if request.auth != null
-                   && request.auth.uid == userId
-                   && request.resource.size  < 50 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*|video/.*|audio/.*');
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
     }
 
-    // ── Public assets (read-only) ───────────────────────────
+    // ── User media (legacy path) ───────────────────────────
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|video/.*|audio/.*');
+    }
+
+    // ── Chat media — participants only ─────────────────────
+    match /chat_media/{conversationId}/{mediaId} {
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(
+          /databases/(default)/documents/conversations/$(conversationId)
+        ).data.participantIds;
+      allow write: if request.auth != null
+        && request.auth.uid in firestore.get(
+          /databases/(default)/documents/conversations/$(conversationId)
+        ).data.participantIds
+        && request.resource.size < 50 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('video/.*')
+          || request.resource.contentType.matches('audio/.*'));
+    }
+
+    // ── ID verification — owner + admin only ──────────────
+    match /verification/{userId}/{docId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == userId
+          || firestore.get(
+              /databases/(default)/documents/users/$(request.auth.uid)
+            ).data.role == 'admin');
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if false;
+    }
+
+    // ── Audit evidence — admin only ────────────────────────
+    match /evidence/{caseId}/{fileId} {
+      allow read, write: if request.auth != null
+        && firestore.get(
+            /databases/(default)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin';
+    }
+
+    // ── Public assets ──────────────────────────────────────
     match /public/{allPaths=**} {
-      allow read:  if true;
+      allow read: if true;
       allow write: if false;
     }
 
-    // ── Default deny ────────────────────────────────────────
+    // ── Default deny ───────────────────────────────────────
     match /{allPaths=**} {
       allow read, write: if false;
     }

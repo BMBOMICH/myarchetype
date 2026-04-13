@@ -1,85 +1,32 @@
-import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
+import { Audio, AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import {
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { logger } from '../utils/logger';
-    deleteVoiceIntro,
-    formatVoiceDuration,
-    getVoiceIntro,
-    MAX_VOICE_INTRO_DURATION,
-    uploadVoiceIntro,
-    VoiceIntro,
-} from '../utils/voiceIntro';
+import { deleteVoiceIntro, formatVoiceDuration, getVoiceIntro, MAX_VOICE_INTRO_DURATION, uploadVoiceIntro, VoiceIntro } from '../utils/voiceIntro';
+
+interface PlaybackSound {
+  unloadAsync: () => Promise<void>;
+  playing: boolean;
+  setOnPlaybackStatusUpdate: (cb: (status: { isLoaded: boolean; didJustFinish: boolean }) => void) => void;
+}
 
 export default function VoiceIntroRecorderScreen() {
   const router = useRouter();
 
-  // Loading / action states
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  // Existing intro
-  const [existingIntro, setExistingIntro] = useState<VoiceIntro | null>(null);
-
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false);
+  const [loading, setLoading]               = useState(true);
+  const [uploading, setUploading]           = useState(false);
+  const [deleting, setDeleting]             = useState(false);
+  const [existingIntro, setExistingIntro]   = useState<VoiceIntro | null>(null);
+  const [isRecording, setIsRecording]       = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [waitingForUri, setWaitingForUri] = useState(false);
+  const [recordedUri, setRecordedUri]       = useState<string | null>(null);
+  const [waitingForUri, setWaitingForUri]   = useState(false);
+  const [isPlaying, setIsPlaying]           = useState(false);
+  const [playbackSound, setPlaybackSound]   = useState<PlaybackSound | null>(null);
 
-  // Playback state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSound, setPlaybackSound] = useState<any>(null);
-
-  // Refs
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // expo-audio recorder
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-
-  // ============ EFFECTS ============
-
-  useEffect(() => {
-    loadExistingIntro();
-    AudioModule.requestRecordingPermissionsAsync().catch(() => {});
-
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      if (playbackSound) {
-        try { playbackSound.unloadAsync(); } catch {}
-      }
-    };
-  }, []);
-
-  // Handle URI after recording stops
-  useEffect(() => {
-    if (waitingForUri && audioRecorder.uri) {
-      setWaitingForUri(false);
-      setRecordedUri(audioRecorder.uri);
-    }
-  }, [waitingForUri, audioRecorder.uri]);
-
-  // Detect playback end
-  useEffect(() => {
-    if (!isPlaying || !playbackSound) return;
-    const check = setInterval(() => {
-      try {
-        if (!playbackSound.playing) setIsPlaying(false);
-      } catch {}
-    }, 500);
-    return () => clearInterval(check);
-  }, [isPlaying, playbackSound]);
-
-  // ============ LOAD DATA ============
+  const audioRecorder     = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const loadExistingIntro = useCallback(async () => {
     const intro = await getVoiceIntro();
@@ -87,29 +34,42 @@ export default function VoiceIntroRecorderScreen() {
     setLoading(false);
   }, []);
 
-  // ============ RECORDING HANDLERS ============
+  useEffect(() => {
+    void loadExistingIntro();
+    void AudioModule.requestRecordingPermissionsAsync().catch(() => {});
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (playbackSound) playbackSound.unloadAsync().catch(() => {});
+    };
+  }, [loadExistingIntro]);
+
+  useEffect(() => {
+    if (waitingForUri && audioRecorder.uri) {
+      setWaitingForUri(false);
+      setRecordedUri(audioRecorder.uri);
+    }
+  }, [waitingForUri, audioRecorder.uri]);
+
+  useEffect(() => {
+    if (!isPlaying || !playbackSound) return;
+    const check = setInterval(() => {
+      try { if (!playbackSound.playing) setIsPlaying(false); } catch {}
+    }, 500);
+    return () => clearInterval(check);
+  }, [isPlaying, playbackSound]);
 
   const startRecording = useCallback(async () => {
     try {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permission Required', 'Microphone permission is required');
-        return;
-      }
-
+      if (!permission.granted) { Alert.alert('Permission Required', 'Microphone permission is required'); return; }
       audioRecorder.record();
       setIsRecording(true);
       setRecordingDuration(0);
       setRecordedUri(null);
-
       recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration((prev) => {
+        setRecordingDuration(prev => {
           if (prev >= MAX_VOICE_INTRO_DURATION) {
-            // Auto-stop
-            if (recordingTimerRef.current) {
-              clearInterval(recordingTimerRef.current);
-              recordingTimerRef.current = null;
-            }
+            if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
             setIsRecording(false);
             try { audioRecorder.stop(); } catch {}
             setWaitingForUri(true);
@@ -126,63 +86,32 @@ export default function VoiceIntroRecorderScreen() {
 
   const stopRecording = useCallback(() => {
     if (!isRecording) return;
-
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     setIsRecording(false);
     audioRecorder.stop();
     setWaitingForUri(true);
   }, [isRecording, audioRecorder]);
 
   const cancelRecording = useCallback(() => {
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     setIsRecording(false);
     setRecordingDuration(0);
     setWaitingForUri(false);
-
     try { audioRecorder.stop(); } catch {}
   }, [audioRecorder]);
 
-  // ============ PLAYBACK HANDLERS ============
-
   const playPreview = useCallback(async () => {
-    const uriToPlay = recordedUri || existingIntro?.url;
+    const uriToPlay = recordedUri ?? existingIntro?.url;
     if (!uriToPlay) return;
-
     try {
-      // Stop current playback
-      if (playbackSound) {
-        try { await playbackSound.unloadAsync(); } catch {}
-        setPlaybackSound(null);
-      }
-
-      if (isPlaying) {
-        setIsPlaying(false);
-        return;
-      }
-
-      // Use expo-audio Sound API
-      const { Audio } = require('expo-audio');
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: uriToPlay },
-        { shouldPlay: true }
-      );
-
-      setPlaybackSound(sound);
+      if (playbackSound) { await playbackSound.unloadAsync().catch(() => {}); setPlaybackSound(null); }
+      if (isPlaying) { setIsPlaying(false); return; }
+      const { sound } = await Audio.Sound.createAsync({ uri: uriToPlay }, { shouldPlay: true });
+      const typedSound = sound as unknown as PlaybackSound;
+      setPlaybackSound(typedSound);
       setIsPlaying(true);
-
-      sound.setOnPlaybackStatusUpdate((status: any) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setIsPlaying(false);
-          setPlaybackSound(null);
-        }
+      typedSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) { setIsPlaying(false); setPlaybackSound(null); }
       });
     } catch (error) {
       logger.error('Error playing preview:', error);
@@ -190,250 +119,160 @@ export default function VoiceIntroRecorderScreen() {
     }
   }, [recordedUri, existingIntro?.url, isPlaying, playbackSound]);
 
-  // ============ UPLOAD / DELETE ============
-
   const handleUpload = useCallback(async () => {
     if (!recordedUri) return;
-
     setUploading(true);
     const result = await uploadVoiceIntro(recordedUri, recordingDuration);
     setUploading(false);
-
-    if (result.success) {
-      Alert.alert('Success', 'Voice intro saved!');
-      router.back();
-    } else {
-      Alert.alert('Error', result.error || 'Upload failed');
-    }
+    if (result.success) { Alert.alert('Success', 'Voice intro saved!'); router.back(); }
+    else Alert.alert('Error', result.error ?? 'Upload failed');
   }, [recordedUri, recordingDuration, router]);
 
   const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Voice Intro',
-      'Delete your voice intro?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            const result = await deleteVoiceIntro();
-            setDeleting(false);
-
-            if (result.success) {
-              setExistingIntro(null);
-              Alert.alert('Deleted', 'Voice intro deleted');
-            }
-          },
-        },
-      ]
-    );
+    Alert.alert('Delete Voice Intro', 'Delete your voice intro?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setDeleting(true);
+        const result = await deleteVoiceIntro();
+        setDeleting(false);
+        if (result.success) { setExistingIntro(null); Alert.alert('Deleted', 'Voice intro deleted'); }
+      }},
+    ]);
   }, []);
 
-  const discardRecording = useCallback(() => {
-    setRecordedUri(null);
-    setRecordingDuration(0);
-  }, []);
+  const discardRecording = useCallback(() => { setRecordedUri(null); setRecordingDuration(0); }, []);
 
-  // ============ LOADING STATE ============
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#53a8b6" />
-      </View>
-    );
-  }
-
-  // ============ RENDER ============
+  if (loading) return <View style={s.centerContainer}><ActivityIndicator size="large" color="#53a8b6" /></View>;
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Back</Text>
+    <View style={s.container}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+          <Text style={s.backButton}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>🎤 Voice Intro</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={s.title}>🎤 Voice Intro</Text>
+        <View style={s.headerSpacer} />
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.subtitle}>
-          Record a {MAX_VOICE_INTRO_DURATION}-second intro to let matches hear your voice!
-        </Text>
+      <View style={s.content}>
+        <Text style={s.subtitle}>Record a {MAX_VOICE_INTRO_DURATION}-second intro to let matches hear your voice!</Text>
 
-        {/* Existing Intro */}
         {existingIntro && !recordedUri && !isRecording && (
-          <View style={styles.existingContainer}>
-            <Text style={styles.existingLabel}>Current Voice Intro</Text>
-            <Text style={styles.existingDuration}>
-              {formatVoiceDuration(existingIntro.duration)}
-            </Text>
-
-            <View style={styles.existingButtons}>
-              <TouchableOpacity style={styles.playButton} onPress={playPreview}>
-                <Text style={styles.playButtonText}>
-                  {isPlaying ? '⏸ Pause' : '▶️ Play'}
-                </Text>
+          <View style={s.existingContainer}>
+            <Text style={s.existingLabel}>Current Voice Intro</Text>
+            <Text style={s.existingDuration}>{formatVoiceDuration(existingIntro.duration)}</Text>
+            <View style={s.existingButtons}>
+              <TouchableOpacity style={s.playButton} onPress={playPreview} accessibilityLabel={isPlaying ? 'Pause' : 'Play voice intro'} accessibilityRole="button">
+                <Text style={s.playButtonText}>{isPlaying ? '⏸ Pause' : '▶️ Play'}</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDelete}
-                disabled={deleting}
-              >
-                <Text style={styles.deleteButtonText}>
-                  {deleting ? '...' : '🗑️ Delete'}
-                </Text>
+              <TouchableOpacity style={s.deleteButton} onPress={handleDelete} disabled={deleting} accessibilityLabel="Delete voice intro" accessibilityRole="button">
+                <Text style={s.deleteButtonText}>{deleting ? '...' : '🗑️ Delete'}</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Recording UI */}
         {isRecording && (
-          <View style={styles.recordingContainer}>
-            <View style={styles.recordingIndicator}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>Recording...</Text>
+          <View style={s.recordingContainer}>
+            <View style={s.recordingIndicator}>
+              <View style={s.recordingDot} />
+              <Text style={s.recordingText}>Recording...</Text>
             </View>
-
-            <Text style={styles.timer}>
-              {formatVoiceDuration(recordingDuration)} / {formatVoiceDuration(MAX_VOICE_INTRO_DURATION)}
-            </Text>
-
-            <View style={styles.timerBar}>
-              <View
-                style={[
-                  styles.timerFill,
-                  { width: `${(recordingDuration / MAX_VOICE_INTRO_DURATION) * 100}%` },
-                ]}
-              />
+            <Text style={s.timer}>{formatVoiceDuration(recordingDuration)} / {formatVoiceDuration(MAX_VOICE_INTRO_DURATION)}</Text>
+            <View style={s.timerBar}>
+              <View style={[s.timerFill, { width: `${(recordingDuration / MAX_VOICE_INTRO_DURATION) * 100}%` as `${number}%` }]} />
             </View>
-
-            <View style={styles.recordingButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelRecording}>
-                <Text style={styles.cancelButtonText}>✕ Cancel</Text>
+            <View style={s.recordingButtons}>
+              <TouchableOpacity style={s.cancelButton} onPress={cancelRecording} accessibilityLabel="Cancel recording" accessibilityRole="button">
+                <Text style={s.cancelButtonText}>✕ Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.stopRecordButton} onPress={stopRecording}>
-                <Text style={styles.stopRecordButtonText}>⏹ Stop</Text>
+              <TouchableOpacity style={s.stopRecordButton} onPress={stopRecording} accessibilityLabel="Stop recording" accessibilityRole="button">
+                <Text style={s.stopRecordButtonText}>⏹ Stop</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Preview Recorded */}
         {recordedUri && !isRecording && (
-          <View style={styles.previewContainer}>
-            <Text style={styles.previewLabel}>Preview Recording</Text>
-            <Text style={styles.previewDuration}>
-              {formatVoiceDuration(recordingDuration)}
-            </Text>
-
-            <TouchableOpacity style={styles.playButton} onPress={playPreview}>
-              <Text style={styles.playButtonText}>
-                {isPlaying ? '⏸ Pause' : '▶️ Play'}
-              </Text>
+          <View style={s.previewContainer}>
+            <Text style={s.previewLabel}>Preview Recording</Text>
+            <Text style={s.previewDuration}>{formatVoiceDuration(recordingDuration)}</Text>
+            <TouchableOpacity style={s.playButton} onPress={playPreview} accessibilityLabel={isPlaying ? 'Pause' : 'Play recording'} accessibilityRole="button">
+              <Text style={s.playButtonText}>{isPlaying ? '⏸ Pause' : '▶️ Play'}</Text>
             </TouchableOpacity>
-
-            <View style={styles.previewButtons}>
-              <TouchableOpacity style={styles.discardButton} onPress={discardRecording}>
-                <Text style={styles.discardButtonText}>Re-record</Text>
+            <View style={s.previewButtons}>
+              <TouchableOpacity style={s.discardButton} onPress={discardRecording} accessibilityLabel="Re-record" accessibilityRole="button">
+                <Text style={s.discardButtonText}>Re-record</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.saveButton, uploading && styles.saveButtonDisabled]}
-                onPress={handleUpload}
-                disabled={uploading}
-              >
-                <Text style={styles.saveButtonText}>
-                  {uploading ? 'Saving...' : '✓ Save'}
-                </Text>
+              <TouchableOpacity style={[s.saveButton, uploading && s.saveButtonDisabled]} onPress={handleUpload} disabled={uploading} accessibilityLabel="Save voice intro" accessibilityRole="button">
+                <Text style={s.saveButtonText}>{uploading ? 'Saving...' : '✓ Save'}</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Start Recording Button */}
         {!isRecording && !recordedUri && (
-          <TouchableOpacity style={styles.startRecordButton} onPress={startRecording}>
-            <View style={styles.micIcon}>
-              <Text style={styles.micIconText}>🎤</Text>
-            </View>
-            <Text style={styles.startRecordText}>
-              {existingIntro ? 'Record New Intro' : 'Start Recording'}
-            </Text>
+          <TouchableOpacity style={s.startRecordButton} onPress={startRecording} accessibilityLabel={existingIntro ? 'Record new intro' : 'Start recording'} accessibilityRole="button">
+            <View style={s.micIcon}><Text style={s.micIconText}>🎤</Text></View>
+            <Text style={s.startRecordText}>{existingIntro ? 'Record New Intro' : 'Start Recording'}</Text>
           </TouchableOpacity>
         )}
 
-        {/* Tips */}
-        <View style={styles.tipsContainer}>
-          <Text style={styles.tipsTitle}>💡 Tips</Text>
-          <Text style={styles.tipText}>• Introduce yourself naturally</Text>
-          <Text style={styles.tipText}>• Mention something interesting about you</Text>
-          <Text style={styles.tipText}>• Be yourself - authenticity wins!</Text>
-          <Text style={styles.tipText}>• Record in a quiet environment</Text>
+        <View style={s.tipsContainer}>
+          <Text style={s.tipsTitle}>💡 Tips</Text>
+          <Text style={s.tipText}>• Introduce yourself naturally</Text>
+          <Text style={s.tipText}>• Mention something interesting about you</Text>
+          <Text style={s.tipText}>• Be yourself - authenticity wins!</Text>
+          <Text style={s.tipText}>• Record in a quiet environment</Text>
         </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
-  centerContainer: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, backgroundColor: '#16213e' },
-  backButton: { color: '#53a8b6', fontSize: 16 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#eee' },
-  headerSpacer: { width: 50 },
-  content: { flex: 1, padding: 20 },
-  subtitle: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 30, lineHeight: 22 },
-
-  // Existing intro
-  existingContainer: { backgroundColor: '#16213e', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 30 },
-  existingLabel: { color: '#5cb85c', fontSize: 14, fontWeight: '600' },
-  existingDuration: { color: '#eee', fontSize: 24, fontWeight: 'bold', marginTop: 10 },
-  existingButtons: { flexDirection: 'row', gap: 15, marginTop: 20 },
-  playButton: { backgroundColor: '#53a8b6', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 20 },
-  playButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  deleteButton: { backgroundColor: '#d9534f', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
-  deleteButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-
-  // Recording
-  recordingContainer: { backgroundColor: '#16213e', borderRadius: 15, padding: 25, alignItems: 'center', marginBottom: 30 },
-  recordingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
-  recordingDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#d9534f' },
-  recordingText: { color: '#d9534f', fontSize: 16, fontWeight: '600' },
-  timer: { color: '#eee', fontSize: 32, fontWeight: 'bold', marginBottom: 15 },
-  timerBar: { width: '100%', height: 8, backgroundColor: '#0f3460', borderRadius: 4, marginBottom: 25 },
-  timerFill: { height: '100%', backgroundColor: '#e67e22', borderRadius: 4 },
-  recordingButtons: { flexDirection: 'row', gap: 20 },
-  cancelButton: { backgroundColor: '#0f3460', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 20 },
-  cancelButtonText: { color: '#888', fontSize: 16, fontWeight: '600' },
-  stopRecordButton: { backgroundColor: '#d9534f', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 20 },
-  stopRecordButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-
-  // Preview
-  previewContainer: { backgroundColor: '#16213e', borderRadius: 15, padding: 25, alignItems: 'center', marginBottom: 30 },
-  previewLabel: { color: '#e67e22', fontSize: 14, fontWeight: '600' },
-  previewDuration: { color: '#eee', fontSize: 28, fontWeight: 'bold', marginVertical: 15 },
-  previewButtons: { flexDirection: 'row', gap: 15, marginTop: 20 },
-  discardButton: { backgroundColor: '#0f3460', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
-  discardButtonText: { color: '#888', fontSize: 14, fontWeight: '600' },
-  saveButton: { backgroundColor: '#5cb85c', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 20 },
-  saveButtonDisabled: { backgroundColor: '#555' },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-
-  // Start button
-  startRecordButton: { backgroundColor: '#e67e22', borderRadius: 20, padding: 30, alignItems: 'center', marginBottom: 30 },
-  micIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  micIconText: { fontSize: 40 },
-  startRecordText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-
-  // Tips
-  tipsContainer: { backgroundColor: '#16213e', borderRadius: 15, padding: 20 },
-  tipsTitle: { color: '#53a8b6', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
-  tipText: { color: '#888', fontSize: 14, marginBottom: 6 },
+const s = StyleSheet.create({
+  container:           { flex: 1, backgroundColor: '#1a1a2e' },
+  centerContainer:     { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
+  header:              { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, backgroundColor: '#16213e' },
+  backButton:          { color: '#53a8b6', fontSize: 16 },
+  title:               { fontSize: 20, fontWeight: 'bold', color: '#eee' },
+  headerSpacer:        { width: 50 },
+  content:             { flex: 1, padding: 20 },
+  subtitle:            { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 30, lineHeight: 22 },
+  existingContainer:   { backgroundColor: '#16213e', borderRadius: 15, padding: 20, alignItems: 'center', marginBottom: 30 },
+  existingLabel:       { color: '#5cb85c', fontSize: 14, fontWeight: '600' },
+  existingDuration:    { color: '#eee', fontSize: 24, fontWeight: 'bold', marginTop: 10 },
+  existingButtons:     { flexDirection: 'row', gap: 15, marginTop: 20 },
+  playButton:          { backgroundColor: '#53a8b6', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 20 },
+  playButtonText:      { color: '#fff', fontSize: 16, fontWeight: '600' },
+  deleteButton:        { backgroundColor: '#d9534f', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
+  deleteButtonText:    { color: '#fff', fontSize: 14, fontWeight: '600' },
+  recordingContainer:  { backgroundColor: '#16213e', borderRadius: 15, padding: 25, alignItems: 'center', marginBottom: 30 },
+  recordingIndicator:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
+  recordingDot:        { width: 12, height: 12, borderRadius: 6, backgroundColor: '#d9534f' },
+  recordingText:       { color: '#d9534f', fontSize: 16, fontWeight: '600' },
+  timer:               { color: '#eee', fontSize: 32, fontWeight: 'bold', marginBottom: 15 },
+  timerBar:            { width: '100%', height: 8, backgroundColor: '#0f3460', borderRadius: 4, marginBottom: 25 },
+  timerFill:           { height: '100%', backgroundColor: '#e67e22', borderRadius: 4 },
+  recordingButtons:    { flexDirection: 'row', gap: 20 },
+  cancelButton:        { backgroundColor: '#0f3460', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 20 },
+  cancelButtonText:    { color: '#888', fontSize: 16, fontWeight: '600' },
+  stopRecordButton:    { backgroundColor: '#d9534f', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 20 },
+  stopRecordButtonText:{ color: '#fff', fontSize: 16, fontWeight: '600' },
+  previewContainer:    { backgroundColor: '#16213e', borderRadius: 15, padding: 25, alignItems: 'center', marginBottom: 30 },
+  previewLabel:        { color: '#e67e22', fontSize: 14, fontWeight: '600' },
+  previewDuration:     { color: '#eee', fontSize: 28, fontWeight: 'bold', marginVertical: 15 },
+  previewButtons:      { flexDirection: 'row', gap: 15, marginTop: 20 },
+  discardButton:       { backgroundColor: '#0f3460', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
+  discardButtonText:   { color: '#888', fontSize: 14, fontWeight: '600' },
+  saveButton:          { backgroundColor: '#5cb85c', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 20 },
+  saveButtonDisabled:  { backgroundColor: '#555' },
+  saveButtonText:      { color: '#fff', fontSize: 16, fontWeight: '600' },
+  startRecordButton:   { backgroundColor: '#e67e22', borderRadius: 20, padding: 30, alignItems: 'center', marginBottom: 30 },
+  micIcon:             { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  micIconText:         { fontSize: 40 },
+  startRecordText:     { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  tipsContainer:       { backgroundColor: '#16213e', borderRadius: 15, padding: 20 },
+  tipsTitle:           { color: '#53a8b6', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  tipText:             { color: '#888', fontSize: 14, marginBottom: 6 },
 });

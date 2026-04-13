@@ -1,4 +1,3 @@
-import { logger } from '../utils/logger';
 "use strict";
 
 /**
@@ -11,10 +10,6 @@ import { logger } from '../utils/logger';
  * - push notifications
  * - deleted-account cleanup
  * - web push notifications
- *
- * Notes:
- * - Callable functions use Gen 2 APIs where possible.
- * - Auth deletion trigger remains Gen 1.
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
@@ -27,570 +22,321 @@ const webpush = require("web-push");
 admin.initializeApp();
 const db = admin.firestore();
 
-// ─────────────────────────────────────────────────────────────
-// Secrets
-// ─────────────────────────────────────────────────────────────
-
-const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
+// ─── Secrets ──────────────────────────────────────────────
+const cloudinaryCloudName  = defineSecret("CLOUDINARY_CLOUD_NAME");
 const cloudinaryUploadPreset = defineSecret("CLOUDINARY_UPLOAD_PRESET");
-const deepaiApiKey = defineSecret("DEEPAI_API_KEY");
-const vapidEmail = defineSecret("VAPID_EMAIL");
-const vapidPublicKey = defineSecret("VAPID_PUBLIC_KEY");
-const vapidPrivateKey = defineSecret("VAPID_PRIVATE_KEY");
+const deepaiApiKey         = defineSecret("DEEPAI_API_KEY");
+const vapidEmail           = defineSecret("VAPID_EMAIL");
+const vapidPublicKey       = defineSecret("VAPID_PUBLIC_KEY");
+const vapidPrivateKey      = defineSecret("VAPID_PRIVATE_KEY");
 
-// ─────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────
-
-const REGION = "europe-west1";
-const HTTP_TIMEOUT_MS = 30_000;
+// ─── Constants ────────────────────────────────────────────
+const REGION           = "europe-west1";
+const HTTP_TIMEOUT_MS  = 30_000;
 const MAX_BASE64_LENGTH = 15 * 1024 * 1024;
-const NSFW_THRESHOLD = 0.6;
-const BATCH_LIMIT = 400;
+const NSFW_THRESHOLD   = 0.6;
+const BATCH_LIMIT      = 400;
 
 const RATE_LIMITS = {
-  like: { count: 100, periodMs: 86_400_000 },
+  like:    { count: 100, periodMs: 86_400_000 },
   message: { count: 500, periodMs: 86_400_000 },
-  report: { count: 10, periodMs: 86_400_000 },
+  report:  { count: 10,  periodMs: 86_400_000 },
 };
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
+// ─── Logger (safe wrapper) ────────────────────────────────
+const logger = {
+  log:  (...a) => functions.logger.log(...a),
+  warn: (...a) => functions.logger.warn(...a),
+  error:(...a) => functions.logger.error(...a),
+};
 
+// ─── Helpers ──────────────────────────────────────────────
 function requireAuth(request) {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Authentication required.");
-  }
+  if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
   return request.auth;
 }
 
 function requireString(value, label) {
-  if (typeof value !== "string" || value.trim().length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0)
     throw new HttpsError("invalid-argument", `${label} must be a non-empty string.`);
-  }
   return value.trim();
 }
 
-function optionalString(value) {
-  return typeof value === "string" ? value : undefined;
-}
-
-function ensureObject(value, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new HttpsError("invalid-argument", `${label} must be an object.`);
-  }
-  return value;
-}
+function optionalString(value) { return typeof value === "string" ? value : undefined; }
 
 function normalizeStringMap(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const out = {};
   for (const [key, val] of Object.entries(value)) {
-    if (typeof val === "string") {
-      out[key] = val;
-    } else if (val != null) {
-      out[key] = String(val);
-    }
+    if (typeof val === "string") out[key] = val;
+    else if (val != null) out[key] = String(val);
   }
   return out;
 }
 
 async function deleteQueryBatched(query) {
-  let totalDeleted = 0;
-
+  let total = 0;
   while (true) {
     const snapshot = await query.limit(BATCH_LIMIT).get();
     if (snapshot.empty) break;
-
     const batch = db.batch();
-    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    snapshot.docs.forEach((d) => batch.delete(d.ref));
     await batch.commit();
-    totalDeleted += snapshot.size;
-
+    total += snapshot.size;
     if (snapshot.size < BATCH_LIMIT) break;
   }
-
-  return totalDeleted;
+  return total;
 }
 
 async function callDeepAI(endpoint, payload) {
   const { data } = await axios.post(
     `https://api.deepai.org/api/${endpoint}`,
     payload,
-    {
-      headers: {
-        "api-key": deepaiApiKey.value(),
-        "Content-Type": "application/json",
-      },
-      timeout: HTTP_TIMEOUT_MS,
-    }
+    { headers: { "api-key": deepaiApiKey.value(), "Content-Type": "application/json" }, timeout: HTTP_TIMEOUT_MS }
   );
   return data;
 }
 
-function getChatId(userA, userB) {
-  return [userA, userB].sort().join("_");
-}
-
-function buildChatParticipants(userA, userB) {
-  return [userA, userB].sort();
-}
+function getChatId(a, b)              { return [a, b].sort().join("_"); }
+function buildChatParticipants(a, b)  { return [a, b].sort(); }
 
 function configureWebPush() {
-  webpush.setVapidDetails(
-    vapidEmail.value(),
-    vapidPublicKey.value(),
-    vapidPrivateKey.value()
-  );
+  webpush.setVapidDetails(vapidEmail.value(), vapidPublicKey.value(), vapidPrivateKey.value());
 }
 
-// ─────────────────────────────────────────────────────────────
-// Photo Upload
-// ─────────────────────────────────────────────────────────────
-
+// ─── Photo Upload ─────────────────────────────────────────
 exports.uploadPhoto = onCall(
-  {
-    region: REGION,
-    secrets: [cloudinaryCloudName, cloudinaryUploadPreset],
-    memory: "256MiB",
-    timeoutSeconds: 60,
-  },
+  { region: REGION, secrets: [cloudinaryCloudName, cloudinaryUploadPreset], memory: "256MiB", timeoutSeconds: 60 },
   async (request) => {
     requireAuth(request);
-
     const photoBase64 = requireString(request.data?.photoBase64, "photoBase64");
-
-    if (photoBase64.length > MAX_BASE64_LENGTH) {
-      throw new HttpsError("invalid-argument", "Image exceeds the size limit.");
-    }
-
+    if (photoBase64.length > MAX_BASE64_LENGTH) throw new HttpsError("invalid-argument", "Image exceeds the size limit.");
     try {
       const { data } = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloudinaryCloudName.value()}/image/upload`,
-        {
-          file: photoBase64,
-          upload_preset: cloudinaryUploadPreset.value(),
-        },
+        { file: photoBase64, upload_preset: cloudinaryUploadPreset.value() },
         { timeout: HTTP_TIMEOUT_MS }
       );
-
-      if (!data?.secure_url) {
-        throw new Error("Cloudinary response missing secure_url");
-      }
-
+      if (!data?.secure_url) throw new Error("Cloudinary response missing secure_url");
       return { url: data.secure_url };
     } catch (error) {
-      logger.error("Cloudinary upload failed:", error?.message || error);
+      logger.error("Cloudinary upload failed:", error?.message ?? error);
       throw new HttpsError("internal", "Photo upload failed.");
     }
   }
 );
 
-// ─────────────────────────────────────────────────────────────
-// AI Verification
-// ─────────────────────────────────────────────────────────────
-
+// ─── AI Verification ──────────────────────────────────────
 exports.verifyPhotoNSFW = onCall(
-  {
-    region: REGION,
-    secrets: [deepaiApiKey],
-    timeoutSeconds: 60,
-  },
+  { region: REGION, secrets: [deepaiApiKey], timeoutSeconds: 60 },
   async (request) => {
     requireAuth(request);
-
     const imageUrl = requireString(request.data?.imageUrl, "imageUrl");
-
     try {
       const result = await callDeepAI("nsfw-detector", { image: imageUrl });
-      const nsfwScore = result?.output?.nsfw_score ?? 1;
-
-      return {
-        isAppropriate: nsfwScore <= NSFW_THRESHOLD,
-        score: nsfwScore,
-      };
+      const score  = result?.output?.nsfw_score ?? 1;
+      return { isAppropriate: score <= NSFW_THRESHOLD, score };
     } catch (error) {
-      logger.error("NSFW verification failed:", error?.message || error);
+      logger.error("NSFW verification failed:", error?.message ?? error);
       throw new HttpsError("internal", "Content verification failed.");
     }
   }
 );
 
 exports.estimateAge = onCall(
-  {
-    region: REGION,
-    secrets: [deepaiApiKey],
-    timeoutSeconds: 60,
-  },
+  { region: REGION, secrets: [deepaiApiKey], timeoutSeconds: 60 },
   async (request) => {
     requireAuth(request);
-
     const imageUrl = requireString(request.data?.imageUrl, "imageUrl");
-
     try {
-      const result = await callDeepAI("demographic-recognition", { image: imageUrl });
+      const result  = await callDeepAI("demographic-recognition", { image: imageUrl });
       const persons = result?.output?.persons ?? [];
-      return {
-        estimatedAge: persons.length > 0 ? persons[0]?.age ?? null : null,
-      };
+      return { estimatedAge: persons.length > 0 ? (persons[0]?.age ?? null) : null };
     } catch (error) {
-      logger.error("Age estimation failed:", error?.message || error);
+      logger.error("Age estimation failed:", error?.message ?? error);
       return { estimatedAge: null };
     }
   }
 );
 
 exports.detectBodyType = onCall(
-  {
-    region: REGION,
-    secrets: [deepaiApiKey],
-    timeoutSeconds: 60,
-  },
+  { region: REGION, secrets: [deepaiApiKey], timeoutSeconds: 60 },
   async (request) => {
     requireAuth(request);
-
     const imageUrl = requireString(request.data?.imageUrl, "imageUrl");
-
     try {
-      const result = await callDeepAI("densecap", { image: imageUrl });
+      const result   = await callDeepAI("densecap", { image: imageUrl });
       const captions = result?.output?.captions ?? [];
-
       const isFullBody = captions.some((c) => {
         const text = String(c?.caption ?? "").toLowerCase();
         return text.includes("person") && (text.includes("standing") || text.includes("full"));
       });
-
       return { isFullBody };
     } catch (error) {
-      logger.error("Body-type detection failed:", error?.message || error);
+      logger.error("Body-type detection failed:", error?.message ?? error);
       return { isFullBody: false };
     }
   }
 );
 
-// ─────────────────────────────────────────────────────────────
-// Rate Limiting
-// ─────────────────────────────────────────────────────────────
-
-exports.checkRateLimit = onCall(
-  { region: REGION },
-  async (request) => {
-    const { uid } = requireAuth(request);
-    const action = request.data?.action;
-
-    if (typeof action !== "string" || !(action in RATE_LIMITS)) {
-      throw new HttpsError(
-        "invalid-argument",
-        `action must be one of: ${Object.keys(RATE_LIMITS).join(", ")}`
-      );
+// ─── Rate Limiting ────────────────────────────────────────
+exports.checkRateLimit = onCall({ region: REGION }, async (request) => {
+  const { uid } = requireAuth(request);
+  const action  = request.data?.action;
+  if (typeof action !== "string" || !(action in RATE_LIMITS))
+    throw new HttpsError("invalid-argument", `action must be one of: ${Object.keys(RATE_LIMITS).join(", ")}`);
+  const limit = RATE_LIMITS[action];
+  const ref   = db.collection("rateLimits").doc(`${uid}_${action}`);
+  const now   = Date.now();
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      tx.set(ref, { count: 1, firstAction: now, lastAction: now, userId: uid, action });
+      return { allowed: true, remaining: limit.count - 1 };
     }
+    const current = snap.data();
+    const elapsed = now - current.firstAction;
+    if (elapsed > limit.periodMs) {
+      tx.set(ref, { count: 1, firstAction: now, lastAction: now, userId: uid, action });
+      return { allowed: true, remaining: limit.count - 1 };
+    }
+    if (current.count >= limit.count) return { allowed: false, remaining: 0, resetIn: limit.periodMs - elapsed };
+    tx.update(ref, { count: admin.firestore.FieldValue.increment(1), lastAction: now });
+    return { allowed: true, remaining: limit.count - current.count - 1 };
+  });
+});
 
-    const limit = RATE_LIMITS[action];
-    const ref = db.collection("rateLimits").doc(`${uid}_${action}`);
-    const now = Date.now();
-
-    return db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-
-      if (!snap.exists) {
-        tx.set(ref, {
-          count: 1,
-          firstAction: now,
-          lastAction: now,
-          userId: uid,
-          action,
-        });
-        return { allowed: true, remaining: limit.count - 1 };
-      }
-
-      const current = snap.data();
-      const elapsed = now - current.firstAction;
-
-      if (elapsed > limit.periodMs) {
-        tx.set(ref, {
-          count: 1,
-          firstAction: now,
-          lastAction: now,
-          userId: uid,
-          action,
-        });
-        return { allowed: true, remaining: limit.count - 1 };
-      }
-
-      if (current.count >= limit.count) {
-        return {
-          allowed: false,
-          remaining: 0,
-          resetIn: limit.periodMs - elapsed,
-        };
-      }
-
-      tx.update(ref, {
-        count: admin.firestore.FieldValue.increment(1),
-        lastAction: now,
-      });
-
-      return {
-        allowed: true,
-        remaining: limit.count - current.count - 1,
-      };
-    });
+// ─── Push Notifications ───────────────────────────────────
+exports.sendNotification = onCall({ region: REGION }, async (request) => {
+  requireAuth(request);
+  const targetUserId  = requireString(request.data?.targetUserId, "targetUserId");
+  const title         = requireString(request.data?.title, "title");
+  const body          = optionalString(request.data?.body);
+  const notifPayload  = normalizeStringMap(request.data?.data);
+  const targetSnap    = await db.collection("users").doc(targetUserId).get();
+  if (!targetSnap.exists) throw new HttpsError("not-found", "Target user not found.");
+  const token = targetSnap.data()?.pushToken;
+  if (!token) return { success: false, reason: "no_push_token" };
+  try {
+    await admin.messaging().send({ token, notification: body ? { title, body } : { title }, data: notifPayload });
+    return { success: true };
+  } catch (error) {
+    const code = error?.code;
+    if (["messaging/invalid-registration-token", "messaging/registration-token-not-registered"].includes(code)) {
+      await db.collection("users").doc(targetUserId).update({ pushToken: admin.firestore.FieldValue.delete() }).catch(() => {});
+    }
+    logger.error("FCM send failed:", code ?? error?.message ?? error);
+    return { success: false, reason: "send_failed" };
   }
-);
+});
 
-// ─────────────────────────────────────────────────────────────
-// Push Notifications
-// ─────────────────────────────────────────────────────────────
-
-exports.sendNotification = onCall(
-  { region: REGION },
-  async (request) => {
-    requireAuth(request);
-
-    const targetUserId = requireString(request.data?.targetUserId, "targetUserId");
-    const title = requireString(request.data?.title, "title");
-    const body = optionalString(request.data?.body);
-    const notifPayload = normalizeStringMap(request.data?.data);
-
-    const targetSnap = await db.collection("users").doc(targetUserId).get();
-    if (!targetSnap.exists) {
-      throw new HttpsError("not-found", "Target user not found.");
-    }
-
-    const token = targetSnap.data()?.pushToken;
-    if (!token) {
-      return { success: false, reason: "no_push_token" };
-    }
-
-    try {
-      await admin.messaging().send({
-        token,
-        notification: body ? { title, body } : { title },
-        data: notifPayload,
-      });
-
-      return { success: true };
-    } catch (error) {
-      const code = error?.code;
-      const invalidTokenCodes = [
-        "messaging/invalid-registration-token",
-        "messaging/registration-token-not-registered",
-      ];
-
-      if (invalidTokenCodes.includes(code)) {
-        await db
-          .collection("users")
-          .doc(targetUserId)
-          .update({
-            pushToken: admin.firestore.FieldValue.delete(),
-          })
-          .catch(() => {});
-      }
-
-      logger.error("FCM send failed:", code || error?.message || error);
-      return { success: false, reason: "send_failed" };
-    }
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// Web Push Notifications
-// ─────────────────────────────────────────────────────────────
-
+// ─── Web Push ─────────────────────────────────────────────
 exports.sendWebPushNotification = onCall(
-  {
-    region: REGION,
-    secrets: [vapidEmail, vapidPublicKey, vapidPrivateKey],
-  },
+  { region: REGION, secrets: [vapidEmail, vapidPublicKey, vapidPrivateKey] },
   async (request) => {
     requireAuth(request);
-
     const recipientUserId = requireString(request.data?.recipientUserId, "recipientUserId");
-    const title = requireString(request.data?.title, "title");
-    const body = requireString(request.data?.body, "body");
-    const screen = optionalString(request.data?.screen) || "home";
-
+    const title           = requireString(request.data?.title, "title");
+    const body            = requireString(request.data?.body, "body");
+    const screen          = optionalString(request.data?.screen) || "home";
     try {
       configureWebPush();
-
-      const userDoc = await db.collection("users").doc(recipientUserId).get();
+      const userDoc             = await db.collection("users").doc(recipientUserId).get();
       const webPushSubscription = userDoc.data()?.webPushSubscription;
-
-      if (!webPushSubscription) {
-        return { success: false, reason: "no_subscription" };
-      }
-
-      const subscription = JSON.parse(webPushSubscription);
-
-      await webpush.sendNotification(
-        subscription,
-        JSON.stringify({
-          title,
-          body,
-          data: { screen },
-        })
-      );
-
+      if (!webPushSubscription) return { success: false, reason: "no_subscription" };
+      await webpush.sendNotification(JSON.parse(webPushSubscription), JSON.stringify({ title, body, data: { screen } }));
       return { success: true };
     } catch (error) {
-      logger.error("[Web Push] Error:", error?.message || error);
+      logger.error("[Web Push] Error:", error?.message ?? error);
       throw new HttpsError("internal", "Failed to send web push notification.");
     }
   }
 );
 
-// ─────────────────────────────────────────────────────────────
-// Chat Helpers
-// ─────────────────────────────────────────────────────────────
-
-exports.ensureChatExists = onCall(
-  { region: REGION },
-  async (request) => {
-    const { uid } = requireAuth(request);
-    const otherUserId = requireString(request.data?.otherUserId, "otherUserId");
-
-    if (uid === otherUserId) {
-      throw new HttpsError("invalid-argument", "Cannot create a chat with yourself.");
-    }
-
-    const chatId = getChatId(uid, otherUserId);
-    const chatRef = db.collection("chats").doc(chatId);
-    const chatSnap = await chatRef.get();
-
-    if (!chatSnap.exists) {
-      await chatRef.set({
-        participants: buildChatParticipants(uid, otherUserId),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastMessage: "",
-        lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastMessageSenderId: uid,
-      });
-    }
-
-    return { success: true, chatId };
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// Report Submission
-// ─────────────────────────────────────────────────────────────
-
-exports.submitReport = onCall(
-  { region: REGION },
-  async (request) => {
-    const { uid } = requireAuth(request);
-
-    const reportedUserId = requireString(request.data?.reportedUserId, "reportedUserId");
-    const reason = requireString(request.data?.reason, "reason");
-    const description = optionalString(request.data?.description);
-    const evidence = request.data?.evidence && typeof request.data.evidence === "object"
-      ? request.data.evidence
-      : undefined;
-
-    if (uid === reportedUserId) {
-      throw new HttpsError("invalid-argument", "You cannot report yourself.");
-    }
-
-    const reportRef = db.collection("reports").doc();
-    await reportRef.set({
-      reporterId: uid,
-      reportedUserId,
-      reason,
-      ...(description ? { description } : {}),
-      ...(evidence ? { evidence } : {}),
+// ─── Chat Helpers ─────────────────────────────────────────
+exports.ensureChatExists = onCall({ region: REGION }, async (request) => {
+  const { uid } = requireAuth(request);
+  const otherUserId = requireString(request.data?.otherUserId, "otherUserId");
+  if (uid === otherUserId) throw new HttpsError("invalid-argument", "Cannot create a chat with yourself.");
+  const chatId  = getChatId(uid, otherUserId);
+  const chatRef = db.collection("chats").doc(chatId);
+  const snap    = await chatRef.get();
+  if (!snap.exists) {
+    await chatRef.set({
+      participants: buildChatParticipants(uid, otherUserId),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastMessage: "", lastMessageAt: admin.firestore.FieldValue.serverTimestamp(), lastMessageSenderId: uid,
     });
-
-    return { success: true, reportId: reportRef.id };
   }
-);
+  return { success: true, chatId };
+});
 
-// ─────────────────────────────────────────────────────────────
-// Block User
-// ─────────────────────────────────────────────────────────────
+// ─── Report Submission ────────────────────────────────────
+exports.submitReport = onCall({ region: REGION }, async (request) => {
+  const { uid } = requireAuth(request);
+  const reportedUserId = requireString(request.data?.reportedUserId, "reportedUserId");
+  const reason         = requireString(request.data?.reason, "reason");
+  const description    = optionalString(request.data?.description);
+  const evidence       = request.data?.evidence && typeof request.data.evidence === "object" ? request.data.evidence : undefined;
+  if (uid === reportedUserId) throw new HttpsError("invalid-argument", "You cannot report yourself.");
+  const ref = db.collection("reports").doc();
+  await ref.set({
+    reporterId: uid, reportedUserId, reason,
+    ...(description ? { description } : {}),
+    ...(evidence ? { evidence } : {}),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { success: true, reportId: ref.id };
+});
 
-exports.blockUser = onCall(
-  { region: REGION },
-  async (request) => {
-    const { uid } = requireAuth(request);
-    const blockedUserId = requireString(request.data?.blockedUserId, "blockedUserId");
-    const reason = optionalString(request.data?.reason);
+// ─── Block User ───────────────────────────────────────────
+exports.blockUser = onCall({ region: REGION }, async (request) => {
+  const { uid } = requireAuth(request);
+  const blockedUserId = requireString(request.data?.blockedUserId, "blockedUserId");
+  const reason        = optionalString(request.data?.reason);
+  if (uid === blockedUserId) throw new HttpsError("invalid-argument", "You cannot block yourself.");
+  await db.collection("blockedUsers").doc(`${uid}_${blockedUserId}`).set({
+    blockerId: uid, blockedUserId, ...(reason ? { reason } : {}),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await Promise.all([
+    db.collection("likes").doc(`${uid}_${blockedUserId}`).delete().catch(() => {}),
+    db.collection("likes").doc(`${blockedUserId}_${uid}`).delete().catch(() => {}),
+  ]);
+  return { success: true };
+});
 
-    if (uid === blockedUserId) {
-      throw new HttpsError("invalid-argument", "You cannot block yourself.");
-    }
+// ─── Unmatch ──────────────────────────────────────────────
+exports.unmatchUsers = onCall({ region: REGION, timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
+  const { uid } = requireAuth(request);
+  const otherUserId = requireString(request.data?.otherUserId, "otherUserId");
+  if (uid === otherUserId) throw new HttpsError("invalid-argument", "Invalid unmatch target.");
+  const chatId  = getChatId(uid, otherUserId);
+  const chatRef = db.collection("chats").doc(chatId);
+  await Promise.all([
+    db.collection("likes").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
+    db.collection("likes").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
+    db.collection("matches").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
+    db.collection("matches").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
+    db.collection("chatSettings").doc(`${uid}_${chatId}`).delete().catch(() => {}),
+    db.collection("chatSettings").doc(`${otherUserId}_${chatId}`).delete().catch(() => {}),
+    db.collection("matchNotes").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
+    db.collection("matchNotes").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
+  ]);
+  const snap = await chatRef.get();
+  if (snap.exists) await db.recursiveDelete(chatRef);
+  return { success: true };
+});
 
-    const blockId = `${uid}_${blockedUserId}`;
-    await db.collection("blockedUsers").doc(blockId).set({
-      blockerId: uid,
-      blockedUserId,
-      ...(reason ? { reason } : {}),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    const likeIds = [`${uid}_${blockedUserId}`, `${blockedUserId}_${uid}`];
-    await Promise.all(
-      likeIds.map((id) => db.collection("likes").doc(id).delete().catch(() => {}))
-    );
-
-    return { success: true };
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// Unmatch Users
-// ─────────────────────────────────────────────────────────────
-
-exports.unmatchUsers = onCall(
-  { region: REGION, timeoutSeconds: 120, memory: "512MiB" },
-  async (request) => {
-    const { uid } = requireAuth(request);
-    const otherUserId = requireString(request.data?.otherUserId, "otherUserId");
-
-    if (uid === otherUserId) {
-      throw new HttpsError("invalid-argument", "Invalid unmatch target.");
-    }
-
-    const chatId = getChatId(uid, otherUserId);
-    const chatRef = db.collection("chats").doc(chatId);
-
-    await Promise.all([
-      db.collection("likes").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
-      db.collection("likes").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
-      db.collection("matches").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
-      db.collection("matches").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
-      db.collection("chatSettings").doc(`${uid}_${chatId}`).delete().catch(() => {}),
-      db.collection("chatSettings").doc(`${otherUserId}_${chatId}`).delete().catch(() => {}),
-      db.collection("matchNotes").doc(`${uid}_${otherUserId}`).delete().catch(() => {}),
-      db.collection("matchNotes").doc(`${otherUserId}_${uid}`).delete().catch(() => {}),
-    ]);
-
-    const chatSnap = await chatRef.get();
-    if (chatSnap.exists) {
-      await db.recursiveDelete(chatRef);
-    }
-
-    return { success: true };
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// Cleanup Deleted User
-// ─────────────────────────────────────────────────────────────
-
+// ─── Cleanup Deleted User ─────────────────────────────────
 exports.cleanupDeletedUser = functions
   .runWith({ timeoutSeconds: 540, memory: "512MB" })
   .auth.user()
   .onDelete(async (user) => {
     const userId = user.uid;
-    let totalDeleted = 0;
-
-    // 1. Delete main user document
+    let total = 0;
     await db.collection("users").doc(userId).delete().catch(() => {});
-    totalDeleted += 1;
-
-    // 2. Delete documents where userId appears in a field
+    total += 1;
     const fieldQueries = [
       db.collection("likes").where("fromUserId", "==", userId),
       db.collection("likes").where("toUserId", "==", userId),
@@ -607,66 +353,24 @@ exports.cleanupDeletedUser = functions
       db.collection("bugReports").where("reporterId", "==", userId),
       db.collection("matchNotes").where("userId", "==", userId),
     ];
-
-    for (const q of fieldQueries) {
-      totalDeleted += await deleteQueryBatched(q);
+    for (const q of fieldQueries) total += await deleteQueryBatched(q);
+    for (const name of ["pushTokens","presence","streaks","datingStats","personalityResults","ratingStatus","userSettings"]) {
+      await db.collection(name).doc(userId).delete().catch(() => {});
     }
-
-    // 3. Delete simple doc-per-user collections (no subcollections)
-    const simpleDocCollections = [
-      "pushTokens",
-      "presence",
-      "streaks",
-      "datingStats",
-      "personalityResults",
-      "ratingStatus",
-      "userSettings",
-    ];
-
-    for (const collectionName of simpleDocCollections) {
-      await db.collection(collectionName).doc(userId).delete().catch(() => {});
-    }
-
-    // 4. Delete rateLimits (has subcollections: rateLimits/{userId}/actions/*)
     try {
       const rateLimitRef = db.collection("rateLimits").doc(userId);
       const rateLimitDoc = await rateLimitRef.get().catch(() => null);
-
-      if (rateLimitDoc && rateLimitDoc.exists) {
+      if (rateLimitDoc?.exists) {
         await db.recursiveDelete(rateLimitRef).catch(() => {});
-        totalDeleted += 1;
+        total += 1;
       } else {
-        // Parent doc may not exist but subcollection might
-        const actionsSnap = await rateLimitRef
-          .collection("actions")
-          .limit(1)
-          .get()
-          .catch(() => null);
-
-        if (actionsSnap && !actionsSnap.empty) {
-          await db.recursiveDelete(rateLimitRef).catch(() => {});
-          totalDeleted += 1;
-        }
+        const actionsSnap = await rateLimitRef.collection("actions").limit(1).get().catch(() => null);
+        if (actionsSnap && !actionsSnap.empty) { await db.recursiveDelete(rateLimitRef).catch(() => {}); total += 1; }
       }
-    } catch (err) {
-      logger.warn("Failed to cleanup rateLimits for user:", userId, err);
+    } catch (err) { logger.warn("Failed to cleanup rateLimits for user:", userId, err); }
+    const chatSnaps = await db.collection("chats").where("participants", "array-contains", userId).get().catch(() => null);
+    if (chatSnaps && !chatSnaps.empty) {
+      for (const d of chatSnaps.docs) { await db.recursiveDelete(d.ref).catch(() => {}); total += 1; }
     }
-
-    // 5. Delete all chats where user is a participant (including subcollections)
-    const chatSnapshots = await db
-      .collection("chats")
-      .where("participants", "array-contains", userId)
-      .get()
-      .catch(() => null);
-
-    if (chatSnapshots && !chatSnapshots.empty) {
-      for (const chatDoc of chatSnapshots.docs) {
-        await db.recursiveDelete(chatDoc.ref).catch(() => {});
-        totalDeleted += 1;
-      }
-    }
-
-    logger.log(
-      `Cleaned up ${totalDeleted} document group(s) for deleted user ${userId}.`
-    );
+    logger.log(`Cleaned up ${total} document group(s) for deleted user ${userId}.`);
   });

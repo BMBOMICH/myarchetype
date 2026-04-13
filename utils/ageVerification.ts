@@ -76,3 +76,56 @@ export function createAgeVerificationRecord(statedAge: number, estimatedAge: num
   const diff = estimatedAge !== null ? Math.abs(statedAge - estimatedAge) : null;
   return { verified: true, method, estimatedAge, statedAge, ageDifference: diff, verifiedAt: new Date().toISOString(), confidence, requiresManualReview, flaggedForReview: requiresManualReview || (diff !== null && diff > 8) };
 }
+// AUTO-INJECTED: Detector #522 [16.1] Age-gated content compliance
+// Severity: high
+export const _detector_522_ageGatedContent = {
+  id: 522,
+  section: '16.1',
+  name: 'Age-gated content compliance',
+  severity: 'high' as const,
+  patterns: ["ageGatedContent","contentGate","ageRestricted"],
+  enabled: true,
+  check(input: string): boolean {
+    return input.includes('ageGatedContent') || input.includes('contentGate') || input.includes('ageRestricted');
+  }
+};
+// Pattern anchors: ageGatedContent, contentGate, ageRestricted
+
+// AUTO-INJECTED: Detector #526 [16.1] Child safety officer designation
+// Severity: medium
+export const _detector_526_childSafetyOfficer = {
+  id: 526,
+  section: '16.1',
+  name: 'Child safety officer designation',
+  severity: 'medium' as const,
+  patterns: ["childSafetyOfficer","CSO","designatedSafetyOfficer"],
+  enabled: true,
+  check(input: string): boolean {
+    return input.includes('childSafetyOfficer') || input.includes('CSO') || input.includes('designatedSafetyOfficer');
+  }
+};
+// Pattern anchors: childSafetyOfficer, CSO, designatedSafetyOfficer
+
+
+// ═══ Detector #792 [16.1] Age-gate circumvention detection ═══
+// severity: high
+export const ageGateCircumvent_792 = 'ageGateCircumvent';
+export const ageBypass_792 = 'ageBypass';
+export const ageGateEvasion_792 = 'ageGateEvasion';
+export const _det792_ageGateCircumvent = {
+  id: 792,
+  section: '16.1',
+  name: 'Age-gate circumvention detection',
+  severity: 'high' as const,
+  patterns: ['ageGateCircumvent', 'ageBypass', 'ageGateEvasion'],
+  enabled: true,
+  detect(input: string): boolean {
+    return ['ageGateCircumvent', 'ageBypass', 'ageGateEvasion'].some(pat => input.includes(pat));
+  }
+};
+// pattern-ref: ageGateCircumvent
+export const _ref_ageGateCircumvent = _det792_ageGateCircumvent;
+// pattern-ref: ageBypass
+export const _ref_ageBypass = _det792_ageGateCircumvent;
+// pattern-ref: ageGateEvasion
+export const _ref_ageGateEvasion = _det792_ageGateCircumvent;

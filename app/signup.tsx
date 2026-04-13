@@ -1,4 +1,4 @@
-// signup.tsx - fixed file
+// signup.tsx - full updated file
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
@@ -18,10 +18,52 @@ import { validateDateOfBirth } from '../utils/ageVerification';
 import { logConsent, logPrivacyAccepted, logTermsAccepted, writeAuditLog } from '../utils/logger';
 import { validateDisplayName } from '../utils/nameValidation';
 import { checkUserBanned, trackAccountCreation } from '../utils/rateLimiter';
+import { checkRegistration } from '../utils/safetyMiddleware';
 
-const IS_WEB = Platform.OS === 'web';
-const IS_IOS = Platform.OS === 'ios';
-const IS_RTL = I18nManager.isRTL;
+// ─── Web-only type declarations ───────────────────────────
+type WebMediaEvent = { matches: boolean };
+type WebMediaQuery = {
+  matches: boolean;
+  addEventListener?: (type: 'change', listener: (e: WebMediaEvent) => void) => void;
+  removeEventListener?: (type: 'change', listener: (e: WebMediaEvent) => void) => void;
+};
+type WebCanvas = { getContext?: (kind: '2d') => { fillText: (text: string, x: number, y: number) => void } | null; toDataURL?: () => string };
+type WebNode = { remove?: () => void; id?: string; textContent?: string | null; setAttribute?: (name: string, value: string) => void };
+type WebKeyEvent = { key?: string };
+declare const window: { matchMedia?: (query: string) => WebMediaQuery; addEventListener?: (type: string, listener: (e: unknown) => void) => void; removeEventListener?: (type: string, listener: (e: unknown) => void) => void };
+declare const document: {
+  getElementById?: (id: string) => WebNode | null;
+  createElement?: (tag: string) => WebNode & WebCanvas;
+  head?: { appendChild?: (node: unknown) => void };
+  querySelector?: (selector: string) => WebNode | null;
+  documentElement?: { lang: string; dir: string };
+  title?: string;
+};
+
+type WebAriaProps = {
+  'aria-live'?: 'assertive' | 'polite' | 'off';
+  'aria-atomic'?: 'true' | 'false';
+  id?: string;
+  role?: string;
+  'aria-modal'?: 'true' | 'false';
+  'aria-describedby'?: string;
+  'aria-invalid'?: 'true' | 'false';
+  'aria-required'?: 'true' | 'false';
+};
+type WebInputProps = { name?: string };
+type WebStyleProps = {
+  outline?: string; outlineWidth?: number; boxShadow?: string; border?: string;
+  WebkitTextFillColor?: string; caretColor?: string; backgroundColor?: string;
+  paddingTop?: number; paddingBottom?: number; paddingLeft?: number;
+  flex?: number; fontSize?: number; letterSpacing?: number; color?: string; direction?: 'ltr' | 'rtl';
+};
+type WebPressableStyle = { cursor?: string };
+type KeyPressEvent = { nativeEvent?: { key?: string; getModifierState?: (name: string) => boolean } };
+
+// ─── Constants ────────────────────────────────────────────
+const IS_WEB  = Platform.OS === 'web';
+const IS_IOS  = Platform.OS === 'ios';
+const IS_RTL  = I18nManager.isRTL;
 const nativeDriver = !IS_WEB;
 
 const ROUTES = { LOGIN: '/login' as const, TERMS: '/terms' as const, PRIVACY: '/privacy' as const };
@@ -46,6 +88,7 @@ const DISPOSABLE_DOMAINS = new Set([
   'discardmail.de','spambox.us','inboxalias.com','tempinbox.com','spamfree24.org','hulapla.de',
 ]);
 
+// ─── Theme tokens ─────────────────────────────────────────
 const darkTokens = {
   bg:'#07070f', bgGradientStart:'#0a0a18', bgGradientMid:'#0e0e24', bgGradientEnd:'#07070f',
   card:'#111128', cardBorder:'#1e1e48', inputBg:'#0d0d24', inputBorder:'#28285a',
@@ -69,7 +112,13 @@ const lightTokens = {
 } as const;
 
 type Tokens = typeof darkTokens;
-type ModalConfig = { title: string; message: string; buttons: { label: string; onPress?: () => void | Promise<void>; primary?: boolean }[] };
+
+// ─── Types ────────────────────────────────────────────────
+type ModalConfig = {
+  title: string; message: string;
+  buttons: { label: string; onPress?: () => void | Promise<void>; primary?: boolean }[];
+};
+
 type FormState = {
   name: string; nameError: string; dob: string; dobError: string;
   email: string; emailError: string; password: string; passwordError: string;
@@ -80,6 +129,7 @@ type FormState = {
   showRequirements: boolean; loading: boolean; lockoutSeconds: number;
   capsLockOn: boolean; breachedWarning: boolean;
 };
+
 type FormAction =
   | { type: 'SET_NAME'; payload: string } | { type: 'SET_NAME_ERROR'; payload: string }
   | { type: 'SET_DOB'; payload: string } | { type: 'SET_DOB_ERROR'; payload: string }
@@ -93,59 +143,6 @@ type FormAction =
   | { type: 'SET_LOADING'; payload: boolean } | { type: 'SET_LOCKOUT'; payload: number }
   | { type: 'SET_CAPS_LOCK'; payload: boolean } | { type: 'SET_BREACHED_WARNING'; payload: boolean }
   | { type: 'CLEAR_ERRORS' } | { type: 'WIPE_SENSITIVE' } | { type: 'RESET' };
-
-// ─── Web-only prop types ──────────────────────────────────
-type WebAriaProps = {
-  'aria-live'?: 'assertive' | 'polite' | 'off';
-  'aria-atomic'?: 'true' | 'false';
-  id?: string;
-  role?: string;
-  'aria-modal'?: 'true' | 'false';
-  'aria-describedby'?: string;
-  'aria-invalid'?: 'true' | 'false';
-  'aria-required'?: 'true' | 'false';
-};
-
-type WebInputProps = {
-  name?: string;
-  cursor?: string;
-};
-
-type WebStyleProps = {
-  outline?: string;
-  outlineWidth?: number;
-  boxShadow?: string;
-  border?: string;
-  WebkitTextFillColor?: string;
-  caretColor?: string;
-  backgroundColor?: string;
-  paddingTop?: number;
-  paddingBottom?: number;
-  paddingLeft?: number;
-  flex?: number;
-  fontSize?: number;
-  letterSpacing?: number;
-  color?: string;
-  direction?: 'ltr' | 'rtl';
-};
-
-type WebPressableStyle = {
-  cursor?: string;
-};
-
-const CSS_ID = 'signup-screen-styles';
-const META_ID = 'signup-screen-meta';
-let injectedTheme: string | null = null;
-let prefersReducedMotion = IS_WEB && typeof window !== 'undefined' ? !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches : false;
-
-const ERROR_MESSAGES: Record<string, string> = {
-  'auth/email-already-in-use': 'Unable to create account. This email may already be registered.',
-  'auth/invalid-email': 'Please enter a valid email address.',
-  'auth/weak-password': 'Password is too weak. Please follow the requirements.',
-  'auth/operation-not-allowed': 'Signup is currently unavailable. Please try again later.',
-  'auth/network-request-failed': 'Network error. Please check your connection.',
-  'auth/too-many-requests': 'Too many attempts. Please try again later.',
-};
 
 const initialForm: FormState = {
   name:'', nameError:'', dob:'', dobError:'', email:'', emailError:'',
@@ -187,6 +184,21 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
+// ─── Utility functions ────────────────────────────────────
+const CSS_ID = 'signup-screen-styles';
+const META_ID = 'signup-screen-meta';
+let injectedTheme: string | null = null;
+let prefersReducedMotion = IS_WEB && typeof window !== 'undefined' ? !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches : false;
+
+const ERROR_MESSAGES: Record<string, string> = {
+  'auth/email-already-in-use': 'Unable to create account. This email may already be registered.',
+  'auth/invalid-email': 'Please enter a valid email address.',
+  'auth/weak-password': 'Password is too weak. Please follow the requirements.',
+  'auth/operation-not-allowed': 'Signup is currently unavailable. Please try again later.',
+  'auth/network-request-failed': 'Network error. Please check your connection.',
+  'auth/too-many-requests': 'Too many attempts. Please try again later.',
+};
+
 const getErrorMessage = (code?: string) => (code && ERROR_MESSAGES[code]) ?? 'An unexpected error occurred. Please try again.';
 const getScreenData = () => { const { width } = Dimensions.get('window'); return { width, isSmall: width < 375 }; };
 const getAnimDuration = (ms: number) => (prefersReducedMotion ? 0 : ms);
@@ -200,16 +212,19 @@ const getFirebaseErrorCode = (error: unknown): string | undefined =>
     ? (error as { code: string }).code
     : undefined;
 
-const debounce = <T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T => {
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T & { cancel: () => void } {
   let t: ReturnType<typeof setTimeout>;
-  return ((...args: Parameters<T>) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }) as T;
-};
+  const debounced = ((...args: Parameters<T>) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }) as T & { cancel: () => void };
+  debounced.cancel = () => clearTimeout(t);
+  return debounced;
+}
 
 const injectWebStyles = (C: Tokens, theme: string) => {
   if (!IS_WEB || typeof document === 'undefined' || injectedTheme === theme) return;
   injectedTheme = theme;
-  document.getElementById(CSS_ID)?.remove();
-  const style = document.createElement('style');
+  document.getElementById?.(CSS_ID)?.remove?.();
+  const style = document.createElement?.('style');
+  if (!style) return;
   style.id = CSS_ID;
   style.textContent = `
     input:focus,input:focus-visible{outline:none!important;box-shadow:none!important}
@@ -223,22 +238,16 @@ const injectWebStyles = (C: Tokens, theme: string) => {
     .modal-message{white-space:pre-wrap}
     *::-webkit-scrollbar{width:6px}*::-webkit-scrollbar-thumb{background:${C.inputBorder};border-radius:3px}
   `;
-  document.head.appendChild(style);
+  document.head?.appendChild?.(style);
 
-  if (!document.getElementById(META_ID)) {
-    const m = document.createElement('meta');
-    m.id = META_ID;
-    document.head.appendChild(m);
-    document.title = 'Sign Up – MyArchetype';
-    document.documentElement.lang = 'en';
-    document.documentElement.dir = 'ltr';
-    let vp = document.querySelector('meta[name="viewport"]');
-    if (!vp) {
-      vp = document.createElement('meta');
-      vp.setAttribute('name', 'viewport');
-      document.head.appendChild(vp);
-    }
-    vp.setAttribute('content', 'width=device-width,initial-scale=1');
+  if (!document.getElementById?.(META_ID)) {
+    const m = document.createElement?.('meta');
+    if (m) { m.id = META_ID; document.head?.appendChild?.(m); }
+    if (document.title !== undefined) document.title = 'Sign Up – MyArchetype';
+    if (document.documentElement) { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
+    let vp = document.querySelector?.('meta[name="viewport"]');
+    if (!vp) { vp = document.createElement?.('meta') ?? null; vp?.setAttribute?.('name', 'viewport'); if (vp) document.head?.appendChild?.(vp); }
+    vp?.setAttribute?.('content', 'width=device-width,initial-scale=1');
   }
 };
 
@@ -303,15 +312,13 @@ async function checkPasswordBreached(password: string): Promise<boolean> {
 async function getDeviceFingerprint(): Promise<string | null> {
   if (!IS_WEB || typeof navigator === 'undefined' || typeof document === 'undefined') return null;
   try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.createElement?.('canvas');
+    const ctx = canvas?.getContext?.('2d');
     ctx?.fillText('myarchetype-fp', 2, 10);
+    const nav = globalThis.navigator;
     const raw = [
-      navigator.userAgent,
-      navigator.language,
-      navigator.platform,
-      String(navigator.hardwareConcurrency ?? ''),
-      canvas.toDataURL(),
+      nav?.userAgent ?? '', nav?.language ?? '', nav?.platform ?? '',
+      String(nav?.hardwareConcurrency ?? ''), canvas?.toDataURL?.() ?? '',
     ].join('|');
     let h = 0;
     for (let i = 0; i < raw.length; i++) h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
@@ -328,18 +335,11 @@ const buildWebInputStyle = (C: Tokens): WebStyleProps => ({
 const showNativeAlert = (title: string, message: string, buttons?: AlertButton[]) =>
   Alert.alert(title, message, buttons ?? [{ text: 'OK' }]);
 
-// ─── KeyPress event type ──────────────────────────────────
-type KeyPressEvent = {
-  nativeEvent?: {
-    key?: string;
-    getModifierState?: (name: string) => boolean;
-  };
-};
+// ─── Sub-components ───────────────────────────────────────
 
 const AnimatedError = React.memo(({ message, inputId, C }: { message: string; inputId: string; C: Tokens }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-6)).current;
-
   useEffect(() => {
     if (message) {
       Animated.parallel([
@@ -351,19 +351,10 @@ const AnimatedError = React.memo(({ message, inputId, C }: { message: string; in
       translateY.setValue(-6);
     }
   }, [message, opacity, translateY]);
-
   if (!message) return null;
-
-  const webProps: WebAriaProps = IS_WEB
-    ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` }
-    : {};
-
+  const webProps: WebAriaProps = IS_WEB ? { 'aria-live': 'assertive', 'aria-atomic': 'true', id: `${inputId}-error` } : {};
   return (
-    <Animated.View
-      style={[st.errorRow, { opacity, transform: [{ translateY }] }]}
-      accessibilityLiveRegion="assertive"
-      {...webProps}
-    >
+    <Animated.View style={[st.errorRow, { opacity, transform: [{ translateY }] }]} accessibilityLiveRegion="assertive" {...webProps}>
       <Ionicons name="alert-circle" size={14} color={C.error} accessibilityElementsHidden importantForAccessibility="no" />
       <Text style={[st.errorText, { color: C.error }]} allowFontScaling maxFontSizeMultiplier={1.3}>{message}</Text>
     </Animated.View>
@@ -379,7 +370,6 @@ const SuccessText = React.memo(({ message, C }: { message: string; C: Tokens }) 
 
 const BrandLogo = React.memo(({ C, paused }: { C: Tokens; paused: boolean }) => {
   const scale = useRef(new Animated.Value(1)).current;
-
   useEffect(() => {
     if (prefersReducedMotion || paused) { scale.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
@@ -389,7 +379,6 @@ const BrandLogo = React.memo(({ C, paused }: { C: Tokens; paused: boolean }) => 
     const task = InteractionManager.runAfterInteractions(() => loop.start());
     return () => { task.cancel(); loop.stop(); };
   }, [paused, scale]);
-
   return (
     <Animated.View style={[st.logoOuter, { transform: [{ scale }] }]} accessibilityElementsHidden importantForAccessibility="no">
       <View style={[st.logoCircle, { backgroundColor: C.accentGlow, borderColor: C.logoBorder }]}>
@@ -403,7 +392,6 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
   const closing = useRef(false);
-
   const doClose = useCallback(async (btn?: ModalConfig['buttons'][0]) => {
     if (closing.current) return;
     closing.current = true;
@@ -412,41 +400,28 @@ const CustomModal = React.memo(({ config, onClose, C }: { config: ModalConfig; o
       onClose();
     });
   }, [opacity, onClose]);
-
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(200), useNativeDriver: nativeDriver }),
       Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 20, bounciness: 4 }),
     ]).start();
     if (!IS_WEB) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') void doClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
+    const h = (e: unknown) => { const key = typeof e === 'object' && e !== null && 'key' in e ? (e as WebKeyEvent).key : undefined; if (key === 'Escape') void doClose(); };
+    window.addEventListener?.('keydown', h);
+    return () => window.removeEventListener?.('keydown', h);
   }, [opacity, scale, doClose]);
-
-  const webDialogProps: WebAriaProps = IS_WEB
-    ? { role: 'dialog', 'aria-modal': 'true' }
-    : {};
-
+  const webDialogProps: WebAriaProps = IS_WEB ? { role: 'dialog', 'aria-modal': 'true' } : {};
   return (
-    <Animated.View
-      style={[st.modalOverlay, { backgroundColor: C.overlay, opacity }]}
-      {...webDialogProps}
-      accessibilityViewIsModal
-    >
+    <Animated.View style={[st.modalOverlay, { backgroundColor: C.overlay, opacity }]} {...webDialogProps} accessibilityViewIsModal>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={() => void doClose()} accessibilityLabel="Close dialog" />
       <Animated.View style={[st.modalCard, { backgroundColor: C.card, borderColor: C.cardBorder, transform: [{ scale }] }]}>
         <Text style={[st.modalTitle, { color: C.textPrimary }]}>{config.title}</Text>
         <Text style={[st.modalMessage, { color: C.textSecondary }]}>{config.message}</Text>
         <View style={st.modalButtons}>
           {config.buttons.map((btn, i) => (
-            <Pressable
-              key={i}
-              onPress={() => void doClose(btn)}
+            <Pressable key={i} onPress={() => void doClose(btn)}
               style={({ pressed }) => [st.modalButton, { backgroundColor: btn.primary ? C.accent : 'transparent', borderColor: btn.primary ? C.accent : C.separator, opacity: pressed ? 0.8 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel={btn.label}
-            >
+              accessibilityRole="button" accessibilityLabel={btn.label}>
               <Text style={[st.modalButtonText, { color: btn.primary ? C.white : C.textSecondary, fontWeight: btn.primary ? '700' : '500' }]}>{btn.label}</Text>
             </Pressable>
           ))}
@@ -475,32 +450,21 @@ const useShake = () => {
 
 const GradientButton = React.memo(({ onPress, disabled, loading, label, C }: { onPress: () => void; disabled: boolean; loading: boolean; label: string; C: Tokens }) => {
   const scale = useRef(new Animated.Value(1)).current;
-
-  const pressIn = useCallback(() => {
-    if (!disabled && !loading) {
-      Animated.spring(scale, { toValue: 0.97, useNativeDriver: nativeDriver, speed: 50 }).start();
-      void triggerHaptic('light');
-    }
-  }, [disabled, loading, scale]);
-
-  const pressOut = useCallback(() => { Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 50 }).start(); }, [scale]);
-  const colors = useMemo(() => (disabled ? [C.disabledBg, C.disabledBg] : [C.buttonGradStart, C.buttonGradEnd]) as [string, string], [disabled, C]);
   const isDisabled = disabled || loading;
-
+  const pressIn = useCallback(() => {
+    if (!isDisabled) { Animated.spring(scale, { toValue: 0.97, useNativeDriver: nativeDriver, speed: 50 }).start(); void triggerHaptic('light'); }
+  }, [isDisabled, scale]);
+  const pressOut = useCallback(() => { Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 50 }).start(); }, [scale]);
+  const colors = useMemo(() => (isDisabled ? [C.disabledBg, C.disabledBg] : [C.buttonGradStart, C.buttonGradEnd]) as [string, string], [isDisabled, C]);
   return (
     <Animated.View style={[st.buttonOuter, { shadowColor: isDisabled ? 'transparent' : C.accent, transform: [{ scale }] }]}>
       <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={isDisabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: isDisabled, busy: loading }}>
         <View pointerEvents={isDisabled ? 'none' : 'auto'} style={{ borderRadius: 16 }}>
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.button, isDisabled && st.buttonDisabled]}>
             {loading ? (
-              <View style={st.buttonContent}>
-                <ActivityIndicator color={C.white} size="small" />
-                <Text style={[st.buttonText, { marginLeft: 10 }]}>Creating Account…</Text>
-              </View>
+              <View style={st.buttonContent}><ActivityIndicator color={C.white} size="small" /><Text style={[st.buttonText, { marginLeft: 10 }]}>Creating Account…</Text></View>
             ) : (
-              <View style={st.buttonContent}>
-                <Text style={[st.buttonText, isDisabled && { color: C.disabledText }]}>{label}</Text>
-              </View>
+              <View style={st.buttonContent}><Text style={[st.buttonText, isDisabled && { color: C.disabledText }]}>{label}</Text></View>
             )}
           </LinearGradient>
         </View>
@@ -525,93 +489,51 @@ const InputField = React.memo(({
   const borderAnim = useRef(new Animated.Value(0)).current;
   const hasError = !!error;
   const webStyle = useMemo(() => buildWebInputStyle(C), [C]);
-
   useEffect(() => {
     Animated.timing(borderAnim, { toValue: focused ? 1 : 0, duration: getAnimDuration(200), useNativeDriver: false }).start();
   }, [focused, borderAnim]);
-
   const borderColor = borderAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [hasError ? C.error : successMsg ? C.success : C.inputBorder, hasError ? C.error : C.accent],
   });
-
   const webNameProp: WebInputProps = webInputName ? { name: webInputName } : {};
   const webErrorProps: WebAriaProps = hasError
     ? { 'aria-describedby': `${inputId}-error`, 'aria-invalid': 'true', 'aria-required': 'true' }
     : { 'aria-required': 'true' };
   const webCursorStyle: WebPressableStyle = IS_WEB ? { cursor: 'pointer' } : {};
-
   return (
     <View style={st.inputContainer}>
-      <Text style={[st.inputLabel, { color: C.textMuted }, focused && { color: C.accent }, hasError && { color: C.error }]} accessibilityElementsHidden importantForAccessibility="no" allowFontScaling maxFontSizeMultiplier={1.2}>
-        {label}
-      </Text>
-
+      <Text style={[st.inputLabel, { color: C.textMuted }, focused && { color: C.accent }, hasError && { color: C.error }]} accessibilityElementsHidden importantForAccessibility="no" allowFontScaling maxFontSizeMultiplier={1.2}>{label}</Text>
       <Animated.View style={[st.inputWrapper, { borderColor, backgroundColor: hasError ? C.errorGlow : C.inputBg }, focused && [st.inputWrapperFocused, { shadowColor: C.inputShadow }]]}>
         <Ionicons name={icon} size={20} color={hasError ? C.error : focused ? C.accent : C.textMuted} style={st.inputIcon} accessibilityElementsHidden importantForAccessibility="no" />
-
         {IS_WEB ? (
-          <TextInput
-            ref={inputRef}
-            nativeID={inputId}
-            {...webNameProp}
-            style={webStyle as WebStyleProps}
-            placeholder={placeholder}
-            placeholderTextColor={C.textMuted}
-            value={value}
-            onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry && !showPassword}
-            keyboardType={keyboardType ?? 'default'}
-            autoCapitalize="none"
-            autoCorrect={false}
+          <TextInput ref={inputRef} nativeID={inputId} {...webNameProp} style={webStyle as WebStyleProps}
+            placeholder={placeholder} placeholderTextColor={C.textMuted} value={value} onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry && !showPassword} keyboardType={keyboardType ?? 'default'}
+            autoCapitalize="none" autoCorrect={false}
             autoComplete={(webAutoComplete ?? autoComplete) as TextInput['props']['autoComplete']}
             textContentType={textContentType as TextInput['props']['textContentType']}
-            editable={editable !== false}
-            returnKeyType={returnKeyType}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress}
-            accessibilityLabel={accessibilityLabel}
-            selectionColor={C.accent}
-            {...webErrorProps}
-          />
+            editable={editable !== false} returnKeyType={returnKeyType}
+            onFocus={onFocus} onBlur={onBlur} onSubmitEditing={onSubmitEditing} onKeyPress={onKeyPress}
+            accessibilityLabel={accessibilityLabel} selectionColor={C.accent} {...webErrorProps} />
         ) : (
-          <TextInput
-            ref={inputRef}
-            nativeID={inputId}
-            style={[st.inputNative, { color: C.textPrimary }]}
-            placeholder={placeholder}
-            placeholderTextColor={C.textMuted}
-            value={value}
-            onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry && !showPassword}
-            keyboardType={keyboardType ?? 'default'}
-            autoCapitalize="none"
-            autoCorrect={false}
+          <TextInput ref={inputRef} nativeID={inputId} style={[st.inputNative, { color: C.textPrimary }]}
+            placeholder={placeholder} placeholderTextColor={C.textMuted} value={value} onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry && !showPassword} keyboardType={keyboardType ?? 'default'}
+            autoCapitalize="none" autoCorrect={false}
             autoComplete={autoComplete as TextInput['props']['autoComplete']}
             textContentType={textContentType as TextInput['props']['textContentType']}
-            editable={editable !== false}
-            returnKeyType={returnKeyType}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onSubmitEditing={onSubmitEditing}
-            onKeyPress={onKeyPress}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityHint={hasError ? error : undefined}
-            selectionColor={C.accent}
-            allowFontScaling
-            maxFontSizeMultiplier={1.1}
-          />
+            editable={editable !== false} returnKeyType={returnKeyType}
+            onFocus={onFocus} onBlur={onBlur} onSubmitEditing={onSubmitEditing} onKeyPress={onKeyPress}
+            accessibilityLabel={accessibilityLabel} accessibilityHint={hasError ? error : undefined}
+            selectionColor={C.accent} allowFontScaling maxFontSizeMultiplier={1.1} />
         )}
-
         {onTogglePassword && (
           <Pressable onPress={onTogglePassword} hitSlop={12} style={[st.eyeButton, webCursorStyle]} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
             <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={focused ? C.accent : C.textMuted} />
           </Pressable>
         )}
       </Animated.View>
-
       <AnimatedError message={error} inputId={inputId} C={C} />
       {!error && successMsg ? <SuccessText message={successMsg} C={C} /> : null}
     </View>
@@ -621,20 +543,14 @@ const InputField = React.memo(({
 const StrengthBar = React.memo(({ password, C }: { password: string; C: Tokens }) => {
   const widthAnim = useRef(new Animated.Value(0)).current;
   const strength = useMemo(() => validators.strength(password, C), [password, C]);
-
   useEffect(() => {
     Animated.timing(widthAnim, { toValue: strength.percent, duration: getAnimDuration(300), useNativeDriver: false }).start();
   }, [strength.percent, widthAnim]);
-
   if (!password) return null;
-
   const animWidth = widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] });
-
   return (
     <View style={st.strengthContainer} accessibilityLabel={`Password strength: ${strength.level}`}>
-      <View style={[st.strengthBarBg, { backgroundColor: C.inputBorder }]}>
-        <Animated.View style={[st.strengthBar, { width: animWidth, backgroundColor: strength.color }]} />
-      </View>
+      <View style={[st.strengthBarBg, { backgroundColor: C.inputBorder }]}><Animated.View style={[st.strengthBar, { width: animWidth, backgroundColor: strength.color }]} /></View>
       <Text style={[st.strengthText, { color: strength.color }]} allowFontScaling maxFontSizeMultiplier={1.2}>{strength.level}</Text>
     </View>
   );
@@ -643,19 +559,14 @@ const StrengthBar = React.memo(({ password, C }: { password: string; C: Tokens }
 const PasswordRequirements = React.memo(({ password, C }: { password: string; C: Tokens }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const v = useMemo(() => validators.password(password), [password]);
-
-  useEffect(() => {
-    Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(300), useNativeDriver: nativeDriver }).start();
-  }, [opacity]);
-
+  useEffect(() => { Animated.timing(opacity, { toValue: 1, duration: getAnimDuration(300), useNativeDriver: nativeDriver }).start(); }, [opacity]);
   const items = [
-    { key: 'length', label: 'At least 8 characters' },
-    { key: 'uppercase', label: 'One uppercase letter (A-Z)' },
-    { key: 'lowercase', label: 'One lowercase letter (a-z)' },
-    { key: 'number', label: 'One number (0-9)' },
-    { key: 'special', label: 'One special character (!@#$%^&*)' },
-  ] as const;
-
+    { key: 'length' as const, label: 'At least 8 characters' },
+    { key: 'uppercase' as const, label: 'One uppercase letter (A-Z)' },
+    { key: 'lowercase' as const, label: 'One lowercase letter (a-z)' },
+    { key: 'number' as const, label: 'One number (0-9)' },
+    { key: 'special' as const, label: 'One special character (!@#$%^&*)' },
+  ];
   return (
     <Animated.View style={[st.requirementsContainer, { backgroundColor: C.requirementsBg, borderColor: C.cardBorder, opacity }]} accessibilityLiveRegion="polite">
       <Text style={[st.requirementsTitle, { color: C.textMuted }]} allowFontScaling maxFontSizeMultiplier={1.2}>Password must include:</Text>
@@ -675,9 +586,7 @@ const PasswordRequirements = React.memo(({ password, C }: { password: string; C:
 const LockoutBanner = React.memo(({ seconds, C }: { seconds: number; C: Tokens }) => !seconds ? null : (
   <View style={[st.lockoutBanner, { backgroundColor: C.errorGlow, borderColor: C.error }]} accessibilityLiveRegion="polite">
     <Ionicons name="time-outline" size={16} color={C.error} accessibilityElementsHidden importantForAccessibility="no" />
-    <Text style={[st.lockoutText, { color: C.error }]} allowFontScaling maxFontSizeMultiplier={1.2}>
-      Too many attempts — try again in <Text style={{ fontWeight: '800' }}>{seconds}s</Text>
-    </Text>
+    <Text style={[st.lockoutText, { color: C.error }]} allowFontScaling maxFontSizeMultiplier={1.2}>Too many attempts — try again in <Text style={{ fontWeight: '800' }}>{seconds}s</Text></Text>
   </View>
 ));
 
@@ -685,7 +594,6 @@ const SuccessOverlay = React.memo(({ C }: { C: Tokens }) => {
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const iconS = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
@@ -696,14 +604,11 @@ const SuccessOverlay = React.memo(({ C }: { C: Tokens }) => {
     ]).start();
     if (!IS_WEB) AccessibilityInfo.announceForAccessibility('Account created successfully!');
   }, [opacity, scale, iconS]);
-
   return (
     <Animated.View style={[st.successOverlay, { backgroundColor: C.overlay, opacity }]} pointerEvents="box-only" accessibilityViewIsModal accessibilityLiveRegion="assertive">
       <Animated.View style={[st.successCard, { backgroundColor: C.card, borderColor: C.cardBorder, transform: [{ scale }] }]} accessibilityRole="alert">
         <Animated.View style={{ transform: [{ scale: iconS }] }}>
-          <View style={[st.successIconCircle, { backgroundColor: C.successGlow }]}>
-            <Ionicons name="checkmark-circle" size={56} color={C.success} />
-          </View>
+          <View style={[st.successIconCircle, { backgroundColor: C.successGlow }]}><Ionicons name="checkmark-circle" size={56} color={C.success} /></View>
         </Animated.View>
         <Text style={[st.successTitleText, { color: C.textPrimary }]}>Account Created!</Text>
         <Text style={[st.successSub, { color: C.textSecondary }]}>Check your email to verify your account.</Text>
@@ -734,6 +639,8 @@ class SignupErrorBoundary extends React.Component<{ children: React.ReactNode },
   }
 }
 
+// ─── Main component ───────────────────────────────────────
+
 export default function SignupScreen() {
   const router = useRouter();
   const scheme = useColorScheme();
@@ -751,6 +658,8 @@ export default function SignupScreen() {
   const lockoutUntil = useRef(0);
   const lockoutTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nameRef = useRef<TextInput>(null);
   const dobRef = useRef<TextInput>(null);
@@ -768,45 +677,54 @@ export default function SignupScreen() {
   const formSlide = useRef(new Animated.Value(prefersReducedMotion ? 0 : 16)).current;
   const footerFade = useRef(new Animated.Value(0)).current;
 
+  // ── Theme injection ──
   useEffect(() => { injectWebStyles(C, isDark ? 'dark' : 'light'); }, [C, isDark]);
 
+  // ── Reduced motion listener ──
   useEffect(() => {
     if (!IS_WEB || typeof window === 'undefined') return;
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const h = (e: MediaQueryListEvent) => { prefersReducedMotion = e.matches; };
-    mq.addEventListener('change', h);
-    return () => mq.removeEventListener('change', h);
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const h = (e: WebMediaEvent) => { prefersReducedMotion = e.matches; };
+    mq?.addEventListener?.('change', h);
+    return () => mq?.removeEventListener?.('change', h);
   }, []);
 
+  // ── Mount / unmount ──
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
       if (lockoutTimer.current) clearInterval(lockoutTimer.current);
       if (navTimeout.current) clearTimeout(navTimeout.current);
+      if (focusTimeout.current) clearTimeout(focusTimeout.current);
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
       dispatch({ type: 'WIPE_SENSITIVE' });
     };
   }, []);
 
+  // ── Resize ──
   useEffect(() => {
     if (!IS_WEB) return;
     const h = debounce(() => setSD(getScreenData()), RESIZE_DEBOUNCE_MS);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
+    window.addEventListener?.('resize', h);
+    return () => { window.removeEventListener?.('resize', h); h.cancel(); };
   }, []);
 
+  // ── App state ──
   useEffect(() => {
     if (IS_WEB) return;
     const sub = AppState.addEventListener('change', (s: AppStateStatus) => setAppActive(s === 'active'));
     return () => sub.remove();
   }, []);
 
+  // ── Back handler ──
   useEffect(() => {
     if (IS_WEB) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => state.loading || showSuccess);
     return () => sub.remove();
   }, [state.loading, showSuccess]);
 
+  // ── Entrance animation ──
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       if (!isMounted.current) return;
@@ -827,8 +745,9 @@ export default function SignupScreen() {
       ]).start();
     });
     return () => task.cancel();
-  }, [fadeAnim, slideAnim, headerFade, headerSlide, formFade, formSlide, footerFade]);
+      }, [fadeAnim, slideAnim, headerFade, headerSlide, formFade, formSlide, footerFade]);
 
+  // ── Lockout countdown ──
   const startLockout = useCallback(() => {
     if (lockoutTimer.current) clearInterval(lockoutTimer.current);
     const tick = () => {
@@ -845,14 +764,14 @@ export default function SignupScreen() {
     lockoutTimer.current = setInterval(tick, 1000);
   }, []);
 
+  // ── Modal helpers ──
   const openModal = useCallback((config: ModalConfig) => setModal(config), []);
   const closeModal = useCallback(() => setModal(null), []);
 
   const showAppAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
     if (IS_WEB) {
       openModal({
-        title,
-        message,
+        title, message,
         buttons: (buttons ?? [{ text: 'OK' }]).map((b, _, arr) => ({
           label: b.text ?? 'OK',
           onPress: b.onPress,
@@ -864,12 +783,14 @@ export default function SignupScreen() {
     }
   }, [openModal]);
 
+  // ── Caps lock detection ──
   const handleKeyPress = useCallback((e: KeyPressEvent) => {
     if (!IS_WEB) return;
     if (!e.nativeEvent?.key) return;
     dispatch({ type: 'SET_CAPS_LOCK', payload: !!e.nativeEvent.getModifierState?.('CapsLock') });
   }, []);
 
+  // ── Derived state ──
   const pwValidation = useMemo(() => validators.password(state.password), [state.password]);
   const passwordsMatch = state.password === state.confirmPassword;
   const emailValid = state.email.length >= MIN_EMAIL_DISPLAY && !validators.email(state.email);
@@ -880,6 +801,7 @@ export default function SignupScreen() {
     state.confirmPassword.length > 0 && !state.loading && state.lockoutSeconds === 0
   ), [state, emailValid, pwValidation.valid, passwordsMatch]);
 
+  // ── Field validators ──
   const validateName = useCallback((text: string) => {
     const v = text.slice(0, 50);
     dispatch({ type: 'SET_NAME', payload: v });
@@ -906,6 +828,7 @@ export default function SignupScreen() {
   const validateConfirm = useCallback((text: string) => dispatch({ type: 'SET_CONFIRM', payload: text.slice(0, MAX_PASSWORD_LENGTH) }), []);
   const dismissKeyboard = useCallback(() => { if (!IS_WEB) Keyboard.dismiss(); }, []);
 
+  // ── Signup handler ──
   const handleSignup = useCallback(async () => {
     dismissKeyboard();
     dispatch({ type: 'CLEAR_ERRORS' });
@@ -934,6 +857,7 @@ export default function SignupScreen() {
 
     if (Date.now() < lockoutUntil.current) { startLockout(); shake(); return; }
 
+    // Check breach status before confirmation dialog
     dispatch({ type: 'SET_LOADING', payload: true });
     const breached = await checkPasswordBreached(state.password);
     dispatch({ type: 'SET_LOADING', payload: false });
@@ -972,6 +896,24 @@ export default function SignupScreen() {
               return;
             }
 
+            // ── Safety middleware registration check ──
+            try {
+              const regSafety = await checkRegistration(email, state.password, state.name.trim(), {
+                serverUrl: '', enableRegistrationCheck: true, enableMessageCheck: false,
+                enablePhotoCheck: false, enableLoginCheck: false, enableProfileCheck: false,
+                autoBlockCritical: true, logAllChecks: false,
+              });
+              if (!regSafety.allowed) {
+                showAppAlert('Registration Denied', regSafety.reasons.join('\n') || 'Registration blocked by safety system.');
+                dispatch({ type: 'SET_LOADING', payload: false });
+                shake();
+                return;
+              }
+            } catch (safetyErr) {
+              // Safety middleware failure should not block signup — log and continue
+              console.warn('[Signup] Safety middleware check failed, continuing:', safetyErr);
+            }
+
             const { user } = await createUserWithEmailAndPassword(auth, email, state.password);
             try { await sendEmailVerification(user); } catch {}
 
@@ -1006,7 +948,7 @@ export default function SignupScreen() {
             const code = getFirebaseErrorCode(error);
             if (code === 'auth/email-already-in-use' || code === 'auth/invalid-email') {
               dispatch({ type: 'SET_EMAIL_ERROR', payload: getErrorMessage(code) });
-              setTimeout(() => emailRef.current?.focus(), FOCUS_DELAY_MS);
+              focusTimeout.current = setTimeout(() => emailRef.current?.focus(), FOCUS_DELAY_MS);
             }
             showAppAlert('Signup Failed', getErrorMessage(code));
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -1016,14 +958,18 @@ export default function SignupScreen() {
     ]);
   }, [state, pwValidation, passwordsMatch, dismissKeyboard, shake, showAppAlert, startLockout, router]);
 
-  const handleLogin = useCallback(() => { if (!state.loading) router.replace(ROUTES.LOGIN); }, [state.loading, router]);
-  const handleTerms = useCallback(() => router.push(ROUTES.TERMS), [router]);
+  // ── Navigation helpers ──
+  const handleLogin  = useCallback(() => { if (!state.loading) router.replace(ROUTES.LOGIN); }, [state.loading, router]);
+  const handleTerms  = useCallback(() => router.push(ROUTES.TERMS), [router]);
   const handlePrivacy = useCallback(() => router.push(ROUTES.PRIVACY), [router]);
-  const focusDOB = useCallback(() => dobRef.current?.focus(), []);
-  const focusEmail = useCallback(() => emailRef.current?.focus(), []);
-  const focusPassword = useCallback(() => passwordRef.current?.focus(), []);
-  const focusConfirm = useCallback(() => confirmRef.current?.focus(), []);
 
+  // ── Focus chain ──
+  const focusDOB      = useCallback(() => dobRef.current?.focus(), []);
+  const focusEmail    = useCallback(() => emailRef.current?.focus(), []);
+  const focusPassword = useCallback(() => passwordRef.current?.focus(), []);
+  const focusConfirm  = useCallback(() => confirmRef.current?.focus(), []);
+
+  // ── Derived display values ──
   const IS_SMALL = screenData.isSmall;
   const emailSuccessMsg = emailValid && !state.emailError ? 'Valid email' : '';
   const confirmError = state.confirmPassword.length > 0 && state.confirmPassword.length >= state.password.length && !passwordsMatch ? 'Passwords do not match' : state.confirmPasswordError;
@@ -1032,6 +978,7 @@ export default function SignupScreen() {
 
   const webCursorStyle: WebPressableStyle = IS_WEB ? { cursor: 'pointer' } : {};
 
+  // ── Render ──
   return (
     <SignupErrorBoundary>
       <View style={[st.rootBg, { backgroundColor: C.bg }]}>
@@ -1063,13 +1010,55 @@ export default function SignupScreen() {
                   <LockoutBanner seconds={state.lockoutSeconds} C={C} />
 
                   <Animated.View style={[st.formCard, { opacity: formFade, transform: [{ translateX: shakeAnim }, { translateY: formSlide }], backgroundColor: C.card, borderColor: C.cardBorder, padding: IS_SMALL ? 24 : 34 }]}>
-                    <InputField inputId="signup-name" label="Display name" icon="person-outline" placeholder="Your first name" value={state.name} onChangeText={validateName} error={state.nameError} focused={state.nameFocused} onFocus={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: false })} autoComplete="name" webAutoComplete="given-name" webInputName="given-name" textContentType="name" returnKeyType="next" onSubmitEditing={focusDOB} inputRef={nameRef} editable={!state.loading} accessibilityLabel="Display name" C={C} />
-                    <InputField inputId="signup-dob" label="Date of birth" icon="calendar-outline" placeholder="YYYY-MM-DD" value={state.dob} onChangeText={validateDOB} error={state.dobError} focused={state.dobFocused} onFocus={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: false })} autoComplete="bday" webAutoComplete="bday" webInputName="bday" textContentType="birthdate" returnKeyType="next" onSubmitEditing={focusEmail} inputRef={dobRef} editable={!state.loading} accessibilityLabel="Date of birth (YYYY-MM-DD)" C={C} />
-                    <InputField inputId="signup-email" label="Email address" icon="mail-outline" placeholder="you@example.com" value={state.email} onChangeText={validateEmail} error={state.emailError} successMsg={emailSuccessMsg} focused={state.emailFocused} onFocus={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: true })} onBlur={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: false })} keyboardType="email-address" autoComplete="email" webAutoComplete="email" webInputName="email" textContentType="emailAddress" returnKeyType="next" onSubmitEditing={focusPassword} inputRef={emailRef} editable={!state.loading} accessibilityLabel="Email address" C={C} onKeyPress={handleKeyPress} />
-                    <InputField inputId="signup-password" label="Password" icon="lock-closed-outline" placeholder="Create a strong password" value={state.password} onChangeText={validatePassword} error={state.passwordError} focused={state.passwordFocused} onFocus={() => { dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true }); dispatch({ type: 'SET_SHOW_REQUIREMENTS', payload: true }); }} onBlur={() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false })} secureTextEntry showPassword={state.showPassword} onTogglePassword={() => dispatch({ type: 'TOGGLE_PASSWORD' })} autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password" textContentType="newPassword" returnKeyType="next" onSubmitEditing={focusConfirm} inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C} onKeyPress={handleKeyPress} />
+                    <InputField
+                      inputId="signup-name" label="Display name" icon="person-outline" placeholder="Your first name"
+                      value={state.name} onChangeText={validateName} error={state.nameError}
+                      focused={state.nameFocused}
+                      onFocus={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: true })}
+                      onBlur={() => dispatch({ type: 'SET_NAME_FOCUSED', payload: false })}
+                      autoComplete="name" webAutoComplete="given-name" webInputName="given-name"
+                      textContentType="name" returnKeyType="next" onSubmitEditing={focusDOB}
+                      inputRef={nameRef} editable={!state.loading} accessibilityLabel="Display name" C={C}
+                    />
+                    <InputField
+                      inputId="signup-dob" label="Date of birth" icon="calendar-outline" placeholder="YYYY-MM-DD"
+                      value={state.dob} onChangeText={validateDOB} error={state.dobError}
+                      focused={state.dobFocused}
+                      onFocus={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: true })}
+                      onBlur={() => dispatch({ type: 'SET_DOB_FOCUSED', payload: false })}
+                      autoComplete="bday" webAutoComplete="bday" webInputName="bday"
+                      textContentType="birthdate" returnKeyType="next" onSubmitEditing={focusEmail}
+                      inputRef={dobRef} editable={!state.loading} accessibilityLabel="Date of birth (YYYY-MM-DD)" C={C}
+                    />
+                    <InputField
+                      inputId="signup-email" label="Email address" icon="mail-outline" placeholder="you@example.com"
+                      value={state.email} onChangeText={validateEmail} error={state.emailError} successMsg={emailSuccessMsg}
+                      focused={state.emailFocused}
+                      onFocus={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: true })}
+                      onBlur={() => dispatch({ type: 'SET_EMAIL_FOCUSED', payload: false })}
+                      keyboardType="email-address" autoComplete="email" webAutoComplete="email" webInputName="email"
+                      textContentType="emailAddress" returnKeyType="next" onSubmitEditing={focusPassword}
+                      inputRef={emailRef} editable={!state.loading} accessibilityLabel="Email address" C={C}
+                      onKeyPress={handleKeyPress}
+                    />
+                    <InputField
+                      inputId="signup-password" label="Password" icon="lock-closed-outline" placeholder="Create a strong password"
+                      value={state.password} onChangeText={validatePassword} error={state.passwordError}
+                      focused={state.passwordFocused}
+                      onFocus={() => { dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: true }); dispatch({ type: 'SET_SHOW_REQUIREMENTS', payload: true }); }}
+                      onBlur={() => dispatch({ type: 'SET_PASSWORD_FOCUSED', payload: false })}
+                      secureTextEntry showPassword={state.showPassword}
+                      onTogglePassword={() => dispatch({ type: 'TOGGLE_PASSWORD' })}
+                      autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password"
+                      textContentType="newPassword" returnKeyType="next" onSubmitEditing={focusConfirm}
+                      inputRef={passwordRef} editable={!state.loading} accessibilityLabel="Password" C={C}
+                      onKeyPress={handleKeyPress}
+                    />
 
                     <StrengthBar password={state.password} C={C} />
-                    {state.showRequirements && state.password.length > 0 && (state.passwordFocused || !pwValidation.valid) && <PasswordRequirements password={state.password} C={C} />}
+                    {state.showRequirements && state.password.length > 0 && (state.passwordFocused || !pwValidation.valid) && (
+                      <PasswordRequirements password={state.password} C={C} />
+                    )}
 
                     {state.breachedWarning && (
                       <View style={[st.lockoutBanner, { backgroundColor: C.errorGlow, borderColor: C.error, marginBottom: 12 }]}>
@@ -1078,7 +1067,23 @@ export default function SignupScreen() {
                       </View>
                     )}
 
-                    <InputField inputId="signup-confirm" label="Confirm password" icon="lock-closed-outline" placeholder="Re-enter your password" value={state.confirmPassword} onChangeText={validateConfirm} error={confirmError} successMsg={confirmSuccessMsg} focused={state.confirmFocused} onFocus={() => { dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: true }); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350); }} onBlur={() => dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: false })} secureTextEntry showPassword={state.showConfirmPassword} onTogglePassword={() => dispatch({ type: 'TOGGLE_CONFIRM_PASSWORD' })} autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password" textContentType="newPassword" returnKeyType="go" onSubmitEditing={canSubmit ? handleSignup : undefined} inputRef={confirmRef} editable={!state.loading} accessibilityLabel="Confirm password" C={C} onKeyPress={handleKeyPress} />
+                    <InputField
+                      inputId="signup-confirm" label="Confirm password" icon="lock-closed-outline" placeholder="Re-enter your password"
+                      value={state.confirmPassword} onChangeText={validateConfirm} error={confirmError} successMsg={confirmSuccessMsg}
+                      focused={state.confirmFocused}
+                      onFocus={() => {
+                        dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: true });
+                        scrollTimeout.current = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350);
+                      }}
+                      onBlur={() => dispatch({ type: 'SET_CONFIRM_FOCUSED', payload: false })}
+                      secureTextEntry showPassword={state.showConfirmPassword}
+                      onTogglePassword={() => dispatch({ type: 'TOGGLE_CONFIRM_PASSWORD' })}
+                      autoComplete="password-new" webAutoComplete="new-password" webInputName="new-password"
+                      textContentType="newPassword" returnKeyType="go"
+                      onSubmitEditing={canSubmit ? handleSignup : undefined}
+                      inputRef={confirmRef} editable={!state.loading} accessibilityLabel="Confirm password" C={C}
+                      onKeyPress={handleKeyPress}
+                    />
 
                     {IS_WEB && state.capsLockOn && (state.passwordFocused || state.confirmFocused) && (
                       <View style={[st.capsLockRow, { backgroundColor: C.errorGlow, borderColor: C.warn }]} accessibilityLiveRegion="polite">
@@ -1124,8 +1129,13 @@ export default function SignupScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────
+
 const st = StyleSheet.create({
-  rootBg:{ flex:1 }, safe:{ flex:1 }, container:{ flex:1 }, fill:{ flex:1 },
+  rootBg:{ flex:1 },
+  safe:{ flex:1 },
+  container:{ flex:1 },
+  fill:{ flex:1 },
   scrollContent:{ flexGrow:1, justifyContent:'center', paddingBottom:52 },
   content:{ width:'100%', alignSelf:'center' },
   backRow:{ flexDirection:'row', alignItems:'center', alignSelf:'flex-start', marginBottom:28, gap:4, paddingVertical:4, paddingRight:8 },

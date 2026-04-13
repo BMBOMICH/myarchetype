@@ -1,1062 +1,427 @@
-╔══════════════════════════════════════════════════════════════════════╗
-║              ULTIMATE PROJECT AUDIT REPORT v5.1                    ║
-╚══════════════════════════════════════════════════════════════════════╝
-  Generated: 2026-03-31T23:43:51.141Z
-  Duration:  13.05s
-  Platform:  win32 (x64)
-  Node:      v20.20.2
+╔═══════════════════════════════════════════════════════════════╗
+║            ULTIMATE PROJECT AUDIT REPORT  v6.4               ║
+╚═══════════════════════════════════════════════════════════════╝
+  Generated:                       2026-04-13T09:24:28.444Z
+  Platform:                        win32
+  Node:                            v20.20.2
+  Duration:                        11.79s
+═════════════════════════════════════════════════════════════════
+  HEALTH SCORE
+═════════════════════════════════════════════════════════════════
+  ⭐ OVERALL              [[32m██████████[0m░░░░░░░░░░] 52/100
 
-══════════════════════════════════════════════════════════════════════
-  OVERALL HEALTH SCORE
-══════════════════════════════════════════════════════════════════════
-
-  🏥 OVERALL           [████████████████░░░░] 78/100
-
-  🔒 security          [████████████████████] 100/100
-  ✨ codeQuality        [███████████████████░] 95/100
-  🧪 testing           [█░░░░░░░░░░░░░░░░░░░] 4/100
-  📚 documentation     [███████████████░░░░░] 75/100
-  ♿ accessibility      [█████████████░░░░░░░] 65/100
-  ⚡ performance        [███████████░░░░░░░░░] 55/100
-  📘 typeSafety        [█████████████████░░░] 85/100
-  🚨 errorHandling     [████████████████████] 100/100
-  📦 dependencies      [██████████████████░░] 90/100
-  🏗️ architecture     [███████████████████░] 95/100
-
-══════════════════════════════════════════════════════════════════════
+  security               [[32m███████████[0m░░░░░░░░░] 55/100
+  typeSafety             [[32m██████████████████[0m░░] 90/100
+  errorHandling          [[32m███████████[0m░░░░░░░░░] 57/100
+  codeQuality            [[32m█████████████[0m░░░░░░░] 65/100
+  dependencies           [[32m[0m░░░░░░░░░░░░░░░░░░░░] 0/100
+  architecture           [[32m██████████████[0m░░░░░░] 70/100
+  reactPatterns          [[32m[0m░░░░░░░░░░░░░░░░░░░░] 0/100
+  accessibility          [[32m████████████████[0m░░░░] 80/100
+  performance            [[32m██████████████[0m░░░░░░] 70/100
+  documentation          [[32m████████████████[0m░░░░] 80/100
+  testing                [[32m[0m░░░░░░░░░░░░░░░░░░░░] 1/100
+  observability          [[32m█████████████[0m░░░░░░░] 65/100
+═════════════════════════════════════════════════════════════════
   1. PROJECT IDENTITY
-══════════════════════════════════════════════════════════════════════
-  Name:                               myarchetype
-  Version:                            1.0.0
-  License:                            unknown
-  Package Manager:                    npm
-  Monorepo:                           No
-  Module Type:                        commonjs
-  Node.js:                            v20.20.2
+═════════════════════════════════════════════════════════════════
+  Name:                            myarchetype
+  Version:                         1.0.0
+  License:                         See LICENSE file
+  Package Manager:                 npm
+  Type:                            commonjs
+  Monorepo:                        No
+  ⚠️  Missing npm scripts: build
 
-  ── Expo
-  ────────
-  SDK Version:                        N/A
-  Bundle ID (iOS):                    com.bmbomich.myarchetype
-  Package (Android):                  com.bmbomich.myarchetype
-  Scheme:                             myarchetype
-  New Architecture:                   Disabled
-  OTA Updates:                        Not configured
-  Runtime Version:                    [object Object]
-  Owner:                              Not set
+  EAS Profiles:                    development, preview, production
+═════════════════════════════════════════════════════════════════
+  2. PACKAGES
+═════════════════════════════════════════════════════════════════
+  Total:                           67
+  Production:                      46
+  Dev:                             21
+  Actually Imported:               38
+  ⚠️  Possibly unused: @shopify/flash-list, expo-asset, expo-constants, expo-font, expo-symbols (+7)
+  ⚠️  Undeclared imports: firebase-functions, firebase-admin, web-push, express, cors
+  ⚠️  108 package version conflict(s)
+═════════════════════════════════════════════════════════════════
+  3. SECURITY
+═════════════════════════════════════════════════════════════════
+  Total Issues:                    29
+  Critical:                        0
+  High:                            0
+  Medium:                          15
+  Low:                             14
 
-  ── Expo Plugins
-  ────────────────
-  • expo-router
-  • expo-camera (configured)
-  • expo-location (configured)
-  • expo-notifications (configured)
-  • expo-secure-store
-  • @sentry/react-native (configured)
-
-  ── EAS Build Profiles
-  ──────────────────────
-  • development (internal) → channel: development
-  • preview (internal) → channel: preview
-  • production (default) → channel: production
-
-══════════════════════════════════════════════════════════════════════
-  2. TECH STACK
-══════════════════════════════════════════════════════════════════════
-
-  ── Mobile Framework
-  ────────────────────
-  Framework:                          Expo v55.0.8
-  React:                              19.2.0
-  React Native:                       0.83.2
-  Workflow:                           bare
-  Hermes:                             Yes ✅
-
-  ── Language / TypeScript
-  ─────────────────────────
-  TypeScript:                         v5.9.3
-  Strict Mode:                        YES ✅
-  No Implicit Any:                    Yes
-  Strict Null Checks:                 Yes
-  Module Resolution:                  bundler
-  Path Aliases:                       @/*
-
-  ── Navigation
-  ──────────────
-  ✅ Expo Router v55.0.7
-  ❌ React Navigation v7.2.1
-  ❌ Stack Navigator
-  ❌ Tab Navigator
-  ❌ Drawer Navigator
-
-  ── Backend Services
-  ────────────────────
-  ✅ Firebase v12.11.0
-     Services: auth, firestore, storage, functions
-  ✅   Firestore Rules
-  ✅   Storage Rules
-  ✅   Firestore Indexes
-  ❌ Supabase v?
-  ❌ MongoDB v?
-  ❌ Prisma v?
-  ❌ GraphQL v?
-  ❌ tRPC v?
-
-  ── Server
-  ──────────
-  Framework:                          Express.js
-  Language:                           TypeScript
-  Hosting:                            Firebase Cloud Functions
-  Endpoints:                          30
-  Security Middleware:
-  ✅   Helmet
-  ✅   CORS
-  ✅   Rate Limiting
-  ✅   HMAC Signing
-  ✅   Auth Middleware
-  ✅   Input Validation
-  ❌   CSRF Protection
-
-  ── Authentication
-  ──────────────────
-  ✅ Firebase Auth
-  ✅ Google Sign-In
-  ❌ Apple Sign-In
-  ❌ Biometric / Face ID
-  ✅ E2EE (TweetNaCl (X25519 + XSalsa20-Poly1305))
-  ❌ Multi-Factor Auth
-  ❌ JWT
-
-  ── Payments
-  ────────────
-  ❌ Stripe v?
-  ❌ RevenueCat v?
-  ❌ In-App Purchases
-
-  ── AI / ML
-  ───────────
-  ❌ face-api.js v?
-  ✅ TensorFlow.js v?
-  ❌ OpenAI v?
-  ✅ Cloudinary AI
-  🌐 Google Safe Browsing
-
-  ── Media
-  ─────────
-  ✅ Cloudinary
-     Used for: Image Upload, Video Upload, Face Detection, EXIF Metadata, Content Moderation, Quality Analysis
-  ✅ expo-image
-  ✅ Image Picker
-  ✅ Camera
-  ✅ Video
-
-  ── Security Libraries
-  ──────────────────────
-  ✅ TweetNaCl v1.0.3
-  ✅ Expo SecureStore
-  ✅ Expo Crypto
-  ❌ Web Crypto API
-  ✅ HMAC signing
-  ❌ Certificate Pinning
-
-  ── State Management
-  ────────────────────
-  ❌ Redux Toolkit
-  ❌ Zustand
-  ❌ Jotai
-  ✅ MMKV
-  ✅ SecureStore
-  ❌ AsyncStorage
-  createContext() usages:             2
-
-  ── UI & Animation
-  ──────────────────
-  ✅ Reanimated v4.2.1
-  ❌ Gesture Handler v2.30.0
-  ❌ NativeWind v?
-  ❌ Bottom Sheet
-  ✅ Haptics
-
-  ── Notifications
-  ─────────────────
-  ✅ Expo Notifications v55.0.13
-  ❌ Firebase Cloud Messaging
-
-  ── Analytics & Monitoring
-  ──────────────────────────
-  ✅ Sentry v7.11.0
-  ❌ Amplitude
-  ❌ Firebase Analytics
-  ❌ Crashlytics
-
-  ── Testing
-  ───────────
-  ✅ Jest v30.3.0
-  ❌ Testing Library
-  ❌ Detox E2E
-  ❌ Maestro
-  ❌ MSW
-  Test files:                         1
-
-  ── Build & Deployment
-  ──────────────────────
-  ✅ EAS Build
-  ✅ GitHub Actions
-  ❌ Docker
-  ❌ OTA Updates
-  Workflow files:
-    • ci.yml
-
-  ── Permissions
-  ───────────────
-  ✅ camera
-  ✅ microphone
-  ✅ location
-  ✅ notifications
-
-══════════════════════════════════════════════════════════════════════
-  3. EXTERNAL APIs
-══════════════════════════════════════════════════════════════════════
-  7 external API endpoints detected:
-
-  [Media]
-    ✅ Cloudinary Upload (api.cloudinary.com)
-       Used in: app\edit-profile.tsx, app\height-verification.tsx, app\selfie-verification.tsx, functions\index.js, utils\bodyTypeDetection.ts
-    ✅ Cloudinary CDN (res.cloudinary.com)
-       Used in: server\src\index.ts
-
-  [Safety]
-    ✅ Google Safe Browsing (safebrowsing.googleapis.com)
-       Used in: server\src\index.ts, utils\socialVerification.ts
-
-  [Security]
-    ✅ HaveIBeenPwned (api.pwnedpasswords.com)
-       Used in: app\signup.tsx, server\src\index.ts
-
-  [Music]
-    ✅ Spotify (api.spotify.com)
-       Used in: utils\sharedPlaylist.ts, utils\spotifyIntegration.ts
-
-  [Location]
-    ✅ ip-api (ip-api.com)
-       Used in: server\src\index.ts
-
-  [Notifications]
-    ✅ Expo Push (exp.host/--/api)
-       Used in: app\second-look.tsx, server\src\index.ts
-
-
-══════════════════════════════════════════════════════════════════════
-  4. PACKAGES
-══════════════════════════════════════════════════════════════════════
-  Total:                              63
-  Production:                         47
-  Development:                        16
-  Actually imported:                  50
-  Not installed:                      0
-  Categories:                         14
-
-  ── ⚠️  Possibly Unused
-  ───────────────────────
-  • @react-native-community/netinfo
-  • expo-apple-authentication
-  • react-native-reanimated-carousel
-
-  ── ⚠️  Imported but not in package.json
-  ────────────────────────────────────────
-  • firebase-functions
-  • firebase-admin
-  • web-push
-  • cors
-  • express
-  • express-rate-limit
-  • helmet
-  • @tensorflow/tfjs
-  • nsfwjs
-
-  ── ⚠️  Potential Duplicates
-  ────────────────────────────
-  ✨ Linting: @commitlint/cli, @commitlint/config-conventional, eslint, eslint-config-expo, lint-staged, prettier
-
-  ── All Packages by Category
-  ────────────────────────────
-
-  🎨 UI Assets (1)
-    ✅ @expo/vector-icons                            15.1.1
-
-  📦 Other (3)
-    ⚪ @react-native-community/netinfo               12.0.1
-    ⚪ husky                                         9.1.7
-    ⚪ sharp-cli                                     5.2.0
-
-  🧭 Navigation (3)
-    ✅ @react-navigation/bottom-tabs                 7.15.8
-    ✅ @react-navigation/elements                    2.9.13
-    ✅ @react-navigation/native                      7.2.1
-
-  🐛 Monitoring (1)
-    ✅ @sentry/react-native                          7.11.0
-
-  🌐 Networking (1)
-    ✅ axios                                         1.13.6
-
-  📱 Expo (26)
-    ✅ expo                                          55.0.8
-    ⚪ expo-apple-authentication                     55.0.9
-    ✅ expo-asset                                    55.0.10
-    ✅ expo-audio                                    55.0.9
-    ✅ expo-auth-session                             55.0.9
-    ✅ expo-camera                                   55.0.11
-    ✅ expo-clipboard                                55.0.9
-    ✅ expo-constants                                55.0.9
-    ✅ expo-crypto                                   55.0.10
-    ✅ expo-device                                   55.0.10
-    ✅ expo-font                                     55.0.4
-    ✅ expo-haptics                                  55.0.9
-    ✅ expo-image                                    55.0.6
-    ✅ expo-image-picker                             55.0.13
-    ✅ expo-linear-gradient                          55.0.9
-    ✅ expo-linking                                  55.0.8
-    ✅ expo-location                                 55.1.4
-    ✅ expo-notifications                            55.0.13
-    ✅ expo-router                                   55.0.7
-    ✅ expo-secure-store                             55.0.9
-    ✅ expo-splash-screen                            55.0.12
-    ✅ expo-status-bar                               55.0.4
-    ✅ expo-symbols                                  55.0.5
-    ✅ expo-system-ui                                55.0.10
-    ✅ expo-video                                    55.0.11
-    ✅ expo-web-browser                              55.0.10
-
-  🔥 Firebase (1)
-    ✅ firebase                                      12.11.0
-
-  ⚛️ React (2)
-    ✅ react                                         19.2.0
-    ✅ react-dom                                     19.2.0
-
-  📱 React Native (9)
-    ✅ react-native                                  0.83.2
-    ✅ react-native-gesture-handler                  2.30.0
-    ✅ react-native-mmkv                             4.3.0
-    ✅ react-native-reanimated                       4.2.1
-    ⚪ react-native-reanimated-carousel              4.0.3
-    ✅ react-native-safe-area-context                5.6.2
-    ✅ react-native-screens                          4.23.0
-    ✅ react-native-web                              0.21.2
-    ✅ react-native-worklets                         0.7.2
-
-  🔒 Security (2)
-    ✅ tweetnacl                                     1.0.3
-    ✅ tweetnacl-util                                0.15.1
-
-  🔧 Build Tools (2)
-    ✅ @babel/core                                   7.29.0
-    ⚪ babel-plugin-transform-remove-console         6.9.4
-
-  ✨ Linting (6)
-    ⚪ @commitlint/cli                               20.5.0
-    ⚪ @commitlint/config-conventional               20.5.0
-    ✅ eslint                                        10.1.0
-    ✅ eslint-config-expo                            55.0.0
-    ⚪ lint-staged                                   16.4.0
-    ⚪ prettier                                      3.8.1
-
-  🧪 Testing (3)
-    ⚪ @types/jest                                   30.0.0
-    ⚪ jest                                          30.3.0
-    ⚪ ts-jest                                       29.4.6
-
-  📘 TypeScript (3)
-    ✅ @types/node                                   25.5.0
-    ✅ @types/react                                  19.2.14
-    ✅ typescript                                    5.9.3
-
-  ── NPM Scripts
-  ───────────────
-  start                     expo start
-  android                   expo run:android
-  ios                       expo run:ios
-  web                       expo start --web
-  build:web                 expo export --platform web
-  export                    expo export --platform web
-  lint                      eslint .
-  typecheck                 tsc --noEmit
-  format                    prettier --write "**/*.{ts,tsx,js,jsx,json}"
-  save                      git add . && git commit -m "Update" && git push
-  prepare                   husky
-
-══════════════════════════════════════════════════════════════════════
-  5. ENVIRONMENT VARIABLES
-══════════════════════════════════════════════════════════════════════
-  Total vars:                         47
-  Unique vars:                        24
-  Empty:                              24
-  Secrets:                            22
-  EXPO_PUBLIC_ vars:                  27
   ✅ .env in .gitignore
-  ✅ .env.example exists
+  ✅ node_modules in .gitignore
+  🔴 Secrets found in git history
+  🔴 Real secrets in .env: Google API Key
+═════════════════════════════════════════════════════════════════
+  4. ENVIRONMENT VARIABLES
+═════════════════════════════════════════════════════════════════
+  Total Defined:                   74
+  Secrets:                         40
+  Empty Values:                    29
+═════════════════════════════════════════════════════════════════
+  5. CODE & ARCHITECTURE
+═════════════════════════════════════════════════════════════════
+  Lines of Code:                   87,242
+  Source Files:                    250
+  Empty Files:                     0
+  Long Files (>300):               82
+  God Files (>500):                48
+       → utils\missingDetectors.ts
+       → utils\missingDetectors2.ts
+       → utils\remainingDetectors.ts
 
-  ── ❌ Needs Attention
-  ─────────────────────
-  • EXPO_PUBLIC_SPOTIFY_CLIENT_ID
-  • EXPO_PUBLIC_FIREBASE_API_KEY
-  • EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
-  • EXPO_PUBLIC_FIREBASE_PROJECT_ID
-  • EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
-  • EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-  • EXPO_PUBLIC_FIREBASE_APP_ID
-  • EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME
-  • EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
-  • EXPO_PUBLIC_SERVER_URL
-  • EXPO_PUBLIC_FUNCTIONS_URL
-  • EXPO_PUBLIC_VAPID_PUBLIC_KEY
-  • VAPID_PUBLIC_KEY
-  • VAPID_PRIVATE_KEY
-  • VAPID_EMAIL
-  • HMAC_SECRET
-  • ANALYTICS_HMAC_SECRET
-  • GOOGLE_SAFE_BROWSING_KEY
-  • NCMEC_API_KEY
-  • EXPO_PUBLIC_SAFE_BROWSING_API_KEY
-  • FIREBASE_PROJECT_ID
-  • NODE_ENV
-  • PORT
+  Components:                      55
+  Custom Hooks:                    1
+  Hooks No Cleanup:                1
+  Untyped Props:                   36
+  map() No key:                    2
+  ScrollView Abuse:                23
 
-  ── .env
-  ────────
-  ✅ 🔑 EXPO_PUBLIC_FIREBASE_API_KEY                  AIza********
-  ✅ 🔑 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN              myar********
-  ✅    EXPO_PUBLIC_FIREBASE_PROJECT_ID               myar********
-  ✅    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET           myar********
-  ✅    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID      4609********
-  ✅    EXPO_PUBLIC_FIREBASE_APP_ID                   1:46********
-  ✅ 🔑 EXPO_PUBLIC_VAPID_PUBLIC_KEY                  BLAm********
-  ✅    EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME             dryu********
-  ✅    EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET          myar********
-  ✅ 🔑 VAPID_PUBLIC_KEY                              BLAm********
-  ✅ 🔑 VAPID_PRIVATE_KEY                             ZM8C********
-  ✅ 🔑 VAPID_EMAIL                                   mail********
-  ✅    EXPO_PUBLIC_FUNCTIONS_URL                     http********
-  ✅    EXPO_PUBLIC_SERVER_URL                        http********
-  ❌    EXPO_PUBLIC_SPOTIFY_CLIENT_ID                 (empty)
-  ✅    FIREBASE_PROJECT_ID                           myar********
-  ✅    NODE_ENV                                      prod********
-  ✅    EXPO_PUBLIC_SENTRY_DSN                        http********
-  ✅    PORT                                          ****
-  ✅ 🔑 HMAC_SECRET                                   XfIx********
-  ✅ 🔑 ANALYTICS_HMAC_SECRET                         rbXe********
-  ✅ 🔑 GOOGLE_SAFE_BROWSING_KEY                      get_********
-  ✅ 🔑 NCMEC_API_KEY                                 get_********
-  ✅ 🔑 EXPO_PUBLIC_SAFE_BROWSING_API_KEY             same********
+  Route Type:                      file-based
+  Total Routes:                    44
+  Dynamic Routes:                  0
+  ✅ 404/not-found page
 
-  ── .env.example
-  ────────────────
-  ❌ 🔑 EXPO_PUBLIC_FIREBASE_API_KEY                  (empty)
-  ❌ 🔑 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN              (empty)
-  ❌    EXPO_PUBLIC_FIREBASE_PROJECT_ID               (empty)
-  ❌    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET           (empty)
-  ❌    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID      (empty)
-  ❌    EXPO_PUBLIC_FIREBASE_APP_ID                   (empty)
-  ❌    EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME             (empty)
-  ❌    EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET          (empty)
-  ❌    EXPO_PUBLIC_SERVER_URL                        (empty)
-  ❌    EXPO_PUBLIC_FUNCTIONS_URL                     (empty)
-  ❌ 🔑 EXPO_PUBLIC_VAPID_PUBLIC_KEY                  (empty)
-  ❌ 🔑 VAPID_PUBLIC_KEY                              (empty)
-  ❌ 🔑 VAPID_PRIVATE_KEY                             (empty)
-  ❌ 🔑 VAPID_EMAIL                                   (empty)
-  ❌    EXPO_PUBLIC_SPOTIFY_CLIENT_ID                 (empty)
-  ❌ 🔑 HMAC_SECRET                                   (empty)
-  ❌ 🔑 ANALYTICS_HMAC_SECRET                         (empty)
-  ❌ 🔑 GOOGLE_SAFE_BROWSING_KEY                      (empty)
-  ❌ 🔑 NCMEC_API_KEY                                 (empty)
-  ❌ 🔑 EXPO_PUBLIC_SAFE_BROWSING_API_KEY             (empty)
-  ❌    FIREBASE_PROJECT_ID                           (empty)
-  ❌    NODE_ENV                                      (empty)
-  ❌    PORT                                          (empty)
+  Circular Deps:                   1
+  Avg Imports/File:                1.5
+  ⚠️  Cycle: app\date-spot-reviews.tsx → utils\dateSpotReviews.ts → utils\dateSpotReviews.ts
+  Dead Exports:                    4754
+  Identical Files:                 0
+  Complexity Issues:               12
+═════════════════════════════════════════════════════════════════
+  6. REACT PATTERN ISSUES
+═════════════════════════════════════════════════════════════════
+  Total Issues:                    1551
+    inline-arrow-props:            261
+    missing-dep-array:             131
+    hook-in-conditional:           342
+    object-literal-prop:           699
+    scrollview-list:               16
+    setstate-after-unmount:        70
+    hook-in-loop:                  5
+    flatlist-no-key-extractor:     3
+    stale-closure:                 24
 
-══════════════════════════════════════════════════════════════════════
-  6. SECURITY
-══════════════════════════════════════════════════════════════════════
-  Critical:                           0
-  High:                               0
-  Medium:                             0
-  Low:                                0
-  Info:                               33
+  ⚠️  app\+not-found.tsx:11 - Inline arrow function as prop "onPress" - use useCallback
+       │ <TouchableOpacity style={s.button} onPress={() => router.replace('/home')} accessibilityLabel="Go to home screen" accessibilityRole="button">
+  ⚠️  app\achievements.tsx:38 - useEffect possibly missing dependency array
+       │ useEffect(() => { void loadAchievements(); }, [loadAchievements]);
+  ⚠️  app\achievements.tsx:27 - Hook "useEffect)" possibly inside conditional
+       │ if (user) {
+  ⚠️  app\achievements.tsx:29 - Hook "useEffect)" possibly inside conditional
+       │ if (snap.exists()) setProgress(getAchievementProgress(snap.data()));
+  ⚠️  app\achievements.tsx:63 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ style={[s.achievementCard, isLocked ? s.achievementLocked : s.achievementUnlocked]}
+  ⚠️  app\achievements.tsx:102 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <Text style={[s.progressNumber, { color: item.c }]}>{item.n}</Text>
+  ⚠️  app\achievements.tsx:109 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <View style={[s.progressBar, { width: `${pct}%` }]} />
+  ⚠️  app\achievements.tsx:116 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ style={[s.categoryChip, !selectedCategory && s.categoryChipActive]}
+  ⚠️  app\achievements.tsx:119 - Prop "accessibilityState" receives new object/array each render - causes unnecessary re-renders
+       │ accessibilityState={{ selected: !selectedCategory }}>
+  ⚠️  app\achievements.tsx:120 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <Text style={[s.categoryChipText, !selectedCategory && s.categoryChipTextActive]}>All</Text>
+═════════════════════════════════════════════════════════════════
+  7. TYPE SAFETY
+═════════════════════════════════════════════════════════════════
+  TS Coverage:                     87%
+  Strict Mode:                     YES ✅
+  "any" Usage:                     24
+       app\chat.tsx:58  →  gifSearchQuery: string; gifResults: any[]; loadingGifs: boolean;
+       app\chat.tsx:68  →  showNearby: boolean; nearbyPlaces: any[]; loadingNearby: boolean;
+       app\chat.tsx:84  →  | { type: 'SET_GIF_RESULTS'; payload: any[] }
+       app\chat.tsx:110  →  | { type: 'SET_NEARBY'; payload: any[] }
+       app\chat.tsx:710  →  const sendGif = useCallback(async (gif: any) => {
+  Suppressions:                    0
+  Non-null (!):                    13
+  Runtime Validation:              zod
+  ⚠️  13 risky non-null assertion(s):
+       app\chat.tsx:397  →  senderId: user!.uid, timestamp: serverTimestamp(), read: false, version: enc.version,
+       app\matches.tsx:527  →  {u.photos!.map((_, i) => <PhotoDot key={i} active={photoIdx === i} />)}
+       app\profile-preview.tsx:176  →  {userData.photos!.map((_, index) => (
+═════════════════════════════════════════════════════════════════
+  8. TESTING
+═════════════════════════════════════════════════════════════════
+  Test Files:                      1
+  Source Files:                    250
+  Testing Score:                   1/100
+  Empty Tests:                     0
+  No Assertions:                   0
+  ✅ Jest configured
+  ❌ Vitest configured
+═════════════════════════════════════════════════════════════════
+  9. ERROR HANDLING
+═════════════════════════════════════════════════════════════════
+  try/catch blocks:                674
+  Empty catches:                   0
+  Error Boundaries:                16
+  Sentry calls:                    5
+  Async no try:                    11
+  Promise.all no err:              1
+═════════════════════════════════════════════════════════════════
+  10. PERFORMANCE
+═════════════════════════════════════════════════════════════════
+  Async Anti-patterns:             41
+  ⚠️  app\admin\index.tsx:42 - Promise.all without error handling
+       │ const [matchesSnap, reportsSnap] = await Promise.all([
+  ⚠️  app\matches.tsx:264 - Promise.all without error handling
+       │ const [likesSnap, snap] = await Promise.all([
+  ⚠️  app\matches.tsx:322 - Promise.all without error handling
+       │ await Promise.all([
+  ⚠️  app\matches.tsx:387 - Promise.all without error handling
+       │ await Promise.all([
+  ⚠️  app\my-matches.tsx:180 - Promise.all without error handling
+       │ const [snap1, snap2] = await Promise.all([
+  Memory Leak Risks:               14
+  ⚠️  app\chat.tsx:324 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\home.tsx:539 - 5 addEventListener vs 2 removeEventListener - possible event listener leak
+  ⚠️  app\index.tsx:138 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\login.tsx:567 - 2 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\personality-quiz.tsx:1121 - 2 addEventListener vs 1 removeEventListener - possible event listener leak
+  ❌ FlashList
+  ✅ useMemo/React.memo
+  ✅ Optimized image component
+═════════════════════════════════════════════════════════════════
+  11. NETWORK
+═════════════════════════════════════════════════════════════════
+  fetch() calls:                   130
+  axios calls:                     2
+  Library:                         SWR
+  ⚠️  3 hardcoded URL(s):
+       server\src\index.ts:15  →  http://localhost:8081
+       server\src\index.ts:15  →  http://localhost:19006
+       server\src\index.ts:15  →  http://localhost:3000
+═════════════════════════════════════════════════════════════════
+  12. SERVICES & BACKEND
+═════════════════════════════════════════════════════════════════
+  ✅ Firebase
+  ❌ Supabase
+  ❌ Prisma
+  ❌ tRPC
+  Server Framework:                None
+  API Endpoints:                   35
+  Without Auth:                    2
+  DB Schema:                       No
+  ❌ DB Indexes
 
-  ── .gitignore Coverage
-  ───────────────────────
-  ✅ envFiles
-  ✅ nodeModules
-  ✅ buildDirs
-  ✅ osFiles
-  ✅ ideFiles
-  ✅ coverage
-  ✅ logs
-  ✅ keystores
-  ✅ certificates
-
-  ✅ No critical, high, or medium issues found!
-
-══════════════════════════════════════════════════════════════════════
-  7. API ENDPOINTS
-══════════════════════════════════════════════════════════════════════
-  Total:                              30
-  Without auth:                       0
-  Without rate limit:                 0
-  Without validation:                 0
-
-  ── All Endpoints
-  ─────────────────
-  🔒 [OPTIONS] *                                   server\src\index.ts:630
-  🔒 [POST  ] /send-notification                  server\src\index.ts:632
-  🔒 [POST  ] /send-expo-notification             server\src\index.ts:647
-  🔒 [POST  ] /check-email                        server\src\index.ts:658
-  🔒 [POST  ] /check-password-breach              server\src\index.ts:665
-  🔒 [POST  ] /register-device                    server\src\index.ts:671
-  🔒 [POST  ] /login-track                        server\src\index.ts:681
-  🔒 [POST  ] /check-device-integrity             server\src\index.ts:691
-  🔒 [POST  ] /validate-location                  server\src\index.ts:699
-  🔒 [POST  ] /moderate-text                      server\src\index.ts:722
-  🔒 [POST  ] /scan-csam                          server\src\index.ts:730
-  🔒 [POST  ] /age-gate-check                     server\src\index.ts:743
-  🔒 [POST  ] /dmca-takedown                      server\src\index.ts:748
-  🔒 [POST  ] /log-screenshot                     server\src\index.ts:757
-  🔒 [POST  ] /share-meeting-location             server\src\index.ts:762
-  🔒 [POST  ] /enforce-trust                      server\src\index.ts:768
-  🔒 [POST  ] /check-url                          server\src\index.ts:774
-  🔒 [POST  ] /screen-name                        server\src\index.ts:780
-  🔒 [POST  ] /pdq-cross-account                  server\src\index.ts:788
-  🔒 [POST  ] /check-cib                          server\src\index.ts:797
-  🔒 [POST  ] /ab-test                            server\src\index.ts:805
-  🔒 [POST  ] /admin/rotate-key                   server\src\index.ts:814
-  🔒 [POST  ] /wcag-audit                         server\src\index.ts:825
-  🔒 [POST  ] /check-contrast                     server\src\index.ts:831
-  🔒 [POST  ] /validate-event                     server\src\index.ts:837
-  🔒 [POST  ] /check-engagement                   server\src\index.ts:844
-  🔒 [POST  ] /check-bot                          server\src\index.ts:852
-  🔒 [POST  ] /track-conversion                   server\src\index.ts:858
-  🔒 [POST  ] /admin/action                       server\src\index.ts:867
-  🟢 [GET   ] /health                             server\src\index.ts:877
-
-══════════════════════════════════════════════════════════════════════
-  8. ROUTES & NAVIGATION
-══════════════════════════════════════════════════════════════════════
-  Router type:                        expo-router
-  Total routes:                       44
-  Dynamic routes:                     0
-  Layouts:                            1
-  Groups:                             None
-  Modals:                             0
-  ✅ 404 / Not Found page
-  ❌ Tab navigation
-  ✅ Stack navigation
-
-  ── Deep Links
-  ──────────────
-  • [scheme] myarchetype
-
-══════════════════════════════════════════════════════════════════════
-  9. COMPONENTS & HOOKS
-══════════════════════════════════════════════════════════════════════
-  Total components:                   54
-  Functional:                         50
-  Memoized:                           15
-  Custom hooks:                       0
-  Contexts:                           1
-  Error boundaries:                   4
-  Avg component lines:                431
-
-  ── ⚠️  Components with 5+ useState
-  ───────────────────────────────────
-  • app\chat.tsx (7 states)
-  • app\profile-setup.tsx (17 states)
-  • app\signup.tsx (5 states)
-  • app\login.tsx (6 states)
-  • app\personality-quiz.tsx (10 states)
-  • app\matches.tsx (10 states)
-  • app\edit-profile.tsx (8 states)
-  • app\stories.tsx (7 states)
-  • app\selfie-verification.tsx (16 states)
-  • app\settings.tsx (6 states)
-  • app\height-verification.tsx (13 states)
-  • app\my-matches.tsx (14 states)
-  • app\_layout.tsx (6 states)
-  • app\video-profile-recorder.tsx (5 states)
-  • app\second-look.tsx (7 states)
-  • app\voice-intro-recorder.tsx (11 states)
-  • app\index.tsx (6 states)
-  • app\date-spot-reviews.tsx (7 states)
-  • app\shared-playlist.tsx (11 states)
-  • app\post-date-rating.tsx (10 states)
-  • app\referral.tsx (6 states)
-  • app\admin\users.tsx (8 states)
-  • app\admin\reports.tsx (6 states)
-  • app\social-verification.tsx (6 states)
-  • app\relationship-mode.tsx (9 states)
-  • app\referral-leaderboard.tsx (5 states)
-  • app\profile-views.tsx (5 states)
-  • app\icebreaker-game.tsx (10 states)
-  • app\smart-photos.tsx (5 states)
-  • app\achievements.tsx (6 states)
-  • app\compatibility-quiz.tsx (8 states)
-  • app\daily-question.tsx (6 states)
-
-══════════════════════════════════════════════════════════════════════
-  10. ERROR HANDLING
-══════════════════════════════════════════════════════════════════════
-  Try/catch blocks:                   453
-  Empty catch blocks:                 0
-  Error boundaries:                   4
-  Sentry captures:                    5
-  Error logging:                      Sentry
-  Error Handling       [████████████████████] 100/100
-
-  ── Global Handlers
-  ───────────────────
-  ❌ unhandledRejection
-  ✅ uncaughtException
-  ✅ errorBoundaryWrapper
-  ✅ globalCatch
-  ✅ sentryInit
-  ❌ crashlytics
-
-══════════════════════════════════════════════════════════════════════
-  11. NETWORK & DATA FETCHING
-══════════════════════════════════════════════════════════════════════
-  Fetch calls:                        61
-  Axios calls:                        2
-  Data libraries:                     axios
-  ✅ Timeout configured
-  ✅ Retry logic
-  ✅ AbortController
-  ❌ GraphQL
-  ❌ WebSocket
-
-══════════════════════════════════════════════════════════════════════
-  12. ACCESSIBILITY
-══════════════════════════════════════════════════════════════════════
-  Accessibility        [█████████████░░░░░░░] 65/100
-  Labels:                             515
-  Roles:                              377
-  Touchable without label:            229
-  Image without alt:                  3
-  ✅ Screen reader support
-  ✅ Dynamic font sizing
-
-  ── Issues
-  ──────────
-  ⚠️  app\+not-found.tsx: Touchable without accessibilityLabel
-  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
-  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
-  ⚠️  app\achievements.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\index.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\reports.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\reports.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\users.tsx: Touchable without accessibilityLabel
-  ⚠️  app\admin\users.tsx: Touchable without accessibilityLabel
-  ⚠️  app\stories.tsx: Image without accessibilityLabel/alt
-  ⚠️  app\stories.tsx: Image without accessibilityLabel/alt
-  ⚠️  app\stories.tsx: Image without accessibilityLabel/alt
-
-══════════════════════════════════════════════════════════════════════
-  13. PERFORMANCE
-══════════════════════════════════════════════════════════════════════
-  Performance          [███████████░░░░░░░░░] 55/100
-  Inline functions in JSX:            229
-  Heavy imports:                      0
-
-  ── Optimizations Used
-  ──────────────────────
-  ❌ usesFlashList
-  ✅ usesFlatList
-  ❌ usesSectionList
-  ❌ usesVirtualizedList
-    usesMemo:                         74
-    usesCallback:                     504
-    usesReactMemo:                    67
-  ❌ usesLazy
-  ❌ usesSuspense
-  ✅ usesInteractionManager
-  ✅ usesRequestAnimationFrame
-  ❌ usesPureComponent
-  ✅ hasImageOptimization
-  ✅ hasListOptimization
-  ❌ hermes
-  ✅ proguard
-
-  ── Issues
-  ──────────
-  [medium] app\chat.tsx: 9 inline arrow functions in JSX
-  [low] app\chat.tsx: Component file is 1690 lines — consider splitting
-  [low] app\date-checkin.tsx: Component file is 521 lines — consider splitting
-  [medium] app\date-spot-reviews.tsx: 11 inline arrow functions in JSX
-  [high] app\edit-profile.tsx: ScrollView with many children — consider FlatList/FlashList
-  [low] app\edit-profile.tsx: Component file is 801 lines — consider splitting
-  [medium] app\height-verification.tsx: 8 inline arrow functions in JSX
-  [low] app\height-verification.tsx: Component file is 651 lines — consider splitting
-  [low] app\home.tsx: Component file is 744 lines — consider splitting
-  [low] app\login.tsx: Component file is 1109 lines — consider splitting
-  [high] app\matches.tsx: ScrollView with many children — consider FlatList/FlashList
-  [low] app\matches.tsx: Component file is 885 lines — consider splitting
-  [medium] app\my-matches.tsx: 14 inline arrow functions in JSX
-  [low] app\my-matches.tsx: Component file is 610 lines — consider splitting
-  [high] app\personality-quiz.tsx: ScrollView with many children — consider FlatList/FlashList
-
-══════════════════════════════════════════════════════════════════════
-  14. ASSETS
-══════════════════════════════════════════════════════════════════════
-  Total assets:                       17
-  Total size:                         1.1 MB
-  Images:                             16
-  Fonts:                              0
-
-  ── Recommendations
-  ───────────────────
-  💡 No @2x/@3x image variants detected
-  💡 12 possibly unused assets
-
-══════════════════════════════════════════════════════════════════════
-  15. INTERNATIONALIZATION
-══════════════════════════════════════════════════════════════════════
-  ✅ i18n (none)
-  Languages:                          None
-  ✅ RTL support
-  ✅ Locale detection
-  Hardcoded strings (est):            530
-
-══════════════════════════════════════════════════════════════════════
-  16. DOCUMENTATION
-══════════════════════════════════════════════════════════════════════
-  Documentation        [███████████████░░░░░] 75/100
-  ✅ README (51 lines)
-  ✅ Install instructions
-  ✅ CHANGELOG
-  ✅ LICENSE
-  ❌ Storybook (0 stories)
-  JSDoc comments:                     66
-  Documentation ratio:                5%
-
-══════════════════════════════════════════════════════════════════════
-  17. TYPE SAFETY
-══════════════════════════════════════════════════════════════════════
-  Type Safety          [█████████████████░░░] 85/100
-  TS files:                           123
-  JS files:                           9
-  Coverage:                           93%
-  "any" usage:                        36
-  Interfaces:                         344
-  Type aliases:                       86
-  @ts-ignore:                         0
-  @ts-nocheck:                        0
-  Runtime validation:                 None
-
-══════════════════════════════════════════════════════════════════════
-  18. BUNDLE SIZE ESTIMATION
-══════════════════════════════════════════════════════════════════════
-  Source code:                        1.8 MB
-  Image assets:                       541.1 KB
-  Font assets:                        0 B
-  Estimated total:                    2.3 MB
-  Barrel (index) files:               6
-
-  ── Heavy Dependencies
-  ──────────────────────
-  📦 27.8 MB      firebase
-
-══════════════════════════════════════════════════════════════════════
-  19. DEPENDENCY GRAPH
-══════════════════════════════════════════════════════════════════════
-  Total modules:                      132
-  Circular deps:                      0
-  Avg imports/file:                   2.3
-
-  ── Most Imported Files
-  ───────────────────────
-    93x  utils\logger
-    72x  firebaseConfig
-    19x  utils\moderation
-     8x  utils\ageVerification
-     8x  cloudinaryConfig
-     5x  components\TrustScoreDisplay
-     5x  utils\location
-     5x  utils\storage
-     5x  utils\rateLimiter
-     4x  utils\e2ee
-
-  ── Possibly Orphan Files
-  ─────────────────────────
-  • app\privacy.tsx
-  • app\terms.tsx
-  • babel.config.js
-  • cloudinaryConfig.ts
-  • commitlint.config.js
-  • components\AdvancedFilters.tsx
-  • components\BodyTypeSelector.tsx
-  • components\HeightBadge.tsx
-  • components\LegalDocument.tsx
-  • components\ProfileCompletionCard.tsx
-
-══════════════════════════════════════════════════════════════════════
-  20. DEPENDENCY HEALTH
-══════════════════════════════════════════════════════════════════════
-  ✅ Lockfile present
-  ❌ Auto-update (Renovate/Dependabot)
-  Native modules:                     34
-  Outdated packages:                  Run npm outdated
-
-══════════════════════════════════════════════════════════════════════
-  21. FILE STRUCTURE
-══════════════════════════════════════════════════════════════════════
-  Total files:                        194
-  Code files:                         132
-  Lines of code:                      37,405
-  Avg lines/file:                     283
-  Files >300 lines:                   36
-  Empty files:                        0
-
-  ── Top-Level Directories
-  ─────────────────────────
-  📁 app
-  📁 assets
-  📁 components
-  📁 functions
-  📁 public
-  📁 scripts
-  📁 server
-  📁 services
-  📁 utils
-  📁 web-push
-  📁 __tests__
-
-  ── Largest Files
-  ─────────────────
-    1690 lines  app\chat.tsx
-    1481 lines  app\profile-setup.tsx
-    1193 lines  app\signup.tsx
-    1109 lines  app\login.tsx
-     946 lines  app\personality-quiz.tsx
-     893 lines  server\src\index.ts
-     885 lines  app\matches.tsx
-     801 lines  app\edit-profile.tsx
-     793 lines  app\stories.tsx
-     788 lines  app\selfie-verification.tsx
-     755 lines  app\settings.tsx
-     744 lines  app\home.tsx
-     722 lines  utils\moderation.ts
-     719 lines  utils\i18n.ts
-     672 lines  components\BodyTypeSelector.tsx
-
-══════════════════════════════════════════════════════════════════════
-  22. CODE QUALITY
-══════════════════════════════════════════════════════════════════════
-  Total lines:                        37,405
-  Code lines:                         32,547
-  Comment ratio:                      3%
-  ✅ ESLint
-  ✅ Prettier
-  ✅ Husky git hooks
-  ✅ lint-staged
-  ✅ commitlint
-
-  ── Issues
-  ──────────
-  TODOs:                              0
-  FIXMEs:                             0
-  "any" types:                        36
-  console.log():                      9
-
-══════════════════════════════════════════════════════════════════════
-  23. GIT
-══════════════════════════════════════════════════════════════════════
-  Branch:                             main
-  Total commits:                      46
-  Last commit:                        2026-03-31 18:31:13 +0400
-  Last message:                       Update
-  Uncommitted:                        111
-  Remote:                             https://github.com/MrBMRBLX/MyArchetype.git
-  Tags:                               0
-  Branches:                           2
-  ✅ GitHub Actions
-  ✅ .gitignore
-
-  ── Commit Conventions
-  ──────────────────────
-  Conventional commits:               0/46 (0%)
-
-  ── Git Hooks
-  ─────────────
-  pre-commit           npm test
-
-  ── Recent Commits
-  ──────────────────
-  26d2ec6 Update
-  2b6446c Update
-  60eb0dd Update
-  8c45f58 Update
-  3210c08 Update
-  6ad63d5 Update
-  b1c3453 Update
-  131d83b Update
-  6624833 Update
-  77e61a3 Update
-
-══════════════════════════════════════════════════════════════════════
-  24. OFFLINE SUPPORT
-══════════════════════════════════════════════════════════════════════
-  Offline              [█████░░░░░░░░░░░░░░░] 25/100
-  ❌ NetInfo / connectivity
-  ❌ Offline queue
-  ❌ Cache-first strategy
-  ✅ Data persistence
-  ❌ Optimistic updates
-  ✅ Offline indicator UI
-
-══════════════════════════════════════════════════════════════════════
-  25. CODE DUPLICATION
-══════════════════════════════════════════════════════════════════════
-  Identical files:                    0
-  Similar files:                      0
-
-══════════════════════════════════════════════════════════════════════
-  26. GIT SECRET SCANNING
-══════════════════════════════════════════════════════════════════════
-  ✅ No secrets found
-
-══════════════════════════════════════════════════════════════════════
-  27. DEPENDENCY LICENSES
-══════════════════════════════════════════════════════════════════════
-  Scanned:                            47
-
-  ── Distribution
-  ────────────────
-    44x  MIT
-     2x  Unlicense
-     1x  Apache-2.0
-
-══════════════════════════════════════════════════════════════════════
-  28. DEEP LINK VALIDATION
-══════════════════════════════════════════════════════════════════════
-  Scheme:                             myarchetype
-  ✅ Linking config
-  ❌ Deep link handler
-
-══════════════════════════════════════════════════════════════════════
-  29. FONT LOADING
-══════════════════════════════════════════════════════════════════════
-  ❌ expo-font
-  ❌ useFonts hook
-  ✅ Loading gate
-  ❌ Properly loaded
-  Custom fonts:                       0
-
-══════════════════════════════════════════════════════════════════════
-  30. UNUSED STYLES
-══════════════════════════════════════════════════════════════════════
-  Total styles:                       2485
-  Unused:                             1095
-  Waste:                              44%
-
-  ── Unused
-  ──────────
-  ⚪ app\+not-found.tsx: container
-  ⚪ app\+not-found.tsx: emoji
-  ⚪ app\+not-found.tsx: title
-  ⚪ app\+not-found.tsx: subtitle
-  ⚪ app\+not-found.tsx: button
-  ⚪ app\+not-found.tsx: buttonText
-  ⚪ app\achievements.tsx: container
-  ⚪ app\achievements.tsx: center
-  ⚪ app\achievements.tsx: content
-  ⚪ app\achievements.tsx: emptyText
-  ⚪ app\achievements.tsx: header
-  ⚪ app\achievements.tsx: backButton
-  ⚪ app\achievements.tsx: title
-  ⚪ app\achievements.tsx: progressCard
-  ⚪ app\achievements.tsx: progressStats
-
-══════════════════════════════════════════════════════════════════════
-  31. FIREBASE COMPLETENESS
-══════════════════════════════════════════════════════════════════════
   ❌ google-services.json
   ❌ GoogleService-Info.plist
-  ✅ Firestore rules
-  ❌ App Check
+  ✅ firestore.rules
+  ❌ App Check enabled
+  ⚠️  Missing android/app/google-services.json
+  ⚠️  Missing ios/GoogleService-Info.plist
 
-  ── Issues
-  ──────────
-  ⚠️  Missing google-services.json for Android
-  ⚠️  Missing GoogleService-Info.plist for iOS
-  ⚠️  No App Check configured
+  ✅ Push permission requested
+  ✅ Push token retrieved
+  ❌ Background handler set
+═════════════════════════════════════════════════════════════════
+  13. EXPO & NATIVE
+═════════════════════════════════════════════════════════════════
+  Android minSdk:                  unknown
+  Android targetSdk:               unknown
+  ❌ Podfile exists
+  ❌ iOS Privacy Manifest
+  ⚠️  Declared but unused perms: INTERNET
+  ⚠️  Used but not declared: CAMERA, ACCESS_FINE_LOCATION
+═════════════════════════════════════════════════════════════════
+  14. ACCESSIBILITY
+═════════════════════════════════════════════════════════════════
+  Score                  [[32m████████████████[0m░░░░] 80/100
+  Labels:                          489
+  Roles:                           362
+  Hints:                           28
+  ⚠️  app\chat.tsx:771 - <Pressable> missing accessibilityLabel
+       │ <Pressable
+  ⚠️  app\chat.tsx:797 - <Pressable> missing accessibilityLabel
+       │ <Pressable onPress={() => setCore({ type: 'SET_PREVIEW', payload: item.mediaUrl ?? null })}>
+  ⚠️  app\chat.tsx:803 - <Pressable> missing accessibilityLabel
+       │ <Pressable onPress={() => setCore({ type: 'SET_PREVIEW', payload: item.mediaUrl ?? null })}>
+  ⚠️  app\chat.tsx:894 - <Pressable> missing accessibilityLabel
+       │ <Pressable style={styles.menuOverlay} onPress={() => setCore({ type: 'SET_MENU', payload: false })}>
+  ⚠️  app\chat.tsx:896 - <Pressable> missing accessibilityLabel
+       │ <Pressable style={styles.menuItem} onPress={() => { setCore({ type: 'SET_MENU', payload: false }); setCore({ type: 'SET_NOTE', payload: true }); }}>
+═════════════════════════════════════════════════════════════════
+  15. ASSETS & BUNDLE
+═════════════════════════════════════════════════════════════════
+  Source Size:                     4.6 MB
+  Image Assets:                    541.1 KB
+  Image Count:                     8
+  Font Files:                      0
+  Tree Shaking:                    CJS ❌
+  ⚠️  Large asset: assets\images\icon.png (384.3 KB)
+═════════════════════════════════════════════════════════════════
+  16. i18n
+═════════════════════════════════════════════════════════════════
+  Library:                         none
+  Locale Files:                    0
+  Hardcoded Strings:               750
+       app\+not-found.tsx:9  →  <Text style={s.title} accessibilityRole="header">Page Not Found</Text>
+       app\+not-found.tsx:10  →  <Text style={s.subtitle}>This screen doesn't exist.</Text>
+       app\+not-found.tsx:12  →  <Text style={s.buttonText}>Go Home</Text>
+  ✅ RTL support
+═════════════════════════════════════════════════════════════════
+  17. PRIVACY & COMPLIANCE
+═════════════════════════════════════════════════════════════════
+  ❌ App Tracking Transparency
+  ✅ Privacy Policy
+  ✅ Terms of Service
+  ✅ Data Deletion
+  ❌ iOS Privacy Manifest
+  ✅ GDPR
+  ✅ COPPA
+═════════════════════════════════════════════════════════════════
+  18. OBSERVABILITY
+═════════════════════════════════════════════════════════════════
+  Score                  [[32m█████████████[0m░░░░░░░] 65/100
+  ✅ Sentry
+  ❌ Crashlytics
+  ❌ Analytics
+  ❌ Flipper
+  ✅ ErrorBoundary + Sentry
+═════════════════════════════════════════════════════════════════
+  19. CODE QUALITY
+═════════════════════════════════════════════════════════════════
+  Comment Ratio:                   7%
+  console.log total:               240
+  TODO/FIXME:                      0
+  ✅ ESLint
+  ❌ Prettier
+  ✅ Husky git hooks
+  Unguarded console:               203
+  ✅ Console stripped in Babel
+       analyze-stack.js:93  →  console.log('\n🔍 COMPLETE PROJECT DEPENDENCY INVENTORY');
+       analyze-stack.js:94  →  console.log('═'.repeat(60));
+       analyze-stack.js:95  →  console.log(`📦 Declared in package.json: ${Object.keys(declaredDeps).length}`);
+  Unused Styles:                   1636/2626 (62%)
+═════════════════════════════════════════════════════════════════
+  20. DOCUMENTATION
+═════════════════════════════════════════════════════════════════
+  Score                  [[32m████████████████[0m░░░░] 80/100
+  ✅ README.md
+  ✅ LICENSE
+  ✅ CHANGELOG.md
+  ❌ CONTRIBUTING.md
+  JSDoc blocks:                    7
+═════════════════════════════════════════════════════════════════
+  21. GIT
+═════════════════════════════════════════════════════════════════
+  Branch:                          main
+  Total Commits:                   47
+  Last Commit:                     chore: stop tracking .env.example
+  Uncommitted:                     213
+  Hooks:                           husky
+  Conventional:                    1/47 commits
+═════════════════════════════════════════════════════════════════
+  22. CI/CD
+═════════════════════════════════════════════════════════════════
+  ✅ CI Pipeline detected
+  ✅ CI Caching configured
+═════════════════════════════════════════════════════════════════
+  23. SEO / WEB
+═════════════════════════════════════════════════════════════════
+  ℹ️  No web/SEO issues detected
+═════════════════════════════════════════════════════════════════
+  24. TOOL RECOMMENDATIONS
+═════════════════════════════════════════════════════════════════
+  Missing/Misconfigured Tools:     0 high, 3 medium, 1 low
 
-══════════════════════════════════════════════════════════════════════
-  32. PUSH NOTIFICATIONS
-══════════════════════════════════════════════════════════════════════
-  Completeness:                       80%
-  ✅ Permission request
-  ✅ Token registration
-  ✅ Foreground handler
-  ❌ Background handler
-  ✅ Response handler
+  🟡 [MEDIUM] @shopify/flash-list
+       Why: FlashList is installed but never imported anywhere in your source code.
+       Where: Replace FlatList usages with FlashList. Search for <FlatList and replace.
+       Install: already installed
+       Usage: import {FlashList} from "@shopify/flash-list";
 
-  ── Missing
-  ───────────
-  ❌ No background handler
+  🟡 [MEDIUM] @tanstack/react-query
+       Why: You have 130 fetch() calls managed with useState+useEffect. This pattern causes race conditions, memory leaks, and duplicate requests.
+       Where: Replace all fetch+useState+useEffect patterns. Especially for Firebase reads, API calls, any server data.
+       Install: npm install @tanstack/react-query
+       Usage: const {data,isLoading,error}=useQuery({queryKey:["key"],queryFn:fetchFn,staleTime:1000*60*5});
 
-══════════════════════════════════════════════════════════════════════
-  33. IMAGE OPTIMIZATION
-══════════════════════════════════════════════════════════════════════
-  Image Opt            [████████████░░░░░░░░] 60/100
-  ✅ Optimized image component
-  ✅ CDN
-  ❌ Caching
-  ✅ Placeholder/blurhash
-  ❌ WebP
+  🟡 [MEDIUM] React Compiler (reactCompiler: true)
+       Why: Without React Compiler you must manually add useMemo/useCallback everywhere. The compiler adds them automatically where safe.
+       Where: app.json experiments section. Affects all components automatically - no code changes needed.
+       Install: no install needed on SDK 54+ - one line in app.json
+       Usage: {"expo":{"experiments":{"reactCompiler":true}}}
 
-══════════════════════════════════════════════════════════════════════
-  34. BUILD CONFIGURATION
-══════════════════════════════════════════════════════════════════════
-  ✅ metro.config
-  ❌ Tree shaking
-  ✅ babel.config
-  ✅ Console removal
-  ✅ Reanimated plugin
-  EAS profiles:                       development, preview, production
+  🔵 [LOW] prettier
+       Why: No code formatter. Code style is inconsistent across files.
+       Where: Root of project. Add format script to package.json.
+       Install: npm install --save-dev prettier
+       Usage: echo {}>.prettierrc && npx prettier --write "**/*.{ts,tsx}"
 
-══════════════════════════════════════════════════════════════════════
-  35. ASYNC STORAGE MISUSE
-══════════════════════════════════════════════════════════════════════
-  Sensitive data in AsyncStorage:     0
-  Large object stores:                0
+═════════════════════════════════════════════════════════════════
+  25. FILE COMPACTNESS
+═════════════════════════════════════════════════════════════════
+  Files With Issues:               12
+  Least compact files:
+       → metro.config.js
+       → fix-moderation.js
+       → utils\heightEstimation.ts
+       → utils\storage.ts
+       → web-push\lib\index.js
 
-══════════════════════════════════════════════════════════════════════
-  36. ERROR RECOVERY UI
-══════════════════════════════════════════════════════════════════════
-  Recovery UI          [███████████████░░░░░] 75/100
-  ✅ Retry button
-  ✅ Fallback UI
-  ✅ Skeleton loader
-  ❌ Empty state
-  ✅ Error state
-  ✅ Pull to refresh
-  ✅ Error boundary
-
-══════════════════════════════════════════════════════════════════════
-  37. CONSOLE USAGE
-══════════════════════════════════════════════════════════════════════
-  Total:                              4
-  Guarded (__DEV__):                  3
-  Unguarded:                          1
-  ✅ Build-time stripping
-  Status:                             Console stripping configured
-
-  ── Unguarded files
-  ───────────────────
-     1x  utils\logger.ts
-
-
-╔══════════════════════════════════════════════════════════════════════╗
-║                        END OF REPORT                               ║
-╚══════════════════════════════════════════════════════════════════════╝
+  ⚠️  metro.config.js (15 lines)
+       │ 27% blank lines (4/15) - remove excess whitespace
+       │ 27% comment lines (4/15) - remove comments, code should be self-explanatory
+  ⚠️  fix-moderation.js (73 lines)
+       │ 26% comment lines (19/73) - remove comments, code should be self-explanatory
+  ⚠️  utils\heightEstimation.ts (164 lines)
+       │ 29% comment lines (47/164) - remove comments, code should be self-explanatory
+  ⚠️  utils\storage.ts (16 lines)
+       │ 63% comment lines (10/16) - remove comments, code should be self-explanatory
+  ⚠️  web-push\lib\index.js (29 lines)
+       │ 86% comment lines (25/29) - remove comments, code should be self-explanatory
+═════════════════════════════════════════════════════════════════
+  26. COMMENTS
+═════════════════════════════════════════════════════════════════
+  Total Comment Lines:             5786
+  Comment Ratio:                   7%
+  Inline Comments:                 5660
+  Block Comments:                  31
+  JSDoc Blocks:                    95
+  Files With Many Comments:        58
+  ⚠️  Remove comments. Compact code is self-documenting. Comments add noise and go stale.
+  Files to clean up:
+  ⚠️  utils\infrastructureSecurity.ts (173 comments)
+       │ // file: utils/infrastructureSecurity.ts
+       │ // ─── [13.1] API Data Exposure ─────────────────────────────
+  ⚠️  utils\deviceIntegrity.ts (158 comments)
+       │ // file: utils/deviceIntegrity.ts
+       │ // ─── [14.1] Network/Graph Analysis ───────────────────────
+  ⚠️  utils\manipulationDetection.ts (120 comments)
+       │ // ═══════════════════════════════════════════════════════════════
+       │ // manipulationDetection.ts — FULL REWRITE
+  ⚠️  utils\financialFraud.ts (113 comments)
+       │ // ═══════════════════════════════════════════════════════════════
+       │ // utils/financialFraud.ts — FULL UPDATED
+  ⚠️  utils\conversationAnalysis.ts (100 comments)
+       │ // file: utils/conversationAnalysis.ts
+       │ // [2.12] AI Emotional Manipulation patterns
+═════════════════════════════════════════════════════════════════
+  RECOMMENDATIONS
+═════════════════════════════════════════════════════════════════
+  🔴 [P1] Secrets in git history - rotate all affected credentials
+  🔴 [P1] Real credentials in .env - rotate immediately
+  📘 [P2] Reduce "any" usage (24 found)
+  🔄 [P2] Fix 1 circular dependency cycle(s)
+  ⚛️ [P2] Fix 1551 React pattern issue(s)
+  🧠 [P2] 14 memory leak risk(s) - check event listener cleanup
+  ✨ [P3] Add Prettier
+  🧹 [P3] 1 useEffect(s) without cleanup
+  📦 [P3] 108 version conflict(s) - run: npm dedupe
+  🗑️ [P3] 4754 potentially dead exports
+  📐 [P3] 12 files need compacting - remove blank lines and whitespace
+  💬 [P3] 5786 comment lines found - remove comments, write self-documenting code
+  🔧 [P3] Consider: @shopify/flash-list - FlashList is installed but never imported anywhere in your source code
+  🔧 [P3] Consider: @tanstack/react-query - You have 130 fetch() calls managed with useState+useEffect
+  🔧 [P3] Consider: React Compiler (reactCompiler: true) - Without React Compiler you must manually add useMemo/useCallback everywhere
+  🔧 [P4] Consider: prettier - No code formatter
+═════════════════════════════════════════════════════════════════
+  Scanner v6.4 | 250 files | 87,242 LOC
+═════════════════════════════════════════════════════════════════

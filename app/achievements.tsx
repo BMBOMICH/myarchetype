@@ -52,6 +52,10 @@ export default function AchievementsScreen() {
 
   const pct = progress.total > 0 ? Math.round((progress.unlocked / progress.total) * 100) : 0;
 
+  const handleBack          = useCallback(() => router.back(), [router]);
+  const handleCategoryAll   = useCallback(() => setCategory(null), []);
+  const handleCategoryPress = useCallback((cat: Category) => () => setCategory(cat), []);
+
   const renderAchievement = useCallback(({ item }: { item: AchievementItem }) => {
     const isLocked = item._type === 'locked';
     return (
@@ -74,12 +78,76 @@ export default function AchievementsScreen() {
 
   const firstLockedId = filteredLocked[0]?.id;
 
-  if (loading) {
-    return (
-      <View style={s.center}>
-        <ActivityIndicator size="large" color="#53a8b6" />
+  const renderHeader = useCallback(() => (
+    <>
+      <View style={s.header}>
+        <TouchableOpacity onPress={handleBack} accessibilityLabel="Go back" accessibilityRole="button">
+          <Text style={s.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={s.title} accessibilityRole="header">🏆 Achievements</Text>
+        <View style={s.headerSpacer} />
       </View>
+
+      <View style={s.progressCard}
+        accessibilityLabel={`Progress: ${progress.unlocked} of ${progress.total} unlocked, ${progress.points} points, ${pct}% complete`}>
+        <View style={s.progressStats}>
+          {([
+            { n: progress.unlocked, l: 'Unlocked', c: '#eee' },
+            { n: progress.total,    l: 'Total',    c: '#eee' },
+            { n: progress.points,   l: 'Points',   c: '#e67e22' },
+          ] as const).map((item, i) => (
+            <React.Fragment key={item.l}>
+              {i > 0 && <View style={s.progressDivider} />}
+              <View style={s.progressStat}>
+                <Text style={[s.progressNumber, { color: item.c }]}>{item.n}</Text>
+                <Text style={s.progressLabel}>{item.l}</Text>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+        <View style={s.progressBarContainer}>
+          <View style={[s.progressBar, { width: `${pct}%` }]} />
+        </View>
+        <Text style={s.progressPercent}>{pct}% Complete</Text>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll}>
+        <TouchableOpacity
+          style={[s.categoryChip, !selectedCategory && s.categoryChipActive]}
+          onPress={handleCategoryAll}
+          accessibilityLabel="Show all categories" accessibilityRole="button"
+          accessibilityState={{ selected: !selectedCategory }}>
+          <Text style={[s.categoryChipText, !selectedCategory && s.categoryChipTextActive]}>All</Text>
+        </TouchableOpacity>
+        {CATEGORIES.map(cat => (
+          <CategoryChip key={cat} cat={cat} selected={selectedCategory === cat} onPress={handleCategoryPress(cat)} />
+        ))}
+      </ScrollView>
+
+      {filteredUnlocked.length > 0 && (
+        <Text style={s.sectionTitle} accessibilityRole="header">✅ Unlocked</Text>
+      )}
+    </>
+  ), [handleBack, handleCategoryAll, handleCategoryPress, progress, pct, selectedCategory, filteredUnlocked.length]);
+
+  const renderItem = useCallback(({ item }: { item: AchievementItem }) => {
+    const isFirstLocked = item._type === 'locked' && item.id === firstLockedId;
+    return (
+      <>
+        {isFirstLocked && <Text style={s.sectionTitle} accessibilityRole="header">🔒 Locked</Text>}
+        {renderAchievement({ item })}
+      </>
     );
+  }, [firstLockedId, renderAchievement]);
+
+  const keyExtractor  = useCallback((item: AchievementItem) => item.id, []);
+  const renderFooter  = useCallback(() => <View style={s.footer} />, []);
+  const renderEmpty   = useCallback(() => (
+    <View style={s.center}><Text style={s.emptyText}>No achievements found</Text></View>
+  ), []);
+
+  if (loading) {
+    return <View style={s.center}><ActivityIndicator size="large" color="#53a8b6" /></View>;
   }
 
   return (
@@ -87,98 +155,38 @@ export default function AchievementsScreen() {
       style={s.container}
       contentContainerStyle={s.content}
       data={listData}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={() => (
-        <>
-          <View style={s.header}>
-            <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
-              <Text style={s.backButton}>← Back</Text>
-            </TouchableOpacity>
-            <Text style={s.title} accessibilityRole="header">🏆 Achievements</Text>
-            <View style={{ width: 50 }} />
-          </View>
-
-          <View
-            style={s.progressCard}
-            accessibilityLabel={`Progress: ${progress.unlocked} of ${progress.total} unlocked, ${progress.points} points, ${pct}% complete`}
-          >
-            <View style={s.progressStats}>
-              {([
-                { n: progress.unlocked, l: 'Unlocked', c: '#eee' },
-                { n: progress.total,    l: 'Total',    c: '#eee' },
-                { n: progress.points,   l: 'Points',   c: '#e67e22' },
-              ] as const).map((item, i) => (
-                <React.Fragment key={item.l}>
-                  {i > 0 && <View style={s.progressDivider} />}
-                  <View style={s.progressStat}>
-                    <Text style={[s.progressNumber, { color: item.c }]}>{item.n}</Text>
-                    <Text style={s.progressLabel}>{item.l}</Text>
-                  </View>
-                </React.Fragment>
-              ))}
-            </View>
-            <View style={s.progressBarContainer}>
-              <View style={[s.progressBar, { width: `${pct}%` }]} />
-            </View>
-            <Text style={s.progressPercent}>{pct}% Complete</Text>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll}>
-            <TouchableOpacity
-              style={[s.categoryChip, !selectedCategory && s.categoryChipActive]}
-              onPress={() => setCategory(null)}
-              accessibilityLabel="Show all categories"
-              accessibilityRole="button"
-              accessibilityState={{ selected: !selectedCategory }}
-            >
-              <Text style={[s.categoryChipText, !selectedCategory && s.categoryChipTextActive]}>All</Text>
-            </TouchableOpacity>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={[s.categoryChip, selectedCategory === cat && s.categoryChipActive]}
-                onPress={() => setCategory(cat)}
-                accessibilityLabel={`Filter by ${cat}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: selectedCategory === cat }}
-              >
-                <Text style={[s.categoryChipText, selectedCategory === cat && s.categoryChipTextActive]}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {filteredUnlocked.length > 0 && (
-            <Text style={s.sectionTitle} accessibilityRole="header">✅ Unlocked</Text>
-          )}
-        </>
-      )}
-      renderItem={({ item }) => {
-        const isFirstLocked = item._type === 'locked' && item.id === firstLockedId;
-        return (
-          <>
-            {isFirstLocked && <Text style={s.sectionTitle} accessibilityRole="header">🔒 Locked</Text>}
-            {renderAchievement({ item })}
-          </>
-        );
-      }}
-      ListEmptyComponent={
-        <View style={s.center}>
-          <Text style={s.emptyText}>No achievements found</Text>
-        </View>
-      }
-      ListFooterComponent={() => <View style={{ height: 50 }} />}
+      keyExtractor={keyExtractor}
+      ListHeaderComponent={renderHeader}
+      renderItem={renderItem}
+      ListEmptyComponent={renderEmpty}
+      ListFooterComponent={renderFooter}
     />
   );
 }
+
+const CategoryChip = React.memo(({ cat, selected, onPress }: {
+  cat: string; selected: boolean; onPress: () => void;
+}) => (
+  <TouchableOpacity
+    style={[s.categoryChip, selected && s.categoryChipActive]}
+    onPress={onPress}
+    accessibilityLabel={`Filter by ${cat}`} accessibilityRole="button"
+    accessibilityState={{ selected }}>
+    <Text style={[s.categoryChipText, selected && s.categoryChipTextActive]}>
+      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+    </Text>
+  </TouchableOpacity>
+));
+CategoryChip.displayName = 'CategoryChip';
 
 const s = StyleSheet.create({
   container:                    { flex: 1, backgroundColor: '#1a1a2e' },
   center:                       { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
   content:                      { padding: 20 },
+  footer:                       { height: 50 },
   emptyText:                    { color: '#666', fontSize: 16 },
   header:                       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 40, marginBottom: 20 },
+  headerSpacer:                 { width: 50 },
   backButton:                   { color: '#53a8b6', fontSize: 16 },
   title:                        { fontSize: 22, fontWeight: 'bold', color: '#eee' },
   progressCard:                 { backgroundColor: '#16213e', borderRadius: 15, padding: 20, marginBottom: 20, borderWidth: 2, borderColor: '#e67e22' },

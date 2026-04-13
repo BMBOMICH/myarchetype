@@ -18,15 +18,15 @@ export async function rankPhotosByQuality(photos: string[]): Promise<Array<{ uri
   for (const uri of photos) {
     try {
       let width = 0, height = 0, bytes = 0;
-      const doc = (globalThis as any).document;
-      if (doc) {
+      const domDoc = (globalThis as { document?: Document }).document;
+      if (domDoc) {
         await new Promise<void>(res => {
-          const img = doc.createElement('img');
+          const img = domDoc.createElement('img');
           img.onload = () => { width = img.naturalWidth; height = img.naturalHeight; res(); };
           img.onerror = () => res();
           img.src = uri;
         });
-        try { const r = await fetch(uri, { method: 'HEAD' }); bytes = parseInt(r.headers.get('content-length') ?? '0'); } catch {}
+        try { const r = await fetch(uri, { method: 'HEAD' }); bytes = parseInt(r.headers.get('content-length') ?? '0', 10); } catch { /* ignore */ }
       }
       const q = scorePhotoQuality({ width, height, bytes });
       results.push({ uri, score: q.score, issues: q.issues });
@@ -40,7 +40,6 @@ export async function validateNewPhoto(newUri: string, existing: string[], cloud
   const dup = await checkNewPhotoDuplicate(newUri, existing);
   if (dup.isDuplicate) return { valid: false, isDuplicate: true, qualityScore: 0, qualityIssues: [], reason: 'This photo is too similar to one you already have.' };
   const q = scorePhotoQuality({ width: cloudinaryData?.width, height: cloudinaryData?.height, bytes: cloudinaryData?.bytes, format: cloudinaryData?.format });
-  // #33: Photo freshness
   if (cloudinaryData?.exifTimestamp) {
     const d = new Date(cloudinaryData.exifTimestamp.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'));
     if (!isNaN(d.getTime())) {
@@ -64,13 +63,12 @@ export async function getSmartPhotoSuggestions(userId?: string): Promise<SmartPh
     const scores: Record<string, number> = {};
     const lowQuality: string[] = [];
     for (const r of ranked) { scores[r.uri] = r.score; if (r.score < 40) lowQuality.push(r.uri); }
-    // #14: Find duplicates
     const duplicates: string[] = [];
     const hashes: string[] = [];
     for (const photo of photos) {
       const hash = await computeImageHash(photo);
       if (!hash) continue;
-      const isDup = hashes.some(h => { let d = 0; for (let i = 0; i < h.length; i++) if (h[i] !== hash[i]) d++; return Math.round(((64-d)/64)*100) >= 90; });
+      const isDup = hashes.some(h => { let d = 0; for (let i = 0; i < h.length; i++) if (h[i] !== hash[i]) d++; return Math.round(((64 - d) / 64) * 100) >= 90; });
       if (isDup) duplicates.push(photo); else hashes.push(hash);
     }
     const recommended = ranked.filter(r => !duplicates.includes(r.uri)).slice(0, 3).map(r => r.uri);
