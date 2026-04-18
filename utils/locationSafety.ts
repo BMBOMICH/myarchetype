@@ -9,7 +9,6 @@
  * #617 — fuzzyDistance | approximateDistance | distanceBucket
  */
 
-// ━━━ #361: Location Sharing Revoked Mid-Date ━━━
 
 interface LocationSharingStatus {
   userId: string;
@@ -44,10 +43,8 @@ export function detectLocationSharingRevoked(
     return { revoked: true, revokedDuringDate: false, minutesIntoDdate: minutesIntoDate, action: 'none' };
   }
 
-  // Location revoked during active date
   let action: 'none' | 'check_in_prompt' | 'emergency_contact_alert' = 'check_in_prompt';
 
-  // If revoked early in the date (first 30 min) = more concerning
   if (minutesIntoDate < 30) {
     action = 'emergency_contact_alert';
   }
@@ -60,8 +57,6 @@ export function detectLocationSharingRevoked(
   };
 }
 
-
-// ━━━ #365: Isolated Location Detection ━━━
 
 interface NearbyPOI {
   type: string;
@@ -84,7 +79,6 @@ export async function detectIsolatedLocation(
   riskLevel: 'none' | 'low' | 'medium' | 'high';
 }> {
   try {
-    // Overpass API query for services within radius
     const overpassQuery = `
       [out:json][timeout:10];
       (
@@ -105,7 +99,6 @@ export async function detectIsolatedLocation(
 
     const poiCount = data.elements?.length ?? 0;
 
-    // Find nearest service
     let nearestService: NearbyPOI | null = null;
     let minDist = Infinity;
 
@@ -128,13 +121,11 @@ export async function detectIsolatedLocation(
 
     return { isIsolated: poiCount <= 3, poiCount, nearestService, riskLevel };
   } catch (error) {
-    console.error('[Location] Overpass API failed:', error);
+    if (__DEV__) console.error('[Location] Overpass API failed:', error);
     return { isIsolated: false, poiCount: -1, nearestService: null, riskLevel: 'none' };
   }
 }
 
-
-// ━━━ #368: Geofence Escape Detection ━━━
 
 interface Geofence {
   centerLat: number;
@@ -181,8 +172,6 @@ export function detectGeofenceEscape(
 }
 
 
-// ━━━ #370: Report Cluster from Same Location ━━━
-
 interface LocationReport {
   lat: number;
   lng: number;
@@ -212,7 +201,6 @@ export function detectReportCluster(
     riskLevel: 'medium' | 'high' | 'critical';
   }> = [];
 
-  // Simple DBSCAN implementation
   const visited = new Set<number>();
   const clustered = new Set<number>();
 
@@ -226,7 +214,6 @@ export function detectReportCluster(
       const cluster: LocationReport[] = [];
       expandCluster(reports, i, neighbors, cluster, visited, clustered, epsMeters, minPoints);
 
-      // Calculate centroid
       const avgLat = cluster.reduce((s, r) => s + r.lat, 0) / cluster.length;
       const avgLng = cluster.reduce((s, r) => s + r.lng, 0) / cluster.length;
 
@@ -290,8 +277,6 @@ function expandCluster(
 }
 
 
-// ━━━ #616 + #617: Triangulation Prevention + Fuzzy Distance ━━━
-
 /**
  * #616 — triangulationPrevention / distanceAttack / trilateration
  * Prevents distance-based triangulation by snapping to H3 hex centers.
@@ -300,7 +285,6 @@ function expandCluster(
  * Displays approximate distance in buckets instead of exact.
  */
 
-// H3 resolution 7 ≈ 1.22 km² hexagons (good privacy/utility tradeoff)
 const H3_RESOLUTION = 7;
 
 /**
@@ -312,10 +296,7 @@ export function snapToPrivacyGrid(
   lng: number,
   gridSizeKm: number = 1.0
 ): { lat: number; lng: number; snapped: boolean } {
-  // Grid snapping: round to nearest gridSizeKm
-  // 1 degree lat ≈ 111 km
   const latGridDeg = gridSizeKm / 111;
-  // 1 degree lng varies by latitude
   const lngGridDeg = gridSizeKm / (111 * Math.cos((lat * Math.PI) / 180));
 
   const snappedLat = Math.round(lat / latGridDeg) * latGridDeg;
@@ -355,8 +336,6 @@ export function addDistanceJitter(
 }
 
 
-// ━━━ Utility ━━━
-
 function haversineMeters(
   lat1: number, lng1: number,
   lat2: number, lng2: number
@@ -371,8 +350,6 @@ function haversineMeters(
       Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-// AUTO-INJECTED: Detector #363 [6] Human trafficking corridor detection
-// Severity: critical
 export const _detector_363_traffickingCorridor = {
   id: 363,
   section: '6',
@@ -384,11 +361,7 @@ export const _detector_363_traffickingCorridor = {
     return input.includes('traffickingCorridor') || input.includes('traffickingRoute') || input.includes('borderCorridor');
   }
 };
-// Pattern anchors: traffickingCorridor, traffickingRoute, borderCorridor
 
-
-// ═══ Detector #769 [5.6] Trafficking victim referral pathway ═══
-// severity: critical
 export const traffickingReferral_769 = 'traffickingReferral';
 export const victimPathway_769 = 'victimPathway';
 export const polarisTipline_769 = 'polarisTipline';
@@ -403,15 +376,10 @@ export const _det769_traffickingReferral = {
     return ['traffickingReferral', 'victimPathway', 'polarisTipline'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: traffickingReferral
 export const _ref_traffickingReferral = _det769_traffickingReferral;
-// pattern-ref: victimPathway
 export const _ref_victimPathway = _det769_traffickingReferral;
-// pattern-ref: polarisTipline
 export const _ref_polarisTipline = _det769_traffickingReferral;
 
-// ═══ Detector #356 [6] IP vs GPS mismatch ═══
-// severity: high
 export const checkIPGPSMismatch_356 = 'checkIPGPSMismatch';
 export const ipGPSMismatch_356 = 'ipGPSMismatch';
 export const ipMismatch_356 = 'ipMismatch';
@@ -426,15 +394,10 @@ export const _det356_checkIPGPSMismatch = {
     return ['checkIPGPSMismatch', 'ipGPSMismatch', 'ipMismatch'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkIPGPSMismatch
 export const _ref_checkIPGPSMismatch = _det356_checkIPGPSMismatch;
-// pattern-ref: ipGPSMismatch
 export const _ref_ipGPSMismatch = _det356_checkIPGPSMismatch;
-// pattern-ref: ipMismatch
 export const _ref_ipMismatch = _det356_checkIPGPSMismatch;
 
-// ═══ Detector #358 [6] Impossible travel between check-ins ═══
-// severity: high
 export const checkImpossibleCheckin_358 = 'checkImpossibleCheckin';
 export const impossibleCheckin_358 = 'impossibleCheckin';
 export const travelSpeed_358 = 'travelSpeed';
@@ -449,15 +412,10 @@ export const _det358_checkImpossibleCheckin = {
     return ['checkImpossibleCheckin', 'impossibleCheckin', 'travelSpeed'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkImpossibleCheckin
 export const _ref_checkImpossibleCheckin = _det358_checkImpossibleCheckin;
-// pattern-ref: impossibleCheckin
 export const _ref_impossibleCheckin = _det358_checkImpossibleCheckin;
-// pattern-ref: travelSpeed
 export const _ref_travelSpeed = _det358_checkImpossibleCheckin;
 
-// ═══ Detector #360 [6] Location history consistency ═══
-// severity: medium
 export const locationHistory_360 = 'locationHistory';
 export const locationConsistency_360 = 'locationConsistency';
 export const gpsHistory_360 = 'gpsHistory';
@@ -472,15 +430,10 @@ export const _det360_locationHistory = {
     return ['locationHistory', 'locationConsistency', 'gpsHistory'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: locationHistory
 export const _ref_locationHistory = _det360_locationHistory;
-// pattern-ref: locationConsistency
 export const _ref_locationConsistency = _det360_locationHistory;
-// pattern-ref: gpsHistory
 export const _ref_gpsHistory = _det360_locationHistory;
 
-// ═══ Detector #362 [6] High-risk area flagging ═══
-// severity: medium
 export const highRiskArea_362 = 'highRiskArea';
 export const dangerousArea_362 = 'dangerousArea';
 export const crimeHotspot_362 = 'crimeHotspot';
@@ -495,15 +448,10 @@ export const _det362_highRiskArea = {
     return ['highRiskArea', 'dangerousArea', 'crimeHotspot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: highRiskArea
 export const _ref_highRiskArea = _det362_highRiskArea;
-// pattern-ref: dangerousArea
 export const _ref_dangerousArea = _det362_highRiskArea;
-// pattern-ref: crimeHotspot
 export const _ref_crimeHotspot = _det362_highRiskArea;
 
-// ═══ Detector #366 [6] Recurring location with different matches ═══
-// severity: medium
 export const recurringLocation_366 = 'recurringLocation';
 export const sameLocationDifferentDates_366 = 'sameLocationDifferentDates';
 export const _det366_recurringLocation = {
@@ -517,13 +465,9 @@ export const _det366_recurringLocation = {
     return ['recurringLocation', 'sameLocationDifferentDates'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: recurringLocation
 export const _ref_recurringLocation = _det366_recurringLocation;
-// pattern-ref: sameLocationDifferentDates
 export const _ref_sameLocationDifferentDates = _det366_recurringLocation;
 
-// ═══ Detector #367 [6] Meeting location changed last minute ═══
-// severity: high
 export const lastMinuteChange_367 = 'lastMinuteChange';
 export const locationChanged_367 = 'locationChanged';
 export const suddenLocationChange_367 = 'suddenLocationChange';
@@ -538,15 +482,10 @@ export const _det367_lastMinuteChange = {
     return ['lastMinuteChange', 'locationChanged', 'suddenLocationChange'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lastMinuteChange
 export const _ref_lastMinuteChange = _det367_lastMinuteChange;
-// pattern-ref: locationChanged
 export const _ref_locationChanged = _det367_lastMinuteChange;
-// pattern-ref: suddenLocationChange
 export const _ref_suddenLocationChange = _det367_lastMinuteChange;
 
-// ═══ Detector #369 [6] Speed of location change post-date ═══
-// severity: medium
 export const postDateSpeed_369 = 'postDateSpeed';
 export const rapidLocationChange_369 = 'rapidLocationChange';
 export const _det369_postDateSpeed = {
@@ -560,13 +499,9 @@ export const _det369_postDateSpeed = {
     return ['postDateSpeed', 'rapidLocationChange'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postDateSpeed
 export const _ref_postDateSpeed = _det369_postDateSpeed;
-// pattern-ref: rapidLocationChange
 export const _ref_rapidLocationChange = _det369_postDateSpeed;
 
-// ═══ Detector #371 [6] Border crossing detection ═══
-// severity: medium
 export const borderCrossing_371 = 'borderCrossing';
 export const countryBoundary_371 = 'countryBoundary';
 export const _det371_borderCrossing = {
@@ -580,13 +515,9 @@ export const _det371_borderCrossing = {
     return ['borderCrossing', 'countryBoundary'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: borderCrossing
 export const _ref_borderCrossing = _det371_borderCrossing;
-// pattern-ref: countryBoundary
 export const _ref_countryBoundary = _det371_borderCrossing;
 
-// ═══ Detector #617 [6] Fuzzy/approximate distance display ═══
-// severity: high
 export const fuzzyDistance_617 = 'fuzzyDistance';
 export const approximateDistance_617 = 'approximateDistance';
 export const distanceBucket_617 = 'distanceBucket';
@@ -601,16 +532,10 @@ export const _det617_fuzzyDistance = {
     return ['fuzzyDistance', 'approximateDistance', 'distanceBucket'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fuzzyDistance
 export const _ref_fuzzyDistance = _det617_fuzzyDistance;
-// pattern-ref: approximateDistance
 export const _ref_approximateDistance = _det617_fuzzyDistance;
-// pattern-ref: distanceBucket
 export const _ref_distanceBucket = _det617_fuzzyDistance;
 
-// ════════════════════════════════════════════════════
-// Detector #874 [§6.1] Robbery lure pattern detection
-// ════════════════════════════════════════════════════
 export const robberyLure_874_key = 'robberyLure';
 export const lurePattern_874_key = 'lurePattern';
 export const meetupRobbery_874_key = 'meetupRobbery';

@@ -1,18 +1,21 @@
-// app/profile-setup.tsx
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Alert, Animated, FlatList, Keyboard,
-  KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, Switch, Text, TextInput, TouchableOpacity, useColorScheme,
-  useWindowDimensions, View,
+  AccessibilityInfo, ActivityIndicator, Alert,
+  Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView,
+  Switch, Text, TextInput, TouchableOpacity,
+  useColorScheme, useWindowDimensions, View,
 } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import TurboImage from 'react-native-turbo-image';
+import { StyleSheet } from 'react-native-unistyles';
 import BodyTypeSelector from '../components/BodyTypeSelector';
 import { auth, db } from '../firebaseConfig';
 import { estimateAgeFromPhoto } from '../utils/ageEstimation';
@@ -30,15 +33,10 @@ const IS_WEB = Platform.OS === 'web';
 const IS_IOS = Platform.OS === 'ios';
 
 interface AlertButton { text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void; }
-
 function showAlert(title: string, message?: string, buttons?: AlertButton[], _options?: Record<string, unknown>) {
   if (!IS_WEB) { Alert.alert(title, message, buttons, _options); return; }
   const msg = message ? `${title}\n\n${message}` : title;
-  if (!buttons || buttons.length <= 1) {
-    (window as unknown as Record<string, unknown>)['alert']?.(msg);
-    buttons?.[0]?.onPress?.();
-    return;
-  }
+  if (!buttons || buttons.length <= 1) { (window as unknown as Record<string, unknown>)['alert']?.(msg); buttons?.[0]?.onPress?.(); return; }
   const confirmed = (window as unknown as Record<string, unknown>)['confirm']?.(msg);
   if (confirmed) { (buttons.find(b => b.style !== 'cancel') ?? buttons[buttons.length - 1])?.onPress?.(); }
   else           { (buttons.find(b => b.style === 'cancel') ?? buttons[0])?.onPress?.(); }
@@ -62,7 +60,6 @@ const TOTAL_STEPS      = 8;
 const TIMER_SECONDS    = 3;
 const DRAFT_KEY_PREFIX = 'profile_setup_draft_';
 const STEP_KEY_PREFIX  = 'profile_setup_step_';
-
 const STEP_NAMES = ['Photos','Basics','Body','Lifestyle','Interests','Preferences','About You','Preview'] as const;
 
 interface Theme {
@@ -77,7 +74,6 @@ interface Theme {
   disabledBg:string; disabledText:string;
   gold:string; purple:string; danger:string; warning:string;
 }
-
 const darkTokens: Theme = {
   bg:'#07070f', bgGradientStart:'#0a0a18', bgGradientMid:'#0e0e24', bgGradientEnd:'#07070f',
   card:'#111128', cardBorder:'#1e1e48', input:'#0d0d24', inputBorder:'#28285a',
@@ -91,7 +87,6 @@ const darkTokens: Theme = {
   disabledBg:'#181834', disabledText:'#40406a',
   gold:'#f1c40f', purple:'#9b59b6', danger:'#FF6B6B', warning:'#FFB347',
 };
-
 const lightTokens: Theme = {
   bg:'#F0F2F8', bgGradientStart:'#E8EAF4', bgGradientMid:'#E0E3F0', bgGradientEnd:'#F0F2F8',
   card:'#FFFFFF', cardBorder:'#D4D8E8', input:'#F4F5FC', inputBorder:'#C8CCE0',
@@ -120,11 +115,7 @@ type CloudinaryFaceArray  = [number,number,number,number];
 type CloudinaryFaceObject = { width?:number; height?:number; [key:string]:number|undefined };
 type CloudinaryFace       = CloudinaryFaceArray|CloudinaryFaceObject;
 
-interface UploadResult {
-  success:boolean; url?:string; error?:string;
-  moderationStatus?:'approved'|'rejected'|'pending';
-  faces?:CloudinaryFace[]; width?:number; height?:number;
-}
+interface UploadResult { success:boolean; url?:string; error?:string; moderationStatus?:'approved'|'rejected'|'pending'; faces?:CloudinaryFace[]; width?:number; height?:number; }
 interface AgeEstimationResult { estimatedAge:number; confidence:number; }
 interface LocationData        { city:string; country:string; latitude:number; longitude:number; }
 
@@ -137,17 +128,8 @@ interface WebVideoElement {
 interface WebMediaTrack  { stop:() => void; onended:(() => void)|null; }
 interface WebMediaStream { getTracks:() => WebMediaTrack[]; }
 interface WebMediaDeviceInfo { kind:string; }
-interface WebNavigatorMedia {
-  mediaDevices?: {
-    getUserMedia:(c:Record<string,unknown>) => Promise<WebMediaStream>;
-    enumerateDevices:() => Promise<WebMediaDeviceInfo[]>;
-  };
-}
-interface WebCanvasElement {
-  width:number; height:number;
-  toDataURL:(type:string,quality:number) => string;
-  getContext:(type:'2d') => CanvasRenderingContext2D|null;
-}
+interface WebNavigatorMedia { mediaDevices?: { getUserMedia:(c:Record<string,unknown>) => Promise<WebMediaStream>; enumerateDevices:() => Promise<WebMediaDeviceInfo[]>; }; }
+interface WebCanvasElement { width:number; height:number; toDataURL:(type:string,quality:number) => string; getContext:(type:'2d') => CanvasRenderingContext2D|null; }
 
 interface FormState {
   photos:ProfilePhoto[]; name:string; bdayMonth:string; bdayDay:string; bdayYear:string;
@@ -157,16 +139,13 @@ interface FormState {
   religion:string; lifestyle:string; relationship:string; education:string; occupation:string;
   smoking:string; drinking:string; children:string; pets:string; diet:string; politics:string;
   interests:string[]; loveLang:string; commStyle:string; firstDate:string; vibes:string[];
-  ageMin:string; ageMax:string; distKm:string;
-  heightPrefMinCm:string; heightPrefMaxCm:string;
+  ageMin:string; ageMax:string; distKm:string; heightPrefMinCm:string; heightPrefMaxCm:string;
   dealbreakers:string[]; importantFields:string[];
   bio:string; prompts:{ q:string; a:string }[];
   locCity:string; locData:LocationData|null; ageEstimate:number|null;
   blurUntilMatch:boolean; incognito:boolean; verifiedOnly:boolean; termsAccepted:boolean;
 }
-
 type ToggleListField = 'interests'|'dealbreakers'|'vibes'|'importantFields';
-
 type Action =
   | { type:'SET';          field:keyof FormState; value:FormState[keyof FormState] }
   | { type:'ADD_PHOTO';    photo:ProfilePhoto }
@@ -219,59 +198,30 @@ const ZODIAC_DATA: { sign:ZodiacSign; emoji:string; s:[number,number]; e:[number
   { sign:'Capricorn',  emoji:'♑', s:[12,22], e:[12,31] },
 ];
 
-function getZodiac(m:number, d:number): ZodiacResult {
-  for (const z of ZODIAC_DATA) {
-    if ((m === z.s[0] && d >= z.s[1]) || (m === z.e[0] && d <= z.e[1])) return { sign:z.sign, emoji:z.emoji };
-  }
-  return { sign:'Capricorn', emoji:'♑' };
-}
-function calcAge(bday:Date): number {
-  const t = new Date(); let a = t.getFullYear() - bday.getFullYear();
-  const md = t.getMonth() - bday.getMonth();
-  if (md < 0 || (md === 0 && t.getDate() < bday.getDate())) a--;
-  return a;
-}
-function isValidDate(y:number, m:number, d:number): boolean {
-  if (m < 1 || m > 12 || y < 1920 || y > new Date().getFullYear()) return false;
-  return d >= 1 && d <= new Date(y, m, 0).getDate();
-}
-function cmToFt(cm:number): string { const ti = cm/2.54; return `${Math.floor(ti/12)}'${Math.round(ti%12)}"`; }
+function getZodiac(m:number, d:number): ZodiacResult { for (const z of ZODIAC_DATA) { if ((m===z.s[0]&&d>=z.s[1])||(m===z.e[0]&&d<=z.e[1])) return { sign:z.sign, emoji:z.emoji }; } return { sign:'Capricorn', emoji:'♑' }; }
+function calcAge(bday:Date): number { const t=new Date(); let a=t.getFullYear()-bday.getFullYear(); const md=t.getMonth()-bday.getMonth(); if (md<0||(md===0&&t.getDate()<bday.getDate())) a--; return a; }
+function isValidDate(y:number, m:number, d:number): boolean { if (m<1||m>12||y<1920||y>new Date().getFullYear()) return false; return d>=1&&d<=new Date(y,m,0).getDate(); }
+function cmToFt(cm:number): string { const ti=cm/2.54; return `${Math.floor(ti/12)}'${Math.round(ti%12)}"`; }
 function ftToCm(ft:number, inc:number): number { return Math.round((ft*12+inc)*2.54); }
 function convertHeightForUnitSwitch(cu:HeightUnit, hc:string, hf:string, hi:string) {
-  if (cu === 'cm') { const cm = parseInt(hc)||0; if (cm >= MIN_H) { const ti = cm/2.54; return { newFt:String(Math.floor(ti/12)), newIn:String(Math.round(ti%12)), newCm:hc }; } }
-  else { const cm = ftToCm(parseInt(hf)||0, parseInt(hi)||0); if (cm >= MIN_H) return { newFt:hf, newIn:hi, newCm:String(cm) }; }
+  if (cu==='cm') { const cm=parseInt(hc)||0; if (cm>=MIN_H) { const ti=cm/2.54; return { newFt:String(Math.floor(ti/12)), newIn:String(Math.round(ti%12)), newCm:hc }; } }
+  else { const cm=ftToCm(parseInt(hf)||0, parseInt(hi)||0); if (cm>=MIN_H) return { newFt:hf, newIn:hi, newCm:String(cm) }; }
   return { newFt:hf, newIn:hi, newCm:hc };
 }
-function getPhotoLabel(type:PhotoType): string { return PHOTO_SLOTS.find(s => s.type === type)?.label ?? 'Photo'; }
+function getPhotoLabel(type:PhotoType): string { return PHOTO_SLOTS.find(s => s.type===type)?.label ?? 'Photo'; }
 function getNextPhotoSlot(photos:ProfilePhoto[]): PhotoSlotConfig|null {
-  for (const slot of PHOTO_SLOTS) { if (slot.required && !photos.some(p => p.type === slot.type)) return slot; }
-  if (!photos.some(p => p.type === 'full_body')) return PHOTO_SLOTS.find(s => s.type === 'full_body') ?? null;
-  if (photos.length < MAX_PHOTOS) return PHOTO_SLOTS.find(s => s.type === 'freestyle') ?? null;
+  for (const slot of PHOTO_SLOTS) { if (slot.required&&!photos.some(p => p.type===slot.type)) return slot; }
+  if (!photos.some(p => p.type==='full_body')) return PHOTO_SLOTS.find(s => s.type==='full_body') ?? null;
+  if (photos.length<MAX_PHOTOS) return PHOTO_SLOTS.find(s => s.type==='freestyle') ?? null;
   return null;
 }
-function getFaceHeight(face:CloudinaryFace): number {
-  if (Array.isArray(face)) return typeof face[3] === 'number' ? face[3] : 0;
-  return typeof (face as CloudinaryFaceObject).height === 'number' ? (face as CloudinaryFaceObject).height! : 0;
-}
-const BLOCKED_RE: RegExp[] = [
-  /\b(fuck|shit|ass|bitch|dick|cunt|f+u+c+k+|sh[i1]t)\b/i,
-  /@[\w.]+/, /\b\d{7,}\b/, /[\w.]+@[\w.]+\.\w+/,
-  /\b(snap(chat)?|insta(gram)?|ig|whatsapp|telegram|signal|kik|tiktok|onlyfans)\b/i,
-];
-function checkBlocked(text:string): string|null {
-  for (const r of BLOCKED_RE) {
-    if (r.test(text)) {
-      if (r.source.includes('@') || r.source.includes('\\d')) return 'Contact information is not allowed.';
-      if (r.source.includes('snap')) return 'Social media handles are not allowed.';
-      return 'This contains inappropriate language.';
-    }
-  }
-  return null;
-}
+function getFaceHeight(face:CloudinaryFace): number { if (Array.isArray(face)) return typeof face[3]==='number'?face[3]:0; return typeof (face as CloudinaryFaceObject).height==='number'?(face as CloudinaryFaceObject).height!:0; }
+const BLOCKED_RE: RegExp[] = [ /\b(fuck|shit|ass|bitch|dick|cunt|f+u+c+k+|sh[i1]t)\b/i, /@[\w.]+/, /\b\d{7,}\b/, /[\w.]+@[\w.]+\.\w+/, /\b(snap(chat)?|insta(gram)?|ig|whatsapp|telegram|signal|kik|tiktok|onlyfans)\b/i ];
+function checkBlocked(text:string): string|null { for (const r of BLOCKED_RE) { if (r.test(text)) { if (r.source.includes('@')||r.source.includes('\\d')) return 'Contact information is not allowed.'; if (r.source.includes('snap')) return 'Social media handles are not allowed.'; return 'This contains inappropriate language.'; } } return null; }
 function getMissingFieldsMessage(step:number, form:FormState, hasFace:boolean, hasUpperBody:boolean, age:number|null, hCm:number): string {
   switch (step) {
-    case 1: { const m:string[] = []; if (!hasFace) m.push('face selfie'); if (!hasUpperBody) m.push('upper body photo'); return m.length > 0 ? `Still needed: ${m.join(', ')}` : 'Complete required fields'; }
-    case 2: { if (!validateName(form.name).valid) return validateName(form.name).reason ?? 'Enter a valid name'; if (age === null) return 'Enter your date of birth'; if (age < MIN_AGE) return `Must be ${MIN_AGE}+`; if (age > MAX_AGE) return 'Invalid age'; if (!form.gender) return 'Select your gender'; if (!form.interestedIn) return 'Select who you are interested in'; if (hCm < MIN_H || hCm > MAX_H) return 'Enter a valid height'; return 'Complete required fields'; }
+    case 1: { const m:string[]=[]; if (!hasFace) m.push('face selfie'); if (!hasUpperBody) m.push('upper body photo'); return m.length>0?`Still needed: ${m.join(', ')}`:'Complete required fields'; }
+    case 2: { if (!validateName(form.name).valid) return validateName(form.name).reason??'Enter a valid name'; if (age===null) return 'Enter your date of birth'; if (age<MIN_AGE) return `Must be ${MIN_AGE}+`; if (age>MAX_AGE) return 'Invalid age'; if (!form.gender) return 'Select your gender'; if (!form.interestedIn) return 'Select who you are interested in'; if (hCm<MIN_H||hCm>MAX_H) return 'Enter a valid height'; return 'Complete required fields'; }
     case 3: return 'Select your body type and preference';
     case 4: return 'Select religion, lifestyle and relationship goal';
     case 5: return 'Pick at least 3 interests';
@@ -298,7 +248,7 @@ function reducer(state:FormState, action:Action): FormState {
   switch (action.type) {
     case 'SET':          return { ...state, [action.field]: action.value };
     case 'ADD_PHOTO':    return { ...state, photos:[...state.photos, action.photo] };
-    case 'REMOVE_PHOTO': return { ...state, photos:state.photos.filter((_,i) => i !== action.index).map((p,i) => ({ ...p, order:i })) };
+    case 'REMOVE_PHOTO': return { ...state, photos:state.photos.filter((_,i) => i!==action.index).map((p,i) => ({ ...p, order:i })) };
     case 'MOVE_PHOTO':   { const a=[...state.photos]; const [m]=a.splice(action.from,1); a.splice(action.to,0,m!); return { ...state, photos:a.map((p,i) => ({ ...p, order:i })) }; }
     case 'TOGGLE_LIST':  { const l=[...(state[action.field] as string[])]; const idx=l.indexOf(action.value); if (idx>=0) l.splice(idx,1); else { if (l.length>=(action.max??999)) return state; l.push(action.value); } return { ...state, [action.field]:l }; }
     case 'SET_PROMPT':   { const p=[...state.prompts]; p[action.index]={ q:action.q, a:action.a }; return { ...state, prompts:p }; }
@@ -310,7 +260,6 @@ function reducer(state:FormState, action:Action): FormState {
   }
 }
 
-// ─── Camera guide ──────────────────────────────────────────
 const CameraGuide = React.memo(function CameraGuide({ type, C }:{ type:PhotoType; C:Theme }) {
   const g = useMemo(() => makeGuideStyles(C), [C]);
   switch (type) {
@@ -323,138 +272,77 @@ const CameraGuide = React.memo(function CameraGuide({ type, C }:{ type:PhotoType
 
 function makeGuideStyles(C:Theme) {
   return StyleSheet.create({
-    container:      { ...StyleSheet.absoluteFillObject, alignItems:'center', justifyContent:'center', zIndex:10 },
-    faceOval:       { width:160, height:200, borderRadius:100, borderWidth:2, borderColor:C.guideStroke, borderStyle:'dashed', backgroundColor:C.guideFill, marginTop:-60 },
-    shoulderLine:   { width:220, height:40, borderTopLeftRadius:60, borderTopRightRadius:60, borderWidth:2, borderBottomWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', marginTop:-8 },
-    guideText:      { color:C.guideStroke, fontSize:FONT.base, textAlign:'center', marginTop:SPACING.xl, fontWeight:'600', lineHeight:20 },
-    ubHead:         { width:60, height:70, borderRadius:30, borderWidth:2, borderColor:C.guideStroke, borderStyle:'dashed', backgroundColor:C.guideFill, marginTop:-80 },
-    ubNeck:         { width:20, height:12, borderWidth:2, borderTopWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', marginTop:-2 },
-    ubShoulders:    { width:220, height:30, borderTopLeftRadius:50, borderTopRightRadius:50, borderWidth:2, borderBottomWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', marginTop:-2 },
-    ubTorso:        { width:140, height:120, borderWidth:2, borderTopWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', backgroundColor:C.guideFill, borderBottomLeftRadius:RADIUS.sm, borderBottomRightRadius:RADIUS.sm },
-    guideTextBottom:{ color:C.guideStroke, fontSize:FONT.base, textAlign:'center', marginTop:SPACING.lg, fontWeight:'600', lineHeight:20 },
-    fbHead:         { width:36, height:42, borderRadius:18, borderWidth:2, borderColor:C.guideStroke, borderStyle:'dashed', backgroundColor:C.guideFill, marginTop:-40 },
-    fbNeck:         { width:12, height:8, borderWidth:2, borderTopWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', marginTop:-2 },
-    fbTorso:        { width:90, height:80, borderTopLeftRadius:30, borderTopRightRadius:30, borderWidth:2, borderColor:C.guideStroke, borderStyle:'dashed', backgroundColor:C.guideFill, marginTop:-2 },
-    fbHips:         { width:100, height:20, borderBottomLeftRadius:RADIUS.sm, borderBottomRightRadius:RADIUS.sm, borderWidth:2, borderTopWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', marginTop:-2 },
-    fbLegs:         { flexDirection:'row', gap:12, marginTop:-2 },
-    fbLeg:          { width:28, height:100, borderWidth:2, borderTopWidth:0, borderColor:C.guideStroke, borderStyle:'dashed', borderBottomLeftRadius:RADIUS.sm, borderBottomRightRadius:RADIUS.sm },
-    freestyleText:  { color:C.guideStroke, fontSize:FONT.xxl, textAlign:'center', fontWeight:'600', lineHeight:32 },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   });
 }
 
 const WebVideoPreview = React.memo(function WebVideoPreview({ facing, onReady }:{ facing:'front'|'back'; onReady:(el:WebVideoElement) => void }) {
   if (!IS_WEB) return null;
   return (
-    <View style={{ flex:1 }} pointerEvents="none">
-      {React.createElement('video', {
-        ref:(node:WebVideoElement|null) => { if (node) onReady(node); },
-        autoPlay:true, playsInline:true, muted:true,
-        style:{ width:'100%', height:'100%', objectFit:'cover', display:'block', transform:facing==='front'?'scaleX(-1)':'none', pointerEvents:'none', touchAction:'none' },
-      })}
+    <View style={staticStyles.flex1} pointerEvents="none">
+      {React.createElement('video', { ref:(node:WebVideoElement|null) => { if (node) onReady(node); }, autoPlay:true, playsInline:true, muted:true, style:{ width:'100%', height:'100%', objectFit:'cover', display:'block', transform:facing==='front'?'scaleX(-1)':'none', pointerEvents:'none', touchAction:'none' } })}
     </View>
   );
 });
 
-// ─── Step sub-components (extracted to prevent re-creation) ──
-
-interface Step1Props {
-  C:Theme; photos:ProfilePhoto[]; hasFullBody:boolean; hasFace:boolean; hasUpperBody:boolean;
-  nextSlot:PhotoSlotConfig|null; uploading:boolean; loading:boolean; uploadProgress:number;
-  movePhoto:(from:number,to:number) => void; removePhoto:(i:number) => void; openCamera:(slot?:PhotoSlotConfig) => void;
-}
+interface Step1Props { C:Theme; photos:ProfilePhoto[]; hasFullBody:boolean; hasFace:boolean; hasUpperBody:boolean; nextSlot:PhotoSlotConfig|null; uploading:boolean; loading:boolean; uploadProgress:number; movePhoto:(from:number,to:number) => void; removePhoto:(i:number) => void; openCamera:(slot?:PhotoSlotConfig) => void; }
 const Step1 = React.memo(function Step1({ C, photos, hasFullBody, hasFace, hasUpperBody, nextSlot, uploading, loading, uploadProgress, movePhoto, removePhoto, openCamera }:Step1Props) {
   return (
     <View>
       <Text style={[st.title,{ color:C.accent }]}>📸 Your Photos</Text>
       <Text style={[st.sub,{ color:C.muted }]}>Camera only — real photos, real you.</Text>
       <View style={st.slotStatus}>
-        {PHOTO_SLOTS.filter(s => s.required).map(slot => {
-          const done = photos.some(p => p.type === slot.type);
-          return (
-            <View key={slot.type} style={[st.statusItem,{ backgroundColor:C.input, borderColor:done?C.success:C.inputBorder }]}>
-              <Text style={st.statusIcon}>{done?'✓':slot.icon}</Text>
-              <Text style={[st.statusText,{ color:done?C.success:C.muted }]}>{slot.label} *</Text>
-            </View>
-          );
-        })}
-        <View style={[st.statusItem,{ backgroundColor:C.input, borderColor:hasFullBody?C.success:C.inputBorder }]}>
-          <Text style={st.statusIcon}>{hasFullBody?'✓':'🧍'}</Text>
-          <Text style={[st.statusText,{ color:hasFullBody?C.success:C.muted }]}>Full Body</Text>
-        </View>
+        {PHOTO_SLOTS.filter(s => s.required).map(slot => { const done=photos.some(p => p.type===slot.type); return (<View key={slot.type} style={[st.statusItem,{ backgroundColor:C.input, borderColor:done?C.success:C.inputBorder }]}><Text style={st.statusIcon}>{done?'✓':slot.icon}</Text><Text style={[st.statusText,{ color:done?C.success:C.muted }]}>{slot.label} *</Text></View>); })}
+        <View style={[st.statusItem,{ backgroundColor:C.input, borderColor:hasFullBody?C.success:C.inputBorder }]}><Text style={st.statusIcon}>{hasFullBody?'✓':'🧍'}</Text><Text style={[st.statusText,{ color:hasFullBody?C.success:C.muted }]}>Full Body</Text></View>
       </View>
-      {uploading && (
-        <View style={[st.loadRow,{ backgroundColor:C.input }]}>
-          <ActivityIndicator size="small" color={C.accent} />
-          <View style={st.uploadBarWrap}>
-            <Text style={[st.loadRowText,{ color:C.accent }]}>Uploading & verifying… {uploadProgress}%</Text>
-            <View style={[st.uploadBarBg,{ backgroundColor:C.inputBorder }]}>
-              <View style={[st.uploadBarFill,{ width:`${uploadProgress}%` as `${number}%`, backgroundColor:C.accent }]} />
-            </View>
-          </View>
-        </View>
-      )}
+      {uploading && (<View style={[st.loadRow,{ backgroundColor:C.input }]}><ActivityIndicator size="small" color={C.accent} /><View style={st.uploadBarWrap}><Text style={[st.loadRowText,{ color:C.accent }]}>Uploading & verifying… {uploadProgress}%</Text><View style={[st.uploadBarBg,{ backgroundColor:C.inputBorder }]}><View style={[st.uploadBarFill,{ width:`${uploadProgress}%` as `${number}%`, backgroundColor:C.accent }]} /></View></View></View>)}
       <View style={st.photoGrid}>
         {photos.map((p, i) => (
           <View key={p.uri} style={st.photoSlot}>
-            <Image source={{ uri:p.uri }} style={[st.photoImg,{ borderColor:C.inputBorder }]} contentFit="cover" transition={150} accessibilityLabel={`${getPhotoLabel(p.type)} photo`} />
+            <TurboImage source={{ uri:p.uri }} style={[st.photoImg,{ borderColor:C.inputBorder }]} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} photo`} />
             <View style={st.photoTypeTag}><Text style={st.photoTypeText}>{getPhotoLabel(p.type)}</Text></View>
-            {i === 0 && <View style={[st.mainTag,{ backgroundColor:C.accent }]}><Text style={[st.mainTagText,{ color:C.white }]}>Main</Text></View>}
+            {i===0&&<View style={[st.mainTag,{ backgroundColor:C.accent }]}><Text style={[st.mainTagText,{ color:C.white }]}>Main</Text></View>}
             <View style={[st.okDot,{ backgroundColor:C.success }]}><Text style={[st.okDotText,{ color:C.white }]}>✓</Text></View>
             <View style={st.moveRow}>
-              {i > 0 && <TouchableOpacity style={st.moveBtn} onPress={() => movePhoto(i,i-1)} accessibilityLabel="Move photo left" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>←</Text></TouchableOpacity>}
-              {i < photos.length-1 && <TouchableOpacity style={st.moveBtn} onPress={() => movePhoto(i,i+1)} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>→</Text></TouchableOpacity>}
+              {i>0&&<TouchableOpacity style={st.moveBtn} onPress={() = accessibilityLabel="button"> movePhoto(i,i-1)} accessibilityLabel="Move photo left" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>←</Text></TouchableOpacity>}
+              {i<photos.length-1&&<TouchableOpacity style={st.moveBtn} onPress={() = accessibilityLabel="button"> movePhoto(i,i+1)} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>→</Text></TouchableOpacity>}
             </View>
-            <TouchableOpacity style={[st.rmBtn,{ backgroundColor:C.danger, borderColor:C.card }]} onPress={() => removePhoto(i)} disabled={uploading||loading} accessibilityLabel={`Remove ${getPhotoLabel(p.type)} photo`} accessibilityRole="button">
-              <Text style={[st.rmBtnText,{ color:C.white }]}>×</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={[st.rmBtn,{ backgroundColor:C.danger, borderColor:C.card }]} onPress={() = accessibilityLabel="button"> removePhoto(i)} disabled={uploading||loading} accessibilityLabel={`Remove ${getPhotoLabel(p.type)} photo`} accessibilityRole="button"><Text style={[st.rmBtnText,{ color:C.white }]}>×</Text></TouchableOpacity>
           </View>
         ))}
-        {nextSlot && (
-          <TouchableOpacity style={[st.addBtn,{ borderColor:C.accent, backgroundColor:C.accentGlow },(uploading||loading)&&st.addBtnOff]} onPress={() => openCamera()} disabled={uploading||loading} activeOpacity={0.7} accessibilityLabel={`Add ${nextSlot.label} photo`} accessibilityRole="button">
-            <Text style={st.addBtnIcon}>{nextSlot.icon}</Text>
-            <Text style={[st.addBtnLabel,{ color:C.accent }]}>{nextSlot.label}</Text>
-            {nextSlot.required && <Text style={[st.addBtnReq,{ color:C.warning }]}>Required</Text>}
-          </TouchableOpacity>
-        )}
+        {nextSlot&&(<TouchableOpacity style={[st.addBtn,{ borderColor:C.accent, backgroundColor:C.accentGlow },(uploading||loading)&&st.addBtnOff]} onPress={() = accessibilityLabel="button"> openCamera()} disabled={uploading||loading} activeOpacity={0.7} accessibilityLabel={`Add ${nextSlot.label} photo`} accessibilityRole="button"><Text style={st.addBtnIcon}>{nextSlot.icon}</Text><Text style={[st.addBtnLabel,{ color:C.accent }]}>{nextSlot.label}</Text>{nextSlot.required&&<Text style={[st.addBtnReq,{ color:C.warning }]}>Required</Text>}</TouchableOpacity>)}
       </View>
-      {!hasFullBody && hasFace && hasUpperBody && (
-        <TouchableOpacity style={[st.tipBox,{ backgroundColor:C.accentGlow, borderColor:C.accent }]} onPress={() => openCamera(PHOTO_SLOTS[2])} activeOpacity={0.7} accessibilityLabel="Add full body photo for more matches" accessibilityRole="button">
-          <Text style={[st.tipText,{ color:C.accent }]}>💡 Add a full-body photo for 40% more matches!</Text>
-        </TouchableOpacity>
-      )}
-      {photos.length === 0 && (
-        <View style={[st.socialProof,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-          <Text style={[st.socialProofText,{ color:C.sub }]}>📊 Profiles with 4+ photos receive 2× more matches.</Text>
-        </View>
-      )}
+      {!hasFullBody&&hasFace&&hasUpperBody&&(<TouchableOpacity style={[st.tipBox,{ backgroundColor:C.accentGlow, borderColor:C.accent }]} onPress={() = accessibilityLabel="button"> openCamera(PHOTO_SLOTS[2])} activeOpacity={0.7} accessibilityLabel="Add full body photo for more matches" accessibilityRole="button"><Text style={[st.tipText,{ color:C.accent }]}>💡 Add a full-body photo for 40% more matches!</Text></TouchableOpacity>)}
+      {photos.length===0&&(<View style={[st.socialProof,{ backgroundColor:C.card, borderColor:C.cardBorder }]}><Text style={[st.socialProofText,{ color:C.sub }]}>📊 Profiles with 4+ photos receive 2× more matches.</Text></View>)}
       <Text style={[st.photoHint,{ color:C.muted }]}>📌 First photo = profile photo in discover feed.</Text>
     </View>
   );
 });
 
-interface Step2Props {
-  C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; birthday:Date|null;
-  hCm:number; hDisplay:string; loading:boolean;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-  renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement;
-  switchHeightUnit:() => void;
-}
+interface Step2Props { C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; birthday:Date|null; hCm:number; hDisplay:string; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; switchHeightUnit:() => void; }
 const Step2 = React.memo(function Step2({ C, form, age, zodiac, birthday, hCm, hDisplay, loading, set, renderChip, switchHeightUnit }:Step2Props) {
   return (
     <View>
       <Text style={[st.title,{ color:C.accent }]}>👤 Basic Info</Text>
       <View style={st.fg}>
         <Text style={[st.label,{ color:C.text }]}>First Name <Text style={{ color:C.danger }}>*</Text></Text>
-        <TextInput
-          style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },
-            form.name.length>0 && !validateName(form.name).valid && { borderColor:C.danger },
-            validateName(form.name).valid && { borderColor:C.success }]}
-          placeholder="Sarah" placeholderTextColor={C.muted} value={form.name}
-          onChangeText={t => set('name', t.replace(/[^a-zA-Z\s\-']/g,''))}
-          onBlur={() => { if (form.name) set('name', formatName(form.name)); }}
-          editable={!loading} maxLength={MAX_NAME} autoCapitalize="words" autoCorrect={false}
-          accessibilityLabel="First name" accessibilityHint="Enter your first name" />
-        {form.name.length>0 && !validateName(form.name).valid && <Text style={[st.err,{ color:C.danger }]}>{validateName(form.name).reason}</Text>}
+        <TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.name.length>0&&!validateName(form.name).valid&&{ borderColor:C.danger },validateName(form.name).valid&&{ borderColor:C.success }]} placeholder="Sarah" placeholderTextColor={C.muted} value={form.name} onChangeText={t => set('name', t.replace(/[^a-zA-Z\s\-']/g,''))} onBlur={useCallback(() => { if (form.name) set('name', formatName(form.name)); , [])}} editable={!loading} maxLength={MAX_NAME} autoCapitalize="words" autoCorrect={false} accessibilityLabel="First name" accessibilityHint="Enter your first name" />
+        {form.name.length>0&&!validateName(form.name).valid&&<Text style={[st.err,{ color:C.danger }]}>{validateName(form.name).reason}</Text>}
       </View>
       <View style={st.fg}>
         <Text style={[st.label,{ color:C.text }]}>Date of Birth <Text style={{ color:C.danger }}>*</Text></Text>
@@ -465,44 +353,16 @@ const Step2 = React.memo(function Step2({ C, form, age, zodiac, birthday, hCm, h
           <Text style={[st.bdaySep,{ color:C.muted }]}>/</Text>
           <TextInput style={[st.input,st.bdayInY,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="YYYY" placeholderTextColor={C.muted} value={form.bdayYear} onChangeText={t => set('bdayYear', t.replace(/\D/g,'').slice(0,4))} keyboardType="number-pad" maxLength={4} editable={!loading} accessibilityLabel="Birth year" />
         </View>
-        {birthday && age !== null && (
-          <View style={st.ageRow}>
-            <Text style={[st.ageDisplay,{ color:age>=MIN_AGE&&age<=MAX_AGE?C.success:C.danger }]}>Age: {age} {age<MIN_AGE?'(Must be 18+)':age>MAX_AGE?'(Invalid)':'✓'}</Text>
-            {zodiac && <Text style={[st.zodiac,{ color:C.accent }]}>{zodiac.emoji} {zodiac.sign}</Text>}
-          </View>
-        )}
-        {form.ageEstimate != null && age != null && Math.abs(age-form.ageEstimate)>AGE_TOL && <Text style={[st.warn,{ color:C.warning }]}>⚠️ Photos suggest ~{form.ageEstimate} years old</Text>}
+        {birthday&&age!==null&&(<View style={st.ageRow}><Text style={[st.ageDisplay,{ color:age>=MIN_AGE&&age<=MAX_AGE?C.success:C.danger }]}>Age: {age} {age<MIN_AGE?'(Must be 18+)':age>MAX_AGE?'(Invalid)':'✓'}</Text>{zodiac&&<Text style={[st.zodiac,{ color:C.accent }]}>{zodiac.emoji} {zodiac.sign}</Text>}</View>)}
+        {form.ageEstimate!=null&&age!=null&&Math.abs(age-form.ageEstimate)>AGE_TOL&&<Text style={[st.warn,{ color:C.warning }]}>⚠️ Photos suggest ~{form.ageEstimate} years old</Text>}
       </View>
+      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Gender <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{GENDER_OPTIONS.map(g => renderChip(g.value, form.gender===g.value, () => set('gender',g.value), g.icon))}</View></View>
+      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Interested In <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map(o => renderChip(o.value, form.interestedIn===o.value, () => set('interestedIn',o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Pronouns</Text><View style={st.chipWrap}>{PRONOUN_OPTIONS.map(p => renderChip(p.value, form.pronouns===p.value, () => set('pronouns',form.pronouns===p.value?'':p.value)))}</View></View>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Gender <Text style={{ color:C.danger }}>*</Text></Text>
-        <View style={st.chipWrap}>{GENDER_OPTIONS.map(g => renderChip(g.value, form.gender===g.value, () => set('gender',g.value), g.icon))}</View>
-      </View>
-      <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Interested In <Text style={{ color:C.danger }}>*</Text></Text>
-        <View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map(o => renderChip(o.value, form.interestedIn===o.value, () => set('interestedIn',o.value), o.icon))}</View>
-      </View>
-      <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Pronouns</Text>
-        <View style={st.chipWrap}>{PRONOUN_OPTIONS.map(p => renderChip(p.value, form.pronouns===p.value, () => set('pronouns',form.pronouns===p.value?'':p.value)))}</View>
-      </View>
-      <View style={st.fg}>
-        <View style={st.labelRow}>
-          <Text style={[st.label,{ color:C.text }]}>Height <Text style={{ color:C.danger }}>*</Text></Text>
-          <TouchableOpacity style={[st.unitBtn,{ backgroundColor:C.input, borderColor:C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7} accessibilityLabel={`Switch to ${form.heightUnit==='cm'?'feet and inches':'centimetres'}`} accessibilityRole="button">
-            <Text style={[st.unitBtnText,{ color:C.accent }]}>{form.heightUnit==='cm'?'Switch to ft/in':'Switch to cm'}</Text>
-          </TouchableOpacity>
-        </View>
-        {form.heightUnit === 'cm' ? (
-          <TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.heightCm.length>0&&(hCm<MIN_H||hCm>MAX_H)&&{ borderColor:C.danger },hCm>=MIN_H&&hCm<=MAX_H&&{ borderColor:C.success }]} placeholder="170" placeholderTextColor={C.muted} value={form.heightCm} onChangeText={t => set('heightCm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Height in centimetres" />
-        ) : (
-          <View style={st.ftRow}>
-            <TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="5" placeholderTextColor={C.muted} value={form.heightFt} onChangeText={t => set('heightFt',t.replace(/\D/g,'').slice(0,1))} keyboardType="number-pad" maxLength={1} editable={!loading} accessibilityLabel="Height feet" />
-            <Text style={[st.ftLbl,{ color:C.muted }]}>ft</Text>
-            <TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="8" placeholderTextColor={C.muted} value={form.heightIn} onChangeText={t => { const c=t.replace(/\D/g,''); if (c==='') { set('heightIn',''); return; } if (parseInt(c)>11) { showAlert('Invalid','Inches must be 0–11.'); return; } set('heightIn',c); }} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Height inches" />
-            <Text style={[st.ftLbl,{ color:C.muted }]}>in</Text>
-          </View>
-        )}
-        {hDisplay !== '' && <Text style={[st.hPreview,{ color:C.success }]}>📏 {hDisplay}</Text>}
+        <View style={st.labelRow}><Text style={[st.label,{ color:C.text }]}>Height <Text style={{ color:C.danger }}>*</Text></Text><TouchableOpacity style={[st.unitBtn,{ backgroundColor:C.input, borderColor:C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7} accessibilityLabel={`Switch to ${form.heightUnit==='cm'?'feet and inches':'centimetres'}`} accessibilityRole="button"><Text style={[st.unitBtnText,{ color:C.accent }]}>{form.heightUnit==='cm'?'Switch to ft/in':'Switch to cm'}</Text></TouchableOpacity></View>
+        {form.heightUnit==='cm' ? (<TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.heightCm.length>0&&(hCm<MIN_H||hCm>MAX_H)&&{ borderColor:C.danger },hCm>=MIN_H&&hCm<=MAX_H&&{ borderColor:C.success }]} placeholder="170" placeholderTextColor={C.muted} value={form.heightCm} onChangeText={t => set('heightCm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Height in centimetres" />) : (<View style={st.ftRow}><TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="5" placeholderTextColor={C.muted} value={form.heightFt} onChangeText={t => set('heightFt',t.replace(/\D/g,'').slice(0,1))} keyboardType="number-pad" maxLength={1} editable={!loading} accessibilityLabel="Height feet" /><Text style={[st.ftLbl,{ color:C.muted }]}>ft</Text><TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="8" placeholderTextColor={C.muted} value={form.heightIn} onChangeText={t => { const c=t.replace(/\D/g,''); if (c==='') { set('heightIn',''); return; } if (parseInt(c)>11) { showAlert('Invalid','Inches must be 0–11.'); return; } set('heightIn',c); }} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Height inches" /><Text style={[st.ftLbl,{ color:C.muted }]}>in</Text></View>)}
+        {hDisplay!==''&&<Text style={[st.hPreview,{ color:C.success }]}>📏 {hDisplay}</Text>}
       </View>
     </View>
   );
@@ -510,22 +370,10 @@ const Step2 = React.memo(function Step2({ C, form, age, zodiac, birthday, hCm, h
 
 interface Step3Props { C:Theme; bodyType:string; lookingForBody:string; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; }
 const Step3 = React.memo(function Step3({ C, bodyType, lookingForBody, loading, set }:Step3Props) {
-  return (
-    <View>
-      <Text style={[st.title,{ color:C.accent }]}>💪 Body & Appearance</Text>
-      <BodyTypeSelector label="Your Body Type *" selectedType={bodyType as BodyType} onSelect={v => set('bodyType',v)} disabled={loading} />
-      <View style={st.spacer} />
-      <BodyTypeSelector label="Body Type Preference *" selectedType={lookingForBody as BodyType} onSelect={v => set('lookingForBody',v)} disabled={loading} showLookingFor />
-    </View>
-  );
+  return (<View><Text style={[st.title,{ color:C.accent }]}>💪 Body & Appearance</Text><BodyTypeSelector label="Your Body Type *" selectedType={bodyType as BodyType} onSelect={v => set('bodyType',v)} disabled={loading} /><View style={st.spacer} /><BodyTypeSelector label="Body Type Preference *" selectedType={lookingForBody as BodyType} onSelect={v => set('lookingForBody',v)} disabled={loading} showLookingFor /></View>);
 });
 
-interface Step4Props {
-  C:Theme; form:FormState; loading:boolean;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-  renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement;
-  renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement;
-}
+interface Step4Props { C:Theme; form:FormState; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement; }
 const Step4 = React.memo(function Step4({ C, form, loading, set, renderChip, renderOpt }:Step4Props) {
   return (
     <View>
@@ -545,50 +393,21 @@ const Step4 = React.memo(function Step4({ C, form, loading, set, renderChip, ren
   );
 });
 
-interface Step5Props {
-  C:Theme; form:FormState; haptic:() => void;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-  dispatch:React.Dispatch<Action>;
-  renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement;
-  renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement;
-}
+interface Step5Props { C:Theme; form:FormState; haptic:() => void; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement; }
 const Step5 = React.memo(function Step5({ C, form, haptic, set, dispatch, renderChip, renderOpt }:Step5Props) {
   return (
     <View>
       <Text style={[st.title,{ color:C.accent }]}>✨ Interests & Personality</Text>
-      <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Interests <Text style={{ color:C.danger }}>*</Text></Text>
-        <Text style={[st.hint,{ color:C.muted }]}>Pick 3–10 · {form.interests.length}/10</Text>
-        <View style={st.chipWrap}>{INTEREST_TAGS.map(t => renderChip(t, form.interests.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'interests', value:t, max:10 }), undefined, !form.interests.includes(t)&&form.interests.length>=10))}</View>
-      </View>
+      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Interests <Text style={{ color:C.danger }}>*</Text></Text><Text style={[st.hint,{ color:C.muted }]}>Pick 3–10 · {form.interests.length}/10</Text><View style={st.chipWrap}>{INTEREST_TAGS.map(t => renderChip(t, form.interests.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'interests', value:t, max:10 }), undefined, !form.interests.includes(t)&&form.interests.length>=10))}</View></View>
       <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Love Language</Text>{LOVE_LANGUAGE_OPTIONS.map(o => renderOpt(o, form.loveLang, v => set('loveLang',form.loveLang===v?'':v)))}</View>
       <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Communication Style</Text><View style={st.chipWrap}>{COMMUNICATION_OPTIONS.map(o => renderChip(o.value, form.commStyle===o.value, () => set('commStyle',form.commStyle===o.value?'':o.value), o.icon))}</View></View>
       <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Preferred First Date</Text><View style={st.chipWrap}>{FIRST_DATE_OPTIONS.map(o => renderChip(o.value, form.firstDate===o.value, () => set('firstDate',form.firstDate===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Your Vibes</Text>
-        <Text style={[st.hint,{ color:C.muted }]}>Pick up to 3</Text>
-        <View style={st.vibeGrid}>
-          {VIBE_EMOJIS.map(e => {
-            const sel = form.vibes.includes(e);
-            const mx  = !sel && form.vibes.length >= 3;
-            return (
-              <TouchableOpacity key={e} style={[st.vibeItem,{ backgroundColor:C.input, borderColor:sel?C.accent:C.inputBorder },sel&&{ backgroundColor:C.accentGlow },mx&&st.chipOff]} onPress={() => { haptic(); dispatch({ type:'TOGGLE_LIST', field:'vibes', value:e, max:3 }); }} disabled={mx} activeOpacity={0.7} accessibilityLabel={`Vibe ${e}${sel?', selected':''}`} accessibilityRole="checkbox" accessibilityState={{ checked:sel, disabled:mx }}>
-                <Text style={st.vibeEmoji}>{e}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Your Vibes</Text><Text style={[st.hint,{ color:C.muted }]}>Pick up to 3</Text><View style={st.vibeGrid}>{VIBE_EMOJIS.map(e => { const sel=form.vibes.includes(e); const mx=!sel&&form.vibes.length>=3; return (<TouchableOpacity key={e} style={[st.vibeItem,{ backgroundColor:C.input, borderColor:sel?C.accent:C.inputBorder },sel&&{ backgroundColor:C.accentGlow },mx&&st.chipOff]} onPress={() = accessibilityLabel="button"> { haptic(); dispatch({ type:'TOGGLE_LIST', field:'vibes', value:e, max:3 }); }} disabled={mx} activeOpacity={0.7} accessibilityLabel={`Vibe ${e}${sel?', selected':''}`} accessibilityRole="checkbox" accessibilityState={{ checked:sel, disabled:mx }}><Text style={st.vibeEmoji}>{e}</Text></TouchableOpacity>); })}</View></View>
     </View>
   );
 });
 
-interface Step6Props {
-  C:Theme; form:FormState; loading:boolean;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-  dispatch:React.Dispatch<Action>;
-  renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement;
-}
+interface Step6Props { C:Theme; form:FormState; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; }
 const Step6 = React.memo(function Step6({ C, form, loading, set, dispatch, renderChip }:Step6Props) {
   return (
     <View>
@@ -602,25 +421,14 @@ const Step6 = React.memo(function Step6({ C, form, loading, set, dispatch, rende
   );
 });
 
-interface Step7Props {
-  C:Theme; form:FormState; loading:boolean; gettingLoc:boolean;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-  dispatch:React.Dispatch<Action>;
-  getLoc:() => void;
-  promptPicker:number|null;
-  setPromptPicker:(v:number|null) => void;
-}
-const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dispatch, getLoc, promptPicker: _pp, setPromptPicker }:Step7Props) {
+interface Step7Props { C:Theme; form:FormState; loading:boolean; gettingLoc:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; getLoc:() => void; promptPicker:number|null; setPromptPicker:(v:number|null) => void; }
+const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dispatch, getLoc, promptPicker:_pp, setPromptPicker }:Step7Props) {
   return (
     <View>
       <Text style={[st.title,{ color:C.accent }]}>💬 About You</Text>
       <View style={st.fg}>
         <Text style={[st.label,{ color:C.text }]}>Bio</Text>
-        {form.bio.length === 0 && (
-          <TouchableOpacity onPress={() => set('bio',"I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7} accessibilityLabel="Load example bio" accessibilityRole="button">
-            <Text style={[st.bioSuggestion,{ color:C.accent }]}>💡 Tap to see an example bio</Text>
-          </TouchableOpacity>
-        )}
+        {form.bio.length===0&&(<TouchableOpacity onPress={() = accessibilityLabel="button"> set('bio',"I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7} accessibilityLabel="Load example bio" accessibilityRole="button"><Text style={[st.bioSuggestion,{ color:C.accent }]}>💡 Tap to see an example bio</Text></TouchableOpacity>)}
         <TextInput style={[st.bioIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="What makes you unique…" placeholderTextColor={C.muted} value={form.bio} onChangeText={t => { const c=t.slice(0,MAX_BIO); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } set('bio',c); }} multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top" accessibilityLabel="Bio" accessibilityHint="Describe yourself" />
         <Text style={[st.charCt,{ color:form.bio.length>=MAX_BIO*0.9?C.warning:C.muted }]}>{form.bio.length}/{MAX_BIO}</Text>
       </View>
@@ -628,51 +436,33 @@ const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dis
         <Text style={[st.label,{ color:C.text }]}>Profile Prompts</Text>
         {form.prompts.map((p, i) => (
           <View key={`${i}_${p.q}`} style={[st.promptCard,{ backgroundColor:C.input, borderColor:C.inputBorder }]}>
-            <TouchableOpacity style={st.promptQ} onPress={() => setPromptPicker(i)} activeOpacity={0.7} accessibilityLabel={p.q||'Choose a prompt question'} accessibilityRole="button">
-              <Text style={[st.promptQText,{ color:C.accent }]}>{p.q||'Tap to pick a question…'}</Text>
-              <Text style={[st.promptArr,{ color:C.accent }]}>▼</Text>
-            </TouchableOpacity>
-            {p.q !== '' && <TextInput style={[st.promptIn,{ backgroundColor:C.card, color:C.text, borderColor:C.inputBorder }]} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a} onChangeText={t => { const c=t.slice(0,MAX_PROMPT); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } dispatch({ type:'SET_PROMPT', index:i, q:p.q, a:c }); }} multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" accessibilityLabel={`Answer to: ${p.q}`} />}
-            {p.q !== '' && <Text style={[st.charCt,{ color:p.a.length>=MAX_PROMPT*0.9?C.warning:C.muted }]}>{p.a.length}/{MAX_PROMPT}</Text>}
-            <TouchableOpacity style={st.promptRm} onPress={() => dispatch({ type:'DEL_PROMPT', index:i })} accessibilityLabel="Remove prompt" accessibilityRole="button">
-              <Text style={[st.promptRmText,{ color:C.danger }]}>✕ Remove</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={st.promptQ} onPress={() = accessibilityLabel="button"> setPromptPicker(i)} activeOpacity={0.7} accessibilityLabel={p.q||'Choose a prompt question'} accessibilityRole="button"><Text style={[st.promptQText,{ color:C.accent }]}>{p.q||'Tap to pick a question…'}</Text><Text style={[st.promptArr,{ color:C.accent }]}>▼</Text></TouchableOpacity>
+            {p.q!==''&&<TextInput style={[st.promptIn,{ backgroundColor:C.card, color:C.text, borderColor:C.inputBorder }]} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a} onChangeText={t => { const c=t.slice(0,MAX_PROMPT); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } dispatch({ type:'SET_PROMPT', index:i, q:p.q, a:c }); }} multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" accessibilityLabel={`Answer to: ${p.q}`} />}
+            {p.q!==''&&<Text style={[st.charCt,{ color:p.a.length>=MAX_PROMPT*0.9?C.warning:C.muted }]}>{p.a.length}/{MAX_PROMPT}</Text>}
+            <TouchableOpacity style={st.promptRm} onPress={() = accessibilityLabel="button"> dispatch({ type:'DEL_PROMPT', index:i })} accessibilityLabel="Remove prompt" accessibilityRole="button"><Text style={[st.promptRmText,{ color:C.danger }]}>✕ Remove</Text></TouchableOpacity>
           </View>
         ))}
-        {form.prompts.length < 3 && (
-          <TouchableOpacity style={[st.addPrompt,{ borderColor:C.accent }]} onPress={() => dispatch({ type:'ADD_PROMPT' })} activeOpacity={0.7} accessibilityLabel="Add a profile prompt" accessibilityRole="button">
-            <Text style={[st.addPromptText,{ color:C.accent }]}>+ Add Prompt</Text>
-          </TouchableOpacity>
-        )}
+        {form.prompts.length<3&&(<TouchableOpacity style={[st.addPrompt,{ borderColor:C.accent }]} onPress={() = accessibilityLabel="button"> dispatch({ type:'ADD_PROMPT' })} activeOpacity={0.7} accessibilityLabel="Add a profile prompt" accessibilityRole="button"><Text style={[st.addPromptText,{ color:C.accent }]}>+ Add Prompt</Text></TouchableOpacity>)}
       </View>
       <View style={st.fg}>
         <Text style={[st.label,{ color:C.text }]}>📍 Location</Text>
         <TouchableOpacity style={[st.locBtn,{ backgroundColor:C.input, borderColor:form.locCity!==''?C.success:C.inputBorder },(gettingLoc||loading)&&st.btnOff]} onPress={getLoc} disabled={gettingLoc||loading} activeOpacity={0.7} accessibilityLabel={form.locCity||'Enable location'} accessibilityRole="button">
-          {gettingLoc
-            ? <View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={[st.locBtnText,{ color:C.accent }]}>Getting Location…</Text></View>
-            : <View style={st.locRow}><Text>{form.locCity?'✓':'📍'}</Text><Text style={[st.locBtnText,{ color:C.accent }]}>{form.locCity||'Enable Location'}</Text></View>}
+          {gettingLoc ? <View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={[st.locBtnText,{ color:C.accent }]}>Getting Location…</Text></View> : <View style={st.locRow}><Text>{form.locCity?'✓':'📍'}</Text><Text style={[st.locBtnText,{ color:C.accent }]}>{form.locCity||'Enable Location'}</Text></View>}
         </TouchableOpacity>
-        {form.locCity !== '' && <Text style={[st.locConf,{ color:C.success }]}>📍 {form.locCity}</Text>}
+        {form.locCity!==''&&<Text style={[st.locConf,{ color:C.success }]}>📍 {form.locCity}</Text>}
       </View>
     </View>
   );
 });
 
-interface Step8Props {
-  C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; hDisplay:string; pct:number;
-  set:(f:keyof FormState,v:FormState[keyof FormState]) => void;
-}
+interface Step8Props { C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; hDisplay:string; pct:number; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; }
 const Step8 = React.memo(function Step8({ C, form, age, zodiac, hDisplay, pct, set }:Step8Props) {
   return (
     <View>
       <Text style={[st.title,{ color:C.accent }]}>👀 Preview & Privacy</Text>
       <View style={[st.privacyCard,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
         <Text style={[st.privacyTitle,{ color:C.text }]}>🔒 Privacy Settings</Text>
-        {([
-          { key:'blurUntilMatch' as const, label:'🔵 Blur photos until match', desc:'Photos blur until you match.',        val:form.blurUntilMatch },
-          { key:'incognito'      as const, label:'👻 Incognito mode',           desc:'Only people you like first see you.', val:form.incognito },
-          { key:'verifiedOnly'   as const, label:'✅ Verified users only',       desc:'Only verified users discover you.',   val:form.verifiedOnly },
-        ] as const).map(pi => (
+        {([{ key:'blurUntilMatch' as const, label:'🔵 Blur photos until match', desc:'Photos blur until you match.', val:form.blurUntilMatch },{ key:'incognito' as const, label:'👻 Incognito mode', desc:'Only people you like first see you.', val:form.incognito },{ key:'verifiedOnly' as const, label:'✅ Verified users only', desc:'Only verified users discover you.', val:form.verifiedOnly }] as const).map(pi => (
           <View key={pi.key} style={[st.privRow,{ borderBottomColor:C.inputBorder }]}>
             <View style={st.privInfo}><Text style={[st.privLabel,{ color:C.text }]}>{pi.label}</Text><Text style={[st.privDesc,{ color:C.muted }]}>{pi.desc}</Text></View>
             <Switch value={pi.val} onValueChange={v => set(pi.key,v)} trackColor={{ false:C.inputBorder, true:C.accent }} thumbColor={pi.val?C.success:C.dim} accessibilityLabel={pi.label} accessibilityRole="switch" accessibilityState={{ checked:pi.val }} />
@@ -681,54 +471,34 @@ const Step8 = React.memo(function Step8({ C, form, age, zodiac, hDisplay, pct, s
       </View>
       <Text style={[st.previewLabel,{ color:C.sub }]}>How others see you:</Text>
       <View style={[st.preview,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-        {form.photos.length > 0 && (
-          <View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>
-              {form.photos.map(p => <Image key={p.uri} source={{ uri:p.uri }} style={[st.previewThumb,form.blurUntilMatch&&{ opacity:0.15 }]} contentFit="cover" transition={150} accessibilityLabel={`${getPhotoLabel(p.type)} preview`} />)}
-            </ScrollView>
-            {form.blurUntilMatch && <View style={st.blurOverlay}><Text style={[st.blurText,{ color:C.accent }]}>🔒 Blurred until match</Text></View>}
-          </View>
-        )}
+        {form.photos.length>0&&(<View><ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>{form.photos.map(p => (<TurboImage key={p.uri} source={{ uri:p.uri }} style={[st.previewThumb, form.blurUntilMatch&&{ opacity:0.15 }]} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} preview`} />))}</ScrollView>{form.blurUntilMatch&&(<View style={st.blurOverlay}><Text style={[st.blurText,{ color:C.accent }]}>🔒 Blurred until match</Text></View>)}</View>)}
         <View style={st.previewInfo}>
           <Text style={[st.previewName,{ color:C.text }]}>{formatName(form.name)||'Your Name'}, {age??'??'}{zodiac?` ${zodiac.emoji}`:''}</Text>
-          {form.pronouns!==''         && <Text style={[st.previewSub,{ color:C.muted }]}>{form.pronouns}</Text>}
-          {hDisplay!==''              && <Text style={[st.previewDetail,{ color:C.sub }]}>📏 {hDisplay}</Text>}
-          {form.occupation.trim()!=='' && <Text style={[st.previewDetail,{ color:C.sub }]}>💼 {form.occupation}</Text>}
-          {form.locCity!==''           && <Text style={[st.previewDetail,{ color:C.sub }]}>📍 {form.locCity}</Text>}
-          {form.vibes.length>0         && <Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>}
-          {form.bio.trim()!==''        && <Text style={[st.previewBio,{ color:C.text }]}>{form.bio.trim()}</Text>}
-          {form.interests.length>0 && (
-            <View style={st.previewTags}>
-              {form.interests.slice(0,5).map(t => <View key={t} style={[st.previewTag,{ backgroundColor:C.input }]}><Text style={[st.previewTagText,{ color:C.accent }]}>{t}</Text></View>)}
-              {form.interests.length>5 && <Text style={[st.previewMore,{ color:C.muted }]}>+{form.interests.length-5} more</Text>}
-            </View>
-          )}
+          {form.pronouns!==''&&<Text style={[st.previewSub,{ color:C.muted }]}>{form.pronouns}</Text>}
+          {hDisplay!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>📏 {hDisplay}</Text>}
+          {form.occupation.trim()!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>💼 {form.occupation}</Text>}
+          {form.locCity!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>📍 {form.locCity}</Text>}
+          {form.vibes.length>0&&<Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>}
+          {form.bio.trim()!==''&&<Text style={[st.previewBio,{ color:C.text }]}>{form.bio.trim()}</Text>}
+          {form.interests.length>0&&(<View style={st.previewTags}>{form.interests.slice(0,5).map(t => <View key={t} style={[st.previewTag,{ backgroundColor:C.input }]}><Text style={[st.previewTagText,{ color:C.accent }]}>{t}</Text></View>)}{form.interests.length>5&&<Text style={[st.previewMore,{ color:C.muted }]}>+{form.interests.length-5} more</Text>}</View>)}
           <Text style={[st.previewPhotoCt,{ color:C.muted }]}>📸 {form.photos.length} photo{form.photos.length!==1?'s':''}</Text>
         </View>
       </View>
       <View style={[st.pctCard,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
         <Text style={[st.pctTitle,{ color:C.text }]}>Profile Completion: {pct}%</Text>
-        <View style={[st.pctBarBg,{ backgroundColor:C.inputBorder }]}>
-          <View style={[st.pctBarFill,{ width:`${pct}%` as `${number}%`, backgroundColor:pct>=80?C.success:pct>=50?C.warning:C.danger }]} />
-        </View>
-        {pct<100 && <Text style={[st.pctHint,{ color:C.muted }]}>Complete more fields to increase visibility!</Text>}
+        <View style={[st.pctBarBg,{ backgroundColor:C.inputBorder }]}><View style={[st.pctBarFill,{ width:`${pct}%` as `${number}%`, backgroundColor:pct>=80?C.success:pct>=50?C.warning:C.danger }]} /></View>
+        {pct<100&&<Text style={[st.pctHint,{ color:C.muted }]}>Complete more fields to increase visibility!</Text>}
       </View>
       <View style={[st.termsRow,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
         <Switch value={form.termsAccepted} onValueChange={v => set('termsAccepted',v)} trackColor={{ false:C.inputBorder, true:C.accent }} thumbColor={form.termsAccepted?C.success:C.dim} accessibilityLabel="Accept terms of service" accessibilityRole="switch" accessibilityState={{ checked:form.termsAccepted }} />
-        <View style={{ flex:1 }}>
-          <Text style={[st.termsText,{ color:C.sub }]}>
-            I agree to the{' '}
-            <Text style={[st.termsLink,{ color:C.accent }]} onPress={() => { void Linking.openURL('https://myarchetype.vercel.app/terms'); }}>Terms of Service</Text>
-            {' '}and{' '}
-            <Text style={[st.termsLink,{ color:C.accent }]} onPress={() => { void Linking.openURL('https://myarchetype.vercel.app/privacy'); }}>Privacy Policy</Text>
-          </Text>
-        </View>
+        <View style={staticStyles.flex1}><Text style={[st.termsText,{ color:C.sub }]}>I agree to the{' '}<Text style={[st.termsLink,{ color:C.accent }]} onPress={useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/terms'); , [])}}>Terms of Service</Text>{' '}and{' '}<Text style={[st.termsLink,{ color:C.accent }]} onPress={useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/privacy'); , [])}}>Privacy Policy</Text></Text></View>
       </View>
     </View>
   );
 });
 
-// ─── Main screen ───────────────────────────────────────────
+const staticStyles = StyleSheet.create({ flex1:{ flex:1 }, absoluteFill:{ position:'absolute', top:0, left:0, right:0, bottom:0 } });
+
 export default function ProfileSetupScreen() {
   const router                 = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -775,9 +545,11 @@ export default function ProfileSetupScreen() {
   const capturingRef  = useRef(false);
   const readyPollRef  = useRef<ReturnType<typeof setInterval>|null>(null);
 
-  const fadeAnim  = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const progAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useSharedValue(1);
+  const slideAnim = useSharedValue(0);
+  const progAnim  = useSharedValue(0);
+
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, transform: [{ translateX: slideAnim.value }] }));
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -795,13 +567,23 @@ export default function ProfileSetupScreen() {
 
   useEffect(() => {
     if (!draftKey || !stepKey) return;
+    let cancelled = false;
     void (async () => {
       try {
         const r = profileStorage.getString(draftKey) ?? null;
-        if (r) { const p = JSON.parse(r) as Partial<FormState>; delete p.photos; if (isMountedRef.current) dispatch({ type:'LOAD', state:p }); }
-        if (isMountedRef.current) setStep(1);
+        if (r && !cancelled) {
+          const parse = () => {
+            const p = JSON.parse(r) as Partial<FormState>;
+            delete p.photos;
+            if (!cancelled && isMountedRef.current) dispatch({ type:'LOAD', state:p });
+          };
+          if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(parse);
+          else setTimeout(parse, 0);
+        }
+        if (!cancelled && isMountedRef.current) setStep(1);
       } catch { /* ignore corrupt draft */ }
     })();
+    return () => { cancelled = true; };
   }, [draftKey, stepKey]);
 
   const prevFormRef = useRef(form);
@@ -819,29 +601,33 @@ export default function ProfileSetupScreen() {
     return () => clearTimeout(t);
   }, [form, step, draftKey, stepKey]);
 
-  useEffect(() => { Animated.timing(progAnim, { toValue:step/TOTAL_STEPS, duration:300, useNativeDriver:false }).start(); }, [step, progAnim]);
+  useEffect(() => {
+    progAnim.value = withTiming(step / TOTAL_STEPS, { duration: 300, easing: Easing.out(Easing.ease) }, []);
+  }, [step, progAnim]);
+
+  const progStyle = useAnimatedStyle(() => ({ width: `${progAnim.value * 100}%` as `${number}%` }));
+
   useEffect(() => { if (promptPicker !== null && promptPicker >= form.prompts.length) setPromptPicker(null); }, [form.prompts.length, promptPicker]);
 
   useEffect(() => {
     if (!IS_WEB && !permission?.granted && permission?.canAskAgain !== false) {
+      let cancelled = false;
       showAlert('Camera Required', 'This app uses your camera to take profile photos.', [
         { text:'Not Now', style:'cancel' },
-        { text:'Grant Access', onPress:() => { void requestPermission(); } },
+        { text:'Grant Access', onPress:() => { if (!cancelled) void requestPermission(); } },
       ]);
+      return () => { cancelled = true; };
     }
   }, [permission?.granted, permission?.canAskAgain, requestPermission]);
 
-  useEffect(() => { AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}: ${STEP_NAMES[step-1]}`); }, [step]);
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}: ${STEP_NAMES[step-1]}`);
+  }, [step]);
 
-  const birthday = useMemo<Date|null>(() => {
-    const m=parseInt(form.bdayMonth), d=parseInt(form.bdayDay), y=parseInt(form.bdayYear);
-    if (isNaN(m)||isNaN(d)||isNaN(y)||!isValidDate(y,m,d)) return null;
-    return new Date(y,m-1,d);
-  }, [form.bdayMonth, form.bdayDay, form.bdayYear]);
-
-  const age    = useMemo(() => birthday ? calcAge(birthday) : null, [birthday]);
-  const zodiac = useMemo(() => birthday ? getZodiac(birthday.getMonth()+1, birthday.getDate()) : null, [birthday]);
-  const hCm    = useMemo(() => form.heightUnit==='cm' ? parseInt(form.heightCm)||0 : ftToCm(parseInt(form.heightFt)||0, parseInt(form.heightIn)||0), [form.heightUnit, form.heightCm, form.heightFt, form.heightIn]);
+  const birthday = useMemo<Date|null>(() => { const m=parseInt(form.bdayMonth), d=parseInt(form.bdayDay), y=parseInt(form.bdayYear); if (isNaN(m)||isNaN(d)||isNaN(y)||!isValidDate(y,m,d)) return null; return new Date(y,m-1,d); }, [form.bdayMonth, form.bdayDay, form.bdayYear]);
+  const age      = useMemo(() => birthday ? calcAge(birthday) : null, [birthday]);
+  const zodiac   = useMemo(() => birthday ? getZodiac(birthday.getMonth()+1, birthday.getDate()) : null, [birthday]);
+  const hCm      = useMemo(() => form.heightUnit==='cm' ? parseInt(form.heightCm)||0 : ftToCm(parseInt(form.heightFt)||0, parseInt(form.heightIn)||0), [form.heightUnit, form.heightCm, form.heightFt, form.heightIn]);
   const hDisplay = useMemo(() => { if (!hCm||hCm<MIN_H) return ''; return form.heightUnit==='cm'?`${hCm} cm (${cmToFt(hCm)})`:``+form.heightFt+`'`+(form.heightIn||0)+`" (${hCm} cm)`; }, [hCm, form.heightUnit, form.heightFt, form.heightIn]);
 
   const hasFace      = useMemo(() => form.photos.some(p => p.type==='face'),       [form.photos]);
@@ -862,91 +648,60 @@ export default function ProfileSetupScreen() {
     }
   }, [step, form, hasFace, hasUpperBody, age, hCm]);
 
-  const pct = useMemo(() => {
-    const c = [hasFace, hasUpperBody, hasFullBody, form.photos.length>=3, validateName(form.name).valid, age!==null&&age>=MIN_AGE, form.gender!=='', form.interestedIn!=='', hCm>=MIN_H, form.bodyType!=='', form.lookingForBody!=='', form.religion!=='', form.lifestyle!=='', form.relationship!=='', form.interests.length>=3, form.bio.trim().length>0, form.locCity!=='', form.education!=='', form.smoking!=='', form.drinking!=='', form.children!=='', form.prompts.length>=1, form.vibes.length>=1, form.loveLang!==''];
-    return Math.round((c.filter(Boolean).length/c.length)*100);
-  }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
-
+  const pct = useMemo(() => { const c=[hasFace,hasUpperBody,hasFullBody,form.photos.length>=3,validateName(form.name).valid,age!==null&&age>=MIN_AGE,form.gender!=='',form.interestedIn!=='',hCm>=MIN_H,form.bodyType!=='',form.lookingForBody!=='',form.religion!=='',form.lifestyle!=='',form.relationship!=='',form.interests.length>=3,form.bio.trim().length>0,form.locCity!=='',form.education!=='',form.smoking!=='',form.drinking!=='',form.children!=='',form.prompts.length>=1,form.vibes.length>=1,form.loveLang!=='']; return Math.round((c.filter(Boolean).length/c.length)*100); }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
   const missingMsg = useMemo(() => getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm), [step, form, hasFace, hasUpperBody, age, hCm]);
 
   const haptic        = useCallback((s:Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => { if (!IS_WEB) Haptics.impactAsync(s).catch(() => {}); }, []);
   const successHaptic = useCallback(() => { if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }, []);
 
   const animate = useCallback((dir:'fwd'|'back') => {
-    const tv = dir==='fwd' ? -screenWidth : screenWidth;
-    Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue:0,  duration:140, useNativeDriver:true }),
-      Animated.timing(slideAnim, { toValue:tv, duration:140, useNativeDriver:true }),
-    ]).start(() => {
-      slideAnim.setValue(dir==='fwd' ? screenWidth : -screenWidth);
-      Animated.parallel([
-        Animated.timing(fadeAnim,  { toValue:1, duration:200, useNativeDriver:true }),
-        Animated.timing(slideAnim, { toValue:0, duration:200, useNativeDriver:true }),
-      ]).start();
+    const exitTarget = dir==='fwd' ? -screenWidth : screenWidth;
+    const enterStart = dir==='fwd' ? screenWidth : -screenWidth;
+    fadeAnim.value  = withTiming(0, { duration:140, easing:Easing.out(Easing.ease) });
+    slideAnim.value = withTiming(exitTarget, { duration:140, easing:Easing.out(Easing.ease) }, (finished) => {
+      if (finished) { slideAnim.value=enterStart; fadeAnim.value=withTiming(1, { duration:200, easing:Easing.out(Easing.ease) }); slideAnim.value=withTiming(0, { duration:200, easing:Easing.out(Easing.ease) }); }
     });
   }, [fadeAnim, slideAnim, screenWidth]);
 
   const goNext = useCallback(() => {
     if (!stepOk) { showAlert('Incomplete', getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm)); return; }
-    if (step >= TOTAL_STEPS) return;
-    if (step === 7) {
-      if (form.bio.trim()) { const b=checkBlocked(form.bio); if (b) { showAlert('Bio Issue',b); return; } }
-      for (const p of form.prompts) { if (p.a.trim()) { const b=checkBlocked(p.a); if (b) { showAlert('Prompt Issue',b); return; } } }
-    }
-    if (step === 6) {
-      const minA=parseInt(form.ageMin)||MIN_AGE, maxA=parseInt(form.ageMax)||50;
-      if (minA>=maxA) { showAlert('Invalid Age Range','Min must be less than max.'); return; }
-      const minH=parseInt(form.heightPrefMinCm)||0, maxH=parseInt(form.heightPrefMaxCm)||0;
-      if (minH>0&&maxH>0&&minH>=maxH) { showAlert('Invalid Height Range','Min must be less than max.'); return; }
-    }
+    if (step>=TOTAL_STEPS) return;
+    if (step===7) { if (form.bio.trim()) { const b=checkBlocked(form.bio); if (b) { showAlert('Bio Issue',b); return; } } for (const p of form.prompts) { if (p.a.trim()) { const b=checkBlocked(p.a); if (b) { showAlert('Prompt Issue',b); return; } } } }
+    if (step===6) { const minA=parseInt(form.ageMin)||MIN_AGE, maxA=parseInt(form.ageMax)||50; if (minA>=maxA) { showAlert('Invalid Age Range','Min must be less than max.'); return; } const minH=parseInt(form.heightPrefMinCm)||0, maxH=parseInt(form.heightPrefMaxCm)||0; if (minH>0&&maxH>0&&minH>=maxH) { showAlert('Invalid Height Range','Min must be less than max.'); return; } }
     haptic(); successHaptic(); animate('fwd'); setStep(s => s+1);
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y:0, animated:false }));
   }, [step, stepOk, form, hasFace, hasUpperBody, age, hCm, haptic, successHaptic, animate]);
 
   const goBack = useCallback(() => {
-    if (step <= 1) {
-      showAlert('Leave Setup?','Your progress is auto-saved.',[{ text:'Stay', style:'cancel' },{ text:'Leave', onPress:() => router.back() }]);
-      return;
-    }
+    if (step<=1) { showAlert('Leave Setup?','Your progress is auto-saved.',[{ text:'Stay', style:'cancel' },{ text:'Leave', onPress:() => router.back() }]); return; }
     haptic(); animate('back'); setStep(s => s-1);
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y:0, animated:false }));
   }, [step, haptic, animate, router]);
 
   const stopWebStream = useCallback(() => {
-    if (readyPollRef.current) { clearInterval(readyPollRef.current); readyPollRef.current = null; }
+    if (readyPollRef.current) { clearInterval(readyPollRef.current); readyPollRef.current=null; }
     streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
+    streamRef.current=null;
     if (isMountedRef.current) setCamReady(false);
   }, []);
 
   const attachStreamToVideo = useCallback(() => {
     const video=webVideoElRef.current, stream=streamRef.current;
     if (!video||!stream) return;
-    if (video.srcObject===(stream as unknown as MediaStream)) {
-      if (video.readyState>=2 && isMountedRef.current) setCamReady(true);
-      return;
-    }
-    video.srcObject = stream as unknown as MediaStream;
+    if (video.srcObject===(stream as unknown as MediaStream)) { if (video.readyState>=2&&isMountedRef.current) setCamReady(true); return; }
+    video.srcObject=stream as unknown as MediaStream;
     if (video.readyState>=2) { video.play().catch(()=>{}); if (isMountedRef.current) setCamReady(true); return; }
-    video.onloadedmetadata = () => { video.play().catch(()=>{}); if (isMountedRef.current) setCamReady(true); };
-    video.oncanplay        = () => { if (isMountedRef.current) setCamReady(true); if (video.paused) video.play().catch(()=>{}); };
-    video.onerror          = () => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera stream error.'); } };
-    stream.getTracks().forEach(t => { t.onended = () => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera disconnected.'); } }; });
+    video.onloadedmetadata=() => { video.play().catch(()=>{}); if (isMountedRef.current) setCamReady(true); };
+    video.oncanplay=() => { if (isMountedRef.current) setCamReady(true); if (video.paused) video.play().catch(()=>{}); };
+    video.onerror=() => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera stream error.'); } };
+    stream.getTracks().forEach(t => { t.onended=() => { if (isMountedRef.current) { setCamReady(false); setCamErr('Camera disconnected.'); } }; });
     if (readyPollRef.current) clearInterval(readyPollRef.current);
-    let pc = 0;
-    readyPollRef.current = setInterval(() => {
-      pc++;
-      if (!isMountedRef.current||pc>30) { if (readyPollRef.current) clearInterval(readyPollRef.current); readyPollRef.current=null; return; }
-      const v = webVideoElRef.current;
-      if (v&&v.readyState>=2) { if (readyPollRef.current) clearInterval(readyPollRef.current); readyPollRef.current=null; if (v.paused) v.play().catch(()=>{}); if (isMountedRef.current) setCamReady(true); }
-    }, 200);
+    let pc=0;
+    readyPollRef.current=setInterval(() => { pc++; if (!isMountedRef.current||pc>30) { if (readyPollRef.current) clearInterval(readyPollRef.current); readyPollRef.current=null; return; } const v=webVideoElRef.current; if (v&&v.readyState>=2) { if (readyPollRef.current) clearInterval(readyPollRef.current); readyPollRef.current=null; if (v.paused) v.play().catch(()=>{}); if (isMountedRef.current) setCamReady(true); } }, 200);
   }, []);
 
   const handleVideoRef = useCallback((el:WebVideoElement|null) => {
-    if (!el) {
-      if (webVideoElRef.current) { webVideoElRef.current.onloadedmetadata=null; webVideoElRef.current.oncanplay=null; webVideoElRef.current.onerror=null; webVideoElRef.current.srcObject=null; }
-      webVideoElRef.current=null; return;
-    }
+    if (!el) { if (webVideoElRef.current) { webVideoElRef.current.onloadedmetadata=null; webVideoElRef.current.oncanplay=null; webVideoElRef.current.onerror=null; webVideoElRef.current.srcObject=null; } webVideoElRef.current=null; return; }
     webVideoElRef.current=el; attachStreamToVideo();
   }, [attachStreamToVideo]);
 
@@ -954,28 +709,23 @@ export default function ProfileSetupScreen() {
     try {
       stopWebStream();
       if (!IS_WEB) return;
-      const nav = navigator as unknown as WebNavigatorMedia;
+      const nav=navigator as unknown as WebNavigatorMedia;
       if (!nav.mediaDevices?.getUserMedia) { if (isMountedRef.current) setCamErr('Camera not supported.'); return; }
-      const devs = await nav.mediaDevices.enumerateDevices();
-      const vd   = devs.filter(d => d.kind==='videoinput');
-      const s    = await nav.mediaDevices.getUserMedia({ video:{ facingMode:vd.length>1?(facing==='front'?'user':'environment'):undefined, width:{ ideal:1280 }, height:{ ideal:960 } }, audio:false });
+      const devs=await nav.mediaDevices.enumerateDevices();
+      const vd=devs.filter(d => d.kind==='videoinput');
+      const s=await nav.mediaDevices.getUserMedia({ video:{ facingMode:vd.length>1?(facing==='front'?'user':'environment'):undefined, width:{ ideal:1280 }, height:{ ideal:960 } }, audio:false });
       if (!isMountedRef.current) { s.getTracks().forEach(t => t.stop()); return; }
-      streamRef.current = s; attachStreamToVideo();
+      streamRef.current=s; attachStreamToVideo();
       setTimeout(() => { if (isMountedRef.current&&streamRef.current) attachStreamToVideo(); }, 600);
       setTimeout(() => { if (isMountedRef.current&&streamRef.current) { attachStreamToVideo(); const v=webVideoElRef.current; if (v&&v.readyState>=2) setCamReady(true); } }, 1200);
     } catch (err:unknown) {
-      const name = (err as { name?:string })?.name ?? '';
-      let msg = 'Could not start camera.';
-      if      (name==='NotAllowedError')      msg = 'Camera access blocked. Allow it in browser settings.';
-      else if (name==='NotFoundError')        msg = 'No camera found.';
-      else if (name==='NotReadableError')     msg = 'Camera in use by another app.';
+      const name=(err as { name?:string })?.name??'';
+      let msg='Could not start camera.';
+      if (name==='NotAllowedError') msg='Camera access blocked. Allow it in browser settings.';
+      else if (name==='NotFoundError') msg='No camera found.';
+      else if (name==='NotReadableError') msg='Camera in use by another app.';
       else if (name==='OverconstrainedError') {
-        try {
-          const s = await (navigator as unknown as WebNavigatorMedia).mediaDevices?.getUserMedia({ video:true, audio:false });
-          if (!s) throw new Error('No stream');
-          if (!isMountedRef.current) { s.getTracks().forEach(t => t.stop()); return; }
-          streamRef.current=s; attachStreamToVideo(); return;
-        } catch { msg = 'Could not start camera.'; }
+        try { const s=await (navigator as unknown as WebNavigatorMedia).mediaDevices?.getUserMedia({ video:true, audio:false }); if (!s) throw new Error('No stream'); if (!isMountedRef.current) { s.getTracks().forEach(t => t.stop()); return; } streamRef.current=s; attachStreamToVideo(); return; } catch { msg='Could not start camera.'; }
       }
       if (isMountedRef.current) setCamErr(msg);
     }
@@ -988,89 +738,47 @@ export default function ProfileSetupScreen() {
   }, [stopWebStream]);
 
   const openCamera = useCallback(async (slot?:PhotoSlotConfig) => {
-    const ts = slot ?? nextSlot;
+    const ts=slot??nextSlot;
     if (!ts) { showAlert('Maximum Photos',`You can add up to ${MAX_PHOTOS} photos.`); return; }
     if (ts.type!=='freestyle'&&form.photos.some(p => p.type===ts.type)) { showAlert('Already Added',`You already have a ${ts.label} photo. Remove it first.`); return; }
-    if (!IS_WEB&&!permission?.granted) {
-      const r = await requestPermission();
-      if (!r.granted) { showAlert('Camera Required','Enable camera in device settings.',[{ text:'Cancel', style:'cancel' },{ text:'Open Settings', onPress:() => { void Linking.openSettings(); } }]); return; }
-    }
+    if (!IS_WEB&&!permission?.granted) { const r=await requestPermission(); if (!r.granted) { showAlert('Camera Required','Enable camera in device settings.',[{ text:'Cancel', style:'cancel' },{ text:'Open Settings', onPress:() => { void Linking.openSettings(); } }]); return; } }
     if (isMountedRef.current) { setCamSlot(ts); setCamFacing(ts.cameraSide); setTimerEnabled(false); setCountdown(null); setCamOpen(true); setCamErr(null); setCamReady(false); setCapturing(false); capturingRef.current=false; }
     if (IS_WEB) setTimeout(() => { if (isMountedRef.current) void startWebStream(ts.cameraSide); }, 500);
   }, [nextSlot, permission, requestPermission, form.photos, startWebStream]);
 
-  const flipCamera = useCallback(() => {
-    const n = camFacing==='front'?'back':'front';
-    setCamFacing(n);
-    if (IS_WEB) { setCamReady(false); void startWebStream(n); }
-  }, [camFacing, startWebStream]);
+  const flipCamera = useCallback(() => { const n=camFacing==='front'?'back':'front'; setCamFacing(n); if (IS_WEB) { setCamReady(false); void startWebStream(n); } }, [camFacing, startWebStream]);
 
   const processPhoto = useCallback(async (uri:string, type:PhotoType, count:number): Promise<boolean> => {
     if (isMountedRef.current) { setUploading(true); setUploadProgress(0); }
     try {
       if (isMountedRef.current) setUploadProgress(10);
-      const nsfwResult = await checkImageSafety(uri);
+      const nsfwResult=await checkImageSafety(uri);
       if (!nsfwResult.safe) { showAlert('🚫 Photo Rejected', nsfwResult.reason); return false; }
       if (isMountedRef.current) setUploadProgress(20);
-
-      let localFaceChecked = false;
-      if (type==='face') {
-        const faceResult = await checkSingleFace(uri);
-        if (faceResult.faceCount!==-1) {
-          localFaceChecked=true;
-          if (!faceResult.ok) { showAlert('Face Check Failed', faceResult.reason+'\n\nTips:\n• Look directly at the camera\n• Good lighting\n• Remove sunglasses'); return false; }
-        }
-      }
-
+      let localFaceChecked=false;
+      if (type==='face') { const faceResult=await checkSingleFace(uri); if (faceResult.faceCount!==-1) { localFaceChecked=true; if (!faceResult.ok) { showAlert('Face Check Failed', faceResult.reason+'\n\nTips:\n• Look directly at the camera\n• Good lighting\n• Remove sunglasses'); return false; } } }
       if (isMountedRef.current) setUploadProgress(35);
-      const upload: UploadResult = await uploadToCloudinary(uri, 'profile_photo');
+      const upload: UploadResult=await uploadToCloudinary(uri, 'profile_photo');
       if (isMountedRef.current) setUploadProgress(60);
-
-      if (!upload.success||!upload.url)             { showAlert('Upload Failed',  upload.error?? 'Could not upload photo.'); return false; }
-      if (upload.moderationStatus==='rejected')     { showAlert('Photo Rejected', 'This photo was flagged as inappropriate. Please use a different photo.'); return false; }
-
+      if (!upload.success||!upload.url) { showAlert('Upload Failed', upload.error??'Could not upload photo.'); return false; }
+      if (upload.moderationStatus==='rejected') { showAlert('Photo Rejected', 'This photo was flagged as inappropriate. Please use a different photo.'); return false; }
       if (isMountedRef.current) setUploadProgress(70);
       const photoUrl=upload.url, detectedFaces=upload.faces??[], imageWidth=upload.width??0, imageHeight=upload.height??0;
-
-      if (type==='face'&&!localFaceChecked) {
-        if (detectedFaces.length===0) { showAlert('No Face Detected','Could not detect a clear face.\n\nTips:\n• Look directly at the camera\n• Good lighting\n• Remove sunglasses or hats'); return false; }
-        if (detectedFaces.length>1)   { showAlert('Multiple Faces',`Detected ${detectedFaces.length} faces. Your photo must show only you.`); return false; }
-      }
-
-      if (type==='face') {
-        try { const ar:AgeEstimationResult|null = await estimateAgeFromPhoto(photoUrl); if (ar?.estimatedAge&&ar.confidence>=0.1) { if (isMountedRef.current) set('ageEstimate',ar.estimatedAge); } } catch { /* non-critical */ }
-      }
-
-      if (type==='upper_body'&&detectedFaces.length>0&&imageWidth>0&&imageHeight>0) {
-        const largestFaceHeight = Math.max(...detectedFaces.map(getFaceHeight));
-        if (largestFaceHeight/imageHeight<0.05) { showAlert('No Person Detected','Please take a photo showing you from the waist up.'); return false; }
-      }
-
+      if (type==='face'&&!localFaceChecked) { if (detectedFaces.length===0) { showAlert('No Face Detected','Could not detect a clear face.\n\nTips:\n• Look directly at the camera\n• Good lighting\n• Remove sunglasses or hats'); return false; } if (detectedFaces.length>1) { showAlert('Multiple Faces',`Detected ${detectedFaces.length} faces. Your photo must show only you.`); return false; } }
+      if (type==='face') { try { const ar:AgeEstimationResult|null=await estimateAgeFromPhoto(photoUrl); if (ar?.estimatedAge&&ar.confidence>=0.1) { if (isMountedRef.current) set('ageEstimate',ar.estimatedAge); } } catch { /* non-critical */ } }
+      if (type==='upper_body'&&detectedFaces.length>0&&imageWidth>0&&imageHeight>0) { const largestFaceHeight=Math.max(...detectedFaces.map(getFaceHeight)); if (largestFaceHeight/imageHeight<0.05) { showAlert('No Person Detected','Please take a photo showing you from the waist up.'); return false; } }
       if (type==='full_body') {
-        let isFullBody = false;
-        if (detectedFaces.length>0&&imageWidth>0&&imageHeight>0) isFullBody = Math.max(...detectedFaces.map(getFaceHeight))/imageHeight<0.25;
-        if (!isFullBody) {
-          try { if (detectedFaces.length===0) { const body=await detectFullBodyPhoto(photoUrl); isFullBody=body.isFullBody; } } catch { /* non-critical */ }
-          if (!isFullBody) {
-            const keep = await new Promise<boolean>(resolve => {
-              showAlert('Not Full Body','Could not detect a full body. Keep this photo anyway?',[
-                { text:'Discard', style:'cancel', onPress:() => resolve(false) },
-                { text:'Keep Anyway', onPress:() => { dispatch({ type:'ADD_PHOTO', photo:{ uri, url:photoUrl, type, order:count, verified:false, uploadedAt:new Date().toISOString() } }); successHaptic(); resolve(true); } },
-              ]);
-            });
-            return keep;
-          }
-        }
+        let isFullBody=false;
+        if (detectedFaces.length>0&&imageWidth>0&&imageHeight>0) isFullBody=Math.max(...detectedFaces.map(getFaceHeight))/imageHeight<0.25;
+        if (!isFullBody) { try { if (detectedFaces.length===0) { const body=await detectFullBodyPhoto(photoUrl); isFullBody=body.isFullBody; } } catch { /* non-critical */ } if (!isFullBody) { const keep=await new Promise<boolean>(resolve => { showAlert('Not Full Body','Could not detect a full body. Keep this photo anyway?',[{ text:'Discard', style:'cancel', onPress:() => resolve(false) },{ text:'Keep Anyway', onPress:() => { dispatch({ type:'ADD_PHOTO', photo:{ uri, url:photoUrl, type, order:count, verified:false, uploadedAt:new Date().toISOString() } }); successHaptic(); resolve(true); } }]); }); return keep; } }
       }
-
       if (isMountedRef.current) setUploadProgress(100);
       dispatch({ type:'ADD_PHOTO', photo:{ uri, url:photoUrl, type, order:count, verified:type==='face'?(localFaceChecked||detectedFaces.length===1):true, uploadedAt:new Date().toISOString() } });
       successHaptic();
-
-      const hints:string[] = [];
-      if (type==='face'&&!hasUpperBody)       hints.push('upper body photo (required)');
-      if (type==='upper_body'&&!hasFullBody)  hints.push('full body photo (+40% more matches)');
-      if (type==='full_body'&&count<3)        hints.push('freestyle photo to show your personality');
+      const hints:string[]=[];
+      if (type==='face'&&!hasUpperBody) hints.push('upper body photo (required)');
+      if (type==='upper_body'&&!hasFullBody) hints.push('full body photo (+40% more matches)');
+      if (type==='full_body'&&count<3) hints.push('freestyle photo to show your personality');
       showAlert('📸 Photo Added!', hints.length>0?`Great shot! Next: ${hints.join(', ')}`:'Looking good! 🎉');
       return true;
     } catch (err:unknown) {
@@ -1090,26 +798,20 @@ export default function ProfileSetupScreen() {
       if (IS_WEB) {
         const v=webVideoElRef.current;
         if (!v) { showAlert('Camera Error','Video element not found. Close and reopen camera.'); return; }
-        if (v.readyState<2) {
-          await new Promise<void>(r => { const dl=Date.now()+3000; const p=() => { if (v.readyState>=2||Date.now()>=dl) { r(); return; } setTimeout(p,100); }; p(); });
-        }
+        if (v.readyState<2) { await new Promise<void>(r => { const dl=Date.now()+3000; const p=() => { if (v.readyState>=2||Date.now()>=dl) { r(); return; } setTimeout(p,100); }; p(); }); }
         if (v.readyState<2) { showAlert('Camera Not Ready','Please wait a moment and try again.'); return; }
-        const doc2 = (globalThis as Record<string,unknown>)['document'] as { createElement:(tag:string) => WebCanvasElement }|undefined;
+        const doc2=(globalThis as Record<string,unknown>)['document'] as { createElement:(tag:string) => WebCanvasElement }|undefined;
         if (!doc2) { showAlert('Browser Error','Cannot access document.'); return; }
         const vw=v.videoWidth, vh=v.videoHeight;
         if (!vw||!vh) { showAlert('Camera Not Ready','Video dimensions not available.'); return; }
-        const canvas=doc2.createElement('canvas');
-        canvas.width=vw; canvas.height=vh;
-        const ctx=canvas.getContext('2d');
-        if (!ctx) { showAlert('Browser Error','Cannot create canvas.'); return; }
-        if (camFacing==='front') { ctx.save(); ctx.scale(-1,1); ctx.drawImage(v as unknown as CanvasImageSource,-canvas.width,0,canvas.width,canvas.height); ctx.restore(); }
-        else ctx.drawImage(v as unknown as CanvasImageSource,0,0,canvas.width,canvas.height);
+        const canvas=doc2.createElement('canvas'); canvas.width=vw; canvas.height=vh;
+        const ctx=canvas.getContext('2d'); if (!ctx) { showAlert('Browser Error','Cannot create canvas.'); return; }
+        if (camFacing==='front') { ctx.save(); ctx.scale(-1,1); ctx.drawImage(v as unknown as CanvasImageSource,-canvas.width,0,canvas.width,canvas.height); ctx.restore(); } else ctx.drawImage(v as unknown as CanvasImageSource,0,0,canvas.width,canvas.height);
         if (canvas.width<100||canvas.height<100) { showAlert('Photo Too Small','Use a higher quality camera.'); return; }
         uri=canvas.toDataURL('image/jpeg',0.88);
       } else {
         if (!cameraRef.current) { showAlert('Camera Error','Camera not available.'); return; }
-        const p=await cameraRef.current.takePictureAsync({ quality:0.88, skipProcessing:false });
-        uri=p?.uri??null;
+        const p=await cameraRef.current.takePictureAsync({ quality:0.88, skipProcessing:false }); uri=p?.uri??null;
       }
       if (!uri) { showAlert('Capture Failed','Could not capture photo.'); return; }
       const accepted=await processPhoto(uri, camSlot.type, form.photos.length);
@@ -1144,28 +846,22 @@ export default function ProfileSetupScreen() {
     ]);
   }, [form.photos, haptic]);
 
-  const movePhoto = useCallback((from:number, to:number) => {
-    if (to<0||to>=form.photos.length) return;
-    dispatch({ type:'MOVE_PHOTO', from, to }); haptic();
-  }, [form.photos.length, haptic]);
+  const movePhoto = useCallback((from:number, to:number) => { if (to<0||to>=form.photos.length) return; dispatch({ type:'MOVE_PHOTO', from, to }); haptic(); }, [form.photos.length, haptic]);
 
   const getLoc = useCallback(async () => {
     showAlert('Location Access','Only your city is shown to other users.',[
       { text:'Not Now', style:'cancel' },
       { text:'Enable', onPress:async () => {
         if (isMountedRef.current) setGettingLoc(true);
-        try {
-          const loc=await requestLocationPermission();
-          if (loc) { const d=loc.city?`${loc.city}, ${loc.country}`:'Location found'; if (isMountedRef.current) { set('locCity',d); set('locData',loc); } await saveUserLocation(loc); showAlert('📍 Location Set',d); }
-          else showAlert('Location Error','Enable location in settings.');
-        } catch { showAlert('Location Error','Something went wrong.'); }
+        try { const loc=await requestLocationPermission(); if (loc) { const d=loc.city?`${loc.city}, ${loc.country}`:'Location found'; if (isMountedRef.current) { set('locCity',d); set('locData',loc); } await saveUserLocation(loc); showAlert('📍 Location Set',d); } else showAlert('Location Error','Enable location in settings.'); }
+        catch { showAlert('Location Error','Something went wrong.'); }
         finally { if (isMountedRef.current) setGettingLoc(false); }
       }},
     ]);
   }, [set]);
 
   const switchHeightUnit = useCallback(() => {
-    const { newFt, newIn, newCm } = convertHeightForUnitSwitch(form.heightUnit, form.heightCm, form.heightFt, form.heightIn);
+    const { newFt, newIn, newCm }=convertHeightForUnitSwitch(form.heightUnit, form.heightCm, form.heightFt, form.heightIn);
     dispatch({ type:'SET', field:'heightUnit', value:form.heightUnit==='cm'?'ft':'cm' });
     dispatch({ type:'SET', field:'heightFt',   value:newFt });
     dispatch({ type:'SET', field:'heightIn',   value:newIn });
@@ -1177,34 +873,11 @@ export default function ProfileSetupScreen() {
     if (isMountedRef.current) setLoading(true);
     try {
       const e2=await ensureMyE2EEIdentity();
-      if (!e2.success||!e2.publicKey) throw new Error(e2.error?? 'Encryption identity failed');
-      const pd = {
-        uid:userId, email:userEmail, name:formatName(form.name), age, birthday:birthday.toISOString(),
-        zodiacSign:zodiac?.sign??null, zodiacEmoji:zodiac?.emoji??null, gender:form.gender,
-        interestedIn:form.interestedIn, pronouns:form.pronouns||null,
-        height:{ value:hCm, unit:form.heightUnit, displayText:hDisplay, verificationMethod:'self-reported', verifiedAt:new Date().toISOString() },
-        bodyType:form.bodyType, lookingFor:form.lookingForBody, religiousViews:form.religion,
-        lifestyle:form.lifestyle, relationshipGoal:form.relationship, education:form.education||null,
-        occupation:form.occupation.trim()||null, smoking:form.smoking||null, drinking:form.drinking||null,
-        children:form.children||null, pets:form.pets||null, diet:form.diet||null, politicalViews:form.politics||null,
-        interests:form.interests, loveLanguage:form.loveLang||null, communicationStyle:form.commStyle||null,
-        preferredFirstDate:form.firstDate||null, vibes:form.vibes,
-        preferences:{ ageRange:{ min:parseInt(form.ageMin)||MIN_AGE, max:parseInt(form.ageMax)||50 }, maxDistanceKm:parseInt(form.distKm)||50, heightRangeCm:{ min:parseInt(form.heightPrefMinCm)||null, max:parseInt(form.heightPrefMaxCm)||null }, dealbreakers:form.dealbreakers, importantFields:form.importantFields },
-        bio:form.bio.trim(), promptAnswers:form.prompts.filter(p => p.a.trim()).map(p => ({ question:p.q, answer:p.a.trim() })),
-        photos:form.photos.map(p => p.url), photoData:form.photos.map(p => ({ url:p.url, type:p.type, order:p.order, verified:p.verified, uploadedAt:p.uploadedAt })),
-        hasFullBodyPhoto:hasFullBody, privacy:{ blurUntilMatch:form.blurUntilMatch, incognitoMode:form.incognito, verifiedUsersOnly:form.verifiedOnly },
-        location:form.locData||null, locationCity:form.locCity||null,
-        personalityType:null, icebreakers:[], profileComplete:true, isVisible:true,
-        encryptionPublicKey:e2.publicKey, encryptionKeyVersion:1,
-      };
-      const ref=doc(db,'users',userId);
-      const ex=await getDoc(ref);
-      if (ex.exists()) {
-        const { uid:_, email:_e, ...ud } = pd;
-        await setDoc(ref, { ...ud, updatedAt:serverTimestamp() }, { merge:true });
-      } else {
-        await setDoc(ref, { ...pd, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), termsAcceptedAt:serverTimestamp(), encryptionCreatedAt:serverTimestamp() });
-      }
+      if (!e2.success||!e2.publicKey) throw new Error(e2.error??'Encryption identity failed');
+      const pd = { uid:userId, email:userEmail, name:formatName(form.name), age, birthday:birthday.toISOString(), zodiacSign:zodiac?.sign??null, zodiacEmoji:zodiac?.emoji??null, gender:form.gender, interestedIn:form.interestedIn, pronouns:form.pronouns||null, height:{ value:hCm, unit:form.heightUnit, displayText:hDisplay, verificationMethod:'self-reported', verifiedAt:new Date().toISOString() }, bodyType:form.bodyType, lookingFor:form.lookingForBody, religiousViews:form.religion, lifestyle:form.lifestyle, relationshipGoal:form.relationship, education:form.education||null, occupation:form.occupation.trim()||null, smoking:form.smoking||null, drinking:form.drinking||null, children:form.children||null, pets:form.pets||null, diet:form.diet||null, politicalViews:form.politics||null, interests:form.interests, loveLanguage:form.loveLang||null, communicationStyle:form.commStyle||null, preferredFirstDate:form.firstDate||null, vibes:form.vibes, preferences:{ ageRange:{ min:parseInt(form.ageMin)||MIN_AGE, max:parseInt(form.ageMax)||50 }, maxDistanceKm:parseInt(form.distKm)||50, heightRangeCm:{ min:parseInt(form.heightPrefMinCm)||null, max:parseInt(form.heightPrefMaxCm)||null }, dealbreakers:form.dealbreakers, importantFields:form.importantFields }, bio:form.bio.trim(), promptAnswers:form.prompts.filter(p => p.a.trim()).map(p => ({ question:p.q, answer:p.a.trim() })), photos:form.photos.map(p => p.url), photoData:form.photos.map(p => ({ url:p.url, type:p.type, order:p.order, verified:p.verified, uploadedAt:p.uploadedAt })), hasFullBodyPhoto:hasFullBody, privacy:{ blurUntilMatch:form.blurUntilMatch, incognitoMode:form.incognito, verifiedUsersOnly:form.verifiedOnly }, location:form.locData||null, locationCity:form.locCity||null, personalityType:null, icebreakers:[], profileComplete:true, isVisible:true, encryptionPublicKey:e2.publicKey, encryptionKeyVersion:1 };
+      const ref=doc(db,'users',userId); const ex=await getDoc(ref);
+      if (ex.exists()) { const { uid:_, email:_e, ...ud }=pd; await setDoc(ref, { ...ud, updatedAt:serverTimestamp() }, { merge:true }); }
+      else { await setDoc(ref, { ...pd, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), termsAcceptedAt:serverTimestamp(), encryptionCreatedAt:serverTimestamp() }); }
       if (draftKey) try { profileStorage.delete(draftKey); } catch { }
       if (stepKey)  try { profileStorage.delete(stepKey);  } catch { }
       dispatch({ type:'RESET' });
@@ -1219,54 +892,28 @@ export default function ProfileSetupScreen() {
   }, [userId, userEmail, birthday, age, zodiac, form, hCm, hDisplay, hasFullBody, draftKey, stepKey, router]);
 
   const handleSave = useCallback(async () => {
-    if (!userId)             { router.replace('/login' as Parameters<typeof router.replace>[0]); return; }
+    if (!userId) { router.replace('/login' as Parameters<typeof router.replace>[0]); return; }
     if (!form.termsAccepted) { showAlert('Terms Required','Please accept the Terms of Service.'); return; }
-    if (!birthday||!age)     { showAlert('Invalid Birthday','Enter a valid date of birth.'); return; }
-    if (form.bio.trim())     { const b=checkBlocked(form.bio); if (b) { showAlert('Bio Issue',b); return; } }
+    if (!birthday||!age) { showAlert('Invalid Birthday','Enter a valid date of birth.'); return; }
+    if (form.bio.trim()) { const b=checkBlocked(form.bio); if (b) { showAlert('Bio Issue',b); return; } }
     for (const p of form.prompts) { if (p.a.trim()) { const b=checkBlocked(p.a); if (b) { showAlert('Prompt Issue',b); return; } } }
-    if (form.ageEstimate && Math.abs(age-form.ageEstimate)>AGE_TOL) {
-      showAlert('Age Verification',`Photos suggest ~${form.ageEstimate} but birthday says ${age}. Continue?`,[{ text:'Go Back', style:'cancel' },{ text:'Continue', onPress:() => void doSave() }]);
-      return;
-    }
-    if (!hasFullBody&&form.photos.length>0) {
-      showAlert('No Full-Body Photo','Add one for more matches?',[{ text:'Add Photo', style:'cancel', onPress:() => { setStep(1); void openCamera(PHOTO_SLOTS[2]); } },{ text:'Continue Anyway', onPress:() => void doSave() }]);
-      return;
-    }
+    if (form.ageEstimate&&Math.abs(age-form.ageEstimate)>AGE_TOL) { showAlert('Age Verification',`Photos suggest ~${form.ageEstimate} but birthday says ${age}. Continue?`,[{ text:'Go Back', style:'cancel' },{ text:'Continue', onPress:() => void doSave() }]); return; }
+    if (!hasFullBody&&form.photos.length>0) { showAlert('No Full-Body Photo','Add one for more matches?',[{ text:'Add Photo', style:'cancel', onPress:() => { setStep(1); void openCamera(PHOTO_SLOTS[2]); } },{ text:'Continue Anyway', onPress:() => void doSave() }]); return; }
     await doSave();
   }, [userId, form, birthday, age, hasFullBody, router, doSave, openCamera]);
 
   const renderChip = useCallback((value:string, selected:boolean, onPress:() => void, icon?:string, disabled?:boolean) => (
-    <TouchableOpacity
-      key={value}
-      style={[st.chip,{ borderColor:selected?C.accent:C.inputBorder, backgroundColor:selected?C.accentGlow:C.input },disabled&&st.chipOff]}
-      onPress={() => { haptic(); onPress(); }}
-      disabled={disabled||loading||uploading}
-      activeOpacity={0.7}
-      accessibilityLabel={`${value}${selected?', selected':''}`}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked:selected, disabled:disabled||loading||uploading }}>
-      {icon != null && <Text style={st.chipIcon}>{icon}</Text>}
+    <TouchableOpacity key={value} style={[st.chip,{ borderColor:selected?C.accent:C.inputBorder, backgroundColor:selected?C.accentGlow:C.input },disabled&&st.chipOff]} onPress={() = accessibilityLabel="button"> { haptic(); onPress(); }} disabled={disabled||loading||uploading} activeOpacity={0.7} accessibilityLabel={`${value}${selected?', selected':''}`} accessibilityRole="checkbox" accessibilityState={{ checked:selected, disabled:disabled||loading||uploading }}>
+      {icon!=null&&<Text style={st.chipIcon}>{icon}</Text>}
       <Text style={[st.chipText,{ color:selected?C.accent:C.sub },selected&&{ fontWeight:'600' }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value.replace(/^\S+\s/,'')}</Text>
-      {selected && <Text style={[st.chipCheck,{ color:C.accent }]}>✓</Text>}
+      {selected&&<Text style={[st.chipCheck,{ color:C.accent }]}>✓</Text>}
     </TouchableOpacity>
   ), [haptic, loading, uploading, C]);
 
   const renderOpt = useCallback((opt:OptionItem, sel:string, onSel:(v:string) => void) => (
-    <TouchableOpacity
-      key={opt.value}
-      style={[st.optRow,{ backgroundColor:C.input, borderColor:sel===opt.value?C.accent:C.inputBorder }]}
-      onPress={() => { haptic(); onSel(opt.value); }}
-      disabled={loading||uploading}
-      activeOpacity={0.7}
-      accessibilityLabel={`${opt.value}${opt.desc?`, ${opt.desc}`:''}${sel===opt.value?', selected':''}`}
-      accessibilityRole="radio"
-      accessibilityState={{ checked:sel===opt.value }}>
-      <View style={st.optHead}>
-        {opt.icon != null && <Text style={st.optIcon}>{opt.icon}</Text>}
-        <Text style={[st.optText,{ color:sel===opt.value?C.accent:C.text }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.value}</Text>
-        {sel===opt.value && <Text style={[st.optCheck,{ color:C.accent }]}>✓</Text>}
-      </View>
-      {opt.desc != null && opt.desc !== '' && <Text style={[st.optDesc,{ color:C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.desc}</Text>}
+    <TouchableOpacity key={opt.value} style={[st.optRow,{ backgroundColor:C.input, borderColor:sel===opt.value?C.accent:C.inputBorder }]} onPress={() = accessibilityLabel="button"> { haptic(); onSel(opt.value); }} disabled={loading||uploading} activeOpacity={0.7} accessibilityLabel={`${opt.value}${opt.desc?`, ${opt.desc}`:''}${sel===opt.value?', selected':''}`} accessibilityRole="radio" accessibilityState={{ checked:sel===opt.value }}>
+      <View style={st.optHead}>{opt.icon!=null&&<Text style={st.optIcon}>{opt.icon}</Text>}<Text style={[st.optText,{ color:sel===opt.value?C.accent:C.text }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.value}</Text>{sel===opt.value&&<Text style={[st.optCheck,{ color:C.accent }]}>✓</Text>}</View>
+      {opt.desc!=null&&opt.desc!==''&&<Text style={[st.optDesc,{ color:C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.desc}</Text>}
     </TouchableOpacity>
   ), [haptic, loading, uploading, C]);
 
@@ -1284,44 +931,39 @@ export default function ProfileSetupScreen() {
     }
   }, [step, C, form, hasFullBody, hasFace, hasUpperBody, nextSlot, uploading, loading, uploadProgress, movePhoto, removePhoto, openCamera, age, zodiac, birthday, hCm, hDisplay, set, renderChip, switchHeightUnit, renderOpt, haptic, dispatch, gettingLoc, getLoc, promptPicker, pct]);
 
+  const promptQData = useMemo(() => PROMPT_QUESTIONS.map((q, i) => ({ q, i })), []);
+
   return (
     <KeyboardAvoidingView style={[st.root,{ backgroundColor:C.bg }]} behavior={IS_IOS?'padding':'height'}>
-      <LinearGradient colors={[C.bgGradientStart, C.bgGradientMid, C.bgGradientEnd]} style={StyleSheet.absoluteFill} start={{ x:0.5, y:0 }} end={{ x:0.5, y:1 }} />
-
+      <LinearGradient colors={[C.bgGradientStart, C.bgGradientMid, C.bgGradientEnd]} style={staticStyles.absoluteFill} start={{ x:0.5, y:0 }} end={{ x:0.5, y:1 }} />
       <View style={[st.topBar,{ backgroundColor:C.card, borderBottomColor:C.cardBorder }]}>
-        <TouchableOpacity onPress={goBack} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityLabel={step===1?'Close setup':'Go back'} accessibilityRole="button">
-          <Text style={[st.backBtn,{ color:C.accent }]}>{step===1?'✕':'← Back'}</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityLabel={step===1?'Close setup':'Go back'} accessibilityRole="button"><Text style={[st.backBtn,{ color:C.accent }]}>{step===1?'✕':'← Back'}</Text></TouchableOpacity>
         <Text style={[st.topTitle,{ color:C.text }]}>{step}/{TOTAL_STEPS} · {STEP_NAMES[step-1]}</Text>
         <Text style={[st.draftLabel,{ color:C.muted }]}>💾 Draft</Text>
       </View>
-
       <View style={[st.stepDots,{ backgroundColor:C.card }]} accessibilityLabel={`Step ${step} of ${TOTAL_STEPS}`}>
         {STEP_NAMES.map((name,i) => <View key={name} style={[st.stepDot,{ backgroundColor:C.inputBorder },i+1<step&&{ backgroundColor:C.success },i+1===step&&{ backgroundColor:C.accent, transform:[{ scale:1.3 }] }]} />)}
       </View>
-
       <View style={[st.progBg,{ backgroundColor:C.inputBorder }]} accessibilityLabel={`${Math.round((step/TOTAL_STEPS)*100)}% complete`} accessibilityRole="progressbar">
-        <Animated.View style={[st.progFill,{ backgroundColor:C.accent, width:progAnim.interpolate({ inputRange:[0,1], outputRange:['0%','100%'] }) }]} />
+        <Animated.View style={[st.progFill,{ backgroundColor:C.accent }, progStyle]} />
       </View>
-
       {IS_WEB ? (
-        <View style={{ flex:1 }}>
+        <View style={staticStyles.flex1}>
           <ScrollView ref={scrollRef} style={st.sv} contentContainerStyle={st.svContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Animated.View style={{ opacity:fadeAnim, transform:[{ translateX:slideAnim }] }}>{renderCurrent()}</Animated.View>
-            <View style={{ height:SPACING.xl }} />
+            <Animated.View style={fadeStyle}>{renderCurrent()}</Animated.View>
+            <View style={st.bottomPad} />
           </ScrollView>
         </View>
       ) : (
-        <Pressable style={{ flex:1 }} onPress={() => Keyboard.dismiss()}>
+        <Pressable style={staticStyles.flex1} onPress={() = accessibilityLabel="button"> Keyboard.dismiss()}>
           <ScrollView ref={scrollRef} style={st.sv} contentContainerStyle={st.svContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Animated.View style={{ opacity:fadeAnim, transform:[{ translateX:slideAnim }] }}>{renderCurrent()}</Animated.View>
-            <View style={{ height:SPACING.xl }} />
+            <Animated.View style={fadeStyle}>{renderCurrent()}</Animated.View>
+            <View style={st.bottomPad} />
           </ScrollView>
         </Pressable>
       )}
-
       <View style={[st.botBar,{ backgroundColor:C.card, borderTopColor:C.cardBorder }]}>
-        {step < TOTAL_STEPS ? (
+        {step<TOTAL_STEPS ? (
           stepOk ? (
             <TouchableOpacity style={st.nextBtnWrap} onPress={goNext} activeOpacity={0.85} accessibilityLabel={`Next: ${STEP_NAMES[step]}`} accessibilityRole="button">
               <LinearGradient colors={[C.buttonGradStart, C.buttonGradEnd]} start={{ x:0, y:0 }} end={{ x:1, y:1 }} style={st.nextBtn}>
@@ -1329,63 +971,39 @@ export default function ProfileSetupScreen() {
               </LinearGradient>
             </TouchableOpacity>
           ) : (
-            <View style={[st.nextBtnWrap,{ opacity:0.6 }]}>
-              <View style={[st.nextBtn,{ backgroundColor:C.disabledBg }]}>
-                <Text style={[st.nextBtnText,{ color:C.disabledText }]}>{missingMsg}</Text>
-              </View>
-            </View>
+            <View style={[st.nextBtnWrap, st.nextBtnDisabled]}><View style={[st.nextBtn,{ backgroundColor:C.disabledBg }]}><Text style={[st.nextBtnText,{ color:C.disabledText }]}>{missingMsg}</Text></View></View>
           )
         ) : (
-          form.termsAccepted && !loading ? (
-            <TouchableOpacity style={st.nextBtnWrap} onPress={() => void handleSave()} activeOpacity={0.85} accessibilityLabel="Create profile" accessibilityRole="button">
+          form.termsAccepted&&!loading ? (
+            <TouchableOpacity style={st.nextBtnWrap} onPress={() = accessibilityLabel="button"> void handleSave()} activeOpacity={0.85} accessibilityLabel="Create profile" accessibilityRole="button">
               <LinearGradient colors={[C.success,'#3aaa50']} start={{ x:0, y:0 }} end={{ x:1, y:1 }} style={st.nextBtn}>
                 <Text style={[st.nextBtnText,{ color:C.white }]}>✓ Create Profile</Text>
               </LinearGradient>
             </TouchableOpacity>
           ) : (
-            <View style={[st.nextBtnWrap,{ opacity:loading?0.8:0.5 }]}>
-              <View style={[st.nextBtn,{ backgroundColor:loading?C.accent:C.disabledBg }]}>
-                {loading
-                  ? <View style={st.saveBtnRow}><ActivityIndicator size="small" color={C.white} /><Text style={[st.nextBtnText,{ color:C.white, marginLeft:SPACING.sm }]}> Creating…</Text></View>
-                  : <Text style={[st.nextBtnText,{ color:C.disabledText }]}>Accept Terms to Continue</Text>}
-              </View>
-            </View>
+            <View style={[st.nextBtnWrap,{ opacity:loading?0.8:0.5 }]}><View style={[st.nextBtn,{ backgroundColor:loading?C.accent:C.disabledBg }]}>{loading ? <View style={st.saveBtnRow}><ActivityIndicator size="small" color={C.white} /><Text style={[st.nextBtnText,{ color:C.white, marginLeft:SPACING.sm }]}> Creating…</Text></View> : <Text style={[st.nextBtnText,{ color:C.disabledText }]}>Accept Terms to Continue</Text>}</View></View>
           )
         )}
       </View>
-
       <Modal visible={camOpen} animationType="slide" onRequestClose={closeCam} statusBarTranslucent>
         <View style={[st.camModal,{ backgroundColor:C.bg }]}>
-          <LinearGradient colors={[C.bgGradientStart, C.bgGradientEnd]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[C.bgGradientStart, C.bgGradientEnd]} style={staticStyles.absoluteFill} />
           <View style={[st.camHead,{ backgroundColor:C.card, borderBottomColor:C.cardBorder }]}>
-            <TouchableOpacity onPress={closeCam} activeOpacity={0.7} disabled={capturing} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityLabel="Cancel photo" accessibilityRole="button">
-              <Text style={[st.camCancel,{ color:C.danger }]}>✕ Cancel</Text>
-            </TouchableOpacity>
-            <View style={st.camHeadCenter}>
-              <Text style={[st.camTitle,{ color:C.text }]}>{camSlot?.icon} {camSlot?.label}</Text>
-              <Text style={[st.camInstr,{ color:C.muted }]}>{camSlot?.instruction}</Text>
-            </View>
-            <TouchableOpacity onPress={() => { if (capturing||countdown!==null) return; handleCapture(); }} activeOpacity={0.7} style={st.camCaptureHeaderBtn} disabled={capturing||countdown!==null} accessibilityLabel={capturing?'Processing photo':'Take photo'} accessibilityRole="button">
-              <Text style={[st.camCaptureHeaderBtnText,{ color:C.white }]}>{capturing?'⏳ Wait...':'📸 Capture'}</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={closeCam} activeOpacity={0.7} disabled={capturing} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityLabel="Cancel photo" accessibilityRole="button"><Text style={[st.camCancel,{ color:C.danger }]}>✕ Cancel</Text></TouchableOpacity>
+            <View style={st.camHeadCenter}><Text style={[st.camTitle,{ color:C.text }]}>{camSlot?.icon} {camSlot?.label}</Text><Text style={[st.camInstr,{ color:C.muted }]}>{camSlot?.instruction}</Text></View>
+            <TouchableOpacity onPress={() = accessibilityLabel="button"> { if (capturing||countdown!==null) return; handleCapture(); }} activeOpacity={0.7} style={st.camCaptureHeaderBtn} disabled={capturing||countdown!==null} accessibilityLabel={capturing?'Processing photo':'Take photo'} accessibilityRole="button"><Text style={[st.camCaptureHeaderBtnText,{ color:C.white }]}>{capturing?'⏳ Wait...':'📸 Capture'}</Text></TouchableOpacity>
           </View>
           <View style={st.camContent} pointerEvents="box-none">
             {IS_WEB ? (
               <View style={[st.camBox,{ borderColor:C.accent }]}>
                 {camErr ? (
-                  <View style={st.camErrWrap}>
-                    <Text style={st.camErrIcon}>📷</Text>
-                    <Text style={[st.camErrText,{ color:C.danger }]}>{camErr}</Text>
-                    <TouchableOpacity style={[st.retryBtn,{ backgroundColor:C.accent }]} onPress={() => { if (isMountedRef.current) { setCamErr(null); setCamReady(false); } if (camSlot) void startWebStream(camSlot.cameraSide); }} activeOpacity={0.7} accessibilityLabel="Retry camera" accessibilityRole="button">
-                      <Text style={[st.retryBtnText,{ color:C.white }]}>Try Again</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <View style={st.camErrWrap}><Text style={st.camErrIcon}>📷</Text><Text style={[st.camErrText,{ color:C.danger }]}>{camErr}</Text><TouchableOpacity style={[st.retryBtn,{ backgroundColor:C.accent }]} onPress={() = accessibilityLabel="button"> { if (isMountedRef.current) { setCamErr(null); setCamReady(false); } if (camSlot) void startWebStream(camSlot.cameraSide); }} activeOpacity={0.7} accessibilityLabel="Retry camera" accessibilityRole="button"><Text style={[st.retryBtnText,{ color:C.white }]}>Try Again</Text></TouchableOpacity></View>
                 ) : (
                   <>
-                    {!camReady && <View style={[StyleSheet.absoluteFillObject,st.camLoadWrap]} pointerEvents="none"><ActivityIndicator size="large" color={C.accent} /><Text style={[st.camLoadText,{ color:C.muted }]}>Starting camera…</Text></View>}
-                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none"><WebVideoPreview facing={camFacing} onReady={handleVideoRef} /></View>
-                    {camReady&&camSlot&&<View style={StyleSheet.absoluteFillObject} pointerEvents="none"><CameraGuide type={camSlot.type} C={C} /></View>}
-                    {capturing&&<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>}
+                    {!camReady&&(<View style={[staticStyles.absoluteFill, st.camLoadWrap]} pointerEvents="none"><ActivityIndicator size="large" color={C.accent} /><Text style={[st.camLoadText,{ color:C.muted }]}>Starting camera…</Text></View>)}
+                    <View style={staticStyles.absoluteFill} pointerEvents="none"><WebVideoPreview facing={camFacing} onReady={handleVideoRef} /></View>
+                    {camReady&&camSlot&&(<View style={staticStyles.absoluteFill} pointerEvents="none"><CameraGuide type={camSlot.type} C={C} /></View>)}
+                    {capturing&&(<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>)}
                   </>
                 )}
               </View>
@@ -1393,13 +1011,13 @@ export default function ProfileSetupScreen() {
               <View style={[st.camBox,{ borderColor:C.accent }]}>
                 <CameraView ref={cameraRef} style={st.camNative} facing={camFacing} onCameraReady={() => { if (isMountedRef.current) setCamReady(true); }} onMountError={err => { if (isMountedRef.current) setCamErr(err.message??'Camera failed.'); }} />
                 {camSlot&&<CameraGuide type={camSlot.type} C={C} />}
-                {capturing&&<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>}
+                {capturing&&(<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>)}
               </View>
             )}
-            {countdown!==null&&<View style={st.countdownOverlay} pointerEvents="none"><Text style={[st.countdownText,{ color:C.white }]}>{countdown}</Text></View>}
+            {countdown!==null&&(<View style={st.countdownOverlay} pointerEvents="none"><Text style={[st.countdownText,{ color:C.white }]}>{countdown}</Text></View>)}
           </View>
           <View style={[st.camControls,{ backgroundColor:C.card, borderTopColor:C.cardBorder }]}>
-            {camSlot?.timerAvailable&&<TouchableOpacity style={[st.timerBtn,{ backgroundColor:C.input, borderColor:timerEnabled?C.accent:C.inputBorder },timerEnabled&&{ backgroundColor:C.accentGlow },capturing&&st.btnOff]} onPress={() => { setTimerEnabled(v => !v); haptic(); }} disabled={capturing} activeOpacity={0.7} accessibilityLabel={timerEnabled?'Disable timer':'Enable 3 second timer'} accessibilityRole="switch" accessibilityState={{ checked:timerEnabled }}><Text style={[st.timerBtnText,{ color:timerEnabled?C.accent:C.text }]}>{timerEnabled?`⏱ ${TIMER_SECONDS}s ON`:'⏱ Timer'}</Text></TouchableOpacity>}
+            {camSlot?.timerAvailable&&<TouchableOpacity style={[st.timerBtn,{ backgroundColor:C.input, borderColor:timerEnabled?C.accent:C.inputBorder },timerEnabled&&{ backgroundColor:C.accentGlow },capturing&&st.btnOff]} onPress={() = accessibilityLabel="button"> { setTimerEnabled(v => !v); haptic(); }} disabled={capturing} activeOpacity={0.7} accessibilityLabel={timerEnabled?'Disable timer':'Enable 3 second timer'} accessibilityRole="switch" accessibilityState={{ checked:timerEnabled }}><Text style={[st.timerBtnText,{ color:timerEnabled?C.accent:C.text }]}>{timerEnabled?`⏱ ${TIMER_SECONDS}s ON`:'⏱ Timer'}</Text></TouchableOpacity>}
             <View style={st.camBtnRow}>
               <TouchableOpacity style={[st.flipBtn,{ backgroundColor:C.input, borderColor:C.inputBorder },capturing&&st.btnOff]} onPress={flipCamera} disabled={capturing} activeOpacity={0.7} accessibilityLabel="Flip camera" accessibilityRole="button"><Text style={st.flipBtnText}>🔄</Text></TouchableOpacity>
               <TouchableOpacity style={[st.captureBtn,{ borderColor:C.accent },(capturing||countdown!==null)&&st.captureBtnOff]} onPress={handleCapture} activeOpacity={0.8} accessibilityLabel={countdown!==null?`Taking photo in ${countdown}`:'Take photo'} accessibilityRole="button" accessibilityState={{ disabled:capturing||countdown!==null }}>
@@ -1410,33 +1028,28 @@ export default function ProfileSetupScreen() {
           </View>
         </View>
       </Modal>
-
       <Modal visible={promptPicker!==null} animationType="slide" transparent onRequestClose={() => setPromptPicker(null)}>
         <View style={st.pickerOverlay}>
           <View style={[st.pickerContent,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
             <Text style={[st.pickerTitle,{ color:C.text }]}>Choose a Question</Text>
-            <FlatList
-              data={PROMPT_QUESTIONS}
-              keyExtractor={(_,i) => `pq_${i}`}
+            <LegendList
+              data={promptQData}
+              keyExtractor={(item) => `pq_${item.i}`}
+              recycleItems={true}
+              estimatedItemSize={64}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item:q }) => {
-                const used = promptPicker!==null&&promptPicker<form.prompts.length&&form.prompts.some((p,i) => p.q===q&&i!==promptPicker);
+              renderItem={({ item }:LegendListRenderItemProps<{ q:string; i:number }>) => {
+                const { q }=item;
+                const used=promptPicker!==null&&promptPicker<form.prompts.length&&form.prompts.some((p,i) => p.q===q&&i!==promptPicker);
                 return (
-                  <TouchableOpacity
-                    style={[st.pickerItem,{ borderBottomColor:C.inputBorder },used&&st.pickerItemOff]}
-                    onPress={() => { if (used||promptPicker===null||promptPicker>=form.prompts.length) return; dispatch({ type:'SET_PROMPT', index:promptPicker, q, a:form.prompts[promptPicker]?.a??'' }); setPromptPicker(null); }}
-                    disabled={used} activeOpacity={0.7}
-                    accessibilityLabel={`${q}${used?', already used':''}`}
-                    accessibilityRole="button" accessibilityState={{ disabled:used }}>
+                  <TouchableOpacity style={[st.pickerItem,{ borderBottomColor:C.inputBorder },used&&st.pickerItemOff]} onPress={() = accessibilityLabel="button"> { if (used||promptPicker===null||promptPicker>=form.prompts.length) return; dispatch({ type:'SET_PROMPT', index:promptPicker, q, a:form.prompts[promptPicker]?.a??'' }); setPromptPicker(null); }} disabled={used} activeOpacity={0.7} accessibilityLabel={`${q}${used?', already used':''}`} accessibilityRole="button" accessibilityState={{ disabled:used }}>
                     <Text style={[st.pickerItemText,{ color:used?C.muted:C.text }]}>{q}</Text>
                     {used&&<Text style={[st.pickerUsed,{ color:C.muted }]}>Already used</Text>}
                   </TouchableOpacity>
                 );
               }}
             />
-            <TouchableOpacity style={st.pickerCancel} onPress={() => setPromptPicker(null)} activeOpacity={0.7} accessibilityLabel="Cancel" accessibilityRole="button">
-              <Text style={[st.pickerCancelText,{ color:C.danger }]}>Cancel</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={st.pickerCancel} onPress={() = accessibilityLabel="button"> setPromptPicker(null)} activeOpacity={0.7} accessibilityLabel="Cancel" accessibilityRole="button"><Text style={[st.pickerCancelText,{ color:C.danger }]}>Cancel</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1446,12 +1059,13 @@ export default function ProfileSetupScreen() {
 
 const st = StyleSheet.create({
   root:{ flex:1 }, sv:{ flex:1 }, svContent:{ padding:SPACING.xl, paddingBottom:SPACING.xxxxl },
+  bottomPad:{ height:SPACING.xl },
   topBar:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:SPACING.lg, paddingTop:IS_IOS?56:44, paddingBottom:SPACING.md, borderBottomWidth:1 },
   backBtn:{ fontSize:FONT.lg, fontWeight:'600' }, topTitle:{ fontSize:FONT.md, fontWeight:'600' }, draftLabel:{ fontSize:FONT.xs },
   stepDots:{ flexDirection:'row', justifyContent:'center', alignItems:'center', gap:SPACING.xs+2, paddingVertical:SPACING.sm, paddingHorizontal:SPACING.lg },
   stepDot:{ width:8, height:8, borderRadius:RADIUS.full }, progBg:{ height:3 }, progFill:{ height:'100%', borderRadius:RADIUS.sm },
   botBar:{ padding:SPACING.lg, paddingBottom:IS_IOS?34:SPACING.lg, borderTopWidth:1 },
-  nextBtnWrap:{ width:'100%', borderRadius:RADIUS.xxl, overflow:'hidden' },
+  nextBtnWrap:{ width:'100%', borderRadius:RADIUS.xxl, overflow:'hidden' }, nextBtnDisabled:{ opacity:0.6 },
   nextBtn:{ paddingVertical:SPACING.lg, borderRadius:RADIUS.xxl, alignItems:'center', minHeight:56, justifyContent:'center' },
   nextBtnText:{ fontSize:FONT.lg, fontWeight:'700', letterSpacing:0.3 },
   saveBtnRow:{ flexDirection:'row', alignItems:'center', justifyContent:'center' },
@@ -1510,7 +1124,7 @@ const st = StyleSheet.create({
   previewLabel:{ fontSize:FONT.base, marginBottom:SPACING.sm+2, fontWeight:'600' },
   preview:{ borderRadius:RADIUS.xl, overflow:'hidden', marginBottom:SPACING.xl, borderWidth:1.5 },
   previewPhotoScroll:{ height:180 }, previewThumb:{ width:140, height:180, marginRight:SPACING.xxs+2 },
-  blurOverlay:{ ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(26,26,46,0.75)', justifyContent:'center', alignItems:'center' }, blurText:{ fontSize:FONT.xl, fontWeight:'bold' },
+  blurOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(26,26,46,0.75)', justifyContent:'center', alignItems:'center' }, blurText:{ fontSize:FONT.xl, fontWeight:'bold' },
   previewInfo:{ padding:SPACING.xl }, previewName:{ fontSize:FONT.xxxl, fontWeight:'800', marginBottom:SPACING.xxs+2, letterSpacing:-0.3 },
   previewSub:{ fontSize:FONT.base, marginBottom:SPACING.sm }, previewDetail:{ fontSize:FONT.base, marginBottom:SPACING.xxs+2 },
   previewVibes:{ fontSize:FONT.xxl+2, marginVertical:SPACING.sm }, previewBio:{ fontSize:FONT.lg-1, lineHeight:22, marginTop:SPACING.sm, marginBottom:SPACING.md },
@@ -1526,8 +1140,7 @@ const st = StyleSheet.create({
   camHead:{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', padding:SPACING.lg, paddingTop:IS_IOS?56:44, borderBottomWidth:1 },
   camCancel:{ fontSize:FONT.lg, fontWeight:'600' },
   camHeadCenter:{ flex:1, alignItems:'center', marginHorizontal:SPACING.sm+2 }, camTitle:{ fontSize:FONT.xl, fontWeight:'800' }, camInstr:{ fontSize:FONT.sm, textAlign:'center', marginTop:SPACING.xxs+2, lineHeight:18 },
-  camCaptureHeaderBtn:{ backgroundColor:'#6C63FF', paddingHorizontal:16, paddingVertical:10, borderRadius:20 },
-  camCaptureHeaderBtnText:{ fontWeight:'700', fontSize:14 },
+  camCaptureHeaderBtn:{ backgroundColor:'#6C63FF', paddingHorizontal:16, paddingVertical:10, borderRadius:20 }, camCaptureHeaderBtnText:{ fontWeight:'700', fontSize:14 },
   camContent:{ flex:1, justifyContent:'center', alignItems:'center', padding:SPACING.xl },
   camBox:{ width:300, height:400, borderRadius:RADIUS.xl, overflow:'hidden', backgroundColor:'#000', borderWidth:2, position:'relative' },
   camNative:{ width:'100%', height:'100%' },
@@ -1535,7 +1148,7 @@ const st = StyleSheet.create({
   camErrText:{ fontSize:FONT.base, textAlign:'center', marginBottom:SPACING.xl, lineHeight:22 },
   camLoadWrap:{ justifyContent:'center', alignItems:'center' }, camLoadText:{ marginTop:SPACING.lg, fontSize:FONT.base },
   retryBtn:{ paddingVertical:SPACING.md+2, paddingHorizontal:SPACING.xxxl, borderRadius:RADIUS.xxl }, retryBtnText:{ fontSize:FONT.base, fontWeight:'600' },
-  camProcessingOverlay:{ ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(0,0,0,0.45)', justifyContent:'center', alignItems:'center', zIndex:30 },
+  camProcessingOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.45)', justifyContent:'center', alignItems:'center', zIndex:30 },
   camProcessingText:{ marginTop:SPACING.lg, fontSize:FONT.base, fontWeight:'600' },
   countdownOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:80, justifyContent:'center', alignItems:'center', zIndex:20 } as const,
   countdownText:{ fontSize:120, fontWeight:'bold', textShadowColor:'rgba(0,0,0,0.8)', textShadowOffset:{ width:2, height:2 }, textShadowRadius:10 },

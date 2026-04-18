@@ -5,7 +5,6 @@ import type { SessionState } from './signalKeyStore';
 
 const b64Dec = naclUtil.decodeBase64, b64Enc = naclUtil.encodeBase64;
 
-// HKDF-SHA256 using expo-crypto
 async function hkdf(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, len: number): Promise<Uint8Array> {
   const prk = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, naclUtil.encodeUTF8(naclUtil.encodeBase64(salt)) + naclUtil.encodeUTF8(naclUtil.encodeBase64(ikm)));
   const okm = new Uint8Array(len);
@@ -18,7 +17,6 @@ async function hkdf(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, len: nu
   return okm.slice(0, len);
 }
 
-// X3DH Key Agreement
 export async function x3dhAgreement(
   myIdPriv: string, myEphemPriv: string,
   theirIdPub: string, theirSignedPub: string, theirOneTimePub?: string
@@ -31,7 +29,6 @@ export async function x3dhAgreement(
   return hkdf(combined, new Uint8Array(32), new TextEncoder().encode('Signal_X3DH'), 64);
 }
 
-// AES-GCM via WebCrypto (available in RN 0.83+)
 async function aesGcmEncrypt(key: Uint8Array, nonce: Uint8Array, plaintext: Uint8Array): Promise<{ ciphertext: Uint8Array; tag: Uint8Array }> {
   const cryptoKey = await globalThis.crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, ['encrypt']);
   const result = await globalThis.crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, cryptoKey, plaintext);
@@ -46,7 +43,6 @@ async function aesGcmDecrypt(key: Uint8Array, nonce: Uint8Array, ciphertext: Uin
   return new Uint8Array(result);
 }
 
-// Double Ratchet Step
 export async function ratchetStep(
   state: SessionState,
   isSender: boolean,
@@ -57,7 +53,6 @@ export async function ratchetStep(
   const chainKey = isSender ? sendingChainKey : receivingChainKey;
   const counter = isSender ? sendingMsgCounter : receivingMsgCounter;
 
-  // Derive message key & next chain key
   const msgKey = await hkdf(new TextEncoder().encode(chainKey), new Uint8Array(0), new TextEncoder().encode('msg_key'), 32);
   const nextChainKey = await hkdf(new TextEncoder().encode(chainKey), new Uint8Array(0), new TextEncoder().encode('chain_key'), 32);
 
@@ -89,7 +84,6 @@ export async function ratchetStep(
   return { newState, output, nonce };
 }
 
-// DH Ratchet Update
 export async function dhRatchetUpdate(
   state: SessionState,
   isInitiator: boolean,

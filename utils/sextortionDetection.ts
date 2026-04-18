@@ -72,16 +72,13 @@ export function routeSextortionVictimSupport(
     };
   }
 
-  // Determine urgency
   let urgency: VictimSupportRouting['urgency'] = 'standard';
   if (isSelfHarmRisk) urgency = 'immediate';
   else if (isMinor) urgency = 'immediate';
   else if (isVictimLanguage) urgency = 'high';
 
-  // Build resource list based on locale and age
   const resources = buildResourceList(userLocale, isMinor, isSelfHarmRisk);
 
-  // In-app actions to show the user
   const inAppActions: string[] = [
     'block_suspect', // one-tap block
     'save_evidence', // screenshot/export conversation
@@ -93,7 +90,6 @@ export function routeSextortionVictimSupport(
     inAppActions.unshift('crisis_hotline_call'); // top priority
   }
 
-  // Auto-actions the platform takes
   const autoActionsApplied: string[] = [];
 
   if (urgency === 'immediate') {
@@ -124,7 +120,6 @@ function buildResourceList(
   const resources: VictimResource[] = [];
   const country = locale.split('-')[1]?.toUpperCase() ?? 'US';
 
-  // Self-harm resources always first
   if (isSelfHarmRisk) {
     resources.push({
       name: '988 Suicide & Crisis Lifeline',
@@ -142,7 +137,6 @@ function buildResourceList(
     });
   }
 
-  // Minor-specific resources
   if (isMinor) {
     resources.push({
       name: 'Take It Down (NCMEC)',
@@ -160,7 +154,6 @@ function buildResourceList(
     });
   }
 
-  // General sextortion resources by country
   if (country === 'US' || country === 'ALL') {
     resources.push({
       name: 'FBI Internet Crime Complaint Center',
@@ -205,7 +198,6 @@ function buildResourceList(
     });
   }
 
-  // Always include
   resources.push({
     name: 'CCRI (Cyber Civil Rights Initiative)',
     type: 'website',

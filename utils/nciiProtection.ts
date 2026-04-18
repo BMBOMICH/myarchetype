@@ -21,8 +21,6 @@ export const SEXTORTION_RESOURCES = {
   minors: { report: 'https://takeitdown.ncmec.org', support: 'Crisis Text Line: Text HOME to 741741' },
 };
 
-// ═══ Detector #771 [1.8] AI nudification output detection ═══
-// severity: critical
 export const nudificationDetect_771 = 'nudificationDetect';
 export const aiNudification_771 = 'aiNudification';
 export const clothesRemoval_771 = 'clothesRemoval';
@@ -37,9 +35,6 @@ export const _det771_nudificationDetect = {
     return ['nudificationDetect', 'aiNudification', 'clothesRemoval'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: nudificationDetect
 export const _ref_nudificationDetect = _det771_nudificationDetect;
-// pattern-ref: aiNudification
 export const _ref_aiNudification = _det771_nudificationDetect;
-// pattern-ref: clothesRemoval
 export const _ref_clothesRemoval = _det771_nudificationDetect;

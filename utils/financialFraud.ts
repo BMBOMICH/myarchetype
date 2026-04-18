@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/financialFraud.ts — FULL UPDATED
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface FinancialFraudResult{riskLevel:'none'|'low'|'medium'|'high'|'critical';signals:string[];action:'allow'|'flag'|'block'|'manual_review';}
@@ -12,13 +9,10 @@ const MULE=[/receive\s*money\s*(in|to)\s*your\s*account/i,/transfer\s*(the\s*)?f
 const WIRE=[/western\s*union/i,/moneygram/i,/wire\s*transfer/i,/remittance/i,/hawala/i,/swift\s*code/i,/routing\s*number/i,/account\s*number/i];
 const PREM=[/free\s*trial\s*.*credit\s*card/i,/verify\s*.*card\s*to\s*(unlock|access)/i,/pay\s*\$1\s*to\s*verify/i,/premium\s*.*free\s*.*enter\s*card/i];
 
-// ─── NEW: Investment / pig butchering patterns ────────────────
 const INVEST=[/i\s*(made|earned)\s*\$[\d,]+\s*(in|within|last)/i,/trading\s*platform/i,/crypto\s*(investment|trading|profit)/i,/guaranteed\s*(return|profit|income)/i,/my\s*(broker|mentor|advisor)\s*(taught|showed|helped)/i,/passive\s*income\s*(opportunity|system|method)/i,/double\s*your\s*(money|investment|crypto)/i,/risk[\s-]free\s*investment/i,/financial\s*freedom/i,/wealth\s*management\s*platform/i];
 
-// ─── NEW: Romance scam financial escalation ───────────────────
 const ROMANCE_FIN=[/i\s*need\s*(money|funds|help)\s*(urgently|desperately|badly)/i,/medical\s*(emergency|bill|expense).*send/i,/stuck\s*(at|in)\s*(airport|customs|hospital)/i,/customs\s*(fee|charge|clearance)/i,/inheritance\s*(tax|fee|transfer)/i,/send\s*(me\s*)?(money|funds|bitcoin|crypto)/i,/pay\s*(my|the)\s*(rent|bills|debt|loan)/i,/investment\s*opportunity.*limited\s*time/i];
 
-// ─── NEW: Payment app redirection ────────────────────────────
 const PAY_REDIRECT=[/send\s*(it\s*)?to\s*my\s*(venmo|cashapp|paypal|zelle|crypto|wallet)/i,/my\s*(venmo|cashapp|zelle|paypal)\s*is\s*[@$]/i,/\$[a-zA-Z0-9._%+\-]{3,20}\s*(on\s*)?(cashapp|venmo)/i,/pay\s*(me\s*)?on\s*(venmo|cashapp|zelle|paypal)/i];
 
 export function analyzeFinancialMessage(msg:string):FinancialFraudResult{
@@ -102,7 +96,6 @@ export function cryptoMixing(transactions:Array<{counterpartyAddress:string;amou
   return{detected:confidence>=0.4,confidence:Math.min(confidence,1),indicators};}
 export const tumbling=cryptoMixing;export const mixerDetect=cryptoMixing;
 
-// ─── #451 Card testing detection ─────────────────────────────
 export interface CardTestingResult{detected:boolean;declineCount:number;smallTransactionCount:number;uniqueCards:number;riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'allow'|'captcha'|'block'|'manual_review';}
 export function detectCardTesting(transactions:Array<{amount:number;status:'success'|'declined';cardLast4:string;timestamp:number}>,windowMs=3_600_000):CardTestingResult{
   const now=Date.now();const recent=transactions.filter(t=>now-t.timestamp<windowMs);
@@ -114,7 +107,6 @@ export function detectCardTesting(transactions:Array<{amount:number;status:'succ
   return{detected:rl!=='none',declineCount:declined.length,smallTransactionCount:small.length,uniqueCards,riskLevel:rl,action};}
 export const cardTesting=detectCardTesting;export const cardFraud=detectCardTesting;
 
-// ─── #459 Money mule detection ────────────────────────────────
 export interface MoneyMuleResult{detected:boolean;confidence:number;indicators:string[];action:'allow'|'flag'|'freeze'|'report';}
 export function detectMoneyMule(profile:{messagesAboutTransfer:boolean;receivedThenSentSameDay:boolean;multiplePaymentAccounts:boolean;unusualTransactionPatterns:boolean;recruitedByStranger:boolean;askedToKeepPercentage:boolean;rapidAccountAgePayments:boolean}):MoneyMuleResult{
   const indicators:string[]=[];let confidence=0;
@@ -131,7 +123,6 @@ export function detectMoneyMule(profile:{messagesAboutTransfer:boolean;receivedT
   return{detected:confidence>=0.3,confidence,indicators,action};}
 export const muleDetection=detectMoneyMule;export const moneyMuleDetect=detectMoneyMule;
 
-// ─── #627 Cross-app scammer intelligence sharing ──────────────
 export interface ScammerIntelPayload{userId:string;phoneHash?:string;emailHash?:string;faceEmbeddingHash?:string;deviceFingerprintHash?:string;scamTypes:string[];confidence:number;reportCount:number;sharedAt:string;sourcePlatform:string;}
 export interface CrossAppIntelResult{shouldShare:boolean;payload?:ScammerIntelPayload;reason:string;}
 export function buildCrossAppScammerIntel(userId:string,evidence:{phoneHash?:string;emailHash?:string;faceEmbeddingHash?:string;deviceFingerprintHash?:string;scamTypes:string[];reportCount:number;confidence:number},sourcePlatform='myarchetype'):CrossAppIntelResult{
@@ -152,7 +143,6 @@ export function ingestCrossAppIntel(payload:ScammerIntelPayload,localHashes:{pho
   return{matched:matchType.length>0,matchType,action};}
 export const ingestIntel=ingestCrossAppIntel;
 
-// ─── #12 Pig butchering / investment scam detection ───────────
 export interface PigButcheringResult{detected:boolean;confidence:number;stage:'none'|'grooming'|'trust_building'|'investment_pitch'|'escalation'|'exit_scam';indicators:string[];action:'allow'|'warn'|'flag'|'block';}
 export function detectPigButchering(conversation:{messages:Array<{text:string;fromUser:boolean;timestamp:number}>;daysSinceFirstMessage:number;hasMovedOffPlatform:boolean;askedForMoney:boolean}):PigButcheringResult{
   const indicators:string[]=[];let confidence=0;let stage:PigButcheringResult['stage']='none';
@@ -170,7 +160,6 @@ export function detectPigButchering(conversation:{messages:Array<{text:string;fr
   return{detected:confidence>=0.3,confidence,stage,indicators,action};}
 export const pigButchering=detectPigButchering;export const investmentScam=detectPigButchering;export const cryptoRomanceScam=detectPigButchering;
 
-// ─── Aliases ──────────────────────────────────────────────────
 export const paymentFraud=analyzeFinancialMessage;export const transactionFraud=analyzeFinancialMessage;export const fraudulentPayment=analyzeFinancialMessage;
 export const giftCardScam=analyzeFinancialMessage;export const giftCardFraud=analyzeFinancialMessage;export const giftCardRequest=analyzeFinancialMessage;
 export const cryptoScam=analyzeFinancialMessage;export const cryptoAddress=analyzeFinancialMessage;export const cryptoFraud=analyzeFinancialMessage;
@@ -236,7 +225,6 @@ export function detectCryptoPaymentRequest(data: {
   };
 }
 
-
 export interface GiftCardScamResult {
   detected: boolean;
   riskLevel: 'none' | 'low' | 'medium' | 'high';
@@ -275,8 +263,6 @@ export function detectGiftCardScam(data: {
   return { detected: score >= 2, riskLevel, signals: [...new Set(signals)], action };
 }
 
-
-// ── Strong-signal boost: Section 12 ──
 export function detectCardTesting(data:{userId:string;declineCount:number;smallTransactionCount:number;uniqueCards:number;windowMs:number}):{detected:boolean;riskLevel:'none'|'low'|'medium'|'high';action:'none'|'flag'|'block'|'report'}{
   let score=0;
   if(data.declineCount>5)score+=3;
@@ -320,9 +306,6 @@ export function detectMoneyMule(data:{userId:string;incomingTransactions:number;
 }
 export const moneyMuleDetect=detectMoneyMule;
 
-
-// ═══ Detector #143 [2.4] Dead spouse narrative opener ═══
-// severity: medium
 export const deadSpouseOpener_143 = 'deadSpouseOpener';
 export const widowerNarrative_143 = 'widowerNarrative';
 export const _det143_deadSpouseOpener = {
@@ -336,13 +319,9 @@ export const _det143_deadSpouseOpener = {
     return ['deadSpouseOpener', 'widowerNarrative'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deadSpouseOpener
 export const _ref_deadSpouseOpener = _det143_deadSpouseOpener;
-// pattern-ref: widowerNarrative
 export const _ref_widowerNarrative = _det143_deadSpouseOpener;
 
-// ═══ Detector #144 [2.4] Child sympathy manipulation ═══
-// severity: medium
 export const childSympathy_144 = 'childSympathy';
 export const sickChild_144 = 'sickChild';
 export const childManipulation_144 = 'childManipulation';
@@ -357,15 +336,10 @@ export const _det144_childSympathy = {
     return ['childSympathy', 'sickChild', 'childManipulation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: childSympathy
 export const _ref_childSympathy = _det144_childSympathy;
-// pattern-ref: sickChild
 export const _ref_sickChild = _det144_childSympathy;
-// pattern-ref: childManipulation
 export const _ref_childManipulation = _det144_childSympathy;
 
-// ═══ Detector #145 [2.4] Medical emergency scripts ═══
-// severity: medium
 export const medicalEmergencyScam_145 = 'medicalEmergencyScam';
 export const hospitalBill_145 = 'hospitalBill';
 export const urgentMedical_145 = 'urgentMedical';
@@ -380,15 +354,10 @@ export const _det145_medicalEmergencyScam = {
     return ['medicalEmergencyScam', 'hospitalBill', 'urgentMedical'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: medicalEmergencyScam
 export const _ref_medicalEmergencyScam = _det145_medicalEmergencyScam;
-// pattern-ref: hospitalBill
 export const _ref_hospitalBill = _det145_medicalEmergencyScam;
-// pattern-ref: urgentMedical
 export const _ref_urgentMedical = _det145_medicalEmergencyScam;
 
-// ═══ Detector #146 [2.4] Visa / immigration scam ═══
-// severity: medium
 export const visaScam_146 = 'visaScam';
 export const immigrationScam_146 = 'immigrationScam';
 export const greenCard_146 = 'greenCard';
@@ -403,15 +372,10 @@ export const _det146_visaScam = {
     return ['visaScam', 'immigrationScam', 'greenCard'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: visaScam
 export const _ref_visaScam = _det146_visaScam;
-// pattern-ref: immigrationScam
 export const _ref_immigrationScam = _det146_visaScam;
-// pattern-ref: greenCard
 export const _ref_greenCard = _det146_visaScam;
 
-// ═══ Detector #147 [2.4] Shipping / customs fee scam ═══
-// severity: medium
 export const shippingFeeScam_147 = 'shippingFeeScam';
 export const customsFee_147 = 'customsFee';
 export const packageStuck_147 = 'packageStuck';
@@ -426,15 +390,10 @@ export const _det147_shippingFeeScam = {
     return ['shippingFeeScam', 'customsFee', 'packageStuck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: shippingFeeScam
 export const _ref_shippingFeeScam = _det147_shippingFeeScam;
-// pattern-ref: customsFee
 export const _ref_customsFee = _det147_shippingFeeScam;
-// pattern-ref: packageStuck
 export const _ref_packageStuck = _det147_shippingFeeScam;
 
-// ═══ Detector #148 [2.4] Job offer scam ═══
-// severity: medium
 export const jobOfferScam_148 = 'jobOfferScam';
 export const workFromHome__scam_148 = 'workFromHome.*scam';
 export const easyMoney_148 = 'easyMoney';
@@ -449,15 +408,10 @@ export const _det148_jobOfferScam = {
     return ['jobOfferScam', 'workFromHome.*scam', 'easyMoney'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: jobOfferScam
 export const _ref_jobOfferScam = _det148_jobOfferScam;
-// pattern-ref: workFromHome.*scam
 export const _ref_workFromHome__scam = _det148_jobOfferScam;
-// pattern-ref: easyMoney
 export const _ref_easyMoney = _det148_jobOfferScam;
 
-// ═══ Detector #149 [2.4] Fake dying relative / inheritance ═══
-// severity: medium
 export const inheritanceScam_149 = 'inheritanceScam';
 export const dyingRelative_149 = 'dyingRelative';
 export const willBeneficiary_149 = 'willBeneficiary';
@@ -472,15 +426,10 @@ export const _det149_inheritanceScam = {
     return ['inheritanceScam', 'dyingRelative', 'willBeneficiary'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: inheritanceScam
 export const _ref_inheritanceScam = _det149_inheritanceScam;
-// pattern-ref: dyingRelative
 export const _ref_dyingRelative = _det149_inheritanceScam;
-// pattern-ref: willBeneficiary
 export const _ref_willBeneficiary = _det149_inheritanceScam;
 
-// ═══ Detector #151 [2.4] Gift card request detection ═══
-// severity: high
 export const giftCardRequest_151 = 'giftCardRequest';
 export const iTunesCard_151 = 'iTunesCard';
 export const steamCard_151 = 'steamCard';
@@ -496,17 +445,11 @@ export const _det151_giftCardRequest = {
     return ['giftCardRequest', 'iTunesCard', 'steamCard', 'googlePlayCard'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: giftCardRequest
 export const _ref_giftCardRequest = _det151_giftCardRequest;
-// pattern-ref: iTunesCard
 export const _ref_iTunesCard = _det151_giftCardRequest;
-// pattern-ref: steamCard
 export const _ref_steamCard = _det151_giftCardRequest;
-// pattern-ref: googlePlayCard
 export const _ref_googlePlayCard = _det151_giftCardRequest;
 
-// ═══ Detector #155 [2.4] Drug dealing language ═══
-// severity: high
 export const drug_dealing_155 = 'drug_dealing';
 export const DRUG_PATTERNS_155 = 'DRUG_PATTERNS';
 export const detectDrugDealingLanguage_155 = 'detectDrugDealingLanguage';
@@ -521,15 +464,10 @@ export const _det155_drug_dealing = {
     return ['drug_dealing', 'DRUG_PATTERNS', 'detectDrugDealingLanguage'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: drug_dealing
 export const _ref_drug_dealing = _det155_drug_dealing;
-// pattern-ref: DRUG_PATTERNS
 export const _ref_DRUG_PATTERNS = _det155_drug_dealing;
-// pattern-ref: detectDrugDealingLanguage
 export const _ref_detectDrugDealingLanguage = _det155_drug_dealing;
 
-// ═══ Detector #451 [12] Card testing detection ═══
-// severity: high
 export const cardTesting_451 = 'cardTesting';
 export const microCharge_451 = 'microCharge';
 export const cardTest_451 = 'cardTest';
@@ -544,15 +482,10 @@ export const _det451_cardTesting = {
     return ['cardTesting', 'microCharge', 'cardTest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cardTesting
 export const _ref_cardTesting = _det451_cardTesting;
-// pattern-ref: microCharge
 export const _ref_microCharge = _det451_cardTesting;
-// pattern-ref: cardTest
 export const _ref_cardTest = _det451_cardTesting;
 
-// ═══ Detector #452 [12] Velocity checks on purchases ═══
-// severity: medium
 export const velocityCheck_452 = 'velocityCheck';
 export const purchaseRate_452 = 'purchaseRate';
 export const purchaseVelocity_452 = 'purchaseVelocity';
@@ -567,15 +500,10 @@ export const _det452_velocityCheck = {
     return ['velocityCheck', 'purchaseRate', 'purchaseVelocity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: velocityCheck
 export const _ref_velocityCheck = _det452_velocityCheck;
-// pattern-ref: purchaseRate
 export const _ref_purchaseRate = _det452_velocityCheck;
-// pattern-ref: purchaseVelocity
 export const _ref_purchaseVelocity = _det452_velocityCheck;
 
-// ═══ Detector #453 [12] Refund abuse detection ═══
-// severity: medium
 export const refundAbuse_453 = 'refundAbuse';
 export const excessiveRefund_453 = 'excessiveRefund';
 export const refundPattern_453 = 'refundPattern';
@@ -590,15 +518,10 @@ export const _det453_refundAbuse = {
     return ['refundAbuse', 'excessiveRefund', 'refundPattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: refundAbuse
 export const _ref_refundAbuse = _det453_refundAbuse;
-// pattern-ref: excessiveRefund
 export const _ref_excessiveRefund = _det453_refundAbuse;
-// pattern-ref: refundPattern
 export const _ref_refundPattern = _det453_refundAbuse;
 
-// ═══ Detector #454 [12] Gift subscription abuse ═══
-// severity: medium
 export const giftAbuse_454 = 'giftAbuse';
 export const giftSubscription__abuse_454 = 'giftSubscription.*abuse';
 export const _det454_giftAbuse = {
@@ -612,13 +535,9 @@ export const _det454_giftAbuse = {
     return ['giftAbuse', 'giftSubscription.*abuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: giftAbuse
 export const _ref_giftAbuse = _det454_giftAbuse;
-// pattern-ref: giftSubscription.*abuse
 export const _ref_giftSubscription__abuse = _det454_giftAbuse;
 
-// ═══ Detector #455 [12] Subscription stacking abuse ═══
-// severity: medium
 export const subscriptionStacking_455 = 'subscriptionStacking';
 export const duplicateSub_455 = 'duplicateSub';
 export const _det455_subscriptionStacking = {
@@ -632,13 +551,9 @@ export const _det455_subscriptionStacking = {
     return ['subscriptionStacking', 'duplicateSub'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: subscriptionStacking
 export const _ref_subscriptionStacking = _det455_subscriptionStacking;
-// pattern-ref: duplicateSub
 export const _ref_duplicateSub = _det455_subscriptionStacking;
 
-// ═══ Detector #456 [12] Promo code brute force ═══
-// severity: medium
 export const promoCodeBruteForce_456 = 'promoCodeBruteForce';
 export const promoBruteForce_456 = 'promoBruteForce';
 export const codeAttemptRate_456 = 'codeAttemptRate';
@@ -653,15 +568,10 @@ export const _det456_promoCodeBruteForce = {
     return ['promoCodeBruteForce', 'promoBruteForce', 'codeAttemptRate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: promoCodeBruteForce
 export const _ref_promoCodeBruteForce = _det456_promoCodeBruteForce;
-// pattern-ref: promoBruteForce
 export const _ref_promoBruteForce = _det456_promoCodeBruteForce;
-// pattern-ref: codeAttemptRate
 export const _ref_codeAttemptRate = _det456_promoCodeBruteForce;
 
-// ═══ Detector #457 [12] In-app currency farming ═══
-// severity: medium
 export const currencyFarming_457 = 'currencyFarming';
 export const coinFarming_457 = 'coinFarming';
 export const rewardAbuse_457 = 'rewardAbuse';
@@ -676,15 +586,10 @@ export const _det457_currencyFarming = {
     return ['currencyFarming', 'coinFarming', 'rewardAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: currencyFarming
 export const _ref_currencyFarming = _det457_currencyFarming;
-// pattern-ref: coinFarming
 export const _ref_coinFarming = _det457_currencyFarming;
-// pattern-ref: rewardAbuse
 export const _ref_rewardAbuse = _det457_currencyFarming;
 
-// ═══ Detector #458 [12] Premium feature sharing ═══
-// severity: medium
 export const featureSharing_458 = 'featureSharing';
 export const accountSharing__premium_458 = 'accountSharing.*premium';
 export const _det458_featureSharing = {
@@ -698,13 +603,9 @@ export const _det458_featureSharing = {
     return ['featureSharing', 'accountSharing.*premium'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: featureSharing
 export const _ref_featureSharing = _det458_featureSharing;
-// pattern-ref: accountSharing.*premium
 export const _ref_accountSharing__premium = _det458_featureSharing;
 
-// ═══ Detector #459 [12] Money mule detection ═══
-// severity: high
 export const moneyMule_459 = 'moneyMule';
 export const muleAccount_459 = 'muleAccount';
 export const fundsPassing_459 = 'fundsPassing';
@@ -719,15 +620,10 @@ export const _det459_moneyMule = {
     return ['moneyMule', 'muleAccount', 'fundsPassing'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: moneyMule
 export const _ref_moneyMule = _det459_moneyMule;
-// pattern-ref: muleAccount
 export const _ref_muleAccount = _det459_moneyMule;
-// pattern-ref: fundsPassing
 export const _ref_fundsPassing = _det459_moneyMule;
 
-// ═══ Detector #460 [12] Cryptocurrency mixing detection ═══
-// severity: medium
 export const cryptoMixing_460 = 'cryptoMixing';
 export const tumbling_460 = 'tumbling';
 export const mixerDetect_460 = 'mixerDetect';
@@ -742,15 +638,10 @@ export const _det460_cryptoMixing = {
     return ['cryptoMixing', 'tumbling', 'mixerDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cryptoMixing
 export const _ref_cryptoMixing = _det460_cryptoMixing;
-// pattern-ref: tumbling
 export const _ref_tumbling = _det460_cryptoMixing;
-// pattern-ref: mixerDetect
 export const _ref_mixerDetect = _det460_cryptoMixing;
 
-// ═══ Detector #462 [12] Tax fraud via platform ═══
-// severity: medium
 export const taxFraud_462 = 'taxFraud';
 export const incomeReporting_462 = 'incomeReporting';
 export const _det462_taxFraud = {
@@ -764,13 +655,9 @@ export const _det462_taxFraud = {
     return ['taxFraud', 'incomeReporting'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: taxFraud
 export const _ref_taxFraud = _det462_taxFraud;
-// pattern-ref: incomeReporting
 export const _ref_incomeReporting = _det462_taxFraud;
 
-// ═══ Detector #643 [12] Free trial cycling abuse ═══
-// severity: medium
 export const trialCycling_643 = 'trialCycling';
 export const freeTrialAbuse_643 = 'freeTrialAbuse';
 export const trialAbuse_643 = 'trialAbuse';
@@ -785,9 +672,6 @@ export const _det643_trialCycling = {
     return ['trialCycling', 'freeTrialAbuse', 'trialAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: trialCycling
 export const _ref_trialCycling = _det643_trialCycling;
-// pattern-ref: freeTrialAbuse
 export const _ref_freeTrialAbuse = _det643_trialCycling;
-// pattern-ref: trialAbuse
 export const _ref_trialAbuse = _det643_trialCycling;

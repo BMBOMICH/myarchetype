@@ -1,5 +1,3 @@
-// utils/sensitiveHealthData.ts — IMPLEMENT IMMEDIATELY
-// Dating apps collect HIV status, STI info, disability — HIPAA-adjacent
 
 export type SensitiveHealthCategory =
   | 'hiv_status'
@@ -112,7 +110,6 @@ export function validateHealthDataStorage(
   return { allowed: policy.storageAllowed, reason: 'Policy satisfied' };
 }
 
-// Detect if messages contain health disclosures (for routing to secure storage)
 const HEALTH_DISCLOSURE_PATTERNS: Record<SensitiveHealthCategory, RegExp[]> = {
   hiv_status: [
     /\bHIV\s*(positive|negative|poz|neg)\b/i,

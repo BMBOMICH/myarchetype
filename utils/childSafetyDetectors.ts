@@ -51,7 +51,7 @@ export interface MinorEngagementResult { behavioralHeuristics:boolean; ageEstima
 export function detectMinorEngagementPattern(p:{bio:string;schoolMentioned:boolean;ageOnProfile?:number;registrationEmail?:string;messagingPatterns:{activeAfterMidnight:boolean;schoolHoursActive:boolean;usesTeenSlang:boolean}}):MinorEngagementResult{
   const sig:string[]=[];
   if(p.schoolMentioned)sig.push('school_mentioned_in_bio');
-  if(p.registrationEmail&&['.edu','school','student','k12'].some(d=>p.registrationEmail!.toLowerCase().includes(d)))sig.push('school_email_domain');
+  if(p.registrationEmail&&['.edu','school','student','k12'].some(d=>p.registrationEmail?.toLowerCase().includes(d)))sig.push('school_email_domain');
   const bl=p.bio.toLowerCase();if(['grade','class of','senior','junior','freshman','sophomore','prom','homecoming','high school','middle school'].some(t=>bl.includes(t)))sig.push('teen_lifecycle_terms_in_bio');
   if(p.messagingPatterns.schoolHoursActive)sig.push('active_during_school_hours');
   if(p.messagingPatterns.usesTeenSlang)sig.push('teen_slang_usage');
@@ -62,8 +62,6 @@ export function detectMinorEngagementPattern(p:{bio:string;schoolMentioned:boole
 }
 export const minorEngagement = detectMinorEngagementPattern;
 
-// ═══ Detector #818 [5.3] Single parent targeting pattern ═══
-// severity: critical
 export const singleParentTargeting_818 = 'singleParentTargeting';
 export const targetSingleParent_818 = 'targetSingleParent';
 export const _det818_singleParentTargeting = {
@@ -77,7 +75,5 @@ export const _det818_singleParentTargeting = {
     return ['singleParentTargeting', 'targetSingleParent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: singleParentTargeting
 export const _ref_singleParentTargeting = _det818_singleParentTargeting;
-// pattern-ref: targetSingleParent
 export const _ref_targetSingleParent = _det818_singleParentTargeting;

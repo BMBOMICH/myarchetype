@@ -35,7 +35,6 @@ export async function runSafetyPipeline(
     }
 
     case 'message': {
-      // Run all conversation detectors
       const convRisk = analyzeConversation(
         payload.messages,
         payload.senderId
@@ -57,7 +56,6 @@ export async function runSafetyPipeline(
         results.push({ detector: '#351', action: 'warn_recipient', detail: `Love bombing score: ${convRisk.loveBombing.score}` });
       }
 
-      // Child predator checks
       const childVelocity = detectChildQuestionVelocity(
         payload.messages, payload.senderId
       );
@@ -73,7 +71,6 @@ export async function runSafetyPipeline(
       );
       if (grooming) results.push({ detector: grooming.detector, action: 'restrict', detail: grooming.detail });
 
-      // Sextortion
       const sextortion = detectSextortionLanguage(payload.latestMessage);
       if (sextortion.detected) {
         results.push({ detector: '#835', action: sextortion.route, detail: `Sextortion ${sextortion.route}` });
@@ -94,7 +91,6 @@ export async function runSafetyPipeline(
     }
   }
 
-  // Execute actions
   for (const result of results) {
     await executeAction(result);
   }
@@ -105,32 +101,23 @@ export async function runSafetyPipeline(
 async function executeAction(result: { detector: string; action: string; detail: string }) {
   switch (result.action) {
     case 'block':
-      // Prevent upload/action entirely
       break;
     case 'ban_and_report':
-      // Ban user + file NCMEC/law enforcement report
       break;
     case 'restrict':
-      // Shadow restrict + queue for human review
       break;
     case 'flag':
-      // Queue for human moderator
       break;
     case 'warn':
-      // Show warning to sender
       break;
     case 'warn_recipient':
-      // Show safety warning to recipient
       break;
     case 'crisis':
-      // Show crisis resources immediately
       break;
     case 'blur':
-      // Auto-blur content pending review
       break;
   }
 
-  // Add to imports in safetyOrchestrator.ts
 import { enforceChildPhotoPolicy, scorePredatorAttractionRisk } from './childImageSafety';
 import { generateAndShareNciiHash, checkNciiBlocklist } from './nciiProtection';
 import { detectFinancialSextortionEscalation } from './financialSextortion';
@@ -149,12 +136,9 @@ import { detectExPartnerMonitoring, detectCoordinatedHarassment } from './postRe
 import { evaluateReportEscalation } from './infrastructureSecurity';
 import { assessLgbtqTargetedRisk, detectBurglaryPattern } from './robberyDetection';
 
-// Add to the runSafetyPipeline switch statement:
 
 case 'message': {
-  // ... existing detectors ...
 
-  // #831 Financial sextortion
   const sextortion = detectFinancialSextortionEscalation(
     payload.messages, payload.senderId
   );
@@ -166,7 +150,6 @@ case 'message': {
     });
   }
 
-  // #835 Victim support routing
   const victimSupport = routeSextortionVictimSupport(
     payload.latestMessage, payload.userLocale, payload.userAge
   );
@@ -178,7 +161,6 @@ case 'message': {
     });
   }
 
-  // #769 Trafficking referral
   const trafficking = detectTraffickingAndRefer(
     payload.messages, payload.senderId, payload.userCountry
   );
@@ -190,7 +172,6 @@ case 'message': {
     });
   }
 
-  // #323 Boundary testing
   const boundaries = detectEscalatingBoundaryTesting(
     payload.messages, payload.senderId, payload.recipientId
   );
@@ -202,7 +183,6 @@ case 'message': {
     });
   }
 
-  // #324 Photo pressure
   const photoPress = detectPhotoRequestPressure(
     payload.messages, payload.senderId, payload.recipientId
   );
@@ -218,7 +198,6 @@ case 'message': {
 }
 
 case 'report': {
-  // #863 Report escalation
   const escalation = evaluateReportEscalation(payload.reports);
   if (escalation.shouldEscalate) {
     results.push({
@@ -230,6 +209,5 @@ case 'report': {
   break;
 }
 
-  // Always log
-  console.log(`[SAFETY] ${result.detector}: ${result.action} — ${result.detail}`);
+  if (__DEV__) console.log(`[SAFETY] ${result.detector}: ${result.action} — ${result.detail}`);
 }

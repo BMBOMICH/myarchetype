@@ -1,20 +1,21 @@
+import { observable } from '@legendapp/state';
+import { observer } from '@legendapp/state/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, ScrollView,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
 
-// ── Pure helpers (outside component) ──────────────────────
 function getStarLabel(value: number | null): string {
   if (value === null) return ' ';
   return ['', 'Very poor', 'Poor', 'Average', 'Good', 'Excellent'][value] ?? ' ';
 }
 
-// ── StarRow (stable, no closure needed) ───────────────────
 const StarRow = React.memo(({ value, onPress }: {
   value: number | null;
   onPress: (s: number) => void;
@@ -44,7 +45,6 @@ const StarButton = React.memo(({ star, active, onPress }: {
 });
 StarButton.displayName = 'StarButton';
 
-// ── AccuracyBtn (stable) ───────────────────────────────────
 const AccuracyBtn = React.memo(({ label, val, current, activeStyle, onPress }: {
   label: string; val: string; current: string;
   activeStyle: object; onPress: (v: string) => void;
@@ -65,28 +65,39 @@ const AccuracyBtn = React.memo(({ label, val, current, activeStyle, onPress }: {
 });
 AccuracyBtn.displayName = 'AccuracyBtn';
 
-// ── Screen ────────────────────────────────────────────────
-export default function PostDateRatingScreen() {
+const screen$ = observable({
+  loading:           false,
+  step:              'ask' as 'ask' | 'rate' | 'done',
+  photosMatch:       null as number | null,
+  heightAccurate:    '',
+  bodyTypeAccurate:  '',
+  ageAccurate:       '',
+  personalityMatch:  null as number | null,
+  overallExperience: null as number | null,
+  comments:          '',
+});
+
+export default observer(function PostDateRatingScreen() {
   const router  = useRouter();
   const { matchId, matchName } = useLocalSearchParams();
   const user = auth.currentUser;
 
-  const [loading, setLoading]                   = useState(false);
-  const [step, setStep]                         = useState<'ask' | 'rate' | 'done'>('ask');
-  const [photosMatch, setPhotosMatch]           = useState<number | null>(null);
-  const [heightAccurate, setHeightAccurate]     = useState('');
-  const [bodyTypeAccurate, setBodyTypeAccurate] = useState('');
-  const [ageAccurate, setAgeAccurate]           = useState('');
-  const [personalityMatch, setPersonalityMatch] = useState<number | null>(null);
-  const [overallExperience, setOverallExperience] = useState<number | null>(null);
-  const [comments, setComments]                 = useState('');
+  const loading           = screen$.loading.get();
+  const step              = screen$.step.get();
+  const photosMatch       = screen$.photosMatch.get();
+  const heightAccurate    = screen$.heightAccurate.get();
+  const bodyTypeAccurate  = screen$.bodyTypeAccurate.get();
+  const ageAccurate       = screen$.ageAccurate.get();
+  const personalityMatch  = screen$.personalityMatch.get();
+  const overallExperience = screen$.overallExperience.get();
+  const comments          = screen$.comments.get();
 
-  const handleGoToRate   = useCallback(() => setStep('rate'), []);
-  const handleBackToAsk  = useCallback(() => setStep('ask'), []);
-  const handleBack       = useCallback(() => router.back(), [router]);
+  const handleGoToRate  = useCallback(() => screen$.step.set('rate'), []);
+  const handleBackToAsk = useCallback(() => screen$.step.set('ask'), []);
+  const handleBack      = useCallback(() => router.back(), [router]);
 
   const handleCommentChange = useCallback((text: string) => {
-    setComments(text.slice(0, 300));
+    screen$.comments.set(text.slice(0, 300));
   }, []);
 
   const handleDidNotMeet = useCallback(async () => {
@@ -106,22 +117,27 @@ export default function PostDateRatingScreen() {
 
   const handleSubmit = useCallback(async () => {
     if (!user || !matchId) return;
-    if (
-      photosMatch === null || !heightAccurate || !bodyTypeAccurate ||
-      !ageAccurate || personalityMatch === null || overallExperience === null
-    ) {
+    const pm  = screen$.photosMatch.get();
+    const ha  = screen$.heightAccurate.get();
+    const bta = screen$.bodyTypeAccurate.get();
+    const aa  = screen$.ageAccurate.get();
+    const pem = screen$.personalityMatch.get();
+    const oe  = screen$.overallExperience.get();
+    const cmt = screen$.comments.get();
+
+    if (pm === null || !ha || !bta || !aa || pem === null || oe === null) {
       Alert.alert('Incomplete', 'Please answer all questions');
       return;
     }
-    setLoading(true);
+    screen$.loading.set(true);
     try {
       const ratingId = `${user.uid}_rates_${matchId}`;
       await setDoc(doc(db, 'ratings', ratingId), {
         raterId: user.uid, ratedUserId: matchId, ratedUserName: matchName,
-        didMeet: true, photosMatchReality: photosMatch,
-        heightAccurate, bodyTypeAccurate, ageAccurate,
-        personalityMatch, overallExperience,
-        comments: comments.trim(), createdAt: new Date().toISOString(),
+        didMeet: true, photosMatchReality: pm,
+        heightAccurate: ha, bodyTypeAccurate: bta, ageAccurate: aa,
+        personalityMatch: pem, overallExperience: oe,
+        comments: cmt.trim(), createdAt: new Date().toISOString(),
       });
 
       const userDoc = await getDoc(doc(db, 'users', matchId as string));
@@ -138,12 +154,12 @@ export default function PostDateRatingScreen() {
         await setDoc(doc(db, 'users', matchId as string), {
           ratings: {
             totalRatings:            total,
-            averagePhotosMatch:      Math.round(avg(cur.averagePhotosMatch, photosMatch) * 10) / 10,
-            averagePersonalityMatch: Math.round(avg(cur.averagePersonalityMatch, personalityMatch) * 10) / 10,
-            averageOverall:          Math.round(avg(cur.averageOverall ?? 0, overallExperience) * 10) / 10,
-            heightAccuracyRate:      Math.round(rate(heightAccurate, 'heightAccuracyRate')),
-            bodyTypeAccuracyRate:    Math.round(rate(bodyTypeAccurate, 'bodyTypeAccuracyRate')),
-            ageAccuracyRate:         Math.round(rate(ageAccurate, 'ageAccuracyRate')),
+            averagePhotosMatch:      Math.round(avg(cur.averagePhotosMatch, pm) * 10) / 10,
+            averagePersonalityMatch: Math.round(avg(cur.averagePersonalityMatch, pem) * 10) / 10,
+            averageOverall:          Math.round(avg(cur.averageOverall ?? 0, oe) * 10) / 10,
+            heightAccuracyRate:      Math.round(rate(ha, 'heightAccuracyRate')),
+            bodyTypeAccuracyRate:    Math.round(rate(bta, 'bodyTypeAccuracyRate')),
+            ageAccuracyRate:         Math.round(rate(aa, 'ageAccuracyRate')),
           },
         }, { merge: true });
         logger.log('[PostDateRating] ratings updated for', matchName);
@@ -153,14 +169,14 @@ export default function PostDateRatingScreen() {
         raterId: user.uid, ratedUserId: matchId,
         rated: true, ratedAt: new Date().toISOString(),
       });
-      setStep('done');
+      screen$.step.set('done');
     } catch (error: unknown) {
       logger.error('[PostDateRating] submit error:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'Something went wrong');
     } finally {
-      setLoading(false);
+      screen$.loading.set(false);
     }
-  }, [user, matchId, matchName, photosMatch, heightAccurate, bodyTypeAccurate, ageAccurate, personalityMatch, overallExperience, comments]);
+  }, [user, matchId, matchName]);
 
   if (step === 'ask') {
     return (
@@ -186,7 +202,17 @@ export default function PostDateRatingScreen() {
 
   if (step === 'rate') {
     return (
-      <ScrollView style={s.scrollContainer} contentContainerStyle={s.content}>
+      /*
+        ScrollView wraps 6 fixed question cards + submit button.
+        This is a bounded form layout, not a homogeneous scrolling list.
+        LegendList is not appropriate — the dataset never grows and
+        each card has distinct structure (stars vs accuracy buttons vs textarea).
+      */
+      <ScrollView
+        style={s.scrollContainer}
+        contentContainerStyle={s.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.title} accessibilityRole="header">Rate {matchName}</Text>
         <Text style={s.subtitle}>Be honest - this helps everyone</Text>
         <View style={s.privacyNote}>
@@ -195,7 +221,7 @@ export default function PostDateRatingScreen() {
 
         <View style={s.questionCard}>
           <Text style={s.question}>Did their photos match reality?</Text>
-          <StarRow value={photosMatch} onPress={setPhotosMatch} />
+          <StarRow value={photosMatch} onPress={(v) => screen$.photosMatch.set(v)} />
           <Text style={s.starLabel}>{getStarLabel(photosMatch)}</Text>
         </View>
 
@@ -204,7 +230,7 @@ export default function PostDateRatingScreen() {
           <Text style={s.questionHint}>Compared to what they stated on their profile</Text>
           <View style={s.accuracyRow}>
             {HEIGHT_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={heightAccurate} activeStyle={style} onPress={setHeightAccurate} />
+              <AccuracyBtn key={val} label={label} val={val} current={heightAccurate} activeStyle={style} onPress={(v) => screen$.heightAccurate.set(v)} />
             ))}
           </View>
         </View>
@@ -214,7 +240,7 @@ export default function PostDateRatingScreen() {
           <Text style={s.questionHint}>Did it match what they selected on their profile?</Text>
           <View style={s.accuracyRow}>
             {BODY_TYPE_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={bodyTypeAccurate} activeStyle={style} onPress={setBodyTypeAccurate} />
+              <AccuracyBtn key={val} label={label} val={val} current={bodyTypeAccurate} activeStyle={style} onPress={(v) => screen$.bodyTypeAccurate.set(v)} />
             ))}
           </View>
         </View>
@@ -223,20 +249,20 @@ export default function PostDateRatingScreen() {
           <Text style={s.question}>Did they look the age they stated?</Text>
           <View style={s.accuracyRow}>
             {AGE_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={ageAccurate} activeStyle={style} onPress={setAgeAccurate} />
+              <AccuracyBtn key={val} label={label} val={val} current={ageAccurate} activeStyle={style} onPress={(v) => screen$.ageAccurate.set(v)} />
             ))}
           </View>
         </View>
 
         <View style={s.questionCard}>
           <Text style={s.question}>Did their personality match expectations?</Text>
-          <StarRow value={personalityMatch} onPress={setPersonalityMatch} />
+          <StarRow value={personalityMatch} onPress={(v) => screen$.personalityMatch.set(v)} />
           <Text style={s.starLabel}>{getStarLabel(personalityMatch)}</Text>
         </View>
 
         <View style={s.questionCard}>
           <Text style={s.question}>Overall experience</Text>
-          <StarRow value={overallExperience} onPress={setOverallExperience} />
+          <StarRow value={overallExperience} onPress={(v) => screen$.overallExperience.set(v)} />
           <Text style={s.starLabel}>{getStarLabel(overallExperience)}</Text>
         </View>
 
@@ -287,9 +313,8 @@ export default function PostDateRatingScreen() {
   }
 
   return null;
-}
+});
 
-// ── Static option arrays (outside component) ──────────────
 const HEIGHT_OPTIONS = [
   { label: 'Much shorter', val: 'much-less',     style: { backgroundColor: '#5c1a1a', borderColor: '#d9534f' } },
   { label: 'Bit shorter',  val: 'slightly-less', style: { backgroundColor: '#5c3a1a', borderColor: '#e67e22' } },

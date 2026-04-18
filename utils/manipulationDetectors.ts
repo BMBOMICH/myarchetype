@@ -12,7 +12,6 @@ export interface ManipResult {
   severity?:   'low' | 'medium' | 'high' | 'critical';
 }
 
-// ─── [2.5] Core Manipulation Detectors ───────────────────
 
 export function loveBombing(text: string): ManipResult {
   const patterns = [
@@ -458,7 +457,7 @@ export const reverseVictim = playingVictim;
 
 export function breadcrumbing(text: string): ManipResult {
   const patterns = [
-    /hey\s+stranger[\s!.]/i,
+    /hey\s+stranger[\s?.]/i,
     /miss\s+you\s+(but|though|however)/i,
     /been\s+thinking\s+about\s+you\s+(lately|sometimes)/i,
     /just\s+checking\s+in/i,
@@ -559,7 +558,6 @@ export function powerDynamic(text: string): ManipResult {
 export const ageGapManip    = powerDynamic;
 export const authorityAbuse = powerDynamic;
 
-// ─── [2.6] PUA Techniques ─────────────────────────────────
 
 export function puaTechnique(text: string): ManipResult {
   const patterns = [
@@ -647,7 +645,6 @@ export function pedestalize(text: string): ManipResult {
 }
 export const idealizeStranger = pedestalize;
 
-// ─── [2.12] AI Emotional Manipulation ────────────────────
 
 export function aiEmotionalManip(text: string): ManipResult {
   const patterns = [
@@ -711,7 +708,6 @@ export function aiGroomingScript(text: string): ManipResult {
 export const syntheticIntimacy = aiGroomingScript;
 export const artificialBond    = aiGroomingScript;
 
-// ─── [2.13] Continued Contact After Block ────────────────
 
 export function blockEvasion(text: string): ManipResult {
   const patterns = [
@@ -778,7 +774,6 @@ export function persistentContact(text: string): ManipResult {
 export const ignoreBlock           = persistentContact;
 export const refuseAcceptRejection = persistentContact;
 
-// ─── [5.8] Proxy Account ─────────────────────────────────
 
 export function proxyAccount(text: string): ManipResult {
   const patterns = [
@@ -836,7 +831,6 @@ export function fakeReferral(text: string): ManipResult {
 export const astroturfing       = fakeReferral;
 export const coordinatedProfile = fakeReferral;
 
-// ─── [5.9] Relationship Deception ────────────────────────
 
 export function marriedDeception(text: string): ManipResult {
   const patterns = [
@@ -899,7 +893,6 @@ export function widowerScam(text: string): ManipResult {
 export const bereaved    = widowerScam;
 export const griefExploit = widowerScam;
 
-// ─── Combined Conversation Analysis ──────────────────────
 
 export interface ConversationManipResult {
   detected:        boolean;
@@ -969,8 +962,6 @@ export function analyzeConversationManip(
   };
 }
 
-// ═══ Detector #158 [2.5] Love bombing escalation ═══
-// severity: high
 export const loveBombEscalation_158 = 'loveBombEscalation';
 export const escalatingLoveBomb_158 = 'escalatingLoveBomb';
 export const _det158_loveBombEscalation = {
@@ -984,13 +975,9 @@ export const _det158_loveBombEscalation = {
     return ['loveBombEscalation', 'escalatingLoveBomb'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: loveBombEscalation
 export const _ref_loveBombEscalation = _det158_loveBombEscalation;
-// pattern-ref: escalatingLoveBomb
 export const _ref_escalatingLoveBomb = _det158_loveBombEscalation;
 
-// ═══ Detector #163 [2.5] Religious manipulation ═══
-// severity: medium
 export const religiousManipulation_163 = 'religiousManipulation';
 export const godWantsUs_163 = 'godWantsUs';
 export const divinePlan_163 = 'divinePlan';
@@ -1005,15 +992,10 @@ export const _det163_religiousManipulation = {
     return ['religiousManipulation', 'godWantsUs', 'divinePlan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: religiousManipulation
 export const _ref_religiousManipulation = _det163_religiousManipulation;
-// pattern-ref: godWantsUs
 export const _ref_godWantsUs = _det163_religiousManipulation;
-// pattern-ref: divinePlan
 export const _ref_divinePlan = _det163_religiousManipulation;
 
-// ═══ Detector #169 [2.5] Manufactured jealousy ═══
-// severity: medium
 export const manufacturedJealousy_169 = 'manufacturedJealousy';
 export const makeJealous_169 = 'makeJealous';
 export const _det169_manufacturedJealousy = {
@@ -1027,13 +1009,9 @@ export const _det169_manufacturedJealousy = {
     return ['manufacturedJealousy', 'makeJealous'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: manufacturedJealousy
 export const _ref_manufacturedJealousy = _det169_manufacturedJealousy;
-// pattern-ref: makeJealous
 export const _ref_makeJealous = _det169_manufacturedJealousy;
 
-// ═══ Detector #170 [2.5] False scarcity patterns ═══
-// severity: medium
 export const falseScarcity_170 = 'falseScarcity';
 export const lastChance_170 = 'lastChance';
 export const limitedTime__relationship_170 = 'limitedTime.*relationship';
@@ -1048,15 +1026,10 @@ export const _det170_falseScarcity = {
     return ['falseScarcity', 'lastChance', 'limitedTime.*relationship'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: falseScarcity
 export const _ref_falseScarcity = _det170_falseScarcity;
-// pattern-ref: lastChance
 export const _ref_lastChance = _det170_falseScarcity;
-// pattern-ref: limitedTime.*relationship
 export const _ref_limitedTime__relationship = _det170_falseScarcity;
 
-// ═══ Detector #171 [2.5] Sunk cost exploitation ═══
-// severity: medium
 export const sunkCost_171 = 'sunkCost';
 export const weveComeThisFar_171 = 'weveComeThisFar';
 export const afterEverything_171 = 'afterEverything';
@@ -1071,15 +1044,10 @@ export const _det171_sunkCost = {
     return ['sunkCost', 'weveComeThisFar', 'afterEverything'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sunkCost
 export const _ref_sunkCost = _det171_sunkCost;
-// pattern-ref: weveComeThisFar
 export const _ref_weveComeThisFar = _det171_sunkCost;
-// pattern-ref: afterEverything
 export const _ref_afterEverything = _det171_sunkCost;
 
-// ═══ Detector #173 [2.5] Urgency manufacturing ═══
-// severity: high
 export const urgencyManufacturing_173 = 'urgencyManufacturing';
 export const actNow_173 = 'actNow';
 export const emergencyPlease_173 = 'emergencyPlease';
@@ -1095,17 +1063,11 @@ export const _det173_urgencyManufacturing = {
     return ['urgencyManufacturing', 'actNow', 'emergencyPlease', 'needItTonight'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: urgencyManufacturing
 export const _ref_urgencyManufacturing = _det173_urgencyManufacturing;
-// pattern-ref: actNow
 export const _ref_actNow = _det173_urgencyManufacturing;
-// pattern-ref: emergencyPlease
 export const _ref_emergencyPlease = _det173_urgencyManufacturing;
-// pattern-ref: needItTonight
 export const _ref_needItTonight = _det173_urgencyManufacturing;
 
-// ═══ Detector #174 [2.5] Digital footprint coaching ═══
-// severity: high
 export const deleteMessages_174 = 'deleteMessages';
 export const clearHistory_174 = 'clearHistory';
 export const dontScreenshot_174 = 'dontScreenshot';
@@ -1120,15 +1082,10 @@ export const _det174_deleteMessages = {
     return ['deleteMessages', 'clearHistory', 'dontScreenshot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deleteMessages
 export const _ref_deleteMessages = _det174_deleteMessages;
-// pattern-ref: clearHistory
 export const _ref_clearHistory = _det174_deleteMessages;
-// pattern-ref: dontScreenshot
 export const _ref_dontScreenshot = _det174_deleteMessages;
 
-// ═══ Detector #175 [2.5] Proof of life refusal pattern ═══
-// severity: high
 export const proofOfLifeRefusal_175 = 'proofOfLifeRefusal';
 export const cantVideoCall_175 = 'cantVideoCall';
 export const camerasBroken_175 = 'camerasBroken';
@@ -1144,17 +1101,11 @@ export const _det175_proofOfLifeRefusal = {
     return ['proofOfLifeRefusal', 'cantVideoCall', 'camerasBroken', 'noVideoChat'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: proofOfLifeRefusal
 export const _ref_proofOfLifeRefusal = _det175_proofOfLifeRefusal;
-// pattern-ref: cantVideoCall
 export const _ref_cantVideoCall = _det175_proofOfLifeRefusal;
-// pattern-ref: camerasBroken
 export const _ref_camerasBroken = _det175_proofOfLifeRefusal;
-// pattern-ref: noVideoChat
 export const _ref_noVideoChat = _det175_proofOfLifeRefusal;
 
-// ═══ Detector #178 [2.5] Second chance scam ═══
-// severity: high
 export const secondChanceScam_178 = 'secondChanceScam';
 export const comeBackAfterBlock_178 = 'comeBackAfterBlock';
 export const newAccountSamePerson_178 = 'newAccountSamePerson';
@@ -1169,15 +1120,10 @@ export const _det178_secondChanceScam = {
     return ['secondChanceScam', 'comeBackAfterBlock', 'newAccountSamePerson'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: secondChanceScam
 export const _ref_secondChanceScam = _det178_secondChanceScam;
-// pattern-ref: comeBackAfterBlock
 export const _ref_comeBackAfterBlock = _det178_secondChanceScam;
-// pattern-ref: newAccountSamePerson
 export const _ref_newAccountSamePerson = _det178_secondChanceScam;
 
-// ═══ Detector #180 [2.5] Excessive spiritual / fate language ═══
-// severity: medium
 export const fateLanguage_180 = 'fateLanguage';
 export const meantToBe_180 = 'meantToBe';
 export const soulmate__early_180 = 'soulmate.*early';
@@ -1193,17 +1139,11 @@ export const _det180_fateLanguage = {
     return ['fateLanguage', 'meantToBe', 'soulmate.*early', 'destinyBroughtUs'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fateLanguage
 export const _ref_fateLanguage = _det180_fateLanguage;
-// pattern-ref: meantToBe
 export const _ref_meantToBe = _det180_fateLanguage;
-// pattern-ref: soulmate.*early
 export const _ref_soulmate__early = _det180_fateLanguage;
-// pattern-ref: destinyBroughtUs
 export const _ref_destinyBroughtUs = _det180_fateLanguage;
 
-// ═══ Detector #186 [2.5] Excessive self-disclosure early ═══
-// severity: medium
 export const excessiveDisclosure_186 = 'excessiveDisclosure';
 export const tooMuchTooSoon_186 = 'tooMuchTooSoon';
 export const _det186_excessiveDisclosure = {
@@ -1217,13 +1157,9 @@ export const _det186_excessiveDisclosure = {
     return ['excessiveDisclosure', 'tooMuchTooSoon'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: excessiveDisclosure
 export const _ref_excessiveDisclosure = _det186_excessiveDisclosure;
-// pattern-ref: tooMuchTooSoon
 export const _ref_tooMuchTooSoon = _det186_excessiveDisclosure;
 
-// ═══ Detector #190 [2.5] Health vulnerability exploitation ═══
-// severity: high
 export const healthExploit_190 = 'healthExploit';
 export const youreNotWell_190 = 'youreNotWell';
 export const illTakeCareOfYou__early_190 = 'illTakeCareOfYou.*early';
@@ -1238,15 +1174,10 @@ export const _det190_healthExploit = {
     return ['healthExploit', 'youreNotWell', 'illTakeCareOfYou.*early'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: healthExploit
 export const _ref_healthExploit = _det190_healthExploit;
-// pattern-ref: youreNotWell
 export const _ref_youreNotWell = _det190_healthExploit;
-// pattern-ref: illTakeCareOfYou.*early
 export const _ref_illTakeCareOfYou__early = _det190_healthExploit;
 
-// ═══ Detector #191 [2.5] Addiction vulnerability exploitation ═══
-// severity: high
 export const addictionExploit_191 = 'addictionExploit';
 export const sobrieryManipulation_191 = 'sobrieryManipulation';
 export const _det191_addictionExploit = {
@@ -1260,7 +1191,5 @@ export const _det191_addictionExploit = {
     return ['addictionExploit', 'sobrieryManipulation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: addictionExploit
 export const _ref_addictionExploit = _det191_addictionExploit;
-// pattern-ref: sobrieryManipulation
 export const _ref_sobrieryManipulation = _det191_addictionExploit;

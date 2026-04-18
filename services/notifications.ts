@@ -21,8 +21,8 @@ function createStorage(): SimpleStorage {
     };
   }
   try {
-    const { MMKV } = require('react-native-mmkv') as { MMKV: new (opts: { id: string }) => SimpleStorage };
-    return new MMKV({ id: 'notifications' });
+    const { createMMKV } = require('react-native-mmkv') as { createMMKV: (opts: { id: string }) => SimpleStorage };
+    return createMMKV({ id: 'notifications' });
   } catch {
     const mem: Record<string, string> = {};
     return { getString: key => mem[key], set: (key, value) => { mem[key] = value; } };

@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/aiSafetyFramework.ts — FULL UPDATED
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
 
@@ -21,22 +18,7 @@ export function enforceAiOptOut(userId: string, featureId: string, records: AiFe
   return { allowed: true };
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADDITIONS TO utils/aiSafetyFramework.ts
-// Covers: #513 Adversarial example detection
-// #514 Model confidence calibration
-// #515 Distribution shift detection
-// #519 Detector drift monitoring
-// #613 Third-party AI data sharing
-// #614 AI icebreaker safety scan
-// #615 AI photo editing boundary
-// #678 Agent-to-agent detection
-// #734 AI hallucination detection
-// #866 AI conversation coherence
-// #661 Socioeconomic bias
-// ═══════════════════════════════════════════════════════════════
 
-// ─── #513 Adversarial example detection ──────────────────────
 export interface AdversarialExampleResult {
   detected: boolean;
   perturbationType: string[];
@@ -47,16 +29,13 @@ export interface AdversarialExampleResult {
 }
 
 export function detectAdversarialExample(input: {
-  // Image signals
   pixelVarianceScore?: number;       // unusually low = smoothed perturbation
   highFrequencyNoise?: number;       // FGSM/PGD artifacts
   colorSpaceAnomaly?: number;        // unusual color distribution
   compressionArtifactLevel?: number; // unusual JPEG artifacts
-  // Text signals
   text?: string;
   unicodeAnomalyScore?: number;      // invisible chars, homoglyphs
   semanticInconsistencyScore?: number; // meaning vs classifier mismatch
-  // Model signals
   modelConfidenceDelta?: number;     // confidence drop vs baseline
   ensembleDisagreement?: number;     // multiple models disagree
   predictionVarianceUnderNoise?: number; // unstable under small perturbations
@@ -102,7 +81,6 @@ export function detectAdversarialExample(input: {
     }
   }
 
-  // Model-level signals
   if ((input.modelConfidenceDelta ?? 0) > 0.4) {
     types.push('confidence_manipulation');
     indicators.push('large_confidence_delta_from_baseline');
@@ -148,7 +126,6 @@ export const adversarialExample = detectAdversarialExample;
 export const adversarialDetect = detectAdversarialExample;
 export const artDetection = detectAdversarialExample;
 
-// ─── #514 Model confidence calibration ───────────────────────
 export interface ConfidenceCalibrationResult {
   calibrated: boolean;
   rawConfidence: number;
@@ -174,7 +151,6 @@ export function calibrateModelConfidence(
   let calibrated = rawConfidence;
 
   if (method === 'temperature_scaling') {
-    // Apply temperature scaling: σ(logit / T)
     const logit = Math.log(rawConfidence / Math.max(1 - rawConfidence, 1e-9));
     const scaledLogit = logit / temp;
     calibrated = 1 / (1 + Math.exp(-scaledLogit));
@@ -183,14 +159,12 @@ export function calibrateModelConfidence(
     const B = options.plattB ?? 0.5;
     calibrated = 1 / (1 + Math.exp(A * rawConfidence + B));
   } else if (method === 'isotonic') {
-    // Simplified isotonic: clamp to monotone bins
     calibrated = Math.max(0.05, Math.min(0.95, rawConfidence * 0.9));
   }
 
   calibrated = Math.max(0, Math.min(1, calibrated));
   const ece = options.historicalECE ?? Math.abs(calibrated - rawConfidence) * 0.5;
 
-  // Reliability bin
   const bin = calibrated >= 0.9 ? 'very_high' :
     calibrated >= 0.7 ? 'high' :
     calibrated >= 0.5 ? 'medium' :
@@ -217,7 +191,6 @@ export const confidenceCalibration = calibrateModelConfidence;
 export const calibrateModel = calibrateModelConfidence;
 export const temperatureScaling = calibrateModelConfidence;
 
-// ─── #515 Distribution shift / model drift detection ─────────
 export interface DriftMonitorResult {
   driftDetected: boolean;
   driftScore: number;
@@ -245,21 +218,18 @@ export function monitorDistributionShift(metrics: Array<{
     let detectorDrift = 0;
     const localTypes: string[] = [];
 
-    // FPR drift
     const fprDelta = Math.abs(m.currentFpr - m.baselineFpr);
     if (fprDelta > 0.05) {
       localTypes.push('fpr_drift');
       detectorDrift = Math.max(detectorDrift, fprDelta);
     }
 
-    // FNR drift
     const fnrDelta = Math.abs(m.currentFnr - m.baselineFnr);
     if (fnrDelta > 0.05) {
       localTypes.push('fnr_drift');
       detectorDrift = Math.max(detectorDrift, fnrDelta);
     }
 
-    // Distribution shift (KL-divergence approximation)
     if (m.baselineDistribution.length === m.currentDistribution.length) {
       let klDiv = 0;
       for (let i = 0; i < m.baselineDistribution.length; i++) {
@@ -311,7 +281,6 @@ export const distributionShift = monitorDistributionShift;
 export const modelDrift = monitorDistributionShift;
 export const driftMonitor = monitorDistributionShift;
 
-// ─── #519 Detector drift monitoring ──────────────────────────
 export interface DetectorDriftResult {
   drifted: boolean;
   detectorId: string;
@@ -384,7 +353,6 @@ export function monitorDetectorDrift(metrics: Array<{
 export const detectorDriftMonitor = monitorDetectorDrift;
 export const driftDetection = monitorDetectorDrift;
 
-// ─── #614 AI-generated icebreaker/conversation safety scan ───
 export interface AiIcebreakerSafetyResult {
   safe: boolean;
   issues: string[];
@@ -464,12 +432,10 @@ export function scanAiIcebreakerSafety(
         severity = 'low';
         topCategory = category;
       }
-      // Filter unsafe content
       filtered = filtered.replace(p, '[filtered]');
     }
   }
 
-  // Stricter for minors
   if ((context?.recipientAge ?? 18) < 18 && issues.length > 0) {
     severity = 'high';
   }
@@ -502,7 +468,6 @@ export const aiIcebreakerSafety = scanAiIcebreakerSafety;
 export const icebreakerSafetyScan = scanAiIcebreakerSafety;
 export const conversationStarterScan = scanAiIcebreakerSafety;
 
-// ─── #615 AI photo editing authenticity boundary ─────────────
 export interface AIPhotoEditResult {
   withinBoundary: boolean;
   editType: string[];
@@ -515,19 +480,16 @@ export interface AIPhotoEditResult {
 }
 
 export function detectAIPhotoEditing(signals: {
-  // Metadata signals
   softwareTag?: string;        // e.g., "Facetune", "Adobe Firefly", "DALL-E"
   aiGeneratedMetadata?: boolean;
   c2paPresent?: boolean;
   c2paClaimsAi?: boolean;
-  // Visual signals
   skinSmoothingLevel?: number; // 0-1
   featureAlterationScore?: number; // facial features changed
   backgroundReplaced?: boolean;
   bodyProportionAlteration?: number; // 0-1
   elaScore?: number;           // Error Level Analysis — high = edited
   noiseInconsistency?: number; // high = composite image
-  // Age-related signals
   estimatedAgeShift?: number;  // years younger/older vs verified age
 }): AIPhotoEditResult {
   const editTypes: string[] = [];
@@ -535,7 +497,6 @@ export function detectAIPhotoEditing(signals: {
   let intensityScore = 0;
   let confidence = 0;
 
-  // AI tool detection from metadata
   const AI_TOOLS = [
     'facetune', 'airbrush', 'meitu', 'snow', 'beautycam',
     'dall-e', 'midjourney', 'stable diffusion', 'adobe firefly',
@@ -566,7 +527,6 @@ export function detectAIPhotoEditing(signals: {
     confidence += 0.9;
   }
 
-  // Visual edit signals
   if ((signals.skinSmoothingLevel ?? 0) > 0.6) {
     editTypes.push('heavy_skin_smoothing');
     indicators.push(`skin_smoothing:${signals.skinSmoothingLevel}`);
@@ -607,7 +567,6 @@ export function detectAIPhotoEditing(signals: {
     confidence += 0.35;
   }
 
-  // Age shift detection
   if (Math.abs(signals.estimatedAgeShift ?? 0) >= 5) {
     editTypes.push('age_misrepresentation');
     indicators.push(`estimated_age_shift:${signals.estimatedAgeShift}yr`);
@@ -666,7 +625,6 @@ export const aiPhotoEdit = detectAIPhotoEditing;
 export const photoEditBoundary = detectAIPhotoEditing;
 export const photoAuthenticity = detectAIPhotoEditing;
 
-// ─── #678 AI-agent-to-AI-agent interaction detection ─────────
 export interface AgentToAgentResult {
   detected: boolean;
   confidence: number;
@@ -703,7 +661,6 @@ export function detectAgentToAgentInteraction(messages: Array<{
   const allContent = messages.map(m => m.content).join('\n');
   const senderIds = [...new Set(messages.map(m => m.senderId))];
 
-  // Pattern matching on content
   for (const { p, signal, weight } of AGENT_SIGNALS) {
     if (p.test(allContent)) {
       signals.push(signal);
@@ -711,13 +668,11 @@ export function detectAgentToAgentInteraction(messages: Array<{
     }
   }
 
-  // Behavioral signals
   const responseTimes = messages
     .map(m => m.metadata?.responseTimeMs ?? null)
     .filter((t): t is number => t !== null);
 
   if (responseTimes.length >= 3) {
-    // Robotic consistency: very low variance in response time
     const avg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
     const variance = responseTimes.reduce((s, t) => s + (t - avg) ** 2, 0) / responseTimes.length;
     const stdDev = Math.sqrt(variance);
@@ -731,7 +686,6 @@ export function detectAgentToAgentInteraction(messages: Array<{
     }
   }
 
-  // Typing pattern
   const typingScores = messages
     .map(m => m.metadata?.typingPatternScore ?? null)
     .filter((t): t is number => t !== null);
@@ -743,14 +697,12 @@ export function detectAgentToAgentInteraction(messages: Array<{
     }
   }
 
-  // Bot user agent
   const userAgents = messages.map(m => m.metadata?.userAgent ?? '').filter(Boolean);
   if (userAgents.some(ua => /bot|crawler|spider|automated|langchain|openai|anthropic/i.test(ua))) {
     signals.push('bot_user_agent');
     confidence += 0.7;
   }
 
-  // Both sides suspiciously similar timing (ai-ai)
   if (senderIds.length >= 2 && responseTimes.length >= 4) {
     const isAiAi = signals.filter(s =>
       ['robotic_response_timing', 'sub_second_responses', 'robotic_typing_pattern'].includes(s)
@@ -805,7 +757,6 @@ export const agentToAgent = detectAgentToAgentInteraction;
 export const aiAgentDetect = detectAgentToAgentInteraction;
 export const botInteraction = detectAgentToAgentInteraction;
 
-// ─── #734 AI hallucination in platform-generated content ──────
 export interface AIHallucinationResult {
   hallucinated: boolean;
   confidence: number;
@@ -834,11 +785,9 @@ export function detectAIHallucination(content: {
 
   const text = content.generatedText;
 
-  // 1. Factual contradiction with known facts
   if (content.knownFacts) {
     for (const [claim, truth] of Object.entries(content.knownFacts)) {
       if (text.toLowerCase().includes(claim.toLowerCase())) {
-        // Simple check: does the text assert something contradicting truth?
         const truthWords = truth.toLowerCase().split(/\s+/).filter(w => w.length > 4);
         const matchCount = truthWords.filter(w => text.toLowerCase().includes(w)).length;
         const matchRatio = truthWords.length > 0 ? matchCount / truthWords.length : 1;
@@ -852,7 +801,6 @@ export function detectAIHallucination(content: {
     }
   }
 
-  // 2. Grounding document check (semantic overlap approximation)
   if (content.groundingDocuments && content.groundingDocuments.length > 0) {
     const textWords = new Set(text.toLowerCase().split(/\s+/).filter(w => w.length > 4));
     const groundingWords = new Set(
@@ -868,7 +816,6 @@ export function detectAIHallucination(content: {
     }
   }
 
-  // 3. Hallucination signals in text itself
   const HALLUCINATION_PATTERNS: Array<{ p: RegExp; type: string; weight: number }> = [
     { p: /\b(studies show|research proves|experts say|scientists confirm)\b.*\b(always|never|100%|guaranteed)\b/i, type: 'false_certainty', weight: 0.4 },
     { p: /\b(according to|based on)\s+(our|the)\s+(records?|data|files?)\b.*\b(you have|you are|your profile shows)\b/i, type: 'fabricated_user_data', weight: 0.7 },
@@ -886,7 +833,6 @@ export function detectAIHallucination(content: {
     }
   }
 
-  // 4. High-stakes context gets stricter threshold
   const isHighStakes = content.platformContext?.isSafetyResource ||
     content.platformContext?.isLegalDisclosure;
   if (isHighStakes && hallucinationScore > 0.1) {
@@ -931,7 +877,6 @@ export const aiHallucination = detectAIHallucination;
 export const hallucinationDetect = detectAIHallucination;
 export const groundingVerify = detectAIHallucination;
 
-// ─── #866 AI conversation coherence analysis ─────────────────
 export interface CoherenceAnalysisResult {
   coherent: boolean;
   coherenceScore: number;
@@ -960,7 +905,6 @@ export function analyzeConversationCoherence(messages: Array<{
     };
   }
 
-  // 1. Topic coherence: does the suspect respond to what was said?
   const allContent = suspectMessages.map(m => m.content.toLowerCase());
   const questionResponses = messages.filter((m, i) => {
     if (m.isFromSuspect) return false;
@@ -979,7 +923,6 @@ export function analyzeConversationCoherence(messages: Array<{
     botScore += 0.25;
   }
 
-  // 2. Copy-paste detection (identical or near-identical messages)
   const contentCounts = new Map<string, number>();
   for (const c of allContent) {
     const normalized = c.replace(/\s+/g, ' ').trim();
@@ -992,7 +935,6 @@ export function analyzeConversationCoherence(messages: Array<{
     botScore += 0.4;
   }
 
-  // 3. Template-like structure (same sentence patterns)
   const startsWithSame = suspectMessages.filter((m, i) =>
     i > 0 && m.content.slice(0, 20).toLowerCase() ===
     suspectMessages[i - 1]!.content.slice(0, 20).toLowerCase()
@@ -1002,7 +944,6 @@ export function analyzeConversationCoherence(messages: Array<{
     botScore += 0.35;
   }
 
-  // 4. Timing regularity (robotic)
   const timestamps = suspectMessages.map(m => m.timestamp).sort((a, b) => a - b);
   const intervals: number[] = [];
   for (let i = 1; i < timestamps.length; i++) {
@@ -1017,7 +958,6 @@ export function analyzeConversationCoherence(messages: Array<{
     }
   }
 
-  // 5. Non-sequitur detection
   const NON_SEQUITUR = [
     /i\s+love\s+you\s+already/i,
     /you\s+are\s+the\s+one\s+for\s+me/i,
@@ -1033,7 +973,6 @@ export function analyzeConversationCoherence(messages: Array<{
     }
   }
 
-  // 6. Overly generic responses
   const GENERIC = [
     /^(that'?s? (great|amazing|wonderful|interesting|nice)\.?\s*){2,}/i,
     /^(i (like|love|enjoy) (that|it|this)\.?\s*){2,}/i,
@@ -1077,7 +1016,6 @@ export const coherenceAnalysis = analyzeConversationCoherence;
 export const conversationCoherence = analyzeConversationCoherence;
 export const botLikelihoodScore = analyzeConversationCoherence;
 
-// ─── #661 Socioeconomic bias in profile visibility ────────────
 export interface SocioeconomicBiasResult {
   biasDetected: boolean;
   biasType: string[];
@@ -1117,7 +1055,6 @@ export function detectSocioeconomicBias(data: {
     };
   }
 
-  // Group by income range
   const incomeGroups: Record<string, number[]> = {};
   for (const u of data.visibilityScores) {
     if (!u.incomeRange) continue;
@@ -1125,7 +1062,6 @@ export function detectSocioeconomicBias(data: {
     incomeGroups[u.incomeRange].push(u.visibilityScore);
   }
 
-  // Group by education
   const eduGroups: Record<string, number[]> = {};
   for (const u of data.visibilityScores) {
     if (!u.educationLevel) continue;
@@ -1135,7 +1071,6 @@ export function detectSocioeconomicBias(data: {
 
   const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 
-  // Disparate impact check across income
   const incomeAvgs = Object.entries(incomeGroups).map(([k, v]) => ({ k, avg: avg(v) }));
   let maxDisparateImpact = 1;
   if (incomeAvgs.length >= 2) {
@@ -1152,7 +1087,6 @@ export function detectSocioeconomicBias(data: {
     }
   }
 
-  // Education bias
   const eduAvgs = Object.entries(eduGroups).map(([k, v]) => ({ k, avg: avg(v) }));
   if (eduAvgs.length >= 2) {
     const sorted = eduAvgs.sort((a, b) => a.avg - b.avg);
@@ -1165,7 +1099,6 @@ export function detectSocioeconomicBias(data: {
     }
   }
 
-  // Algorithm weight audit
   if (data.algorithmWeights) {
     const socioeconomicFeatures = ['income', 'job_prestige', 'education_score', 'verified_employer'];
     const problematic = socioeconomicFeatures.filter(f =>
@@ -1180,7 +1113,6 @@ export function detectSocioeconomicBias(data: {
 
   const biasDetected = types.length > 0;
 
-  // Approximate Fairlearn metrics
   const allScores = data.visibilityScores.map(u => u.visibilityScore);
   const overallAvg = avg(allScores);
   const demographicParity = maxDisparateImpact;
@@ -1214,7 +1146,6 @@ export const socioeconomicBias = detectSocioeconomicBias;
 export const visibilityBias = detectSocioeconomicBias;
 export const algorithmicBias = detectSocioeconomicBias;
 
-// ─── #613 Third-party AI data sharing detection ───────────────
 export interface ThirdPartyAIResult {
   detected: boolean;
   vendors: string[];
@@ -1255,7 +1186,6 @@ export function detectThirdPartyAIDataSharing(config: {
   const requiredActions: string[] = [];
   let maxRisk: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
 
-  // Detect known AI vendors from network traffic
   for (const req of config.networkRequests) {
     for (const vendor of KNOWN_AI_VENDORS) {
       if (vendor.domains.some(d => req.domain.includes(d))) {
@@ -1269,7 +1199,6 @@ export function detectThirdPartyAIDataSharing(config: {
     }
   }
 
-  // SDK detection
   const AI_SDKS = ['openai', 'anthropic', 'langchain', '@google-ai', 'cohere', 'replicate', 'mistral'];
   for (const sdk of config.sdksDetected) {
     if (AI_SDKS.some(s => sdk.toLowerCase().includes(s))) {
@@ -1279,7 +1208,6 @@ export function detectThirdPartyAIDataSharing(config: {
     }
   }
 
-  // Sensitive data categories shared with AI
   const SENSITIVE_CATEGORIES = ['messages', 'photos', 'location', 'health', 'sexual_orientation', 'age', 'biometric'];
   const sensitiveSent = config.userDataCategories.filter(c => SENSITIVE_CATEGORIES.includes(c));
   if (sensitiveSent.length > 0 && vendors.length > 0) {
@@ -1292,7 +1220,6 @@ export function detectThirdPartyAIDataSharing(config: {
     }
   }
 
-  // Consent checks
   const { consentConfig } = config;
   if (vendors.length > 0 && !consentConfig.aiDataSharingDisclosed) {
     requiredActions.push('Disclose AI data sharing in privacy policy (GDPR Art.13)');
@@ -1413,7 +1340,6 @@ export function explainModerationDecision(r: {flagged:boolean;categories:Record<
 }
 export const DEFAULT_AI_CONSENT = { matchingAlgorithm:true, photoAnalysis:true, messageModeration:true, personalityInsights:false, voiceAnalysis:false };
 
-// ─── #511 Model inversion attack prevention ───────────────
 export interface ModelInversionResult{risk:'none'|'low'|'medium'|'high';indicators:string[];recommendation:string;action:'allow'|'rate_limit'|'block';}
 export function detectModelInversionAttack(queries:Array<{input:string;timestamp:number;userId:string}>,userId:string,windowMs=3_600_000):ModelInversionResult{
 const now=Date.now(),userQ=queries.filter(q=>q.userId===userId&&now-q.timestamp<windowMs);
@@ -1428,7 +1354,6 @@ if(risk!=='none')writeAuditLog('ai.model_inversion_risk',{userId,indicators,risk
 return{risk,indicators,action,recommendation:risk==='high'?'Block user. Likely model inversion attack.':risk==='medium'?'Rate limit. Monitor for model inversion.':risk!=='none'?'Monitor query patterns.':'No model inversion risk detected.'};}
 export const modelInversion=detectModelInversionAttack;export const inversionAttack=detectModelInversionAttack;export const privacyAttack=detectModelInversionAttack;
 
-// ─── #512 Membership inference attack prevention ──────────
 export interface MembershipInferenceResult{risk:'none'|'low'|'medium'|'high';confidence:number;recommendation:string;}
 export function detectMembershipInferenceAttack(modelConfidences:number[],threshold=0.95):MembershipInferenceResult{
 if(modelConfidences.length<5)return{risk:'none',confidence:0,recommendation:'Insufficient data.'};
@@ -1439,7 +1364,6 @@ if(risk!=='none')writeAuditLog('ai.membership_inference_risk',{highConfidenceRat
 return{risk,confidence:avgConf,recommendation:risk==='high'?'Apply differential privacy. High membership inference risk.':risk!=='none'?'Monitor confidence distributions. Consider output perturbation.':'Membership inference risk within acceptable bounds.'};}
 export const membershipInference=detectMembershipInferenceAttack;export const inferenceAttack=detectMembershipInferenceAttack;export const memberInfer=detectMembershipInferenceAttack;
 
-// ─── #513 Adversarial example detection ──────────────────
 export interface AdversarialExampleResult{detected:boolean;perturbationType:string[];confidence:number;action:'allow'|'flag'|'block';}
 export function detectAdversarialExample(input:{text?:string;imageFeatures?:number[];expectedLabel?:string;modelConfidence?:number;gradientNorm?:number}):AdversarialExampleResult{
 const types:string[]=[];
@@ -1452,7 +1376,6 @@ if(action!=='allow')writeAuditLog('ai.adversarial_example',{types,confidence}).c
 return{detected:types.length>0,perturbationType:types,confidence,action};}
 export const adversarialExample=detectAdversarialExample;export const adversarialDetect=detectAdversarialExample;export const perturbationDetect=detectAdversarialExample;
 
-// ─── #514 Model confidence calibration ───────────────────
 export interface CalibrationResult{calibrated:boolean;expectedCalibrationError:number;maxCalibrationError:number;recommendation:string;temperatureScaling?:number;}
 export function calibrateModelConfidence(predictions:Array<{confidence:number;correct:boolean}>,bins=10):CalibrationResult{
 if(predictions.length<50)return{calibrated:true,expectedCalibrationError:0,maxCalibrationError:0,recommendation:'Insufficient data for calibration.'};
@@ -1464,7 +1387,6 @@ if(!calibrated)writeAuditLog('ai.calibration_needed',{ece,mce,temperature}).catc
 return{calibrated,expectedCalibrationError:Math.round(ece*1000)/1000,maxCalibrationError:Math.round(mce*1000)/1000,temperatureScaling:calibrated?undefined:temperature,recommendation:calibrated?'Model is well calibrated.':ece>0.15?`Poor calibration (ECE=${ece.toFixed(3)}). Apply temperature scaling T=${temperature}.`:`Moderate calibration error. Consider temperature scaling.`};}
 export const confidenceCalibration=calibrateModelConfidence;export const calibrateModel=calibrateModelConfidence;export const temperatureScaling=calibrateModelConfidence;
 
-// ─── #519 Detector drift monitoring ──────────────────────
 export interface DriftMonitorResult{driftDetected:boolean;driftScore:number;affectedDetectors:string[];action:'none'|'alert'|'retrain'|'rollback';recommendation:string;}
 export function monitorDetectorDrift(metrics:Array<{detectorId:string;baselineFpr:number;currentFpr:number;baselineFnr:number;currentFnr:number;baselineLatencyMs:number;currentLatencyMs:number}>):DriftMonitorResult{
 const drifted:string[]=[],driftScores:number[]=[];
@@ -1475,7 +1397,6 @@ if(action!=='none')writeAuditLog('ai.detector_drift',{affectedDetectors:drifted,
 return{driftDetected:drifted.length>0,driftScore:maxDrift,affectedDetectors:drifted,action,recommendation:action==='rollback'?'Critical drift. Rollback to last stable version.':action==='retrain'?'Significant drift. Schedule retraining.':action==='alert'?'Moderate drift detected. Monitor closely.':'All detectors within baseline bounds.'};}
 export const detectorDrift=monitorDetectorDrift;export const driftMonitor=monitorDetectorDrift;export const performanceDrift=monitorDetectorDrift;
 
-// ─── #614 AI-generated icebreaker/conversation safety scan ─
 export interface AiIcebreakerSafetyResult{safe:boolean;issues:string[];severity:'none'|'low'|'medium'|'high';filteredContent:string;recommendation:string;}
 export function scanAiIcebreakerSafety(content:string,recipientContext?:{age?:number;previousFlags?:number}):AiIcebreakerSafetyResult{
 const issues:string[]=[];
@@ -1493,7 +1414,6 @@ if(sev!=='none')writeAuditLog('ai.icebreaker_safety',{issues,severity:sev}).catc
 return{safe:sev==='none',issues,severity:sev,filteredContent,recommendation:sev==='high'?'Remove AI icebreaker. Regenerate with stricter constraints.':sev!=='none'?'Review AI icebreaker before sending.':'AI icebreaker passed safety check.'};}
 export const aiIcebreakerSafety=scanAiIcebreakerSafety;export const scanAIIcebreaker=scanAiIcebreakerSafety;export const aiConversationScan=scanAiIcebreakerSafety;
 
-// ─── #731 AI conversation starter safety scan ─────────────
 export interface AiStarterSafetyResult{safe:boolean;issues:string[];filteredStarter:string;severity:'none'|'low'|'medium'|'high';}
 export function scanAiConversationStarter(starter:string,context?:{isFirstMessage?:boolean;matchAge?:number}):AiStarterSafetyResult{
 const result=scanAiIcebreakerSafety(starter,{age:context?.matchAge});
@@ -1501,7 +1421,6 @@ if(context?.isFirstMessage&&/\b(phone|number|whatsapp|telegram|snapchat|instagra
 return{safe:result.safe&&!result.issues.includes('platform_redirect_first_message'),issues:result.issues,filteredStarter:result.filteredContent,severity:result.severity};}
 export const aiStarterSafety=scanAiConversationStarter;export const conversationStarterScan=scanAiConversationStarter;export const aiStarterModerate=scanAiConversationStarter;
 
-// ─── #732 AI matching recommendation audit ────────────────
 export interface MatchingAuditResult{biasDetected:boolean;disparateImpactRatio:number;affectedGroups:string[];recommendation:string;passed:boolean;}
 export function auditAiMatchingRecommendation(outcomes:{userId:string;demographic:string;matchCount:number;shown:number}[]):MatchingAuditResult{
 const results=auditMatchingFairness(outcomes);const dir=results[0]?.value??1;
@@ -1511,7 +1430,6 @@ if(!results[0]?.passed)writeAuditLog('ai.matching_bias_detected',{disparateImpac
 return{biasDetected:!results[0]?.passed??false,disparateImpactRatio:dir,affectedGroups:affected,passed:results[0]?.passed??true,recommendation:dir<0.8?`Disparate impact detected (ratio=${dir.toFixed(2)}). Review matching algorithm for bias. Affected: ${affected.join(', ')}.`:dir<0.9?'Minor disparity. Monitor matching fairness.':'Matching recommendations appear fair.'};}
 export const matchingAudit=auditAiMatchingRecommendation;export const recommendationAudit=auditAiMatchingRecommendation;export const aiMatchBias=auditAiMatchingRecommendation;
 
-// ─── #733 AI-generated profile content disclosure ─────────
 export interface AiContentDisclosureResult{hasAiContent:boolean;disclosureAdded:boolean;disclosureText:string;fields:string[];}
 export function enforceAiContentDisclosure(profileFields:Record<string,string>,aiGeneratedFields:string[]):AiContentDisclosureResult{
 const fields=aiGeneratedFields.filter(f=>f in profileFields);const hasAiContent=fields.length>0;
@@ -1519,7 +1437,6 @@ const disclosureText=hasAiContent?`Some profile content (${fields.join(', ')}) w
 return{hasAiContent,disclosureAdded:hasAiContent,disclosureText,fields};}
 export const aiContentDisclosure=enforceAiContentDisclosure;export const aiProfileDisclosure=enforceAiContentDisclosure;export const aiGeneratedDisclosure=enforceAiContentDisclosure;
 
-// ─── #865 AI scam scaling detection ──────────────────────
 export interface AiScamScalingResult{detected:boolean;scalingIndicators:string[];estimatedVictimCount:number;riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'none'|'alert'|'suspend'|'ban';}
 export function detectAiScamScaling(messages:Array<{senderId:string;text:string;timestamp:number;recipientId:string}>):AiScamScalingResult{
 const senders=new Map<string,{texts:string[];recipients:Set<string>;timestamps:number[]}>();
@@ -1536,7 +1453,6 @@ if(action!=='none')writeAuditLog('ai.scam_scaling_detected',{indicators,estimate
 return{detected:indicators.length>0,scalingIndicators:indicators,estimatedVictimCount:vc,riskLevel:rl,action};}
 export const aiScamScaling=detectAiScamScaling;export const scaledScam=detectAiScamScaling;export const aiAssistedScam=detectAiScamScaling;
 
-// ─── #866 AI conversation coherence analysis ─────────────
 export interface CoherenceAnalysisResult{coherent:boolean;coherenceScore:number;anomalies:string[];botLikelihood:number;recommendation:string;}
 export function analyzeConversationCoherence(messages:Array<{text:string;senderId:string;timestamp:number}>):CoherenceAnalysisResult{
 if(messages.length<3)return{coherent:true,coherenceScore:1,anomalies:[],botLikelihood:0,recommendation:'Insufficient messages for analysis.'};
@@ -1550,7 +1466,6 @@ if(botLikelihood>0.5)writeAuditLog('ai.coherence_anomaly',{anomalies,botLikeliho
 return{coherent:botLikelihood<0.5,coherenceScore:Math.round(coherenceScore*100)/100,anomalies,botLikelihood:Math.round(botLikelihood*100)/100,recommendation:botLikelihood>=0.75?'High bot likelihood. Flag for review.':botLikelihood>=0.5?'Moderate bot signals. Monitor.':'Conversation appears human-generated.'};}
 export const coherenceAnalysis=analyzeConversationCoherence;export const conversationCoherence=analyzeConversationCoherence;export const aiCoherence=analyzeConversationCoherence;
 
-// ─── #867 Deepfake live-call quality escalation ───────────
 export interface DeepfakeLiveCallResult{suspectedDeepfake:boolean;indicators:string[];confidence:number;action:'allow'|'warn'|'terminate';}
 export function detectDeepfakeLiveCall(frameMetrics:Array<{blinkRate:number;lipSyncScore:number;facialJitterMs:number;skinTextureConsistency:number;backgroundConsistency:number;timestamp:number}>):DeepfakeLiveCallResult{
 if(frameMetrics.length<3)return{suspectedDeepfake:false,indicators:[],confidence:0,action:'allow'};
@@ -1566,7 +1481,6 @@ if(action!=='allow')writeAuditLog('ai.deepfake_live_call',{indicators,confidence
 return{suspectedDeepfake:confidence>=0.4,indicators,confidence:Math.round(confidence*100)/100,action};}
 export const deepfakeLiveCall=detectDeepfakeLiveCall;export const liveCallDeepfake=detectDeepfakeLiveCall;export const videoCallDeepfake=detectDeepfakeLiveCall;
 
-// ─── #661 Socioeconomic bias in profile visibility ────────
 export interface SocioeconomicBiasResult{biasDetected:boolean;biasType:string[];affectedDemographics:string[];disparateImpactRatio:number;recommendation:string;}
 export function detectSocioeconomicBias(visibilityData:{userId:string;incomeLevel?:'low'|'medium'|'high';educationLevel?:string;neighborhood?:string;profileViews:number;matchRate:number}[]):SocioeconomicBiasResult{
 const byIncome=new Map<string,{views:number;matches:number;count:number}>();
@@ -1578,7 +1492,6 @@ if(biasTypes.length)writeAuditLog('ai.socioeconomic_bias',{disparateImpactRatio:
 return{biasDetected:biasTypes.length>0,biasType:biasTypes,affectedDemographics:affected,disparateImpactRatio:Math.round(dir*100)/100,recommendation:dir<0.8?`Socioeconomic bias detected. ${affected.join(', ')} group under-represented. Review visibility algorithm.`:dir<0.9?'Minor socioeconomic disparity. Monitor.':'No significant socioeconomic bias detected.'};}
 export const socioeconomicBias=detectSocioeconomicBias;export const visibilityBias=detectSocioeconomicBias;export const classBasedBias=detectSocioeconomicBias;
 
-// ─── #15.1 AI data minimization enforcement ───────────────
 export interface AiDataMinimizationResult{compliant:boolean;excessFields:string[];recommendation:string;}
 export function enforceAiDataMinimization(requestedFields:string[],purposeAllowedFields:Record<string,string[]>,purpose:string):AiDataMinimizationResult{
 const allowed=purposeAllowedFields[purpose]??[];const excess=requestedFields.filter(f=>!allowed.includes(f));
@@ -1586,7 +1499,6 @@ if(excess.length)writeAuditLog('ai.data_minimization_violation',{purpose,excessF
 return{compliant:excess.length===0,excessFields:excess,recommendation:excess.length>0?`Remove fields not needed for ${purpose}: ${excess.join(', ')}`.trim():'Data request is minimal and compliant.'};}
 export const aiDataMinimization=enforceAiDataMinimization;export const dataMinimize=enforceAiDataMinimization;
 
-// ─── #15.1 Training data opt-out enforcement ──────────────
 export interface TrainingOptOutResult{optedOut:boolean;userId:string;dataExcluded:string[];effectiveDate:string;}
 const trainingOptOuts=new Set<string>();
 export function enforceTrainingDataOptOut(userId:string,optOut:boolean):TrainingOptOutResult{
@@ -1596,7 +1508,6 @@ if(optOut)writeAuditLog('ai.training_opt_out',{userId,excluded}).catch(()=>{});
 return{optedOut:optOut,userId,dataExcluded:excluded,effectiveDate:new Date().toISOString()};}
 export const trainingOptOut=enforceTrainingDataOptOut;export const excludeFromTraining=enforceTrainingDataOptOut;
 
-// ─── #15.2 AI concierge safety boundary enforcement ───────
 export interface ConciergeSafetyResult{allowed:boolean;boundary:string|null;sanitizedResponse:string;}
 const CONCIERGE_BOUNDARIES=['do not impersonate user','do not share private data','do not provide financial advice','do not provide medical advice','do not facilitate harm'];
 export function enforceConciergeSafetyBoundary(response:string,requestType:string):ConciergeSafetyResult{
@@ -1606,7 +1517,6 @@ if(violations.length)writeAuditLog('ai.concierge_boundary_violation',{requestTyp
 return{allowed:violations.length===0,boundary:violations[0]??null,sanitizedResponse:sanitized};}
 export const conciergeSafety=enforceConciergeSafetyBoundary;export const agentBoundary=enforceConciergeSafetyBoundary;
 
-// ─── #15.2 AI agent impersonation prevention ──────────────
 export interface AgentImpersonationResult{detected:boolean;signals:string[];action:'allow'|'flag'|'block';}
 export function detectAgentImpersonation(message:string,senderIsAi:boolean):AgentImpersonationResult{
 const signals:string[]=[];
@@ -1618,7 +1528,6 @@ if(action!=='allow')writeAuditLog('ai.agent_impersonation',{signals,action}).cat
 return{detected:signals.length>0,signals,action};}
 export const agentImpersonation=detectAgentImpersonation;export const aiImpersonation=detectAgentImpersonation;
 
-// ─── #15.4 Novel scam script detection ────────────────────
 export interface NovelScamScriptResult{detected:boolean;noveltyScore:number;closestKnownScript:string|null;recommendation:string;}
 const KNOWN_SCAM_SIGNATURES=['investment guaranteed','oil rig','customs fee','release funds','i love you already','my pastor said','send gift card','bitcoin address','i am a soldier deployed'];
 export function detectNovelScamScript(message:string):NovelScamScriptResult{
@@ -1629,7 +1538,6 @@ if(detected)writeAuditLog('ai.novel_scam_script',{noveltyScore,closestKnownScrip
 return{detected,noveltyScore:Math.round(noveltyScore*100)/100,closestKnownScript:closest,recommendation:detected?noveltyScore>0.7?'Potentially novel scam script. Add to training data and flag.':'Known scam pattern detected. Block and report.':'No scam script detected.'};}
 export const novelScamScript=detectNovelScamScript;export const unknownScamDetect=detectNovelScamScript;
 
-// ─── #15.4 Slow-burn romance scam arc detection ───────────
 export interface SlowBurnScamResult{detected:boolean;arcStage:'benign'|'trust_building'|'crisis_intro'|'financial_ask';riskScore:number;recommendation:string;}
 export function detectSlowBurnScamArc(conversationArc:{daysSinceFirst:number;loveDeclarationDays?:number;crisisIntroducedDays?:number;financialAskDays?:number;messageCount:number}):SlowBurnScamResult{
 let stage:SlowBurnScamArc['arcStage']='benign' as SlowBurnScamResult['arcStage'];let riskScore=0;
@@ -1639,6 +1547,5 @@ else if(conversationArc.loveDeclarationDays!==undefined){const earlyLove=convers
 if(conversationArc.loveDeclarationDays!==undefined&&conversationArc.crisisIntroducedDays!==undefined&&conversationArc.financialAskDays!==undefined)riskScore=Math.min(riskScore+0.2,1);
 if(riskScore>=0.5)writeAuditLog('ai.slow_burn_scam_arc',{stage,riskScore,days:conversationArc.daysSinceFirst}).catch(()=>{});
 return{detected:riskScore>=0.5,arcStage:stage,riskScore:Math.round(riskScore*100)/100,recommendation:stage==='financial_ask'?'Financial request detected in romance arc. High scam probability.':stage==='crisis_intro'?'Crisis narrative introduced. Monitor for financial ask.':stage==='trust_building'?'Rapid love declaration. Monitor relationship arc.':'No scam arc detected.'};}
-// Fix linter — type alias not needed, already inlined above
 type SlowBurnScamArc = SlowBurnScamResult;
 export const slowBurnScam=detectSlowBurnScamArc;export const romanceArcScam=detectSlowBurnScamArc;

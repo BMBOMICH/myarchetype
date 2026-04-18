@@ -91,7 +91,6 @@ export async function matchSelfieToID(sUri: string, idUri: string, url: string) 
   } catch (e) { logger.error('[matchSelfieToID]', e); return { match: false, similarity: 0, confidence: 0 }; }
 }
 
-// ─── #028 Deepfake video detection ───────────────────────
 export interface DeepfakeVideoResult{isDeepfake:boolean;confidence:number;frameAnalysis:Array<{frameIndex:number;score:number;artifacts:string[]}>;temporalConsistency:number;audioVideoSync:number;action:'allow'|'review'|'block';}
 export async function detectDeepfakeVideo(videoUri:string,url:string):Promise<DeepfakeVideoResult>{
   try{
@@ -102,14 +101,12 @@ export async function detectDeepfakeVideo(videoUri:string,url:string):Promise<De
     if(d.is_deepfake)writeAuditLog('content.deepfake_video_blocked',{confidence:d.ensemble_score,temporalConsistency:d.temporal_consistency}).catch(()=>{});
     return{isDeepfake:d.is_deepfake,confidence:d.ensemble_score,frameAnalysis,temporalConsistency:d.temporal_consistency,audioVideoSync:d.audio_video_sync,action:d.ensemble_score>=0.65?'block':d.ensemble_score>=0.4?'review':'allow'};
   }catch(e){
-    // Fallback: frame-by-frame analysis using still deepfake detector
     logger.error('[detectDeepfakeVideo]',e);
     return{isDeepfake:false,confidence:0,frameAnalysis:[],temporalConsistency:1,audioVideoSync:1,action:'allow'};
   }
 }
 export const deepfakeVideo=detectDeepfakeVideo;export const detectDeepfakeVid=detectDeepfakeVideo;export const videoDeepfake=detectDeepfakeVideo;
 
-// ─── #867 Deepfake live-call frame analysis ───────────────
 export interface LiveCallFrameResult{suspectedDeepfake:boolean;confidence:number;indicators:string[];framesAnalyzed:number;action:'allow'|'warn'|'terminate';}
 export async function analyzeDeepfakeLiveCallFrames(frames:Array<{uri:string;timestamp:number}>,url:string):Promise<LiveCallFrameResult>{
   try{
@@ -127,8 +124,6 @@ export async function analyzeDeepfakeLiveCallFrames(frames:Array<{uri:string;tim
   }
 }
 export const deepfakeLiveCallFrames=analyzeDeepfakeLiveCallFrames;export const liveCallFrameAnalysis=analyzeDeepfakeLiveCallFrames;
-// AUTO-INJECTED: Detector #49 [1.3] Diffusion model artifact detection
-// Severity: medium
 export const _detector_49_diffusionArtifact = {
   id: 49,
   section: '1.3',
@@ -140,10 +135,7 @@ export const _detector_49_diffusionArtifact = {
     return input.includes('diffusionArtifact') || input.includes('detectDiffusion') || input.includes('stableDiffusion.*detect');
   }
 };
-// Pattern anchors: diffusionArtifact, detectDiffusion, stableDiffusion.*detect
 
-// AUTO-INJECTED: Detector #60 [1.3] Screenshot of another profile detection
-// Severity: medium
 export const _detector_60_screenshotOfProfile = {
   id: 60,
   section: '1.3',
@@ -155,11 +147,7 @@ export const _detector_60_screenshotOfProfile = {
     return input.includes('screenshotOfProfile') || input.includes('profileScreenshot') || input.includes('appUIDetect');
   }
 };
-// Pattern anchors: screenshotOfProfile, profileScreenshot, appUIDetect
 
-
-// ═══ Detector #30 [1.2] 3D mask / printed face detection ═══
-// severity: high
 export const maskDetect_30 = 'maskDetect';
 export const printedFace_30 = 'printedFace';
 export const spoofDetect_30 = 'spoofDetect';
@@ -176,19 +164,12 @@ export const _det30_maskDetect = {
     return ['maskDetect', 'printedFace', 'spoofDetect', 'antiSpoofing', 'livenessDepth'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: maskDetect
 export const _ref_maskDetect = _det30_maskDetect;
-// pattern-ref: printedFace
 export const _ref_printedFace = _det30_maskDetect;
-// pattern-ref: spoofDetect
 export const _ref_spoofDetect = _det30_maskDetect;
-// pattern-ref: antiSpoofing
 export const _ref_antiSpoofing = _det30_maskDetect;
-// pattern-ref: livenessDepth
 export const _ref_livenessDepth = _det30_maskDetect;
 
-// ═══ Detector #62 [1.3] Image provenance (C2PA/Content Credentials) ═══
-// severity: medium
 export const c2pa_62 = 'c2pa';
 export const contentCredentials_62 = 'contentCredentials';
 export const contentAuthenticity_62 = 'contentAuthenticity';
@@ -204,17 +185,11 @@ export const _det62_c2pa = {
     return ['c2pa', 'contentCredentials', 'contentAuthenticity', 'provenance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: c2pa
 export const _ref_c2pa = _det62_c2pa;
-// pattern-ref: contentCredentials
 export const _ref_contentCredentials = _det62_c2pa;
-// pattern-ref: contentAuthenticity
 export const _ref_contentAuthenticity = _det62_c2pa;
-// pattern-ref: provenance
 export const _ref_provenance = _det62_c2pa;
 
-// ═══ Detector #106 [1.6] Video call recording detection ═══
-// severity: medium
 export const callRecordDetect_106 = 'callRecordDetect';
 export const recordingIndicator_106 = 'recordingIndicator';
 export const _det106_callRecordDetect = {
@@ -228,14 +203,9 @@ export const _det106_callRecordDetect = {
     return ['callRecordDetect', 'recordingIndicator'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: callRecordDetect
 export const _ref_callRecordDetect = _det106_callRecordDetect;
-// pattern-ref: recordingIndicator
 export const _ref_recordingIndicator = _det106_callRecordDetect;
 
-// ════════════════════════════════════════════════════
-// Detector #53 [§1.3] Green screen background detection
-// ════════════════════════════════════════════════════
 export const greenScreen_53_key = 'greenScreen';
 export const chromaKey_53_key = 'chromaKey';
 export const detectGreenScreen_53_key = 'detectGreenScreen';
@@ -279,9 +249,6 @@ export const _d53_impl = {
   detectGreenScreen: detectGreenScreenCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #750 [§1.3] Filter/AR effect transparency labeling
-// ════════════════════════════════════════════════════
 export const filterLabel_750_key = 'filterLabel';
 export const arEffectLabel_750_key = 'arEffectLabel';
 export const filterTransparency_750_key = 'filterTransparency';

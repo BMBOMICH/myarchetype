@@ -51,7 +51,6 @@ interface UserData {
   status?: string;
 }
 
-// ─── #153: Profile completeness score ────────────────────
 
 export function calculateProfileCompletion(userData: UserData): ProfileCompletionResult {
   const completed: string[] = [];
@@ -140,7 +139,6 @@ export function calculateProfileCompletion(userData: UserData): ProfileCompletio
   return { percentage, completed, missing, tips: tips.slice(0, 3), verificationLevel, trustBonus };
 }
 
-// ─── #154: Verification level badge ──────────────────────
 
 export function deriveVerificationLevel(userData: UserData): VerificationLevel {
   const hasSelfie = !!userData.selfieVerified;

@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import type express from 'express';
 
-// ─── [13.1] Field-level access control (upgraded) ─────────
 export const PROFILE_FIELD_ACL = {
   displayName:   { sensitivity: 'public',    ttl: 0,         rateLimit: 1000 },
   age:           { sensitivity: 'public',    ttl: 0,         rateLimit: 1000 },
@@ -29,14 +28,12 @@ export function enforceProfileFieldACL(
       if (!acl || acl.neverExpose) return !acl?.neverExpose;
       if (acl.rateLimit === 0) return false;
       if (acl.sensitivity === 'match_only' && !context.isMatched) return false;
-      // Time-decay for match-only fields: hide if match is stale
       if (acl.ttl > 0 && context.matchAgeMs && context.matchAgeMs > acl.ttl * 1000) return false;
       return true;
     })
   );
 }
 
-// ─── [13.1] ID Obfuscation & Resolution ──────────────────
 const ID_SECRET = process.env.ID_OBFUSCATION_SECRET ?? 'fallback-change-in-prod';
 export function obfuscateUserId(id: string, requester: string): string {
   return crypto.createHmac('sha256', ID_SECRET).update(`${id}:${requester}`).digest('hex').slice(0, 16);
@@ -47,7 +44,6 @@ export class ObfuscatedIdRegistry {
   resolve(o: string): string | null { return this.map.get(o) ?? null; }
 }
 
-// ─── [13.2] Bulk Fetch & Scraping Defense (upgraded) ─────
 export class BulkFetchDetector {
   private windows = new Map<string, { reqs: number; since: number; ids: Set<string>; ips: Set<string> }>();
   private readonly WIN_MS = 60_000;
@@ -72,7 +68,6 @@ export class BulkFetchDetector {
   getStats(uid: string) { const w = this.windows.get(`${uid}:bulk`); return { reqs: w?.reqs ?? 0, unique: w?.ids.size ?? 0 }; }
 }
 
-// ─── [13.1] Query Depth Limiter (GraphQL/REST) ────────────
 export function enforceQueryDepth(q: Record<string, unknown>, max = 3, depth = 0): { allowed: boolean; depth: number } {
   if (depth > max) return { allowed: false, depth };
   let d = depth;
@@ -86,7 +81,6 @@ export function enforceQueryDepth(q: Record<string, unknown>, max = 3, depth = 0
   return { allowed: true, depth: d };
 }
 
-// ─── [13.3] Security Headers ──────────────────────────────
 export function securityHeadersMiddleware(_req: express.Request, res: express.Response, next: express.NextFunction): void {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -101,13 +95,11 @@ export function securityHeadersMiddleware(_req: express.Request, res: express.Re
   next();
 }
 
-// ─── [13.1] Response Sanitizer ────────────────────────────
 const INTERNAL = new Set(['passwordHash','salt','internalNotes','trustScoreHistory','moderationFlags','ipHistory','deviceIds','adminNotes','bannedAt','autoBan','shadowBanned','_firestore']);
 export function sanitizeApiResponse(d: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(d).filter(([k]) => !INTERNAL.has(k) && !k.startsWith('_')));
 }
 
-// ─── [13.3] API Anomaly Detection (stream-ready) ──────────
 export type AnomalySignal = {
   type: 'sequential_id_scan'|'credential_stuffing'|'bulk_download'|'geolocation_probing'|'automation_fingerprint'|'parameter_tampering'|'rate_limit_probing';
   userId?: string; ip: string; severity: 'low'|'medium'|'high'|'critical'; blockRecommended: boolean; evidence?: string;
@@ -140,7 +132,6 @@ export function detectApiAnomaly(logs: { ip: string; userId?: string; endpoint: 
   return sigs;
 }
 
-// ─── [13.1] Pagination Enforcer ───────────────────────────
 export function enforcePagination(page: number, perPage: number, max = 20) {
   if (page<1) return { page:1, perPage:max, offset:0, valid:false, reason:'page>=1' };
   if (perPage>max) return { page, perPage:max, offset:(page-1)*max, valid:false, reason:`capped@${max}` };
@@ -148,13 +139,11 @@ export function enforcePagination(page: number, perPage: number, max = 20) {
   return { page, perPage, offset:(page-1)*perPage, valid:true };
 }
 
-// ─── [13.1] Sensitive Access Audit ────────────────────────
 export function auditSensitiveAccess(endpoint: string, userId: string, ip: string, success: boolean, dataTypes: string[]) {
   const id = `AUDIT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   process.stdout.write(JSON.stringify({ severity:'AUDIT', auditId:id, endpoint, userId, ip, success, dataTypes, ts: new Date().toISOString() })+'\n');
   return { auditId: id, logged: true };
 }
 
-// ─── [13.2] Honeypot Injection & Detection ────────────────
 export function injectHoneypotField(p: Record<string, unknown>): Record<string, unknown> { return { ...p, _h: crypto.randomBytes(4).toString('hex') }; }
 export function detectHoneypotAccess(fields: string[]): boolean { return fields.includes('_h'); }

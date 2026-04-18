@@ -9,13 +9,12 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 
-// ─── Types ───────────────────────────────────────────────
 
 export type BodyType = 'Slim' | 'Average' | 'Athletic' | 'Curvy';
 export type BodyTypeValue = BodyType | 'Any';
@@ -35,30 +34,19 @@ export interface BodyTypeSelectorProps {
   showLookingFor?: boolean;
 }
 
-// ─── Design tokens ───────────────────────────────────────
 
-const C = {
-  bg: '#1a1a2e',
-  surface: '#16213e',
+const LOCAL = {
   surfaceActive: '#0f3460',
-  border: '#0f3460',
-  accent: '#53a8b6',
-  success: '#5cb85c',
-  danger: '#d9534f',
-  warning: '#e67e22',
-  textPrimary: '#eeeeee',
-  textSecondary: '#aaaaaa',
-  textMuted: '#888888',
-  textDim: '#666666',
-  white: '#ffffff',
-  overlay: 'rgba(0, 0, 0, 0.85)',
-  skin: '#53a8b6',         // silhouette fill
-  skinHighlight: '#6ec5d4', // optional lighter accent
+  success:       '#5cb85c',
+  warning:       '#e67e22',
+  white:         '#ffffff',
+  overlay:       'rgba(0, 0, 0, 0.85)',
+  skin:          '#53a8b6',
+  skinHighlight: '#6ec5d4',
 } as const;
 
 const HIT = { top: 12, bottom: 12, left: 12, right: 12 } as const;
 
-// ─── Body-type option data ───────────────────────────────
 
 const BODY_TYPES: readonly BodyTypeOption[] = [
   {
@@ -94,106 +82,65 @@ const ANY_OPTION: BodyTypeOption = {
   examples: 'Open to all body types',
 };
 
-// ─── Anatomical silhouette system ────────────────────────
 
-/**
- * Each torso "slice" can have per-corner border radius for
- * natural body curves (e.g. rounded shoulders, flared hips).
- */
 interface TorsoSection {
   readonly w: number;
   readonly h: number;
-  readonly rtl?: number; // borderTopLeftRadius
-  readonly rtr?: number; // borderTopRightRadius
-  readonly rbl?: number; // borderBottomLeftRadius
-  readonly rbr?: number; // borderBottomRightRadius
+  readonly rtl?: number;
+  readonly rtr?: number;
+  readonly rbl?: number;
+  readonly rbr?: number;
 }
 
-/** Each leg is rendered as a tapered column of stacked slices. */
 interface LegSection {
   readonly w: number;
   readonly h: number;
 }
 
 interface FigureConfig {
-  /** Head diameter (rendered as a circle). */
   readonly head: number;
-  /** [width, height] of the neck. */
   readonly neck: readonly [number, number];
-  /**
-   * Torso slices from shoulders → hips. More slices = smoother
-   * width transitions = more realistic contours.
-   */
   readonly torso: readonly TorsoSection[];
-  /**
-   * Leg slices from thigh → ankle (each leg is identical).
-   * The last slice gets fully-rounded bottom corners (foot hint).
-   */
   readonly legs: readonly LegSection[];
-  /** Gap between the two leg columns. */
   readonly legGap: number;
 }
 
-/**
- * Four anatomically-proportioned figure configs.
- *
- * Design notes:
- * - Head ≈ 1/7.5 of total height (stylised).
- * - Width changes between adjacent torso slices are ≤ 6 px
- *   so curves feel organic, not stepped.
- * - Shoulder slices have large top-corner radii to mimic
- *   the deltoid slope from neck → outer shoulder.
- * - Hip slices use bottom-corner radii for a natural taper
- *   into the thigh gap.
- * - Leg columns taper smoothly: thigh → knee → calf → ankle.
- */
 const FIGURES: Record<BodyType, FigureConfig> = {
-  /* ── Slim ──────────────────────────────────────────── */
   Slim: {
     head: 20,
     neck: [7, 6],
     torso: [
-      // Shoulders — gentle slope
       { w: 30, h: 5, rtl: 12, rtr: 12 },
       { w: 28, h: 4, rtl: 4, rtr: 4 },
-      // Chest
       { w: 26, h: 10 },
       { w: 25, h: 10 },
-      // Ribcage → waist (barely tapers)
       { w: 24, h: 8 },
       { w: 22, h: 8 },
-      // Waist
       { w: 21, h: 6 },
-      // Lower torso → hips
       { w: 22, h: 5 },
       { w: 24, h: 5, rbl: 5, rbr: 5 },
     ],
     legs: [
-      { w: 8, h: 18 },  // upper thigh
-      { w: 7, h: 6 },   // knee
-      { w: 7, h: 16 },  // calf
-      { w: 6, h: 5 },   // lower calf
-      { w: 5, h: 4 },   // ankle
+      { w: 8, h: 18 },
+      { w: 7, h: 6 },
+      { w: 7, h: 16 },
+      { w: 6, h: 5 },
+      { w: 5, h: 4 },
     ],
     legGap: 5,
   },
 
-  /* ── Average ───────────────────────────────────────── */
   Average: {
     head: 22,
     neck: [9, 6],
     torso: [
       { w: 38, h: 6, rtl: 14, rtr: 14 },
       { w: 36, h: 4, rtl: 4, rtr: 4 },
-      // Chest
       { w: 34, h: 10 },
       { w: 33, h: 10 },
-      // Ribcage
       { w: 31, h: 8 },
       { w: 29, h: 7 },
-      // Waist
       { w: 28, h: 6 },
-      // Lower torso → hips
       { w: 30, h: 5 },
       { w: 32, h: 5, rbl: 5, rbr: 5 },
     ],
@@ -207,60 +154,48 @@ const FIGURES: Record<BodyType, FigureConfig> = {
     legGap: 5,
   },
 
-  /* ── Athletic ──────────────────────────────────────── */
   Athletic: {
     head: 22,
     neck: [11, 6],
     torso: [
-      // Broad shoulders
       { w: 48, h: 7, rtl: 16, rtr: 16 },
       { w: 46, h: 4, rtl: 4, rtr: 4 },
-      // Wide chest (pecs)
       { w: 44, h: 10 },
       { w: 42, h: 8 },
-      // V-taper: chest → narrow waist
       { w: 38, h: 7 },
       { w: 34, h: 6 },
-      // Narrow waist
       { w: 30, h: 6 },
-      // Lower torso → hips
       { w: 32, h: 5 },
       { w: 34, h: 5, rbl: 5, rbr: 5 },
     ],
     legs: [
-      { w: 14, h: 17 },  // muscular thighs
+      { w: 14, h: 17 },
       { w: 12, h: 6 },
-      { w: 12, h: 15 },  // muscular calves
+      { w: 12, h: 15 },
       { w: 10, h: 5 },
       { w: 8, h: 4 },
     ],
     legGap: 5,
   },
 
-  /* ── Curvy (hourglass) ─────────────────────────────── */
   Curvy: {
     head: 22,
     neck: [8, 5],
     torso: [
-      // Shoulders
       { w: 34, h: 5, rtl: 12, rtr: 12 },
       { w: 36, h: 4, rtl: 4, rtr: 4 },
-      // Bust (fuller)
       { w: 40, h: 10 },
       { w: 38, h: 6 },
-      // Under-bust taper
       { w: 34, h: 5 },
-      // Defined waist (narrowest point — hourglass)
       { w: 28, h: 6 },
       { w: 26, h: 5 },
-      // Hips flare out dramatically
       { w: 32, h: 5 },
       { w: 38, h: 5 },
       { w: 44, h: 6, rbl: 8, rbr: 8 },
       { w: 42, h: 4, rbl: 6, rbr: 6 },
     ],
     legs: [
-      { w: 16, h: 15 },  // fuller thighs
+      { w: 16, h: 15 },
       { w: 13, h: 6 },
       { w: 11, h: 14 },
       { w: 9, h: 5 },
@@ -270,16 +205,15 @@ const FIGURES: Record<BodyType, FigureConfig> = {
   },
 };
 
-// ─── Silhouette component ────────────────────────────────
 
 const BodyFigure = React.memo(function BodyFigure({
   type,
-  color = C.skin,
+  color = LOCAL.skin,
 }: {
   type: BodyType;
   color?: string;
 }) {
-  const cfg = FIGURES[type];
+  const cfg     = FIGURES[type];
   const lastLeg = cfg.legs.length - 1;
 
   return (
@@ -335,10 +269,8 @@ const BodyFigure = React.memo(function BodyFigure({
                   width: part.w,
                   height: part.h,
                   backgroundColor: color,
-                  // Smooth top corners for thigh attachment
                   borderTopLeftRadius: i === 0 ? 3 : 1,
                   borderTopRightRadius: i === 0 ? 3 : 1,
-                  // Rounded bottom for ankle / foot hint
                   borderBottomLeftRadius: i === lastLeg ? part.w / 2 : 1,
                   borderBottomRightRadius: i === lastLeg ? part.w / 2 : 1,
                   marginTop: i === 0 ? 0 : -1,
@@ -352,7 +284,7 @@ const BodyFigure = React.memo(function BodyFigure({
   );
 });
 
-const figS = StyleSheet.create({
+const figS = StyleSheet.create(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -366,15 +298,13 @@ const figS = StyleSheet.create({
   legCol: {
     alignItems: 'center',
   },
-});
+}));
 
-// ─── Helpers ─────────────────────────────────────────────
 
 function isBodyType(v: BodyTypeValue | ''): v is BodyType {
   return v !== '' && v !== 'Any';
 }
 
-// ─── Main component ─────────────────────────────────────
 
 export default function BodyTypeSelector({
   selectedType,
@@ -384,16 +314,16 @@ export default function BodyTypeSelector({
   showLookingFor = false,
 }: BodyTypeSelectorProps) {
   const [modalVisible, setModalVisible] = useState(false);
-  const [previewType, setPreviewType] = useState<BodyTypeValue | null>(null);
+  const [previewType,  setPreviewType]  = useState<BodyTypeValue | null>(null);
 
   const options = useMemo<readonly BodyTypeOption[]>(
     () => (showLookingFor ? [...BODY_TYPES, ANY_OPTION] : BODY_TYPES),
-    [showLookingFor]
+    [showLookingFor],
   );
 
   const selectedOption = useMemo(
     () => options.find((o) => o.value === selectedType),
-    [options, selectedType]
+    [options, selectedType],
   );
 
   const openModal = useCallback(() => setModalVisible(true), []);
@@ -408,7 +338,7 @@ export default function BodyTypeSelector({
       onSelect(value);
       closeModal();
     },
-    [onSelect, closeModal]
+    [onSelect, closeModal],
   );
 
   return (
@@ -461,24 +391,29 @@ export default function BodyTypeSelector({
               {showLookingFor ? 'your preference' : 'your body'}
             </Text>
 
+            {/*
+              ScrollView wraps 4–5 option cards in a flexWrap grid.
+              This is a bounded, static dataset. LegendList virtualization
+              adds complexity with zero measurable benefit here.
+            */}
             <ScrollView
               contentContainerStyle={s.grid}
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
               {options.map((opt) => {
-                const isSelected = selectedType === opt.value;
-                const isPreviewed = previewType === opt.value;
+                const isSelected  = selectedType === opt.value;
+                const isPreviewed = previewType  === opt.value;
 
                 return (
                   <TouchableOpacity
                     key={opt.value}
                     style={[
                       s.card,
-                      isSelected && s.cardSelected,
-                      isPreviewed && !isSelected && s.cardPreview,
+                      isSelected                  && s.cardSelected,
+                      isPreviewed && !isSelected  && s.cardPreview,
                     ]}
-                    onPress={() => handleSelect(opt.value)}
+                    onPress={() = accessibilityLabel="button"> handleSelect(opt.value)}
                     onPressIn={() => setPreviewType(opt.value)}
                     onPressOut={() => setPreviewType(null)}
                     disabled={disabled}
@@ -497,12 +432,7 @@ export default function BodyTypeSelector({
                       </View>
                     )}
 
-                    <Text
-                      style={[
-                        s.optLabel,
-                        isSelected && s.optLabelSelected,
-                      ]}
-                    >
+                    <Text style={[s.optLabel, isSelected && s.optLabelSelected]}>
                       {opt.label}
                     </Text>
 
@@ -535,22 +465,31 @@ export default function BodyTypeSelector({
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const s = StyleSheet.create((theme) => ({
   container: { marginBottom: 20 },
-  label: { fontSize: 16, color: C.textPrimary, marginBottom: 5 },
-  hint: { fontSize: 12, color: C.textMuted, marginBottom: 10, fontStyle: 'italic' },
+
+  label: {
+    fontSize: 16,
+    color: theme.colors.text,
+    marginBottom: 5,
+  },
+  hint: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
 
   /* selector button */
   selectorBtn: {
-    backgroundColor: C.surface,
+    backgroundColor: theme.colors.surface,
     borderRadius: 15,
     padding: 15,
     borderWidth: 2,
-    borderColor: C.border,
+    borderColor: theme.colors.border,
   },
-  selectorRow: { flexDirection: 'row', alignItems: 'center' },
+  selectorRow:   { flexDirection: 'row', alignItems: 'center' },
   miniSilhouette: {
     transform: [{ scale: 0.35 }],
     marginRight: -20,
@@ -559,38 +498,38 @@ const s = StyleSheet.create({
     width: 45,
     overflow: 'hidden',
   },
-  selectorText: { flex: 1, marginLeft: 10 },
-  selectedLabel: { fontSize: 16, fontWeight: '600', color: C.textPrimary },
-  selectedDesc: { fontSize: 12, color: C.textMuted, marginTop: 2 },
-  arrow: { color: C.accent, fontSize: 14 },
+  selectorText:  { flex: 1, marginLeft: 10 },
+  selectedLabel: { fontSize: 16, fontWeight: '600', color: theme.colors.text },
+  selectedDesc:  { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 },
+  arrow:         { color: theme.colors.primary, fontSize: 14 },
 
   /* modal */
   overlay: {
     flex: 1,
-    backgroundColor: C.overlay,
+    backgroundColor: LOCAL.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modal: {
-    backgroundColor: C.bg,
+    backgroundColor: theme.colors.background,
     borderRadius: 20,
     padding: 20,
     width: '100%',
     maxHeight: '90%',
     borderWidth: 2,
-    borderColor: C.border,
+    borderColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: C.textPrimary,
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 5,
   },
   modalSub: {
     fontSize: 13,
-    color: C.textMuted,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -605,20 +544,21 @@ const s = StyleSheet.create({
   /* option cards */
   card: {
     width: '48%',
-    backgroundColor: C.surface,
+    backgroundColor: theme.colors.surface,
     borderRadius: 15,
     padding: 12,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: C.border,
+    borderColor: theme.colors.border,
     marginBottom: 10,
     position: 'relative',
   },
   cardSelected: {
-    borderColor: C.accent,
-    backgroundColor: C.surfaceActive,
+    borderColor: theme.colors.primary,
+    backgroundColor: LOCAL.surfaceActive,
   },
-  cardPreview: { borderColor: C.warning },
+  cardPreview: { borderColor: LOCAL.warning },
+
   figureWrap: {
     transform: [{ scale: 0.55 }],
     height: 95,
@@ -629,44 +569,48 @@ const s = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: C.accent,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: 20,
   },
-  anyText: { color: C.white, fontSize: 16, fontWeight: 'bold' },
+  anyText: { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
+
   optLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: C.textPrimary,
+    color: theme.colors.text,
     marginTop: 5,
     marginBottom: 5,
   },
-  optLabelSelected: { color: C.accent },
+  optLabelSelected: { color: theme.colors.primary },
+
   optDesc: {
     fontSize: 11,
-    color: C.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 4,
   },
   optExamples: {
     fontSize: 10,
-    color: C.textDim,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     fontStyle: 'italic',
   },
+
   checkBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: C.success,
+    backgroundColor: LOCAL.success,
     borderRadius: 12,
     width: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkText: { color: C.white, fontSize: 14, fontWeight: 'bold' },
-  cancelBtn: { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
-  cancelText: { color: C.danger, fontSize: 16 },
-});
+  checkText: { color: LOCAL.white, fontSize: 14, fontWeight: 'bold' },
+
+  cancelBtn:  { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
+  cancelText: { color: theme.colors.error, fontSize: 16 },
+}));

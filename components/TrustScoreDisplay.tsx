@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { getUserTrustLevel } from '../utils/ratingSystem';
 
 interface Ratings {
@@ -88,12 +89,12 @@ function DetailedScore({
       {hasRatings ? (
         <View style={styles.ratingsSection}>
           <Text style={styles.sectionLabel}>Community Ratings ({ratings.totalRatings} reviews)</Text>
-          <RatingBar label="Photos match reality"  value={ratings.averagePhotosMatch ?? 0}     max={5} />
-          <RatingBar label="Height accurate"        value={ratings.heightAccuracyRate ?? 0}     max={100} isPercent />
-          <RatingBar label="Body type accurate"     value={ratings.bodyTypeAccuracyRate ?? 0}   max={100} isPercent />
-          <RatingBar label="Age accurate"           value={ratings.ageAccuracyRate ?? 0}        max={100} isPercent />
+          <RatingBar label="Photos match reality"  value={ratings.averagePhotosMatch ?? 0}      max={5} />
+          <RatingBar label="Height accurate"        value={ratings.heightAccuracyRate ?? 0}      max={100} isPercent />
+          <RatingBar label="Body type accurate"     value={ratings.bodyTypeAccuracyRate ?? 0}    max={100} isPercent />
+          <RatingBar label="Age accurate"           value={ratings.ageAccuracyRate ?? 0}         max={100} isPercent />
           <RatingBar label="Personality match"      value={ratings.averagePersonalityMatch ?? 0} max={5} />
-          <RatingBar label="Overall experience"     value={ratings.averageOverall ?? 0}         max={5} />
+          <RatingBar label="Overall experience"     value={ratings.averageOverall ?? 0}          max={5} />
         </View>
       ) : (
         <View style={styles.noRatingsBox}>
@@ -126,14 +127,14 @@ function TrustModal({ visible, onClose, ratings, selfieVerified, ageVerified, he
 
 export default function TrustScoreDisplay({ ratings, selfieVerified = false, ageVerified = false, heightVerified = false, size = 'medium' }: TrustScoreDisplayProps) {
   const [showModal, setShowModal] = useState(false);
-  const trustLevel   = getUserTrustLevel(ratings) as TrustLevel;
-  const trustScore   = calculateDisplayScore(ratings);
-  const verCount     = [selfieVerified, ageVerified, heightVerified].filter(Boolean).length;
-  const modalProps   = { visible: showModal, onClose: () => setShowModal(false), ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore };
+  const trustLevel = getUserTrustLevel(ratings) as TrustLevel;
+  const trustScore = calculateDisplayScore(ratings);
+  const verCount   = [selfieVerified, ageVerified, heightVerified].filter(Boolean).length;
+  const modalProps = { visible: showModal, onClose: () => setShowModal(false), ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore };
 
   if (size === 'small') {
     return (
-      <TouchableOpacity style={[styles.smallBadge, { backgroundColor: trustLevel.color }]} onPress={() => setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}`} accessibilityRole="button">
+      <TouchableOpacity style={[styles.smallBadge, { backgroundColor: trustLevel.color }]} onPress={() = accessibilityLabel="button"> setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}`} accessibilityRole="button">
         <Text style={styles.smallBadgeText}>{trustLevel.label}</Text>
         <TrustModal {...modalProps} />
       </TouchableOpacity>
@@ -142,7 +143,7 @@ export default function TrustScoreDisplay({ ratings, selfieVerified = false, age
 
   if (size === 'medium') {
     return (
-      <TouchableOpacity style={styles.mediumContainer} onPress={() => setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}, score: ${trustScore}%`} accessibilityRole="button">
+      <TouchableOpacity style={styles.mediumContainer} onPress={() = accessibilityLabel="button"> setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}, score: ${trustScore}%`} accessibilityRole="button">
         <View style={styles.mediumRow}>
           <View style={[styles.mediumBadge, { backgroundColor: trustLevel.color }]}>
             <Text style={styles.mediumBadgeText}>{trustLevel.label}</Text>
@@ -162,31 +163,31 @@ export default function TrustScoreDisplay({ ratings, selfieVerified = false, age
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   smallBadge:             { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10 },
   smallBadgeText:         { color: '#fff', fontSize: 11, fontWeight: '600' },
   mediumContainer:        { backgroundColor: '#16213e', borderRadius: 10, padding: 12 },
   mediumRow:              { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mediumBadge:            { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 10 },
   mediumBadgeText:        { color: '#fff', fontSize: 12, fontWeight: '600' },
-  mediumScore:            { color: '#eee', fontSize: 18, fontWeight: 'bold' },
-  mediumVerified:         { color: '#888', fontSize: 11, marginTop: 6 },
+  mediumScore:            { color: theme.colors.text, fontSize: 18, fontWeight: 'bold' },
+  mediumVerified:         { color: theme.colors.textSecondary, fontSize: 11, marginTop: 6 },
   largeContainer:         { marginBottom: 10 },
   detailContainer:        {},
   scoreHeader:            { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 15 },
   scoreBadge:             { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 12 },
   scoreBadgeText:         { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  scoreNumber:            { color: '#eee', fontSize: 28, fontWeight: 'bold' },
+  scoreNumber:            { color: theme.colors.text, fontSize: 28, fontWeight: 'bold' },
   scoreBarContainer:      { marginBottom: 20 },
   scoreBarBg:             { height: 8, backgroundColor: '#0f3460', borderRadius: 4, overflow: 'hidden' },
   scoreBarFill:           { height: 8, borderRadius: 4 },
-  scoreLabel:             { color: '#888', fontSize: 12, marginTop: 5, textAlign: 'right' },
+  scoreLabel:             { color: theme.colors.textSecondary, fontSize: 12, marginTop: 5, textAlign: 'right' },
   verificationsSection:   { marginBottom: 20 },
   sectionLabel:           { color: '#53a8b6', fontSize: 14, fontWeight: '600', marginBottom: 10 },
   verificationRow:        { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   verificationDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: '#555', marginRight: 10 },
   verificationDotActive:  { backgroundColor: '#5cb85c' },
-  verificationText:       { color: '#888', fontSize: 13 },
+  verificationText:       { color: theme.colors.textSecondary, fontSize: 13 },
   verificationTextActive: { color: '#5cb85c' },
   ratingsSection:         { marginBottom: 10 },
   ratingItem:             { marginBottom: 12 },
@@ -194,12 +195,12 @@ const styles = StyleSheet.create({
   ratingBarRow:           { flexDirection: 'row', alignItems: 'center', gap: 10 },
   ratingBarBg:            { flex: 1, height: 6, backgroundColor: '#0f3460', borderRadius: 3, overflow: 'hidden' },
   ratingBarFill:          { height: 6, borderRadius: 3, backgroundColor: '#53a8b6' },
-  ratingValue:            { color: '#eee', fontSize: 13, fontWeight: '600', width: 45, textAlign: 'right' },
+  ratingValue:            { color: theme.colors.text, fontSize: 13, fontWeight: '600', width: 45, textAlign: 'right' },
   noRatingsBox:           { backgroundColor: '#0f3460', borderRadius: 10, padding: 15 },
-  noRatingsText:          { color: '#888', fontSize: 13, textAlign: 'center' },
+  noRatingsText:          { color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center' },
   modalOverlay:           { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent:           { backgroundColor: '#1a1a2e', borderRadius: 20, padding: 20, width: '100%', maxWidth: 400, borderWidth: 1, borderColor: '#0f3460' },
-  modalTitle:             { fontSize: 22, fontWeight: 'bold', color: '#eee', textAlign: 'center', marginBottom: 20 },
+  modalTitle:             { fontSize: 22, fontWeight: 'bold', color: theme.colors.text, textAlign: 'center', marginBottom: 20 },
   modalClose:             { marginTop: 15, paddingVertical: 10, alignItems: 'center' },
   modalCloseText:         { color: '#d9534f', fontSize: 15 },
-});
+}));

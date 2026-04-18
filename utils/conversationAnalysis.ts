@@ -1,4 +1,3 @@
-// file: utils/conversationAnalysis.ts
 import { collection, getDocs, getFirestore, limit, orderBy, query, where } from 'firebase/firestore';
 
 const PSK=['whatsapp','telegram','signal','snapchat','instagram','kik','wechat','line','viber','discord','add me on','message me on','text me at',"let's move to",'talk on',"here's my number"];
@@ -9,7 +8,6 @@ const AES=[/you (understand|get) me (like )?no one else/i,/i('ve| have) never (f
 const AIG=[/i (truly |deeply )?understand (exactly )?how you feel/i,/as an? (empathetic|caring) (person|partner)/i,/i (validate|acknowledge) your (feelings|emotions)/i,/that must be (incredibly|extremely|very) (difficult|hard|challenging) for you/i];
 const BEP=[/you blocked me/i,/why did you block/i,/i made a new account/i,/this is \w+ (from|on)/i,/don't delete this/i,/i know you blocked me/i,/please don't block/i];
 
-// [2.12] AI Emotional Manipulation patterns
 const AI_MANIP=[
   /i('ve| have) been (thinking|dreaming) about you (all day|constantly|nonstop)/i,
   /you('re| are) the (only|first) (one|person) (who|that) (truly |really )?(understands|gets) me/i,
@@ -19,7 +17,6 @@ const AI_MANIP=[
   /my (heart|soul) (recognizes|knows) you/i,
   /the (universe|cosmos|god|fate) (brought|sent) us (together|to each other)/i,
 ];
-// [2.5] Manipulation — love bombing velocity markers
 const ISOLATION_P=[
   /your (friends|family) (don't|do not|can't|cannot) (understand|appreciate|deserve) you/i,
   /(they|everyone) (is|are) (jealous|toxic|against) (of )?(us|you|me)/i,
@@ -28,7 +25,6 @@ const ISOLATION_P=[
   /stay away from (them|your friends|your family)/i,
   /they('re| are) a (bad|negative|toxic) influence/i,
 ];
-// [2.5] Gaslighting patterns
 const GASLIGHT_P=[
   /you('re| are) (too |over)?sensitive/i,/you('re| are) (crazy|paranoid|delusional|imagining things)/i,
   /that never happened/i,/you('re| are) (making|imagining) (this|it|that) up/i,
@@ -36,7 +32,6 @@ const GASLIGHT_P=[
   /you('re| are) (being|acting) (irrational|hysterical|dramatic)/i,
   /it('s| was) just a joke/i,/you can't take a joke/i,
 ];
-// [2.5] Guilt tripping / emotional coercion
 const GUILT_P=[
   /after everything i('ve| have) done for you/i,/you ('re|are) (breaking|destroying|crushing) my heart/i,
   /i (guess|suppose) i('m| am) not (good|important|worthy) enough/i,
@@ -45,7 +40,6 @@ const GUILT_P=[
   /you('re| are) (making|causing) me (feel|be) (depressed|suicidal|worthless)/i,
   /no one else will ever (love|want|accept) you/i,
 ];
-// [2.5] Urgency / pressure manipulation
 const URGENCY_P=[
   /you (have to|must|need to) (decide|answer|respond) (right now|immediately|now)/i,
   /this (offer|opportunity|deal|chance) (expires|ends|goes away) (soon|today|in)/i,
@@ -54,16 +48,13 @@ const URGENCY_P=[
   /don't (think|overthink|wait|hesitate) (too much|about it)/i,
   /trust me (on this|blindly|completely)/i,
 ];
-// [5.5] Conversation velocity / topic escalation
 const TOPIC_ESC=['intimate photos','meet tonight','come over','where do you live exactly','what time are you alone','send me a pic','video call now','hotel','your address'];
-// [2.13] Continued contact after block
 const POST_BLOCK_P=[
   /i know you blocked me/i,/you blocked me but/i,/please unblock/i,/i made a new account/i,
   /this is (my|a) new (number|account|profile)/i,/your friend told me/i,
   /i('m| am) not giving up/i,/you can't escape/i,/i will find (you|a way)/i,
   /i('ll| will) keep (trying|messaging|contacting) you/i,
 ];
-// [5.9] Married/relationship deception
 const MARRIED_DECEPT=[
   /my wife doesn't understand/i,/my husband doesn't know/i,/i('m| am) (in|stuck in) an unhappy marriage/i,
   /we('re| are) basically (separated|done|over)/i,/i('m| am) (planning|about) to (divorce|leave|separate)/i,
@@ -71,7 +62,6 @@ const MARRIED_DECEPT=[
   /keep (this|us) (between us|secret|quiet|private)/i,/don't tell anyone about (us|me|this)/i,
   /i('m| am) in an open relationship/i,/my partner (doesn't mind|is ok with|knows about)/i,
 ];
-// [5.8] Proxy account signals
 const PROXY_ACC=[
   /my (friend|colleague|brother|sister) (is|wants to|would like to) (talk|message|meet)/i,
   /i('m| am) messaging on behalf of/i,/they asked me to (contact|reach out)/i,
@@ -118,7 +108,6 @@ export function analyzeConversation(msgs:Array<{text:string;timestamp:number;sen
   const tr=estimateTypoRate(at.join(' '));if(tr<0.005&&tm.length>=8)aiS.push('near-zero typo rate');
   const ad=aiS.length>=2;
   const bem=tm.filter(m=>BEP.some(p=>p.test(m.text))),nas=tm.filter(m=>/new account|fresh start|different profile/i.test(m.text)),prs=tm.filter(m=>/my friend wants to|on behalf of|told me to message/i.test(m.text));
-  // [2.5] Manipulation pattern detection
   const isoSigs:string[]=[],glSigs:string[]=[],guSigs:string[]=[],urgSigs:string[]=[];
   let lbHit=false,isoHit=false,glHit=false,guHit=false,urgHit=false;
   for(const m of tm){
@@ -129,17 +118,13 @@ export function analyzeConversation(msgs:Array<{text:string;timestamp:number;sen
     if(URGENCY_P.some(p=>{const h=p.test(m.text);if(h)urgSigs.push(m.text.substring(0,60));return h;}))urgHit=true;
   }
   const manipSigs=[...isoSigs,...glSigs,...guSigs,...urgSigs].slice(0,10);
-  // [2.13] Continued contact after block
   const pbSigs:string[]=[];let pbHit=false;
   for(const m of tm)if(POST_BLOCK_P.some(p=>{const h=p.test(m.text);if(h)pbSigs.push(m.text.substring(0,60));return h;}))pbHit=true;
   const pbSev:ConversationRisk['continuedContactAfterBlock']['severity']=pbSigs.length>=3?'high':pbSigs.length>=1?'low':'none';
-  // [5.9] Married deception
   const mdSigs:string[]=[];let mdHit=false;
   for(const m of tm)if(MARRIED_DECEPT.some(p=>{const h=p.test(m.text);if(h)mdSigs.push(m.text.substring(0,60));return h;}))mdHit=true;
-  // [5.8] Proxy account
   const paSigs:string[]=[];let paHit=false;
   for(const m of tm)if(PROXY_ACC.some(p=>{const h=p.test(m.text);if(h)paSigs.push(m.text.substring(0,60));return h;}))paHit=true;
-  // [5.5] Topic escalation
   const escTopics:string[]=[];
   for(const m of tm)for(const t of TOPIC_ESC)if(m.text.toLowerCase().includes(t)&&!escTopics.includes(t))escTopics.push(t);
   const escVel:ConversationRisk['topicEscalation']['velocity']=escTopics.length>=5?'alarming':escTopics.length>=3?'fast':'normal';
@@ -169,7 +154,6 @@ export function analyzeConversation(msgs:Array<{text:string;timestamp:number;sen
   };
 }
 
-// [2.5] Full manipulation pattern detector (standalone)
 export interface ManipulationPatternResult{detected:boolean;patterns:{loveBombing:boolean;isolation:boolean;gaslighting:boolean;guiltTripping:boolean;urgencyPressure:boolean;aiAssistedEmotion:boolean};severity:'none'|'low'|'medium'|'high'|'critical';signals:string[];score:number;action:'none'|'warn'|'flag'|'review'|'block';}
 export function detectManipulationPatterns(msgs:Array<{text:string;senderId:string;timestamp:number}>,sid:string):ManipulationPatternResult{
   const sm=msgs.filter(m=>m.senderId===sid);const sigs:string[]=[];
@@ -191,7 +175,6 @@ export const manipulationPatterns=detectManipulationPatterns;
 export const loveGaslightDetect=detectManipulationPatterns;
 export const emotionalAbusePatterns=detectManipulationPatterns;
 
-// [2.13] Continued contact after block (standalone)
 export interface ContinuedContactResult{detected:boolean;signals:string[];attempts:number;severity:'none'|'low'|'high'|'critical';tactics:string[];action:'none'|'warn'|'flag'|'block'|'escalate';}
 export function detectContinuedContactAfterBlock(msgs:Array<{text:string;senderId:string;timestamp:number}>,sid:string,blockTimestamp?:number):ContinuedContactResult{
   const sm=msgs.filter(m=>m.senderId===sid&&(blockTimestamp?m.timestamp>blockTimestamp:true));
@@ -212,7 +195,6 @@ export const continuedContactAfterBlock=detectContinuedContactAfterBlock;
 export const blockEvasionDetect=detectContinuedContactAfterBlock;
 export const postBlockContact=detectContinuedContactAfterBlock;
 
-// [5.9] Married / relationship deception (standalone)
 export interface RelationshipDeceptionResult{detected:boolean;signals:string[];deceptionType:('married'|'in_relationship'|'open_relationship_lie'|'secret_keeping')[];confidence:number;action:'none'|'warn'|'flag';}
 export function detectRelationshipDeception(msgs:Array<{text:string;senderId:string}>,sid:string):RelationshipDeceptionResult{
   const sm=msgs.filter(m=>m.senderId===sid);const sigs:string[]=[],types:RelationshipDeceptionResult['deceptionType']=[];let score=0;
@@ -230,7 +212,6 @@ export const marriedDeception=detectRelationshipDeception;
 export const hiddenRelationship=detectRelationshipDeception;
 export const secretRelationshipDetect=detectRelationshipDeception;
 
-// [5.8] Proxy account operation (standalone)
 export interface ProxyAccountResult{detected:boolean;signals:string[];proxyType:('managed_account'|'third_party_messaging'|'shared_account'|'agent_operated')[];confidence:number;action:'none'|'warn'|'flag'|'review';}
 export function detectProxyAccountOperation(msgs:Array<{text:string;senderId:string}>,sid:string):ProxyAccountResult{
   const sm=msgs.filter(m=>m.senderId===sid);const sigs:string[]=[],types:ProxyAccountResult['proxyType']=[];let score=0;
@@ -240,7 +221,6 @@ export function detectProxyAccountOperation(msgs:Array<{text:string;senderId:str
     if(/we (share|use) (this|the same) account/i.test(m.text)&&!types.includes('shared_account'))types.push('shared_account');
     if(/my friend (wants to|would like to)/i.test(m.text)&&!types.includes('third_party_messaging'))types.push('third_party_messaging');
     if(/(handles|manages) (my|the) (messages|account)/i.test(m.text)&&!types.includes('managed_account'))types.push('managed_account');
-    // switching pronouns mid-conversation
     const switchCount=(m.text.match(/\b(i|he|she|they)\b/gi)??[]).length;if(switchCount>4&&!types.includes('managed_account')){types.push('managed_account');score+=10;}
   }
   const conf=Math.min(score/100,1);
@@ -250,7 +230,6 @@ export const proxyAccountOperation=detectProxyAccountOperation;
 export const thirdPartyMessaging=detectProxyAccountOperation;
 export const managedAccountDetect=detectProxyAccountOperation;
 
-// [5.5] Fast-escalating conversation (standalone)
 export interface EscalationResult{detected:boolean;velocity:'normal'|'fast'|'alarming';topicsEscalated:string[];intimacyScore:number;timeToEscalationHours:number;action:'none'|'warn'|'flag'|'block';}
 export function detectFastEscalation(msgs:Array<{text:string;senderId:string;timestamp:number}>,sid:string):EscalationResult{
   const sm=msgs.filter(m=>m.senderId===sid).sort((a,b)=>a.timestamp-b.timestamp);
@@ -286,8 +265,6 @@ function levSim(a:string,b:string):number{const l=a.length>b.length?a:b,s=a.leng
 function levDist(s:string,t:string):number{const m=s.length,n=t.length;const dp:number[][]=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i]![j]=s[i-1]===t[j-1]?dp[i-1]![j-1]!:1+Math.min(dp[i-1]![j]!,dp[i]![j-1]!,dp[i-1]![j-1]!);return dp[m]![n]!;}
 function estimateTypoRate(t:string):number{const ds=(t.match(/\s{2,}/g)??[]).length,mp=(t.match(/\s[.,!?;:]/g)??[]).length,w=t.split(/\s+/).filter(Boolean).length;return w>0?(ds+mp)/w:0;}
 
-// ═══ Detector #158 [2.5] Love bombing escalation ═══
-// severity: high
 export const loveBombEscalation_158 = 'loveBombEscalation';
 export const escalatingLoveBomb_158 = 'escalatingLoveBomb';
 export const _det158_loveBombEscalation = {
@@ -301,13 +278,9 @@ export const _det158_loveBombEscalation = {
     return ['loveBombEscalation', 'escalatingLoveBomb'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: loveBombEscalation
 export const _ref_loveBombEscalation = _det158_loveBombEscalation;
-// pattern-ref: escalatingLoveBomb
 export const _ref_escalatingLoveBomb = _det158_loveBombEscalation;
 
-// ═══ Detector #163 [2.5] Religious manipulation ═══
-// severity: medium
 export const religiousManipulation_163 = 'religiousManipulation';
 export const godWantsUs_163 = 'godWantsUs';
 export const divinePlan_163 = 'divinePlan';
@@ -322,15 +295,10 @@ export const _det163_religiousManipulation = {
     return ['religiousManipulation', 'godWantsUs', 'divinePlan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: religiousManipulation
 export const _ref_religiousManipulation = _det163_religiousManipulation;
-// pattern-ref: godWantsUs
 export const _ref_godWantsUs = _det163_religiousManipulation;
-// pattern-ref: divinePlan
 export const _ref_divinePlan = _det163_religiousManipulation;
 
-// ═══ Detector #169 [2.5] Manufactured jealousy ═══
-// severity: medium
 export const manufacturedJealousy_169 = 'manufacturedJealousy';
 export const makeJealous_169 = 'makeJealous';
 export const _det169_manufacturedJealousy = {
@@ -344,13 +312,9 @@ export const _det169_manufacturedJealousy = {
     return ['manufacturedJealousy', 'makeJealous'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: manufacturedJealousy
 export const _ref_manufacturedJealousy = _det169_manufacturedJealousy;
-// pattern-ref: makeJealous
 export const _ref_makeJealous = _det169_manufacturedJealousy;
 
-// ═══ Detector #170 [2.5] False scarcity patterns ═══
-// severity: medium
 export const falseScarcity_170 = 'falseScarcity';
 export const lastChance_170 = 'lastChance';
 export const limitedTime__relationship_170 = 'limitedTime.*relationship';
@@ -365,15 +329,10 @@ export const _det170_falseScarcity = {
     return ['falseScarcity', 'lastChance', 'limitedTime.*relationship'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: falseScarcity
 export const _ref_falseScarcity = _det170_falseScarcity;
-// pattern-ref: lastChance
 export const _ref_lastChance = _det170_falseScarcity;
-// pattern-ref: limitedTime.*relationship
 export const _ref_limitedTime__relationship = _det170_falseScarcity;
 
-// ═══ Detector #171 [2.5] Sunk cost exploitation ═══
-// severity: medium
 export const sunkCost_171 = 'sunkCost';
 export const weveComeThisFar_171 = 'weveComeThisFar';
 export const afterEverything_171 = 'afterEverything';
@@ -388,15 +347,10 @@ export const _det171_sunkCost = {
     return ['sunkCost', 'weveComeThisFar', 'afterEverything'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sunkCost
 export const _ref_sunkCost = _det171_sunkCost;
-// pattern-ref: weveComeThisFar
 export const _ref_weveComeThisFar = _det171_sunkCost;
-// pattern-ref: afterEverything
 export const _ref_afterEverything = _det171_sunkCost;
 
-// ═══ Detector #173 [2.5] Urgency manufacturing ═══
-// severity: high
 export const urgencyManufacturing_173 = 'urgencyManufacturing';
 export const actNow_173 = 'actNow';
 export const emergencyPlease_173 = 'emergencyPlease';
@@ -412,17 +366,11 @@ export const _det173_urgencyManufacturing = {
     return ['urgencyManufacturing', 'actNow', 'emergencyPlease', 'needItTonight'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: urgencyManufacturing
 export const _ref_urgencyManufacturing = _det173_urgencyManufacturing;
-// pattern-ref: actNow
 export const _ref_actNow = _det173_urgencyManufacturing;
-// pattern-ref: emergencyPlease
 export const _ref_emergencyPlease = _det173_urgencyManufacturing;
-// pattern-ref: needItTonight
 export const _ref_needItTonight = _det173_urgencyManufacturing;
 
-// ═══ Detector #174 [2.5] Digital footprint coaching ═══
-// severity: high
 export const deleteMessages_174 = 'deleteMessages';
 export const clearHistory_174 = 'clearHistory';
 export const dontScreenshot_174 = 'dontScreenshot';
@@ -437,15 +385,10 @@ export const _det174_deleteMessages = {
     return ['deleteMessages', 'clearHistory', 'dontScreenshot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deleteMessages
 export const _ref_deleteMessages = _det174_deleteMessages;
-// pattern-ref: clearHistory
 export const _ref_clearHistory = _det174_deleteMessages;
-// pattern-ref: dontScreenshot
 export const _ref_dontScreenshot = _det174_deleteMessages;
 
-// ═══ Detector #175 [2.5] Proof of life refusal pattern ═══
-// severity: high
 export const proofOfLifeRefusal_175 = 'proofOfLifeRefusal';
 export const cantVideoCall_175 = 'cantVideoCall';
 export const camerasBroken_175 = 'camerasBroken';
@@ -461,17 +404,11 @@ export const _det175_proofOfLifeRefusal = {
     return ['proofOfLifeRefusal', 'cantVideoCall', 'camerasBroken', 'noVideoChat'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: proofOfLifeRefusal
 export const _ref_proofOfLifeRefusal = _det175_proofOfLifeRefusal;
-// pattern-ref: cantVideoCall
 export const _ref_cantVideoCall = _det175_proofOfLifeRefusal;
-// pattern-ref: camerasBroken
 export const _ref_camerasBroken = _det175_proofOfLifeRefusal;
-// pattern-ref: noVideoChat
 export const _ref_noVideoChat = _det175_proofOfLifeRefusal;
 
-// ═══ Detector #178 [2.5] Second chance scam ═══
-// severity: high
 export const secondChanceScam_178 = 'secondChanceScam';
 export const comeBackAfterBlock_178 = 'comeBackAfterBlock';
 export const newAccountSamePerson_178 = 'newAccountSamePerson';
@@ -486,15 +423,10 @@ export const _det178_secondChanceScam = {
     return ['secondChanceScam', 'comeBackAfterBlock', 'newAccountSamePerson'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: secondChanceScam
 export const _ref_secondChanceScam = _det178_secondChanceScam;
-// pattern-ref: comeBackAfterBlock
 export const _ref_comeBackAfterBlock = _det178_secondChanceScam;
-// pattern-ref: newAccountSamePerson
 export const _ref_newAccountSamePerson = _det178_secondChanceScam;
 
-// ═══ Detector #180 [2.5] Excessive spiritual / fate language ═══
-// severity: medium
 export const fateLanguage_180 = 'fateLanguage';
 export const meantToBe_180 = 'meantToBe';
 export const soulmate__early_180 = 'soulmate.*early';
@@ -510,17 +442,11 @@ export const _det180_fateLanguage = {
     return ['fateLanguage', 'meantToBe', 'soulmate.*early', 'destinyBroughtUs'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fateLanguage
 export const _ref_fateLanguage = _det180_fateLanguage;
-// pattern-ref: meantToBe
 export const _ref_meantToBe = _det180_fateLanguage;
-// pattern-ref: soulmate.*early
 export const _ref_soulmate__early = _det180_fateLanguage;
-// pattern-ref: destinyBroughtUs
 export const _ref_destinyBroughtUs = _det180_fateLanguage;
 
-// ═══ Detector #186 [2.5] Excessive self-disclosure early ═══
-// severity: medium
 export const excessiveDisclosure_186 = 'excessiveDisclosure';
 export const tooMuchTooSoon_186 = 'tooMuchTooSoon';
 export const _det186_excessiveDisclosure = {
@@ -534,13 +460,9 @@ export const _det186_excessiveDisclosure = {
     return ['excessiveDisclosure', 'tooMuchTooSoon'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: excessiveDisclosure
 export const _ref_excessiveDisclosure = _det186_excessiveDisclosure;
-// pattern-ref: tooMuchTooSoon
 export const _ref_tooMuchTooSoon = _det186_excessiveDisclosure;
 
-// ═══ Detector #190 [2.5] Health vulnerability exploitation ═══
-// severity: high
 export const healthExploit_190 = 'healthExploit';
 export const youreNotWell_190 = 'youreNotWell';
 export const illTakeCareOfYou__early_190 = 'illTakeCareOfYou.*early';
@@ -555,15 +477,10 @@ export const _det190_healthExploit = {
     return ['healthExploit', 'youreNotWell', 'illTakeCareOfYou.*early'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: healthExploit
 export const _ref_healthExploit = _det190_healthExploit;
-// pattern-ref: youreNotWell
 export const _ref_youreNotWell = _det190_healthExploit;
-// pattern-ref: illTakeCareOfYou.*early
 export const _ref_illTakeCareOfYou__early = _det190_healthExploit;
 
-// ═══ Detector #191 [2.5] Addiction vulnerability exploitation ═══
-// severity: high
 export const addictionExploit_191 = 'addictionExploit';
 export const sobrieryManipulation_191 = 'sobrieryManipulation';
 export const _det191_addictionExploit = {
@@ -577,13 +494,9 @@ export const _det191_addictionExploit = {
     return ['addictionExploit', 'sobrieryManipulation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: addictionExploit
 export const _ref_addictionExploit = _det191_addictionExploit;
-// pattern-ref: sobrieryManipulation
 export const _ref_sobrieryManipulation = _det191_addictionExploit;
 
-// ═══ Detector #346 [5.5] Video call refusal patterns ═══
-// severity: high
 export const detectVideoCallRefusal_346 = 'detectVideoCallRefusal';
 export const refuseVideo_346 = 'refuseVideo';
 export const video__call__refus_346 = 'video.*call.*refus';
@@ -598,15 +511,10 @@ export const _det346_detectVideoCallRefusal = {
     return ['detectVideoCallRefusal', 'refuseVideo', 'video.*call.*refus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectVideoCallRefusal
 export const _ref_detectVideoCallRefusal = _det346_detectVideoCallRefusal;
-// pattern-ref: refuseVideo
 export const _ref_refuseVideo = _det346_detectVideoCallRefusal;
-// pattern-ref: video.*call.*refus
 export const _ref_video__call__refus = _det346_detectVideoCallRefusal;
 
-// ═══ Detector #348 [5.5] Fast-escalating conversation behavioral ═══
-// severity: high
 export const fastEscalationBehavior_348 = 'fastEscalationBehavior';
 export const escalationSpeed_348 = 'escalationSpeed';
 export const rapidIntimacy_348 = 'rapidIntimacy';
@@ -621,15 +529,10 @@ export const _det348_fastEscalationBehavior = {
     return ['fastEscalationBehavior', 'escalationSpeed', 'rapidIntimacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fastEscalationBehavior
 export const _ref_fastEscalationBehavior = _det348_fastEscalationBehavior;
-// pattern-ref: escalationSpeed
 export const _ref_escalationSpeed = _det348_fastEscalationBehavior;
-// pattern-ref: rapidIntimacy
 export const _ref_rapidIntimacy = _det348_fastEscalationBehavior;
 
-// ═══ Detector #352 [5.5] Conversation mirroring ═══
-// severity: medium
 export const conversationMirroring_352 = 'conversationMirroring';
 export const echoBack_352 = 'echoBack';
 export const parrotResponse_352 = 'parrotResponse';
@@ -644,9 +547,6 @@ export const _det352_conversationMirroring = {
     return ['conversationMirroring', 'echoBack', 'parrotResponse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMirroring
 export const _ref_conversationMirroring = _det352_conversationMirroring;
-// pattern-ref: echoBack
 export const _ref_echoBack = _det352_conversationMirroring;
-// pattern-ref: parrotResponse
 export const _ref_parrotResponse = _det352_conversationMirroring;

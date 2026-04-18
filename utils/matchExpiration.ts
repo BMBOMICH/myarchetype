@@ -77,7 +77,7 @@ export async function getExpiringMatches(config: ExpirationConfig = DEFAULT_CONF
     const threshold = new Date(Date.now() + config.warningBeforeExpiryHours * 3_600_000).toISOString();
     const col = collection(db, 'likes');
     const baseQuery = (field: string) => query(col, where(field, '==', user.uid), where('status', '==', 'matched'), where('expiresAt', '<', threshold));
-    const [fromSnap, toSnap] = await Promise.all([getDocs(baseQuery('fromUserId')), getDocs(baseQuery('toUserId'))]);
+    const [fromSnap, toSnap] = await Promise.all([getDocs(baseQuery('fromUserId').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })), getDocs(baseQuery('toUserId'))]);
     const matches: Match[] = [];
     const addSnap = (snap: typeof fromSnap) => snap.forEach(d => { const data = d.data() as Omit<Match, 'id'>; if (!isMatchExpired({ id: d.id, ...data })) matches.push({ id: d.id, ...data }); });
     addSnap(fromSnap); addSnap(toSnap);

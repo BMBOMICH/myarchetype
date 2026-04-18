@@ -13,7 +13,6 @@ import { logger } from './logger';
  * ```
  */
 
-// ─── Configuration ───────────────────────────────────────────────────────────
 
 /**
  * Giphy public beta key — suitable for development only.
@@ -28,7 +27,6 @@ const MAX_LIMIT          = 50;
 const CONTENT_RATING     = 'pg-13';
 const REQUEST_TIMEOUT_MS = 10_000;
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface GiphyGif {
   readonly id: string;
@@ -64,7 +62,6 @@ interface GiphyApiResponse {
   readonly data?: readonly GiphyApiGif[];
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function clampLimit(limit: number): string {
   return String(Math.max(1, Math.min(Math.round(limit), MAX_LIMIT)));
@@ -99,7 +96,7 @@ async function fetchGiphy(
   const signal = (() => {
     if (externalSignal) return externalSignal;
     controller = new AbortController();
-    timeoutId  = setTimeout(() => controller!.abort(), REQUEST_TIMEOUT_MS);
+    timeoutId  = setTimeout(() => controller?.abort(), REQUEST_TIMEOUT_MS);
     return controller.signal;
   })();
 
@@ -117,7 +114,6 @@ async function fetchGiphy(
   }
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function searchGifs(
   query: string,

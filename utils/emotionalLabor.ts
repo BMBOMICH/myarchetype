@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/emotionalLabor.ts — FULL UPDATED
-// Covers: [20.1] #897 Emotional fatigue (both interfaces unified)
-// [20.1] #898 Harassment normalization (full + alias)
-// [20] Swipe fatigue, usage limits, moderator wellbeing
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export function calculateHarassmentExposure(inc:{type:string;severity:number;timestamp:number}[],win=30){
@@ -16,7 +10,6 @@ if(act)writeAuditLog('wellbeing.harassment_exposure',{score:sc,level:lv}).catch(
 return{score:sc,level:lv,breakdown:bd,interventionRequired:act,recommendedAction:sc>=20?'Contact safety team immediately.':sc>=10?'Take a break. Messages flagged for review.':sc>=5?'Some interactions flagged. Report/block as needed.':'Experience looks okay. Keep reporting concerns.'};}
 export const harassmentExposure=calculateHarassmentExposure;
 
-// ─── #897 Emotional fatigue — core scoring ───────────────────
 export interface EmotionalFatigueResult{
   fatigued:boolean;
   fatigueScore:number;
@@ -25,7 +18,6 @@ export interface EmotionalFatigueResult{
   riskLevel:'none'|'low'|'medium'|'high'|'critical';
   recommendedBreakMinutes:number;
   safetyResourcesShown:boolean;
-  // user-facing intervention fields
   indicators:string[];
   interventionType:'none'|'gentle_nudge'|'break_suggestion'|'resources';
   message:string|null;
@@ -38,7 +30,6 @@ export function detectEmotionalFatigue(s:{
   unmatchRate:number;
   reportedMessagesLast7d?:number;
   selfHarmKeywordsInDraft?:boolean;
-  // optional user-facing signals
   sessionsToday?:number;
   avgSessionMinutes?:number;
   negativeInteractions?:number;
@@ -53,7 +44,6 @@ export function detectEmotionalFatigue(s:{
   if(s.unmatchRate>0.7){sc+=15;indicators.push('high_unmatch_rate');}
   if((s.reportedMessagesLast7d??0)>=3){sc+=15;indicators.push('multiple_reports_this_week');}
   if(s.selfHarmKeywordsInDraft){sc+=50;indicators.push('self_harm_keywords_detected');}
-  // user-facing signals
   const sessionsToday=s.sessionsToday??s.sessionCount24h;
   const avgMins=s.avgSessionMinutes??s.avgSessionDuration;
   const negInt=s.negativeInteractions??0;
@@ -79,22 +69,17 @@ export function detectEmotionalFatigue(s:{
     indicators,interventionType,message
   };}
 export const emotionalFatigue=detectEmotionalFatigue;
-// Legacy alias for intervention-only call pattern
 export const detectEmotionalFatigueIntervention=(signals:{sessionsToday:number;avgSessionMinutes:number;negativeInteractions:number;reportsMade:number;blocksThisWeek:number})=>
   detectEmotionalFatigue({harassmentExposureScore:0,sessionCount24h:signals.sessionsToday,swipeRatio:0,avgSessionDuration:signals.avgSessionMinutes,unmatchRate:0,...signals});
 export const emotionalFatigueIntervention=detectEmotionalFatigueIntervention;
 export const fatigueIntervention=detectEmotionalFatigue;
 
-// ─── #898 Harassment normalization prevention ─────────────────
-// Full interface with all fields from both wellbeing.ts and emotionalLabor.ts
 export interface HarassmentNormalizationResult{
-  // wellbeing.ts fields
   normalized:boolean;
   threshold:number;
   receivedCount:number;
   recommendation:string;
   autoAction:'none'|'warn_sender'|'restrict_sender'|'escalate';
-  // emotionalLabor.ts fields
   nudge:string|undefined;
   reportingBarrierRisk:boolean;
   normalizationScore:number;
@@ -107,7 +92,6 @@ export function preventHarassmentNormalization(h:{
   neverReported:number;
   daysSinceFirstHarassment?:number;
   consecutiveWeeksWithHarassment?:number;
-  // optional wellbeing-style event log
   harassmentEvents?:Array<{timestamp:number;type:string;senderId:string}>;
   recipientId?:string;
   windowMs?:number;
@@ -121,7 +105,6 @@ export function preventHarassmentNormalization(h:{
   let it:HarassmentNormalizationResult['interventionType']='none';
   if(te)it='safety_team_alert';else if(norm)it='strong_nudge';else if(bar)it='gentle_nudge';
   const nudge=norm?"You've received several flagged messages. You don't have to tolerate this. Reporting helps keep everyone safe.":bar?"Noticed something uncomfortable? It only takes a second to report — it helps protect you and others.":undefined;
-  // wellbeing-style event counting
   const threshold=3;
   let receivedCount=h.harassmentExperienced;
   if(h.harassmentEvents&&h.windowMs){
@@ -137,7 +120,6 @@ export function preventHarassmentNormalization(h:{
 export const emotionalLaborDetect=preventHarassmentNormalization;
 export const normalizedHarassment=preventHarassmentNormalization;
 export const harassmentNormalizationPrevention=preventHarassmentNormalization;
-// Wellbeing-style alias for event-log based calling
 export function detectHarassmentNormalization(harassmentEvents:Array<{timestamp:number;type:string;senderId:string}>,recipientId:string,windowMs=7*86_400_000):HarassmentNormalizationResult{
   return preventHarassmentNormalization({harassmentReportsSubmitted:0,harassmentExperienced:harassmentEvents.length,neverReported:harassmentEvents.length,harassmentEvents,recipientId,windowMs});}
 export const harassmentNormalization=detectHarassmentNormalization;
@@ -165,7 +147,6 @@ if(rec.length>=20&&rec.every(s=>s.direction==='right'))return{anomaly:true,swipe
 if(rec.length>=10){const ints=rec.slice(1).map((s,i)=>s.timestamp-rec[i]!.timestamp),avg=ints.reduce((a,b)=>a+b,0)/ints.length,variance=ints.reduce((s,t)=>s+(t-avg)**2,0)/ints.length;if(Math.sqrt(variance)<100)return{anomaly:true,swipesPerMinute:spm,reason:'robotic uniform timing',botLikelihood:0.80};}
 return{anomaly:false,swipesPerMinute:spm,botLikelihood:0};}
 
-// ─── [20.1] Moderator Wellbeing ───────────────────────────────
 export interface ModWellbeingCheckResult{needsSupport:boolean;riskLevel:'none'|'low'|'medium'|'high'|'critical';supportType:string[];mandatoryBreak:boolean;escalateToSupervisor:boolean;resourcesShown:string[];}
 export function checkModeratorWellbeing(mod:{csamReviewedToday:number;violentContentToday:number;totalHoursToday:number;consecutiveDaysWithoutBreak:number;selfReportedDistress?:boolean;errorsLast30Min?:number}):ModWellbeingCheckResult{
 let score=0;const support:string[]=[];
@@ -181,13 +162,7 @@ if(rl==='critical')writeAuditLog('mod.wellbeing_critical',{score,csamToday:mod.c
 return{needsSupport:score>=30,riskLevel:rl,supportType:support,mandatoryBreak:score>=50,escalateToSupervisor:score>=70,resourcesShown:resources};}
 export const modWellbeing=checkModeratorWellbeing;export const secondaryTraumaCheck=checkModeratorWellbeing;
 
-// ═══════════════════════════════════════════════════════════════
-// ADDITIONS/STRENGTHENING TO utils/emotionalLabor.ts
-// Covers: #897 Emotional fatigue intervention
-// #898 Harassment normalization prevention
-// ═══════════════════════════════════════════════════════════════
 
-// ─── #897 Emotional Fatigue ───────────────────────────────────
 export interface EmotionalFatigueResult {
   fatigued: boolean;
   fatigueScore: number;
@@ -329,7 +304,6 @@ export const emotionalFatigue = detectEmotionalFatigue;
 export const fatigueDetect = detectEmotionalFatigue;
 export const fatigueIntervention = detectEmotionalFatigue;
 
-// ─── #898 Harassment normalization prevention ─────────────────
 export interface HarassmentNormalizationResult {
   normalized: boolean;
   threshold: number;

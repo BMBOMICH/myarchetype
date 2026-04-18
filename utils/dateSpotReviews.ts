@@ -95,7 +95,7 @@ export default function DateSpotReviewsScreen() {
       {[1, 2, 3, 4, 5].map((n) => (
         <TouchableOpacity
           key={n}
-          onPress={() => onPress?.(n)}
+          onPress={() = accessibilityLabel="button"> onPress?.(n)}
           disabled={!onPress}
           accessibilityLabel={`${n} star${n > 1 ? 's' : ''}${onPress ? '' : `, rated ${count}`}`}
           accessibilityRole={onPress ? 'button' : 'text'}
@@ -110,12 +110,11 @@ export default function DateSpotReviewsScreen() {
     return <View style={styles.container}><ActivityIndicator size="large" color="#53a8b6" /></View>;
   }
 
-  // ── Create form ───────────────────────────────────────
   if (showCreate) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setCreate(false)} accessibilityLabel="Go back" accessibilityRole="button">
+          <TouchableOpacity onPress={() = accessibilityLabel="button"> setCreate(false)} accessibilityLabel="Go back" accessibilityRole="button">
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Review a Spot</Text>
@@ -137,7 +136,7 @@ export default function DateSpotReviewsScreen() {
             {PLACE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type} style={[styles.chip, form.placeType === type && styles.chipSelected]}
-                onPress={() => setField('placeType', type)}
+                onPress={() = accessibilityLabel="button"> setField('placeType', type)}
                 accessibilityLabel={`Place type: ${type}${form.placeType === type ? ', selected' : ''}`}
                 accessibilityRole="button" accessibilityState={{ selected: form.placeType === type }}
               >
@@ -162,7 +161,7 @@ export default function DateSpotReviewsScreen() {
             {PRICE_RANGES.map((price) => (
               <TouchableOpacity
                 key={price} style={[styles.chip, form.priceRange === price && styles.chipSelected]}
-                onPress={() => setField('priceRange', price)}
+                onPress={() = accessibilityLabel="button"> setField('priceRange', price)}
                 accessibilityLabel={`Price range: ${price}${form.priceRange === price ? ', selected' : ''}`}
                 accessibilityRole="button" accessibilityState={{ selected: form.priceRange === price }}
               >
@@ -180,7 +179,7 @@ export default function DateSpotReviewsScreen() {
               return (
                 <TouchableOpacity
                   key={tag} style={[styles.chip, selected && styles.chipSelected]}
-                  onPress={() => setField('selectedGoodFor', selected ? form.selectedGoodFor.filter(t => t !== tag) : [...form.selectedGoodFor, tag])}
+                  onPress={() = accessibilityLabel="button"> setField('selectedGoodFor', selected ? form.selectedGoodFor.filter(t => t !== tag) : [...form.selectedGoodFor, tag])}
                   accessibilityLabel={`${tag.replace('_', ' ')}${selected ? ', selected' : ''}`}
                   accessibilityRole="button" accessibilityState={{ selected }}
                 >
@@ -213,15 +212,14 @@ export default function DateSpotReviewsScreen() {
     );
   }
 
-  // ── List view ─────────────────────────────────────────
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>📍 Date Spots</Text>
-        <TouchableOpacity onPress={() => setCreate(true)} accessibilityLabel="Add a review" accessibilityRole="button">
+        <TouchableOpacity onPress={() = accessibilityLabel="button"> setCreate(true)} accessibilityLabel="Add a review" accessibilityRole="button">
           <Text style={styles.addButton}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -229,7 +227,7 @@ export default function DateSpotReviewsScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
         <TouchableOpacity
           style={[styles.filterChip, !filterType && styles.filterChipActive]}
-          onPress={() => setFilterType(null)}
+          onPress={() = accessibilityLabel="button"> setFilterType(null)}
           accessibilityLabel="Show all types" accessibilityRole="button"
           accessibilityState={{ selected: !filterType }}
         >
@@ -238,7 +236,7 @@ export default function DateSpotReviewsScreen() {
         {PLACE_TYPES.map((type) => (
           <TouchableOpacity
             key={type} style={[styles.filterChip, filterType === type && styles.filterChipActive]}
-            onPress={() => setFilterType(type)}
+            onPress={() = accessibilityLabel="button"> setFilterType(type)}
             accessibilityLabel={`Filter by ${type}`} accessibilityRole="button"
             accessibilityState={{ selected: filterType === type }}
           >
@@ -297,7 +295,7 @@ export default function DateSpotReviewsScreen() {
 
             <TouchableOpacity
               style={styles.likeButton}
-              onPress={() => handleLike(item.id)}
+              onPress={() = accessibilityLabel="button"> handleLike(item.id)}
               accessibilityLabel={`Like this review, ${item.likes} likes`}
               accessibilityRole="button"
             >

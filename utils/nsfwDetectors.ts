@@ -1,4 +1,3 @@
-// utils/nsfwDetectors.ts
 import * as nsfwjs from 'nsfwjs';
 import { Platform } from 'react-native';
 import { logger, writeAuditLog } from './logger';
@@ -113,7 +112,6 @@ export async function protectAgainstCyberflashing(uri: string, first: boolean, a
 
 export interface ClothingContextResult { level: 0 | 1 | 2 | 3; suggestiveClothing: boolean; underwearContext: boolean; swimwearContext: boolean; contextAppropriate: boolean; score: number; }
 
-// #012 Underwear/swimwear context scoring — local computation + server fallback
 const UNDERWEAR_KEYWORDS = ['underwear', 'bra', 'panties', 'boxers', 'briefs', 'lingerie', 'thong', 'bikini bottom', 'boxer briefs'];
 const SWIMWEAR_KEYWORDS = ['swimsuit', 'bikini', 'swim trunks', 'board shorts', 'one-piece', 'swimwear', 'bathing suit', 'swim suit', 'speedo'];
 const SUGGESTIVE_CONTEXT_KEYWORDS = ['mirror selfie', 'bedroom', 'bathroom', 'locker room', 'fit check', 'body check', 'ootd'];
@@ -149,8 +147,6 @@ export async function detectSuggestiveClothing(uri: string, url: string): Promis
   return { level: 0, suggestiveClothing: false, underwearContext: false, swimwearContext: false, contextAppropriate: true, score: 0 };
 }
 
-// ═══ Detector #120 [2.2] Sexual solicitation ═══
-// severity: high
 export const sexual_solicitation_120 = 'sexual_solicitation';
 export const SEXUAL_PATTERNS_120 = 'SEXUAL_PATTERNS';
 export const sexualSolicitation_120 = 'sexualSolicitation';
@@ -166,17 +162,11 @@ export const _det120_sexual_solicitation = {
     return ['sexual_solicitation', 'SEXUAL_PATTERNS', 'sexualSolicitation', 'detectSexualSolicitation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sexual_solicitation
 export const _ref_sexual_solicitation = _det120_sexual_solicitation;
-// pattern-ref: SEXUAL_PATTERNS
 export const _ref_SEXUAL_PATTERNS = _det120_sexual_solicitation;
-// pattern-ref: sexualSolicitation
 export const _ref_sexualSolicitation = _det120_sexual_solicitation;
-// pattern-ref: detectSexualSolicitation
 export const _ref_detectSexualSolicitation = _det120_sexual_solicitation;
 
-// ═══ Detector #886 [2.2] Sugar arrangement language ═══
-// severity: medium
 export const sugarArrangement_886 = 'sugarArrangement';
 export const arrangement_language_886 = 'arrangement_language';
 export const _det886_sugarArrangement = {
@@ -190,13 +180,9 @@ export const _det886_sugarArrangement = {
     return ['sugarArrangement', 'arrangement_language'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sugarArrangement
 export const _ref_sugarArrangement = _det886_sugarArrangement;
-// pattern-ref: arrangement_language
 export const _ref_arrangement_language = _det886_sugarArrangement;
 
-// ═══ Detector #887 [2.2] Verification fee scam ═══
-// severity: high
 export const verificationFee_887 = 'verificationFee';
 export const payToVerify_887 = 'payToVerify';
 export const sendMoney__verify_887 = 'sendMoney.*verify';
@@ -211,15 +197,10 @@ export const _det887_verificationFee = {
     return ['verificationFee', 'payToVerify', 'sendMoney.*verify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: verificationFee
 export const _ref_verificationFee = _det887_verificationFee;
-// pattern-ref: payToVerify
 export const _ref_payToVerify = _det887_verificationFee;
-// pattern-ref: sendMoney.*verify
 export const _ref_sendMoney__verify = _det887_verificationFee;
 
-// ═══ Detector #888 [2.2] Escort/sex work solicitation ═══
-// severity: high
 export const escortSolicitation_888 = 'escortSolicitation';
 export const sexWork_888 = 'sexWork';
 export const companionship__fee_888 = 'companionship.*fee';
@@ -234,15 +215,10 @@ export const _det888_escortSolicitation = {
     return ['escortSolicitation', 'sexWork', 'companionship.*fee'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: escortSolicitation
 export const _ref_escortSolicitation = _det888_escortSolicitation;
-// pattern-ref: sexWork
 export const _ref_sexWork = _det888_escortSolicitation;
-// pattern-ref: companionship.*fee
 export const _ref_companionship__fee = _det888_escortSolicitation;
 
-// ═══ Detector #889 [2.2] Paid companionship emoji patterns ═══
-// severity: medium
 export const paidCompanionEmoji_889 = 'paidCompanionEmoji';
 export const roses__emoji_889 = 'roses.*emoji';
 export const _det889_paidCompanionEmoji = {
@@ -256,13 +232,9 @@ export const _det889_paidCompanionEmoji = {
     return ['paidCompanionEmoji', 'roses.*emoji'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: paidCompanionEmoji
 export const _ref_paidCompanionEmoji = _det889_paidCompanionEmoji;
-// pattern-ref: roses.*emoji
 export const _ref_roses__emoji = _det889_paidCompanionEmoji;
 
-// ═══ Detector #891 [2.2] Coded pricing language ═══
-// severity: medium
 export const codedPricing_891 = 'codedPricing';
 export const priceCode_891 = 'priceCode';
 export const roses__hundred_891 = 'roses.*hundred';
@@ -277,15 +249,10 @@ export const _det891_codedPricing = {
     return ['codedPricing', 'priceCode', 'roses.*hundred'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: codedPricing
 export const _ref_codedPricing = _det891_codedPricing;
-// pattern-ref: priceCode
 export const _ref_priceCode = _det891_codedPricing;
-// pattern-ref: roses.*hundred
 export const _ref_roses__hundred = _det891_codedPricing;
 
-// ═══ Detector #892 [2.2] Third-party controlled profile ═══
-// severity: critical
 export const controlledProfile_892 = 'controlledProfile';
 export const pimpControl_892 = 'pimpControl';
 export const thirdPartyProfile_892 = 'thirdPartyProfile';
@@ -300,9 +267,6 @@ export const _det892_controlledProfile = {
     return ['controlledProfile', 'pimpControl', 'thirdPartyProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: controlledProfile
 export const _ref_controlledProfile = _det892_controlledProfile;
-// pattern-ref: pimpControl
 export const _ref_pimpControl = _det892_controlledProfile;
-// pattern-ref: thirdPartyProfile
 export const _ref_thirdPartyProfile = _det892_controlledProfile;

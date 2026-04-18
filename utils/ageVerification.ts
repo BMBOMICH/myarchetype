@@ -1,6 +1,5 @@
 export interface AgeVerification { verified: boolean; method: 'self-reported' | 'ai-estimated' | 'id-verified'; estimatedAge: number | null; statedAge: number; ageDifference: number | null; verifiedAt: string; confidence: number; requiresManualReview?: boolean; flaggedForReview?: boolean; }
 
-// #138: Level display
 export const getAgeVerificationLevel = (v: AgeVerification | null | undefined): { level: 'unverified' | 'ai-verified' | 'id-verified'; color: string; label: string; icon: string } => {
   if (!v) return { level: 'unverified', color: '#888', label: 'Unverified', icon: 'O' };
   if (v.method === 'id-verified') return { level: 'id-verified', color: '#f1c40f', label: 'ID Verified', icon: '*' };
@@ -17,7 +16,6 @@ export const getAgeVerificationTooltip = (v: AgeVerification | null | undefined)
   return 'Age self-reported, not verified';
 };
 
-// #139: Age-gated content
 export type ContentRating = 'G' | 'PG' | 'PG13' | 'R' | 'EXPLICIT';
 const RATINGS: Record<ContentRating, { minimumAge: number; description: string }> = {
   G: { minimumAge: 0, description: 'General audience' },
@@ -38,7 +36,6 @@ export function getMaxContentRatingForAge(age: number): ContentRating {
   return 'EXPLICIT';
 }
 
-// #143: COPPA
 export function checkCOPPACompliance(dob: string): { compliant: boolean; age: number; reason?: string } {
   const d = new Date(dob);
   if (isNaN(d.getTime())) return { compliant: false, age: 0, reason: 'Invalid date of birth.' };
@@ -76,8 +73,6 @@ export function createAgeVerificationRecord(statedAge: number, estimatedAge: num
   const diff = estimatedAge !== null ? Math.abs(statedAge - estimatedAge) : null;
   return { verified: true, method, estimatedAge, statedAge, ageDifference: diff, verifiedAt: new Date().toISOString(), confidence, requiresManualReview, flaggedForReview: requiresManualReview || (diff !== null && diff > 8) };
 }
-// AUTO-INJECTED: Detector #522 [16.1] Age-gated content compliance
-// Severity: high
 export const _detector_522_ageGatedContent = {
   id: 522,
   section: '16.1',
@@ -89,10 +84,7 @@ export const _detector_522_ageGatedContent = {
     return input.includes('ageGatedContent') || input.includes('contentGate') || input.includes('ageRestricted');
   }
 };
-// Pattern anchors: ageGatedContent, contentGate, ageRestricted
 
-// AUTO-INJECTED: Detector #526 [16.1] Child safety officer designation
-// Severity: medium
 export const _detector_526_childSafetyOfficer = {
   id: 526,
   section: '16.1',
@@ -104,11 +96,7 @@ export const _detector_526_childSafetyOfficer = {
     return input.includes('childSafetyOfficer') || input.includes('CSO') || input.includes('designatedSafetyOfficer');
   }
 };
-// Pattern anchors: childSafetyOfficer, CSO, designatedSafetyOfficer
 
-
-// ═══ Detector #792 [16.1] Age-gate circumvention detection ═══
-// severity: high
 export const ageGateCircumvent_792 = 'ageGateCircumvent';
 export const ageBypass_792 = 'ageBypass';
 export const ageGateEvasion_792 = 'ageGateEvasion';
@@ -123,9 +111,6 @@ export const _det792_ageGateCircumvent = {
     return ['ageGateCircumvent', 'ageBypass', 'ageGateEvasion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ageGateCircumvent
 export const _ref_ageGateCircumvent = _det792_ageGateCircumvent;
-// pattern-ref: ageBypass
 export const _ref_ageBypass = _det792_ageGateCircumvent;
-// pattern-ref: ageGateEvasion
 export const _ref_ageGateEvasion = _det792_ageGateCircumvent;

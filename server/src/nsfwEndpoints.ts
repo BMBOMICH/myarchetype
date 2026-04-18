@@ -1,6 +1,3 @@
-// server/src/nsfwEndpoints.ts
-// REPLACES previous — hardens #007, adds #009/#012/#600 detector signals
-// Patterns: verify-photo-nsfw | verify-video-nsfw | SERVER_URL.*nsfw | cyberflash | partial_nudity
 import { spawn } from 'child_process';
 import crypto from 'crypto';
 import express, { Request, Response } from 'express';
@@ -10,7 +7,6 @@ import path from 'path';
 
 const router = express.Router();
 
-// ─── Types ──────────────────────────────────────────────────────────────────
 interface NsfwScanRequest {
   image?: string;
   imageUrl?: string;
@@ -36,7 +32,6 @@ interface ScanResult {
   layers: Record<string, unknown>;
 }
 
-// ─── Audit Logger (#16.8, #007) ─────────────────────────────────────────────
 const auditLog = (endpoint: string, result: Partial<ScanResult>, meta: Record<string, unknown>) => {
   process.stdout.write(JSON.stringify({
     severity: 'MODERATION_AUDIT',
@@ -51,7 +46,6 @@ const auditLog = (endpoint: string, result: Partial<ScanResult>, meta: Record<st
   }) + '\n');
 };
 
-// ─── Safe Python Runner (stdin/stdout, no shell injection) ──────────────────
 function runPython(script: string, input?: unknown): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn('python3', ['-c', script], { env: { ...process.env, PYTHONIOENCODING: 'utf8' } });
@@ -65,7 +59,6 @@ function runPython(script: string, input?: unknown): Promise<string> {
   });
 }
 
-// ─── Temp File Helper ───────────────────────────────────────────────────────
 const TMP_DIR = '/tmp/nsfw_scans';
 fs.mkdir(TMP_DIR, { recursive: true }).catch(() => {});
 async function writeTempImage(b64: string): Promise<string> {
@@ -74,12 +67,8 @@ async function writeTempImage(b64: string): Promise<string> {
   return tmp;
 }
 
-// ─── Rate Limiting ──────────────────────────────────────────────────────────
 const scanLimiter = rateLimit({ windowMs: 60_000, max: 50, message: { error: 'Too many scan requests' } });
 
-// ════════════════════════════════════════════════════════════════════════════
-// #007  POST /api/verify-photo-nsfw  ← PRIMARY SERVER-SIDE NSFW BACKSTOP
-// ════════════════════════════════════════════════════════════════════════════
 router.post('/verify-photo-nsfw', scanLimiter, async (req: Request, res: Response) => {
   const { image, imageUrl, checks = ['nsfw', 'nudity'] } = req.body as NsfwScanRequest;
   if (!image && !imageUrl) return res.status(400).json({ error: 'image or imageUrl required' });
@@ -89,7 +78,6 @@ router.post('/verify-photo-nsfw', scanLimiter, async (req: Request, res: Respons
     if (image) tmpPath = await writeTempImage(image);
     const src = tmpPath ?? imageUrl!;
 
-    // ── Unified Python Scanner (Marqo + NudeNet + Context/Signals) ─────────
     const script = `
 import sys, json, warnings, os, re
 warnings.filterwarnings('ignore')
@@ -161,16 +149,13 @@ print(json.dumps({
     return res.json(result);
 
   } catch (err) {
-    console.error('[/verify-photo-nsfw]', err);
+    if (__DEV__) console.error('[/verify-photo-nsfw]', err);
     return res.status(500).json({ error: 'Internal scan error' });
   } finally {
     if (tmpPath) await fs.unlink(tmpPath).catch(() => {});
   }
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// #007  POST /api/verify-video-nsfw  ← VIDEO NSFW BACKSTOP
-// ════════════════════════════════════════════════════════════════════════════
 router.post('/verify-video-nsfw', scanLimiter, async (req: Request, res: Response) => {
   const { videoUrl, sampleRate = 1 } = req.body as VideoScanRequest;
   if (!videoUrl) return res.status(400).json({ error: 'videoUrl required' });
@@ -222,7 +207,7 @@ print(json.dumps({
     return res.json(result);
 
   } catch (err) {
-    console.error('[/verify-video-nsfw]', err);
+    if (__DEV__) console.error('[/verify-video-nsfw]', err);
     return res.status(500).json({ error: 'Internal video scan error' });
   } finally {
     await fs.rm(frameDir, { recursive: true, force: true }).catch(() => {});

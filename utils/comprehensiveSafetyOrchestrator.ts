@@ -1,13 +1,8 @@
-// ═══════════════════════════════════════════════════════════════
-// comprehensiveSafetyOrchestrator.ts
-// Upgrades: #724 trusted contact / guardian alert
-// ═══════════════════════════════════════════════════════════════
 
 import { writeAuditLog } from './logger';
 
 export type SafetyAction = 'allow' | 'review' | 'block' | 'require_verification';
 
-// ─── #724 Date Safety Check ──────────────────────────────
 
 export interface DateSafetyCheckResult {
   safe: boolean;
@@ -34,7 +29,6 @@ export function comprehensiveDateSafetyCheck(date: {
   const checklist: DateSafetyCheckResult['checklist'] = [];
   let riskScore = 0;
 
-  // Venue safety
   if (!date.venuePublic) {
     warnings.push('Private venue on first date — suggest a public place');
     riskScore += 30;
@@ -43,7 +37,6 @@ export function comprehensiveDateSafetyCheck(date: {
     checklist.push({ item: 'Meet in a public place', completed: true, required: true });
   }
 
-  // Time check
   const hour = new Date(date.meetupTime).getHours();
   if (hour >= 22 || hour < 6) {
     warnings.push('Late night meetup — consider meeting during daylight hours');
@@ -53,7 +46,6 @@ export function comprehensiveDateSafetyCheck(date: {
     checklist.push({ item: 'Meet during daytime or early evening', completed: true, required: false });
   }
 
-  // Location sharing
   if (!date.shareLocation) {
     warnings.push('Consider sharing your live location with a trusted contact');
     riskScore += 10;
@@ -62,7 +54,6 @@ export function comprehensiveDateSafetyCheck(date: {
     checklist.push({ item: 'Share live location with trusted contact', completed: true, required: false });
   }
 
-  // Trusted contact
   if (!date.trustedContactSet) {
     warnings.push('No trusted contact set — add someone before your date');
     riskScore += 20;
@@ -71,7 +62,6 @@ export function comprehensiveDateSafetyCheck(date: {
     checklist.push({ item: 'Set a trusted contact', completed: true, required: true });
   }
 
-  // Verification
   if (!date.otherPersonVerified && date.firstDate) {
     warnings.push('Your date hasn\'t verified their identity — proceed with caution');
     riskScore += 15;
@@ -80,7 +70,6 @@ export function comprehensiveDateSafetyCheck(date: {
     checklist.push({ item: 'Date has verified identity', completed: date.otherPersonVerified, required: false });
   }
 
-  // Report count
   if (date.otherPersonReportCount >= 3) {
     warnings.push('This person has multiple reports — exercise extreme caution');
     riskScore += 30;
@@ -89,12 +78,10 @@ export function comprehensiveDateSafetyCheck(date: {
     riskScore += 10;
   }
 
-  // First date checklist
   checklist.push({ item: 'Arrange your own transportation', completed: false, required: true });
   checklist.push({ item: 'Charge your phone', completed: false, required: false });
   checklist.push({ item: 'Know your exit plan', completed: false, required: false });
 
-  // Resources
   if (riskScore > 0) {
     resources.push('Emergency: Call 911 or 112');
     resources.push('Crisis Text Line: Text HOME to 741741');
@@ -126,7 +113,6 @@ export function comprehensiveDateSafetyCheck(date: {
   };
 }
 
-// ─── Photo Check Orchestrator ────────────────────────────
 
 export interface PhotoCheckResult {
   action: SafetyAction;
@@ -143,11 +129,9 @@ export async function comprehensivePhotoCheck(
   serverUrl: string
 ): Promise<PhotoCheckResult> {
   void imageUri; void imageHash; void userId; void context; void serverUrl;
-  // In production: call backend for NSFW/CSAM/deepfake check
   return { action: 'allow', reasons: [], confidence: 0, shouldAutoBlur: false };
 }
 
-// ─── Message Check Orchestrator ──────────────────────────
 
 export interface MessageCheckResult {
   action: SafetyAction;
@@ -173,7 +157,6 @@ export async function comprehensiveMessageCheck(
 ): Promise<MessageCheckResult> {
   void text; void isFirstMessage; void conversationDays; void serverUrl;
   void sessions; void messageHistory; void senderAge; void recipientAge;
-  // In production: call backend + local classifiers
   return {
     action: 'allow', reasons: [], riskScore: 0,
     ipvDetected: false, groomingDetected: false, financialFraud: false,
@@ -181,7 +164,6 @@ export async function comprehensiveMessageCheck(
   };
 }
 
-// ─── Login Check Orchestrator ────────────────────────────
 
 export interface LoginCheckResult {
   action: SafetyAction;
@@ -199,7 +181,6 @@ export async function comprehensiveLoginCheck(
   return { action: 'allow', reasons: [], riskScore: 0 };
 }
 
-// ─── Registration Check Orchestrator ─────────────────────
 
 export interface RegistrationCheckResult {
   action: SafetyAction;
@@ -215,7 +196,6 @@ export async function comprehensiveRegistrationCheck(
   return { action: 'allow', reasons: [], riskScore: 0 };
 }
 
-// ─── Profile Update Check Orchestrator ───────────────────
 
 export interface ProfileUpdateCheckResult {
   action: SafetyAction;

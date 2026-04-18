@@ -1,4 +1,3 @@
-// file: utils/legalAuditProcess.ts
 import { writeAuditLog } from './logger';
 
 export interface AuditLog{eventId:string;timestamp:Date;actorId:string;actorRole:'user'|'moderator'|'admin'|'system';action:string;targetId?:string;targetType?:'user'|'message'|'photo'|'report';metadata:Record<string,unknown>;ipHash:string;immutable:true;}
@@ -46,7 +45,6 @@ Object.keys(byCategory).forEach(k=>{if((byCategory[k]??0)<5)delete byCategory[k]
 return{from:period.from,to:period.to,totalReports:snap.size,reportsByCategory:byCategory,actionsTaken:{},governmentRequests:0,governmentRequestsComplied:0,appealOutcomes:{upheld:0,overturned:0,pending:0},nciiHashesAdded:0,csaeReportedToNcmec:0};}
 export const transparencyReport=generateTransparencyReport;
 
-// ─── [16.8] Emergency Law Enforcement Requests ───────────────
 export interface EmergencyLEResult{acknowledged:boolean;responseDeadlineHours:number;dataPreserved:boolean;evidencePackageId:string;escalatedTo:string;legalReviewBypassed:boolean;reason:string;}
 export async function handleEmergencyLERequest(req:{agencyName:string;agencyContact:string;emergencyDescription:string;targetUserId:string;reviewedBy:string}):Promise<EmergencyLEResult>{
 const eid=crypto.randomUUID();
@@ -75,8 +73,6 @@ export function processMlatRequest(req:{requestingCountry:string;treatyExists:bo
 return{accepted:req.treatyExists,processingDays:req.treatyExists?30:90,requiresCourtOrder:!req.treatyExists,diplomaticChannelRequired:!req.treatyExists,legalReviewRequired:true};}
 export const mlatRequest=processMlatRequest;export const mutualLegalAssistance=processMlatRequest;
 
-// ═══ Detector #575 [16.8] Law enforcement subpoena process ═══
-// severity: high
 export const subpoenaProcess_575 = 'subpoenaProcess';
 export const lawEnforcement__request_575 = 'lawEnforcement.*request';
 export const legalRequest_575 = 'legalRequest';
@@ -91,9 +87,6 @@ export const _det575_subpoenaProcess = {
     return ['subpoenaProcess', 'lawEnforcement.*request', 'legalRequest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: subpoenaProcess
 export const _ref_subpoenaProcess = _det575_subpoenaProcess;
-// pattern-ref: lawEnforcement.*request
 export const _ref_lawEnforcement__request = _det575_subpoenaProcess;
-// pattern-ref: legalRequest
 export const _ref_legalRequest = _det575_subpoenaProcess;

@@ -1,9 +1,4 @@
-// ═══════════════════════════════════════════════════════════════
-// finalDetectors.ts — [32] Progressive Disclosure + [9] Physical Date
-// Upgrades: #706, #649
-// ═══════════════════════════════════════════════════════════════
 
-// ─── #706 STI Access / Progressive Disclosure ────────────
 
 export interface STIAccessResult {
   progressiveDisclosure: boolean;
@@ -39,7 +34,6 @@ export function stiAccess(matchState: 'browsing' | 'matched' | 'mutual_like' | '
   };
 }
 
-// ─── #649 Drink Spiking / Safety Awareness ───────────────
 
 export interface DrinkSpikingAlertResult {
   safetyTips: string[];
@@ -113,6 +107,5 @@ export function drinkSpikingAlert(message?: string): DrinkSpikingAlertResult {
 export const drinkSafetyTips = drinkSpikingAlert;
 export const spikingAlert = drinkSpikingAlert;
 
-// ─── Re-exports for backward compatibility ───────────────
 
 export const getDrinkSafetyTips = () => drinkSpikingAlert().safetyTips;

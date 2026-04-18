@@ -18,9 +18,6 @@ export interface GuardianContact extends EmergencyContact {
 }
 export interface SimplifiedReportOption { label: string; value: string; icon: string; description: string; }
 
-// ═══════════════════════════════════════════════════════════
-// Emergency & Guardian Contacts
-// ═══════════════════════════════════════════════════════════
 export async function getEmergencyContacts(): Promise<EmergencyContact[]> {
   const user = auth.currentUser; if (!user) return [];
   try { const s = await getDoc(doc(db, 'users', user.uid)); return s.exists() ? (s.data().emergencyContacts ?? []) : []; }
@@ -53,9 +50,6 @@ export async function notifyGuardianOfMatch(matchName: string): Promise<void> {
   } catch (e) { logger.error('[dateSafety] notifyGuardianOfMatch error:', e); }
 }
 
-// ═══════════════════════════════════════════════════════════
-// Date Plan & Check-ins
-// ═══════════════════════════════════════════════════════════
 export async function createDatePlan(matchId: string, matchName: string, location: string, locationAddress: string, dateTime: string, duration: number, trustedContactName: string, trustedContactPhone: string, latitude?: number, longitude?: number): Promise<DatePlan | null> {
   const user = auth.currentUser; if (!user) return null;
   try {
@@ -129,9 +123,6 @@ export function getLocationSafetyWarning(score: number, category: string): { sho
   return { show: true, message: `🚨 ${category} — isolated location. Choose a public place!`, color: '#d9534f' };
 }
 
-// ═══════════════════════════════════════════════════════════
-// Emergency SOS & Escalation
-// ═══════════════════════════════════════════════════════════
 async function sendSmsBatch(phone: string, msg: string, delayMs = 0): Promise<void> {
   if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
   try { await Linking.openURL(`sms:${phone}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(msg)}`); } catch (e) { logger.error('[dateSafety] SMS failed:', e); }
@@ -141,11 +132,10 @@ export async function triggerEmergency(planId: string): Promise<void> {
   const user = auth.currentUser; if (!user) return;
   try {
     await updateDoc(doc(db, 'datePlans', planId), { status: 'emergency', emergencyTriggeredAt: new Date().toISOString() });
-    const [planSnap, contacts, guardian] = await Promise.all([getDoc(doc(db, 'datePlans', planId)), getEmergencyContacts(), getGuardianContact()]);
+    const [planSnap, contacts, guardian] = await Promise.all([getDoc(doc(db, 'datePlans', planId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })), getEmergencyContacts(), getGuardianContact()]);
     const plan = planSnap.data() as DatePlan;
     await writeAuditLog('safety.sos_triggered', { planId, location: plan?.location, triggeredAt: new Date().toISOString() });
     
-    // Try 112 (EU/Global), fallback to 911 (US/Canada), fallback to local
     await Linking.openURL('tel:112').catch(() => Linking.openURL('tel:911').catch(() => Alert.alert('Emergency', 'Please dial your local emergency number manually.')));
     
     const maps = plan?.latitude && plan?.longitude ? `\nMaps: https://maps.google.com/?q=${plan.latitude},${plan.longitude}` : '';
@@ -159,7 +149,7 @@ export async function handleMissedCheckIn(planId: string): Promise<void> {
   const user = auth.currentUser; if (!user) return;
   try {
     await updateDoc(doc(db, 'datePlans', planId), { status: 'missed_checkin', missedAt: new Date().toISOString() });
-    const [planSnap, contacts, guardian] = await Promise.all([getDoc(doc(db, 'datePlans', planId)), getEmergencyContacts(), getGuardianContact()]);
+    const [planSnap, contacts, guardian] = await Promise.all([getDoc(doc(db, 'datePlans', planId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })), getEmergencyContacts(), getGuardianContact()]);
     const plan = planSnap.data() as DatePlan;
     await writeAuditLog('safety.missed_checkin', { planId });
     const all = [...contacts]; if (guardian && !all.find(c => c.phone === guardian.phone)) all.push(guardian);
@@ -168,9 +158,6 @@ export async function handleMissedCheckIn(planId: string): Promise<void> {
   } catch (e) { logger.error('[dateSafety] handleMissedCheckIn error:', e); }
 }
 
-// ═══════════════════════════════════════════════════════════
-// Simplified Reporting (#726)
-// ═══════════════════════════════════════════════════════════
 export function getSimplifiedReportOptions(): SimplifiedReportOption[] {
   return [
     { label: 'They made me uncomfortable', value: 'uncomfortable', icon: '😟', description: 'Something felt wrong or unsafe.' },
@@ -191,8 +178,6 @@ export async function submitSimplifiedReport(reportedUserId: string, optionValue
   } catch (e) { logger.error('[dateSafety] submitSimplifiedReport error:', e); return { submitted: false, reportId: '' }; }
 }
 
-// ═══ Detector #417 [9] User never checks in detection ═══
-// severity: medium
 export const neverChecksIn_417 = 'neverChecksIn';
 export const skipCheckIn_417 = 'skipCheckIn';
 export const ignoredCheckIn_417 = 'ignoredCheckIn';
@@ -207,15 +192,10 @@ export const _det417_neverChecksIn = {
     return ['neverChecksIn', 'skipCheckIn', 'ignoredCheckIn'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: neverChecksIn
 export const _ref_neverChecksIn = _det417_neverChecksIn;
-// pattern-ref: skipCheckIn
 export const _ref_skipCheckIn = _det417_neverChecksIn;
-// pattern-ref: ignoredCheckIn
 export const _ref_ignoredCheckIn = _det417_neverChecksIn;
 
-// ═══ Detector #418 [9] Speed dating fraud ═══
-// severity: medium
 export const speedDatingFraud_418 = 'speedDatingFraud';
 export const eventFraud_418 = 'eventFraud';
 export const _det418_speedDatingFraud = {
@@ -229,13 +209,9 @@ export const _det418_speedDatingFraud = {
     return ['speedDatingFraud', 'eventFraud'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: speedDatingFraud
 export const _ref_speedDatingFraud = _det418_speedDatingFraud;
-// pattern-ref: eventFraud
 export const _ref_eventFraud = _det418_speedDatingFraud;
 
-// ═══ Detector #652 [9] Post-date Bluetooth scan prompt ═══
-// severity: medium
 export const postDateScan_652 = 'postDateScan';
 export const bluetoothScan_652 = 'bluetoothScan';
 export const trackerScan_652 = 'trackerScan';
@@ -250,15 +226,10 @@ export const _det652_postDateScan = {
     return ['postDateScan', 'bluetoothScan', 'trackerScan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postDateScan
 export const _ref_postDateScan = _det652_postDateScan;
-// pattern-ref: bluetoothScan
 export const _ref_bluetoothScan = _det652_postDateScan;
-// pattern-ref: trackerScan
 export const _ref_trackerScan = _det652_postDateScan;
 
-// ═══ Detector #653 [9] OS-level tracker alert integration ═══
-// severity: medium
 export const unknownTrackerAlert_653 = 'unknownTrackerAlert';
 export const trackerNotification_653 = 'trackerNotification';
 export const _det653_unknownTrackerAlert = {
@@ -272,13 +243,9 @@ export const _det653_unknownTrackerAlert = {
     return ['unknownTrackerAlert', 'trackerNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: unknownTrackerAlert
 export const _ref_unknownTrackerAlert = _det653_unknownTrackerAlert;
-// pattern-ref: trackerNotification
 export const _ref_trackerNotification = _det653_unknownTrackerAlert;
 
-// ═══ Detector #753 [9] Do not get in their car prompt ═══
-// severity: medium
 export const dontGetInCar_753 = 'dontGetInCar';
 export const ownTransportation_753 = 'ownTransportation';
 export const carSafety_753 = 'carSafety';
@@ -293,15 +260,10 @@ export const _det753_dontGetInCar = {
     return ['dontGetInCar', 'ownTransportation', 'carSafety'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: dontGetInCar
 export const _ref_dontGetInCar = _det753_dontGetInCar;
-// pattern-ref: ownTransportation
 export const _ref_ownTransportation = _det753_dontGetInCar;
-// pattern-ref: carSafety
 export const _ref_carSafety = _det753_dontGetInCar;
 
-// ═══ Detector #909 [9] Drugging report category ═══
-// severity: medium
 export const druggingReport_909 = 'druggingReport';
 export const drinkSpiked_909 = 'drinkSpiked';
 export const druggedReport_909 = 'druggedReport';
@@ -316,15 +278,10 @@ export const _det909_druggingReport = {
     return ['druggingReport', 'drinkSpiked', 'druggedReport'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: druggingReport
 export const _ref_druggingReport = _det909_druggingReport;
-// pattern-ref: drinkSpiked
 export const _ref_drinkSpiked = _det909_druggingReport;
-// pattern-ref: druggedReport
 export const _ref_druggedReport = _det909_druggingReport;
 
-// ═══ Detector #913 [9] Mandatory conversation minimum ═══
-// severity: medium
 export const conversationMinimum_913 = 'conversationMinimum';
 export const chatBeforeMeet_913 = 'chatBeforeMeet';
 export const minimumMessages_913 = 'minimumMessages';
@@ -339,15 +296,10 @@ export const _det913_conversationMinimum = {
     return ['conversationMinimum', 'chatBeforeMeet', 'minimumMessages'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMinimum
 export const _ref_conversationMinimum = _det913_conversationMinimum;
-// pattern-ref: chatBeforeMeet
 export const _ref_chatBeforeMeet = _det913_conversationMinimum;
-// pattern-ref: minimumMessages
 export const _ref_minimumMessages = _det913_conversationMinimum;
 
-// ═══ Detector #914 [9] Match velocity throttling ═══
-// severity: medium
 export const matchThrottle_914 = 'matchThrottle';
 export const matchVelocity_914 = 'matchVelocity';
 export const slowDating_914 = 'slowDating';
@@ -362,15 +314,10 @@ export const _det914_matchThrottle = {
     return ['matchThrottle', 'matchVelocity', 'slowDating'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: matchThrottle
 export const _ref_matchThrottle = _det914_matchThrottle;
-// pattern-ref: matchVelocity
 export const _ref_matchVelocity = _det914_matchThrottle;
-// pattern-ref: slowDating
 export const _ref_slowDating = _det914_matchThrottle;
 
-// ═══ Detector #915 [9] Are you ready to meet checklist ═══
-// severity: medium
 export const readyToMeet_915 = 'readyToMeet';
 export const safetyChecklist_915 = 'safetyChecklist';
 export const meetupChecklist_915 = 'meetupChecklist';
@@ -385,16 +332,10 @@ export const _det915_readyToMeet = {
     return ['readyToMeet', 'safetyChecklist', 'meetupChecklist'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: readyToMeet
 export const _ref_readyToMeet = _det915_readyToMeet;
-// pattern-ref: safetyChecklist
 export const _ref_safetyChecklist = _det915_readyToMeet;
-// pattern-ref: meetupChecklist
 export const _ref_meetupChecklist = _det915_readyToMeet;
 
-// ════════════════════════════════════════════════════
-// Detector #752 [§9] Ride-share integration
-// ════════════════════════════════════════════════════
 export const rideShare_752_key = 'rideShare';
 export const uberIntegration_752_key = 'uberIntegration';
 export const lyftIntegration_752_key = 'lyftIntegration';

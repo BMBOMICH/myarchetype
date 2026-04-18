@@ -1,15 +1,14 @@
-// app/deal-breakers.tsx
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, InteractionManager, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { DealBreakers, DEFAULT_DEAL_BREAKERS, getDealBreakers, saveDealBreakers } from '../utils/dealBreakers';
 import { logger } from '../utils/logger';
 
 const RELIGIONS = ['Traditional', 'Modern', 'Spiritual', 'None'] as const;
 
-// ─── Sub-components (memoized to avoid re-renders on state change) ──
-
-// Memoized toggle row — avoids inline onValueChange in Switch
 interface ToggleRowProps { label: string; value: boolean; onChange: (v: boolean) => void; last?: boolean; }
 const ToggleRow = React.memo(function ToggleRow({ label, value, onChange, last }: ToggleRowProps) {
   return (
@@ -20,7 +19,6 @@ const ToggleRow = React.memo(function ToggleRow({ label, value, onChange, last }
   );
 });
 
-// Memoized religion button — avoids inline onPress in religion map
 interface ReligionButtonProps { religion: string; active: boolean; onPress: (r: string) => void; }
 const ReligionButton = React.memo(function ReligionButton({ religion, active, onPress }: ReligionButtonProps) {
   const handlePress = useCallback(() => onPress(religion), [onPress, religion]);
@@ -33,22 +31,17 @@ const ReligionButton = React.memo(function ReligionButton({ religion, active, on
   );
 });
 
-// ─── Section components (each section is its own memoized component) ──
-
-interface ProfileQualitySectionProps {
-  mustHaveVerified: boolean; mustHaveBio: boolean; mustHaveMultiplePhotos: boolean;
-  onChange: (key: keyof DealBreakers, value: unknown) => void;
-}
+interface ProfileQualitySectionProps { mustHaveVerified: boolean; mustHaveBio: boolean; mustHaveMultiplePhotos: boolean; onChange: (key: keyof DealBreakers, value: unknown) => void; }
 const ProfileQualitySection = React.memo(function ProfileQualitySection({ mustHaveVerified, mustHaveBio, mustHaveMultiplePhotos, onChange }: ProfileQualitySectionProps) {
-  const onVerified  = useCallback((v: boolean) => onChange('mustHaveVerified', v), [onChange]);
-  const onBio       = useCallback((v: boolean) => onChange('mustHaveBio', v), [onChange]);
-  const onPhotos    = useCallback((v: boolean) => onChange('mustHaveMultiplePhotos', v), [onChange]);
+  const onVerified = useCallback((v: boolean) => onChange('mustHaveVerified', v), [onChange]);
+  const onBio      = useCallback((v: boolean) => onChange('mustHaveBio', v), [onChange]);
+  const onPhotos   = useCallback((v: boolean) => onChange('mustHaveMultiplePhotos', v), [onChange]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>📸 Profile Quality</Text>
-      <ToggleRow label="Must be verified"     value={mustHaveVerified}       onChange={onVerified} />
-      <ToggleRow label="Must have bio"        value={mustHaveBio}            onChange={onBio} />
-      <ToggleRow label="Must have 3+ photos"  value={mustHaveMultiplePhotos} onChange={onPhotos} last />
+      <ToggleRow label="Must be verified"    value={mustHaveVerified}       onChange={onVerified} />
+      <ToggleRow label="Must have bio"       value={mustHaveBio}            onChange={onBio} />
+      <ToggleRow label="Must have 3+ photos" value={mustHaveMultiplePhotos} onChange={onPhotos} last />
     </View>
   );
 });
@@ -87,15 +80,15 @@ const HeightRangeSection = React.memo(function HeightRangeSection({ minHeight, m
 
 interface LifestyleSectionProps { noSmoking: boolean; noDrinking: boolean; noDrugs: boolean; onChange: (key: keyof DealBreakers, value: unknown) => void; }
 const LifestyleSection = React.memo(function LifestyleSection({ noSmoking, noDrinking, noDrugs, onChange }: LifestyleSectionProps) {
-  const onSmoke  = useCallback((v: boolean) => onChange('noSmoking', v), [onChange]);
-  const onDrink  = useCallback((v: boolean) => onChange('noDrinking', v), [onChange]);
-  const onDrugs  = useCallback((v: boolean) => onChange('noDrugs', v), [onChange]);
+  const onSmoke = useCallback((v: boolean) => onChange('noSmoking', v), [onChange]);
+  const onDrink = useCallback((v: boolean) => onChange('noDrinking', v), [onChange]);
+  const onDrugs = useCallback((v: boolean) => onChange('noDrugs', v), [onChange]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>🚬 Lifestyle</Text>
-      <ToggleRow label="No smoking"  value={noSmoking}  onChange={onSmoke} />
-      <ToggleRow label="No alcohol"  value={noDrinking} onChange={onDrink} />
-      <ToggleRow label="No drugs"    value={noDrugs}    onChange={onDrugs} last />
+      <ToggleRow label="No smoking" value={noSmoking}  onChange={onSmoke} />
+      <ToggleRow label="No alcohol" value={noDrinking} onChange={onDrink} />
+      <ToggleRow label="No drugs"   value={noDrugs}    onChange={onDrugs} last />
     </View>
   );
 });
@@ -109,10 +102,10 @@ const KidsSection = React.memo(function KidsSection({ mustWantKids, mustNotWantK
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>👶 Kids</Text>
-      <ToggleRow label="Must want kids"          value={mustWantKids}    onChange={onWantKids} />
-      <ToggleRow label="Must NOT want kids"      value={mustNotWantKids} onChange={onNotWantKids} />
-      <ToggleRow label="Must already have kids"  value={mustHaveKids}    onChange={onHaveKids} />
-      <ToggleRow label="Must NOT have kids"      value={mustNotHaveKids} onChange={onNotHaveKids} last />
+      <ToggleRow label="Must want kids"         value={mustWantKids}    onChange={onWantKids} />
+      <ToggleRow label="Must NOT want kids"     value={mustNotWantKids} onChange={onNotWantKids} />
+      <ToggleRow label="Must already have kids" value={mustHaveKids}    onChange={onHaveKids} />
+      <ToggleRow label="Must NOT have kids"     value={mustNotHaveKids} onChange={onNotHaveKids} last />
     </View>
   );
 });
@@ -152,8 +145,6 @@ const DistanceSection = React.memo(function DistanceSection({ maxDistanceKm, onC
   );
 });
 
-// ─── FlatList section data ─────────────────────────────────
-
 type SectionKey = 'quality' | 'age' | 'height' | 'lifestyle' | 'kids' | 'religion' | 'distance';
 interface SectionItem { key: SectionKey; }
 const SECTION_DATA: SectionItem[] = [
@@ -161,15 +152,13 @@ const SECTION_DATA: SectionItem[] = [
   { key: 'lifestyle' }, { key: 'kids' }, { key: 'religion' }, { key: 'distance' },
 ];
 
-// ─── Main Component ───────────────────────────────────────
-
 export default function DealBreakersScreen() {
   const router = useRouter();
-  const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
   const [dealBreakers, setDealBreakers] = useState<DealBreakers>(DEFAULT_DEAL_BREAKERS);
+  const isMounted                       = useRef(true);
 
-  // Stable updater — functional update avoids stale closure
   const updateBreaker = useCallback(<K extends keyof DealBreakers>(key: K, value: DealBreakers[K]) => {
     setDealBreakers(prev => ({ ...prev, [key]: value }));
   }, []);
@@ -177,14 +166,27 @@ export default function DealBreakersScreen() {
   const loadDealBreakers = useCallback(async () => {
     try {
       const data = await getDealBreakers();
+      if (!isMounted.current) return;
       setDealBreakers(data);
     } catch (error) {
       logger.error('[DealBreakers] Load error:', error);
+      if (!isMounted.current) return;
       Alert.alert('Error', 'Failed to load deal breakers.');
-    } finally { setLoading(false); }
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { void loadDealBreakers(); }, [loadDealBreakers]);
+  useEffect(() => {
+    isMounted.current = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadDealBreakers();
+    }, []);
+    return () => {
+      isMounted.current = false;
+      task.cancel();
+    };
+  }, [loadDealBreakers]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -198,12 +200,11 @@ export default function DealBreakersScreen() {
     } finally { setSaving(false); }
   }, [dealBreakers, router]);
 
-  const handleReset = useCallback(() => setDealBreakers(DEFAULT_DEAL_BREAKERS), []);
-  const handleBack  = useCallback(() => router.back(), [router]);
+  const handleReset     = useCallback(() => setDealBreakers(DEFAULT_DEAL_BREAKERS), []);
+  const handleBack      = useCallback(() => router.back(), [router]);
   const handleSavePress = useCallback(() => void handleSave(), [handleSave]);
 
-  // Stable section renderer — reads from dealBreakers state
-  const renderSection = useCallback(({ item }: { item: SectionItem }) => {
+  const renderSection = useCallback(({ item }: LegendListRenderItemProps<SectionItem>) => {
     switch (item.key) {
       case 'quality':   return <ProfileQualitySection mustHaveVerified={dealBreakers.mustHaveVerified} mustHaveBio={dealBreakers.mustHaveBio} mustHaveMultiplePhotos={dealBreakers.mustHaveMultiplePhotos} onChange={updateBreaker} />;
       case 'age':       return <AgeRangeSection minAge={dealBreakers.minAge ?? null} maxAge={dealBreakers.maxAge ?? null} onChange={updateBreaker} />;
@@ -245,7 +246,7 @@ export default function DealBreakersScreen() {
   if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#53a8b6" /></View>;
 
   return (
-    <FlatList
+    <LegendList
       style={styles.container}
       contentContainerStyle={styles.content}
       data={SECTION_DATA}
@@ -253,43 +254,44 @@ export default function DealBreakersScreen() {
       keyExtractor={keyExtractor}
       ListHeaderComponent={ListHeader}
       ListFooterComponent={ListFooter}
-      removeClippedSubviews={false}
+      estimatedItemSize={200}
+      recycleItems={false}
       keyboardShouldPersistTaps="handled"
       accessibilityLabel="Deal breakers settings"
     />
   );
 }
 
-const styles = StyleSheet.create({
-  container:              { flex: 1, backgroundColor: '#1a1a2e' },
-  content:                { padding: 20 },
-  loadingContainer:       { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-  header:                 { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 30 },
-  headerSpacer:           { width: 50 },
-  backButton:             { color: '#53a8b6', fontSize: 16 },
-  title:                  { fontSize: 24, fontWeight: 'bold', color: '#eee' },
-  subtitle:               { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 25, lineHeight: 20 },
-  section:                { backgroundColor: '#16213e', borderRadius: 15, padding: 16, marginBottom: 20 },
-  sectionTitle:           { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginBottom: 15 },
-  toggleRow:              { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
-  toggleRowLast:          { borderBottomWidth: 0 },
-  toggleLabel:            { color: '#eee', fontSize: 15 },
-  rangeRow:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
-  rangeInput:             { backgroundColor: '#0f3460', color: '#fff', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 100, textAlign: 'center' },
-  rangeDash:              { color: '#888', fontSize: 16 },
-  orText:                 { color: '#888', fontSize: 13, marginTop: 15, marginBottom: 10 },
-  religionButtons:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  religionButton:         { backgroundColor: '#0f3460', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#0f3460' },
-  religionButtonActive:   { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
-  religionButtonText:     { color: '#888', fontSize: 14 },
+const styles = StyleSheet.create((theme) => ({
+  container:               { flex: 1, backgroundColor: theme.colors.background },
+  content:                 { padding: 20 },
+  loadingContainer:        { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
+  header:                  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 30 },
+  headerSpacer:            { width: 50 },
+  backButton:              { color: '#53a8b6', fontSize: 16 },
+  title:                   { fontSize: 24, fontWeight: 'bold', color: theme.colors.text },
+  subtitle:                { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 25, lineHeight: 20 },
+  section:                 { backgroundColor: '#16213e', borderRadius: 15, padding: 16, marginBottom: 20 },
+  sectionTitle:            { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginBottom: 15 },
+  toggleRow:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
+  toggleRowLast:           { borderBottomWidth: 0 },
+  toggleLabel:             { color: theme.colors.text, fontSize: 15 },
+  rangeRow:                { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
+  rangeInput:              { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 100, textAlign: 'center' },
+  rangeDash:               { color: theme.colors.textSecondary, fontSize: 16 },
+  orText:                  { color: theme.colors.textSecondary, fontSize: 13, marginTop: 15, marginBottom: 10 },
+  religionButtons:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  religionButton:          { backgroundColor: '#0f3460', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#0f3460' },
+  religionButtonActive:    { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
+  religionButtonText:      { color: theme.colors.textSecondary, fontSize: 14 },
   religionButtonTextActive:{ color: '#fff', fontWeight: '600' },
-  distanceRow:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  distanceInput:          { backgroundColor: '#0f3460', color: '#fff', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 120, textAlign: 'center' },
-  distanceUnit:           { color: '#888', fontSize: 16 },
-  saveButton:             { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 10 },
-  saveButtonDisabled:     { backgroundColor: '#555' },
-  saveButtonText:         { color: '#fff', fontSize: 18, fontWeight: '600' },
-  resetButton:            { paddingVertical: 14, alignItems: 'center', marginTop: 10 },
-  resetButtonText:        { color: '#d9534f', fontSize: 16 },
-  bottomSpacer:           { height: 50 },
-});
+  distanceRow:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  distanceInput:           { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 120, textAlign: 'center' },
+  distanceUnit:            { color: theme.colors.textSecondary, fontSize: 16 },
+  saveButton:              { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 10 },
+  saveButtonDisabled:      { backgroundColor: '#555' },
+  saveButtonText:          { color: '#fff', fontSize: 18, fontWeight: '600' },
+  resetButton:             { paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  resetButtonText:         { color: '#d9534f', fontSize: 16 },
+  bottomSpacer:            { height: 50 },
+}));

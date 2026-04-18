@@ -1,13 +1,9 @@
-// utils/ageEstimation.ts
-// Upgraded: face-api.js CDN → InsightFace server endpoint
-// Falls back to face-api.js on web if server unavailable
 
 import { Platform } from 'react-native';
 
 const IS_WEB = Platform.OS === 'web';
 const SERVER_URL = process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? process.env.EXPO_PUBLIC_SERVER_URL ?? '';
 
-// ── Legacy face-api types (web fallback only) ─────────────
 const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
 const FACE_API_WEIGHTS = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
 
@@ -33,7 +29,6 @@ export interface AgeGateResult {
   estimatedAge: number | null; statedAge: number; requiresManualReview: boolean;
 }
 
-// ── Primary: InsightFace server endpoint ──────────────────
 async function estimateAgeInsightFace(photoUrl: string): Promise<AgeEstimationResult | null> {
   if (!SERVER_URL) return null;
   try {
@@ -53,7 +48,6 @@ async function estimateAgeInsightFace(photoUrl: string): Promise<AgeEstimationRe
   } catch { return null; }
 }
 
-// ── Fallback: face-api.js (web only, legacy) ──────────────
 async function loadFaceApiLegacy(): Promise<boolean> {
   if (!IS_WEB) return false;
   if (ageModelLoaded) return true;
@@ -66,6 +60,7 @@ async function loadFaceApiLegacy(): Promise<boolean> {
         await new Promise<void>((res, rej) => {
           const doc = g.document;
           const ex = doc?.querySelector(`script[src="${FACE_API_CDN}"]`);
+  // FIXME: add removeEventListener cleanup for the listener below
           if (ex) { ex.addEventListener('load', () => { faceapi = (globalThis as GlobalWithFaceApi).faceapi!; res(); }); ex.addEventListener('error', () => rej(new Error('Script error'))); return; }
           if (!doc) { rej(new Error('No document')); return; }
           const s = doc.createElement('script'); s.src = FACE_API_CDN; s.async = true;
@@ -78,7 +73,7 @@ async function loadFaceApiLegacy(): Promise<boolean> {
       const toLoad: Promise<void>[] = [];
       if (!faceapi.nets.ageGenderNet.isLoaded)     toLoad.push(faceapi.nets.ageGenderNet.loadFromUri(FACE_API_WEIGHTS));
       if (!faceapi.nets.tinyFaceDetector.isLoaded) toLoad.push(faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_WEIGHTS));
-      if (toLoad.length) await Promise.all(toLoad);
+      if (toLoad.length) await Promise.all(toLoad).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
       ageModelLoaded = true; return true;
     } catch { ageLoadPromise = null; return false; }
   })();
@@ -103,9 +98,7 @@ async function estimateAgeFaceApi(photoUrl: string): Promise<AgeEstimationResult
   } catch { return null; }
 }
 
-// ── Public API ────────────────────────────────────────────
 export async function estimateAgeFromPhoto(photoUrl: string): Promise<AgeEstimationResult | null> {
-  // Try InsightFace server first (more accurate), fall back to face-api.js
   const serverResult = await estimateAgeInsightFace(photoUrl);
   if (serverResult) return serverResult;
   return estimateAgeFaceApi(photoUrl);
@@ -117,7 +110,7 @@ export function validateAge(stated: number, estimated: number, tolerance = 5): {
 }
 
 export async function estimateAgeFromMultiplePhotos(urls: string[]): Promise<AgeEstimationResult | null> {
-  const results = (await Promise.all(urls.map(estimateAgeFromPhoto))).filter((r): r is AgeEstimationResult => r !== null);
+  const results = (await Promise.all(urls.map(estimateAgeFromPhoto).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }))).filter((r): r is AgeEstimationResult => r !== null);
   if (!results.length) return null;
   const avg  = Math.round(results.reduce((s, r) => s + r.estimatedAge, 0) / results.length);
   const conf = Math.round(results.reduce((s, r) => s + r.confidence, 0) / results.length);

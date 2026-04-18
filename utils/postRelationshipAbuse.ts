@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/postRelationshipAbuse.ts — FULL UPDATED
-// Covers: [5.7] Post-Relationship Abuse  [5.8] Proxy Account Operation
-// [5.9] Married / Relationship Deception
-// [2.13] #852 Post-block contact #853 Post-rejection escalation
-//         #854 Cross-platform block circumvention
-// ═══════════════════════════════════════════════════════════════
 import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
 import { writeAuditLog } from './logger';
 
@@ -20,7 +13,6 @@ const SEXTORTION_SCRIPTS=["I recorded you on camera. Send $500 in bitcoin or I s
 const HARASS_SCRIPTS=["You'll regret leaving me. I'm going to make your life hell","I'll make sure no one ever wants to date you again","I'm going to tell everyone what you're really like","You think you can just move on? I won't let that happen","I'll ruin your reputation so no one trusts you again"];
 const DECEPTION_SCRIPTS=["I'm separated but we haven't filed yet, it's complicated","My wife doesn't understand me anymore, we're basically roommates","I'm still legally married but we live separate lives","Don't tell anyone I'm married, it would complicate things","I'm only staying for the kids, the marriage is over","My husband and I haven't been intimate in years","We have an open marriage so it's not really cheating","I'm planning to file for divorce next month"];
 
-// ─── [5.7] Ex-Partner Monitoring ─────────────────────────────
 export interface ExPartnerMonitoringResult{detected:boolean;viewCount:number;timeSpanDays:number;wasFormerMatch:boolean;riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'none'|'warn'|'restrict_visibility'|'block'|'notify_le';recommendations:string[];scriptMatchScore:number;scriptMatchType:string|null;piiDetected:Array<{type:string;text:string;score:number}>;voiceThreatDetected:boolean;voiceThreatTranscript:string|null;}
 export async function detectExPartnerMonitoring(viewerId:string,viewedProfileId:string,recentViews:Array<{timestamp:number}>,options?:{messageAttempts?:Array<{timestamp:number;blocked:boolean}>;reportHistory?:Array<{timestamp:number;category:string}>;recentMessages?:Array<{text:string;senderId:string;timestamp:number}>;voiceMessageUrls?:Array<{url:string;senderId:string;timestamp:number}>}):Promise<ExPartnerMonitoringResult>{
 let wasFormerMatch=false;try{const db=getFirestore(),snap=await getDocs(query(collection(db,'matches'),where('users','array-contains',viewerId)));for(const m of snap.docs){const d=m.data();if(d['users']?.includes(viewedProfileId)&&(d['status']==='unmatched'||d['status']==='blocked')){wasFormerMatch=true;break;}}}catch{wasFormerMatch=recentViews.length>=5;}
@@ -28,7 +20,7 @@ const viewCount=recentViews.length;if(viewCount<2)return{detected:false,viewCoun
 const oldest=recentViews[0]!.timestamp,newest=recentViews[recentViews.length-1]!.timestamp,timeSpanDays=(newest-oldest)/86400000,vpd=viewCount/Math.max(timeSpanDays,0.5);
 const blockedAttempts=options?.messageAttempts?.filter(m=>m.blocked).length??0,reportCount=options?.reportHistory?.length??0;
 let sms=0,smt:string|null=null;
-if(options?.recentMessages?.length){const vt=options.recentMessages.filter(m=>m.senderId===viewerId).map(m=>m.text).join(' ');if(vt.length>20){const[h,rv,sx]=await Promise.all([batchSim(vt,HARASS_SCRIPTS),batchSim(vt,REVENGE_SCRIPTS),batchSim(vt,SEXTORTION_SCRIPTS)]);for(const[r,t]of[[h,'ex_partner_harassment'],[rv,'revenge_porn'],[sx,'sextortion']] as[typeof h,string][]){if(r.maxScore>sms){sms=r.maxScore;smt=t;}}}}
+if(options?.recentMessages?.length){const vt=options.recentMessages.filter(m=>m.senderId===viewerId).map(m=>m.text).join(' ');if(vt.length>20){const[h,rv,sx]=await Promise.all([batchSim(vt,HARASS_SCRIPTS).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),batchSim(vt,REVENGE_SCRIPTS),batchSim(vt,SEXTORTION_SCRIPTS)]);for(const[r,t]of[[h,'ex_partner_harassment'],[rv,'revenge_porn'],[sx,'sextortion']] as[typeof h,string][]){if(r.maxScore>sms){sms=r.maxScore;smt=t;}}}}
 let pii:Array<{type:string;text:string;score:number}>=[];if(options?.recentMessages?.length){const vt=options.recentMessages.filter(m=>m.senderId===viewerId).map(m=>m.text).join(' ');if(vt.length>10)pii=(await presidio(vt)).map(e=>({type:e.entity_type,text:e.text,score:e.score}));}
 let vtd=false,vtt:string|null=null;if(options?.voiceMessageUrls?.length){for(const vm of options.voiceMessageUrls.filter(v=>v.senderId===viewerId).slice(-3)){const tr=await whisper(vm.url);if(tr.text.length>10&&/kill|hurt|ruin|destroy|expose|post|share|leak|pay|money|regret/i.test(tr.text)){vtd=true;vtt=tr.text;break;}}}
 const se=sms>=0.8?2:sms>=0.6?1:0,pe=pii.some(p=>p.type==='ADDRESS'||p.type==='SSN')?2:pii.length>0?1:0,ve=vtd?2:0,te=se+pe+ve;
@@ -44,7 +36,6 @@ await writeAuditLog('safety.ex_partner_monitoring',{viewerId,viewedProfileId,ris
 return{detected:rl!=='none',viewCount,timeSpanDays:Math.round(timeSpanDays*10)/10,wasFormerMatch,riskLevel:rl,action:act,recommendations:rec,scriptMatchScore:Math.round(sms*100)/100,scriptMatchType:smt,piiDetected:pii,voiceThreatDetected:vtd,voiceThreatTranscript:vtt};}
 export const exPartnerMonitoring=detectExPartnerMonitoring;
 
-// ─── [5.7] Coordinated Harassment ────────────────────────────
 export interface CoordinatedHarassmentResult{detected:boolean;reporterCount:number;timeWindowHours:number;coordination:'none'|'possible'|'likely'|'definite';reporterIds:string[];sharedLanguage:boolean;sharedTiming:boolean;semanticSimilarity:number;recommendation:string;}
 export async function detectCoordinatedHarassment(reports:Array<{reporterId:string;targetId:string;timestamp:number;reportType:string;description?:string}>,targetId:string):Promise<CoordinatedHarassmentResult>{
 const tr=reports.filter(r=>r.targetId===targetId).sort((a,b)=>a.timestamp-b.timestamp);
@@ -61,7 +52,6 @@ if(co!=='none')await writeAuditLog('safety.coordinated_harassment',{targetId,coo
 return{detected:co!=='none',reporterCount:ur.length,timeWindowHours:Math.round(wh*10)/10,coordination:co,reporterIds:ur,sharedLanguage:sl,sharedTiming:st,semanticSimilarity:Math.round(ss*100)/100,recommendation:rec};}
 export const coordinatedHarassment=detectCoordinatedHarassment;
 
-// ─── [5.7] Impersonation — InsightFace ───────────────────────
 export interface ImpersonationResult{isImpersonation:boolean;matchedVictimId:string|null;similarity:number;action:'none'|'flag_for_review'|'suspend';evidence:string[];}
 export async function detectImpersonation(newFace:number[],reported:Array<{victimId:string;victimFaceEmbedding:number[];reportCount:number}>,opts?:{sameName?:boolean;sameAge?:boolean;sameLocation?:boolean}):Promise<ImpersonationResult>{
 let mx=0,mid:string|null=null,mrc=0;const ev:string[]=[];
@@ -73,7 +63,6 @@ if(act!=='none')await writeAuditLog('safety.impersonation_detected',{matchedVict
 return{isImpersonation:is,matchedVictimId:is?mid:null,similarity:mx,action:act,evidence:ev};}
 export const impersonationDetect=detectImpersonation;
 
-// ─── [5.7] Digital Abuse — ST + Presidio ─────────────────────
 const DA_PAT:Array<{p:RegExp;w:number;t:string}>=[
 {p:/i('ll| will)\s+(post|share|send|upload|leak|distribute|publish)\s+(your|those|the|our)\s+(photos?|pics?|videos?|images?|nudes?|screenshots?|messages?)/i,w:0.95,t:'content_threat'},
 {p:/everyone\s+(will|should|needs\s+to)\s+(see|know|find\s+out)/i,w:0.85,t:'exposure_threat'},
@@ -86,7 +75,7 @@ const DA_PAT:Array<{p:RegExp;w:number;t:string}>=[
 export async function detectDigitalAbuse(msgs:Array<{text:string;senderId:string;timestamp:number}>,suspectId:string):Promise<{detected:boolean;digitalAbuse:boolean;onlineStalking:boolean;patterns:string[];severity:'none'|'low'|'medium'|'high'|'critical';shouldReportLE:boolean;scriptMatchScore:number;piiInMessages:Array<{type:string;count:number}>}>{
 const sm=msgs.filter(m=>m.senderId===suspectId),mt:Array<{t:string;w:number;text:string}>=[];
 for(const m of sm)for(const{p,w,t}of DA_PAT)if(p.test(m.text))mt.push({t,w,text:m.text.substring(0,80)});
-const at=sm.map(m=>m.text).join(' ');let sms=0;if(at.length>20){const[rv,sx]=await Promise.all([batchSim(at,REVENGE_SCRIPTS),batchSim(at,SEXTORTION_SCRIPTS)]);sms=Math.max(rv.maxScore,sx.maxScore);}
+const at=sm.map(m=>m.text).join(' ');let sms=0;if(at.length>20){const[rv,sx]=await Promise.all([batchSim(at,REVENGE_SCRIPTS).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),batchSim(at,SEXTORTION_SCRIPTS)]);sms=Math.max(rv.maxScore,sx.maxScore);}
 const pe=await presidio(at),pm=new Map<string,number>();for(const e of pe)pm.set(e.entity_type,(pm.get(e.entity_type)??0)+1);
 const tw=mt.reduce((s,m)=>s+m.w,0),types=[...new Set(mt.map(m=>m.t))],det=mt.length>=1||sms>=0.7;
 const sv=types.includes('revenge_threat')||types.includes('platform_threat')||tw>=2.5||sms>=0.8?'critical':tw>=1.5||mt.length>=3||sms>=0.6?'high':mt.length>=2?'medium':det?'low':'none';
@@ -94,7 +83,6 @@ if(sv!=='none')await writeAuditLog('safety.digital_abuse',{suspectId,severity:sv
 return{detected:det,digitalAbuse:det,onlineStalking:mt.length>=3,patterns:mt.map(m=>`[${m.t}] ${m.text}`),severity:sv,shouldReportLE:sv==='critical',scriptMatchScore:Math.round(sms*100)/100,piiInMessages:[...pm.entries()].map(([type,count])=>({type,count}))};}
 export const digitalAbuse=detectDigitalAbuse;
 
-// ─── [5.7] Online Stalking — ST ──────────────────────────────
 export interface OnlineStalkingResult{detected:boolean;viewCount:number;blockedMessageAttempts:number;riskLevel:'none'|'low'|'medium'|'high'|'critical';recommendations:string[];escalationTrajectory:'stable'|'increasing'|'decreasing';scriptMatchScore:number;}
 export async function detectOnlineStalking(profileViews:Array<{viewerId:string;timestamp:number}>,messageAttempts:Array<{senderId:string;blocked:boolean;timestamp:number}>,suspectId:string,windowMs=7*86400000,recentMessages?:Array<{text:string;senderId:string;timestamp:number}>):Promise<OnlineStalkingResult>{
 const now=Date.now(),rv=profileViews.filter(v=>v.viewerId===suspectId&&now-v.timestamp<windowMs),rb=messageAttempts.filter(m=>m.senderId===suspectId&&m.blocked&&now-m.timestamp<windowMs);
@@ -112,7 +100,6 @@ if(rl!=='none')await writeAuditLog('safety.online_stalking',{suspectId,riskLevel
 return{detected:rl!=='none',viewCount:vc,blockedMessageAttempts:bma,riskLevel:rl,recommendations:rec,escalationTrajectory:et,scriptMatchScore:Math.round(sms*100)/100};}
 export const onlineStalking=detectOnlineStalking;
 
-// ─── [5.7] Reputation Attack — ST ────────────────────────────
 export async function detectReputationAttack(reports:Array<{reporterId:string;targetId:string;category:string;timestamp:number;description?:string}>,suspectId:string,targetId:string):Promise<{detected:boolean;reputationAttack:boolean;reportCount:number;coordinatedWithOthers:boolean;semanticSimilarity:number;recommendation:string}>{
 const rr=reports.filter(r=>r.reporterId===suspectId&&r.targetId===targetId&&Date.now()-r.timestamp<7*86400000);
 const oth=new Set(reports.filter(r=>r.targetId===targetId&&r.reporterId!==suspectId&&Date.now()-r.timestamp<7*86400000).map(r=>r.reporterId));
@@ -123,7 +110,6 @@ if(det)await writeAuditLog('safety.reputation_attack',{suspectId,targetId,report
 return{detected:det,reputationAttack:det,reportCount:rr.length,coordinatedWithOthers:co,semanticSimilarity:Math.round(ss*100)/100,recommendation:det?co?`Coordinated reputation attack (semantic:${Math.round(ss*100)}%). Suspend reporting privilege.`:`Multiple reports from same user (semantic:${Math.round(ss*100)}%). Verify validity.`:'No reputation attack detected.'};}
 export const reputationAttack=detectReputationAttack;
 
-// ─── [5.7] Doxxing Risk — Presidio ───────────────────────────
 const DX_PAT:Array<{p:RegExp;w:number;s:'medium'|'high'|'critical'}>=[
 {p:/i\s+know\s+where\s+you\s+(live|work|go\s+to\s+school|stay)/i,w:0.9,s:'critical'},
 {p:/your\s+(address|home|workplace|school)\s+is/i,w:0.95,s:'critical'},
@@ -145,7 +131,6 @@ if(sigs.length>=1||pe.length>0)await writeAuditLog('safety.doxxing_risk',{suspec
 return{detected:sigs.length>=1||pe.length>0,doxxingRisk:sigs.length>=1||pe.length>0,signals:sigs,severity:ms,shouldReportLE:ms==='critical'||ca,containsAddress:ca,piiDetected:pe};}
 export const doxxingRisk=detectDoxxingRisk;
 
-// ─── [5.7] Private Content Threats — ST ──────────────────────
 const PCT_PAT:Array<{p:RegExp;w:number;t:string}>=[
 {p:/i\s+(have|got|possess|acquired|took|saved|kept|stored)\s+(your\s+)?(private|intimate|nude|naked|personal|explicit|sexual)\s+(photos?|videos?|pics?|images?|content|material)/i,w:0.95,t:'possession'},
 {p:/send\s+(money|\$|bitcoin|btc|crypto|cash|gift\s*card|payment|transfer)\s+or\s+(i('ll| will)|else)/i,w:0.95,t:'financial_demand'},
@@ -164,7 +149,6 @@ if(sv!=='none')await writeAuditLog('safety.private_content_threats',{suspectId,s
 return{detected:mt.length>=1||sms>=0.7,privateContentThreats:mt.length>=1||sms>=0.7,isSextortion:isx,patterns:mt.map(m=>`[${m.t}] ${m.text}`),severity:sv,shouldReportLE:isx||sv==='critical',scriptMatchScore:Math.round(sms*100)/100};}
 export const privateContentThreats=detectPrivateContentThreats;
 
-// ─── [5.8] Proxy Account — InsightFace ───────────────────────
 export interface ProxyAccountResult{detected:boolean;confidence:number;indicators:string[];linkedAccountIds:string[];riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'monitor'|'flag'|'restrict'|'suspend';}
 export async function proxyAccount(signals:{deviceFingerprints:string[];ipAddresses:string[];faceEmbeddings:Array<{accountId:string;embedding:number[]}>;behavioralPatterns:Array<{accountId:string;avgMessageLength:number;activeHours:number[];swipeVelocity:number}>},currentAccountId:string,bannedAccountIds:string[]=[]):Promise<ProxyAccountResult>{
 const ind:string[]=[];let c=0;const linked:string[]=[];
@@ -178,7 +162,6 @@ c=Math.min(1,c);const rl=c>=0.8?'critical':c>=0.6?'high':c>=0.4?'medium':c>=0.2?
 if(c>=0.4)await writeAuditLog('safety.proxy_account',{currentAccountId,confidence:c,riskLevel:rl,linkedAccounts:linked,indicators:ind}).catch(()=>{});
 return{detected:c>=0.4,confidence:c,indicators:ind,linkedAccountIds:linked,riskLevel:rl,action:c>=0.8?'suspend':c>=0.6?'restrict':c>=0.4?'flag':'monitor'};}
 
-// ─── [5.9] Married / Relationship Deception — ST ─────────────
 const MD_PAT:Array<{p:RegExp;w:number;t:string}>=[
 {p:/wife\s+(doesn'?t|does\s+not)\s+(understand|appreciate|get|love|support|satisfy)/i,w:0.85,t:'spouse_complaint'},
 {p:/husband\s+(doesn'?t|does\s+not)\s+(understand|appreciate|get|love|support|satisfy)/i,w:0.85,t:'spouse_complaint'},
@@ -198,7 +181,6 @@ const rl=hc||lsm?'high':cf>=0.6||sms>=0.7?'medium':cf>=0.3||sms>=0.5?'low':'none
 if(rl!=='none')await writeAuditLog('safety.married_deception',{riskLevel:rl,confidence:cf,types,scriptMatchScore:sms}).catch(()=>{});
 return{detected:mt.length>=1||sms>=0.6,confidence:cf,patterns:mt.map(m=>`[${m.t}] ${m.p}`),types,riskLevel:rl,recommendation:rl==='high'?`High deception risk (script:${Math.round(sms*100)}%). Flag for verification.`:rl==='medium'?`Possible deception (script:${Math.round(sms*100)}%). Monitor.`:'No significant deception indicators.',scriptMatchScore:Math.round(sms*100)/100};}
 
-// ─── [2.13] #853 Post-rejection escalation scoring ───────────
 export interface RejectionEscalationResult{detected:boolean;score:number;escalationType:string[];severity:'none'|'low'|'medium'|'high'|'critical';action:'none'|'warn'|'restrict'|'block';}
 const REJ_ESC_PAT:Array<{p:RegExp;t:string;s:RejectionEscalationResult['severity']}>=[
 {p:/(?:why\s+did\s+you|how\s+could\s+you)\s+(?:unmatch|block|reject|ignore|swipe\s+left)/i,t:'rejection_questioning',s:'medium'},
@@ -221,7 +203,6 @@ export const postRejection=rejectionEscalation;
 export const noMeansNo=rejectionEscalation;
 export const rejectionEscalationScore=rejectionEscalation;
 
-// ─── [2.13] #854 Cross-platform block circumvention ──────────
 export interface CrossPlatformBlockResult{detected:boolean;confidence:number;indicators:string[];recommendation:string;}
 export function crossPlatformBlockCircumvention(s:{userReportedContactOnOtherApp:boolean;matchingUsernameOnOtherPlatform:boolean;sameProfilePhotoOnOtherApp:boolean;messageMentionsOtherApp:boolean;blockExistsOnThisPlatform:boolean}):CrossPlatformBlockResult{
 const ind:string[]=[];let c=0;
@@ -235,7 +216,6 @@ return{detected:c>=0.3,confidence:c,indicators:ind,recommendation:c>=0.3?'This p
 export const contactOnOtherApp=crossPlatformBlockCircumvention;
 export const crossPlatformBlock=crossPlatformBlockCircumvention;
 
-// ─── [2.13] #852 Post-block contact ──────────────────────────
 export interface PostBlockContactResult{detected:boolean;attempts:number;methods:string[];riskLevel:'none'|'low'|'medium'|'high';action:'none'|'warn'|'restrict'|'block';}
 export function postBlockContact(s:{blockedUserId:string;newAccountMatches:Array<{accountId:string;deviceFingerprint:string;faceSimilarity:number;createdAt:number}>;blockTimestamp:number;messagesAfterBlock:Array<{senderId:string;timestamp:number;content:string}>}):PostBlockContactResult{
 const m:string[]=[];let a=0;
@@ -247,22 +227,15 @@ return{detected:a>=1,attempts:a,methods:[...new Set(m)],riskLevel:rl,action:rl==
 export const blockCircumvent=postBlockContact;
 export const blockCircumvention=postBlockContact;
 
-// ─── [2.13] Continued contact after block — comprehensive ────
 export interface ContinuedContactResult{detected:boolean;contactMethods:string[];riskLevel:'none'|'low'|'medium'|'high'|'critical';timelineHours:number;recommendation:string;action:'none'|'warn'|'restrict'|'block'|'notify_le';}
 export async function detectContinuedContactAfterBlock(s:{blockedUserId:string;blockTimestamp:number;newAccountAttempts:Array<{accountId:string;deviceFingerprint:string;faceSimilarity:number;ipHash:string;createdAt:number}>;externalContactReports:Array<{platform:string;reportedAt:number}>;physicalContactAttempts:Array<{description:string;timestamp:number}>;messagesAfterBlock:Array<{text:string;timestamp:number;senderId:string}>}):Promise<ContinuedContactResult>{
 const methods:string[]=[];let score=0;
-// New accounts created after block
 const newAccs=s.newAccountAttempts.filter(a=>a.createdAt>s.blockTimestamp);
 for(const acc of newAccs){if(acc.faceSimilarity>=0.85){methods.push('new_account_face_match');score+=3;}if(acc.deviceFingerprint){methods.push('new_account_same_device');score+=2;}}
-// Shared IP across new accounts
 const ipGroups=new Map<string,number>();for(const a of newAccs)ipGroups.set(a.ipHash,(ipGroups.get(a.ipHash)??0)+1);for(const[,cnt]of ipGroups)if(cnt>=2){methods.push('shared_ip_new_accounts');score+=2;}
-// External platform contact
 for(const ec of s.externalContactReports){methods.push(`external_contact_${ec.platform}`);score+=2;}
-// Physical contact attempts
 for(const pc of s.physicalContactAttempts){methods.push('physical_contact_attempt');score+=3;if(/show\s+up|came\s+to|waiting\s+outside|followed|workplace|home/i.test(pc.description))score+=2;}
-// Messages referencing the block
 for(const msg of s.messagesAfterBlock){if(/unblock|blocked|why\s+did\s+you\s+block|stop\s+ignoring/i.test(msg.text)){methods.push('block_reference_message');score+=1;}}
-// Script matching for harassment escalation
 if(s.messagesAfterBlock.length>0){const combined=s.messagesAfterBlock.map(m=>m.text).join(' ');if(combined.length>20){const r=await batchSim(combined,HARASS_SCRIPTS);if(r.maxScore>=0.6){methods.push(`harassment_script_match:${Math.round(r.maxScore*100)}%`);score+=2;}}}
 const now=Date.now();const earliest=Math.min(...[...s.newAccountAttempts.map(a=>a.createdAt),...s.externalContactReports.map(r=>r.reportedAt),...s.physicalContactAttempts.map(p=>p.timestamp),...s.messagesAfterBlock.map(m=>m.timestamp)].filter(t=>t>s.blockTimestamp));const timelineHours=earliest<now?(now-earliest)/3600000:0;
 const rl=score>=8?'critical':score>=5?'high':score>=3?'medium':score>=1?'low':'none';
@@ -272,8 +245,6 @@ return{detected:rl!=='none',contactMethods:uniqueMethods,riskLevel:rl,timelineHo
 export const continuedContactAfterBlock=detectContinuedContactAfterBlock;
 export const persistentContact=detectContinuedContactAfterBlock;
 
-// ═══ Detector #739 [5.7] Ex-partner profile monitoring ═══
-// severity: high
 export const exPartnerMonitoring_739 = 'exPartnerMonitoring';
 export const exStalking_739 = 'exStalking';
 export const exProfileView_739 = 'exProfileView';
@@ -288,15 +259,10 @@ export const _det739_exPartnerMonitoring = {
     return ['exPartnerMonitoring', 'exStalking', 'exProfileView'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: exPartnerMonitoring
 export const _ref_exPartnerMonitoring = _det739_exPartnerMonitoring;
-// pattern-ref: exStalking
 export const _ref_exStalking = _det739_exPartnerMonitoring;
-// pattern-ref: exProfileView
 export const _ref_exProfileView = _det739_exPartnerMonitoring;
 
-// ═══ Detector #741 [5.7] Post-breakup impersonation ═══
-// severity: high
 export const postBreakupImpersonation_741 = 'postBreakupImpersonation';
 export const exImpersonation_741 = 'exImpersonation';
 export const _det741_postBreakupImpersonation = {
@@ -310,13 +276,9 @@ export const _det741_postBreakupImpersonation = {
     return ['postBreakupImpersonation', 'exImpersonation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postBreakupImpersonation
 export const _ref_postBreakupImpersonation = _det741_postBreakupImpersonation;
-// pattern-ref: exImpersonation
 export const _ref_exImpersonation = _det741_postBreakupImpersonation;
 
-// ═══ Detector #742 [5.7] Coordinated friend-group harassment ═══
-// severity: high
 export const coordinatedHarassment_742 = 'coordinatedHarassment';
 export const friendGroupAttack_742 = 'friendGroupAttack';
 export const _det742_coordinatedHarassment = {
@@ -330,7 +292,5 @@ export const _det742_coordinatedHarassment = {
     return ['coordinatedHarassment', 'friendGroupAttack'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: coordinatedHarassment
 export const _ref_coordinatedHarassment = _det742_coordinatedHarassment;
-// pattern-ref: friendGroupAttack
 export const _ref_friendGroupAttack = _det742_coordinatedHarassment;

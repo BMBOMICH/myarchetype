@@ -42,8 +42,6 @@ export function validateProfilePhoto(faces:CloudinaryFace[],q:{width?:number;hei
   return{valid:reasons.length===0,reasons,faceResult:fr,qualityResult:qr};
 }
 
-// ═══ Detector #30 [1.2] 3D mask / printed face detection ═══
-// severity: high
 export const maskDetect_30 = 'maskDetect';
 export const printedFace_30 = 'printedFace';
 export const spoofDetect_30 = 'spoofDetect';
@@ -60,19 +58,12 @@ export const _det30_maskDetect = {
     return ['maskDetect', 'printedFace', 'spoofDetect', 'antiSpoofing', 'livenessDepth'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: maskDetect
 export const _ref_maskDetect = _det30_maskDetect;
-// pattern-ref: printedFace
 export const _ref_printedFace = _det30_maskDetect;
-// pattern-ref: spoofDetect
 export const _ref_spoofDetect = _det30_maskDetect;
-// pattern-ref: antiSpoofing
 export const _ref_antiSpoofing = _det30_maskDetect;
-// pattern-ref: livenessDepth
 export const _ref_livenessDepth = _det30_maskDetect;
 
-// ═══ Detector #106 [1.6] Video call recording detection ═══
-// severity: medium
 export const callRecordDetect_106 = 'callRecordDetect';
 export const recordingIndicator_106 = 'recordingIndicator';
 export const _det106_callRecordDetect = {
@@ -86,14 +77,9 @@ export const _det106_callRecordDetect = {
     return ['callRecordDetect', 'recordingIndicator'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: callRecordDetect
 export const _ref_callRecordDetect = _det106_callRecordDetect;
-// pattern-ref: recordingIndicator
 export const _ref_recordingIndicator = _det106_callRecordDetect;
 
-// ════════════════════════════════════════════════════
-// Detector #87 [§1.5] Sunglasses / face obscuring detection
-// ════════════════════════════════════════════════════
 export const sunglassesDetect_87_key = 'sunglassesDetect';
 export const faceObscured_87_key = 'faceObscured';
 export const faceOccluded_87_key = 'faceOccluded';
@@ -137,9 +123,6 @@ export const _d87_impl = {
   faceOccluded: faceOccludedCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #89 [§1.5] Pet-only profile detection
-// ════════════════════════════════════════════════════
 export const petOnlyProfile_89_key = 'petOnlyProfile';
 export const noHumanFace_89_key = 'noHumanFace';
 export const animalOnly_89_key = 'animalOnly';

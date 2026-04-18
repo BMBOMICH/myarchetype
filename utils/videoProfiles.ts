@@ -6,6 +6,7 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 import { auth, db } from '../firebaseConfig';
+import { Storage } from '../services/storage';
 import { logger } from './logger';
 import { checkImageSafety, checkVideoFramesSafety } from './moderation';
 
@@ -39,13 +40,13 @@ interface FaceFrameResponse {
   faceDetected: boolean;
 }
 
-export const checkVideoNSFW   = checkVideoFramesSafety;
-export const moderateVideo    = checkVideoFramesSafety;
-export const extractFrames    = checkVideoFramesSafety;
+export const checkVideoNSFW = checkVideoFramesSafety;
+export const moderateVideo  = checkVideoFramesSafety;
+export const extractFrames  = checkVideoFramesSafety;
 
-const MAX_VIDEO_SIZE_MB           = 50;
-const MAX_VIDEO_DURATION_SECONDS  = 15;
-const MIN_VIDEO_DURATION_SECONDS  = 2;
+const MAX_VIDEO_SIZE_MB          = 50;
+const MAX_VIDEO_DURATION_SECONDS = 15;
+const MIN_VIDEO_DURATION_SECONDS = 2;
 
 export async function trackFaceInVideo(
   videoUri: string, frameCount = 8, authToken?: string,
@@ -104,30 +105,40 @@ export async function trackFaceInVideo(
   }
 }
 
-export const faceTrack      = trackFaceInVideo;
-export const trackFace      = trackFaceInVideo;
-export const mediapipeMesh  = trackFaceInVideo;
+export const faceTrack     = trackFaceInVideo;
+export const trackFace     = trackFaceInVideo;
+export const mediapipeMesh = trackFaceInVideo;
 
 export function detectVirtualCamera(cloudinaryData: CloudinaryVideoData): { isVirtual: boolean; signals: string[] } {
   const signals: string[] = [];
   const codec = cloudinaryData.video?.codec?.toLowerCase() ?? '';
   if (['rawvideo', 'utvideo', 'lagarith'].some(vc => codec.includes(vc))) signals.push(`Unusual codec: ${codec}`);
   const w = cloudinaryData.width ?? 0, h = cloudinaryData.height ?? 0;
-  const SCREEN_RES = [[1920,1080],[2560,1440],[3840,2160],[1280,720],[1366,768],[1440,900],[1680,1050]] as const;
+  const SCREEN_RES = [[1920, 1080], [2560, 1440], [3840, 2160], [1280, 720], [1366, 768], [1440, 900], [1680, 1050]] as const;
   if (SCREEN_RES.some(([sw, sh]) => w === sw && h === sh) && w > 1200) signals.push('Dimensions match screen resolution');
   const fn = (cloudinaryData.original_filename ?? '').toLowerCase();
-  if (['obs','screen','capture','record','stream'].some(k => fn.includes(k))) signals.push('Filename suggests screen recording');
+  if (['obs', 'screen', 'capture', 'record', 'stream'].some(k => fn.includes(k))) signals.push('Filename suggests screen recording');
   return { isVirtual: signals.length >= 2, signals };
 }
 
 export function validateVideoMetadata(cloudinaryData: CloudinaryVideoData): { hasValidTimestamp: boolean; issues: string[] } {
   const issues: string[] = [];
   let hasValidTimestamp = true;
+
+  const cacheKey = `vid_meta_${cloudinaryData.created_at ?? 'unknown'}`;
+  const cached = Storage.getString(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached) as { hasValidTimestamp: boolean; issues: string[] }; } catch { }
+  }
+
   if (cloudinaryData.created_at) {
     const age = Date.now() - new Date(cloudinaryData.created_at).getTime();
     if (age > 5 * 60 * 1_000) { hasValidTimestamp = false; issues.push('Video appears pre-recorded rather than live.'); }
   }
-  return { hasValidTimestamp, issues };
+
+  const result = { hasValidTimestamp, issues };
+  Storage.setString(cacheKey, JSON.stringify(result));
+  return result;
 }
 
 export async function validateProfileVideo(videoUri: string): Promise<VideoMetadataCheck> {
@@ -178,6 +189,10 @@ export async function uploadVideoProfile(videoUri: string): Promise<VideoUploadR
     const thumbUrl     = uploadData.eager?.[0]?.secure_url ?? uploadData.secure_url.replace('/upload/', '/upload/c_thumb,w_400,h_400,g_face,f_jpg/');
     const thumbSafety  = await checkImageSafety(thumbUrl, 'video_frame');
     if (!thumbSafety.safe) return { success: false, error: 'Video thumbnail contains inappropriate content.' };
+
+    Storage.setString(`vid_profile_${user.uid}`, uploadData.secure_url);
+    Storage.setString(`vid_thumb_${user.uid}`, thumbUrl);
+
     await updateDoc(doc(db, 'users', user.uid), {
       videoProfile: uploadData.secure_url, videoProfileThumbnail: thumbUrl,
       videoProfileUploadedAt: new Date().toISOString(), videoProfileDuration: uploadData.duration ?? 0,
@@ -195,6 +210,9 @@ export async function deleteVideoProfile(): Promise<VideoUploadResult> {
   const user = auth.currentUser;
   if (!user) return { success: false, error: 'User not authenticated' };
   try {
+    Storage.delete(`vid_profile_${user.uid}`);
+    Storage.delete(`vid_thumb_${user.uid}`);
+
     await updateDoc(doc(db, 'users', user.uid), { videoProfile: null, videoProfileThumbnail: null, videoProfileUploadedAt: null, videoProfileDuration: null });
     return { success: true };
   } catch (err) {
@@ -211,10 +229,10 @@ export function isVideoOld(uploadedAt: string | null): boolean {
 export function getVideoAge(uploadedAt: string | null): string {
   if (!uploadedAt) return '';
   const d = Math.floor((Date.now() - new Date(uploadedAt).getTime()) / (1_000 * 60 * 60 * 24));
-  if (d === 0)   return 'Today';
-  if (d === 1)   return 'Yesterday';
-  if (d < 30)    return `${d} days ago`;
-  if (d < 60)    return '1 month ago';
-  if (d < 365)   return `${Math.floor(d / 30)} months ago`;
+  if (d === 0)  return 'Today';
+  if (d === 1)  return 'Yesterday';
+  if (d < 30)   return `${d} days ago`;
+  if (d < 60)   return '1 month ago';
+  if (d < 365)  return `${Math.floor(d / 30)} months ago`;
   return 'Over a year ago';
 }

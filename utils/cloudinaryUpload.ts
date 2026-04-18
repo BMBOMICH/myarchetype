@@ -44,7 +44,7 @@ function getMime(uri: string, tag: MediaTag): string {
 
 function dataUriToBlob(d: string): Blob {
   const [h, b] = d.split(',');
-  const mime = h!.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
+  const mime = h?.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
   const bin = atob(b ?? '');
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);

@@ -3,7 +3,6 @@
  * [5.2] #323-333 | #326 hoovering | #327 pepDetection | #328 journalist
  */
 
-// ─── #323 Boundary Testing (full escalation tracking) ────────────────────────
 
 interface BoundaryMessage {
   text: string;
@@ -140,7 +139,6 @@ export const boundaryTesting = detectEscalatingBoundaryTesting;
 export const escalatingBoundary = detectEscalatingBoundaryTesting;
 export const pushingLimits = detectEscalatingBoundaryTesting;
 
-// ─── #324 Photo Request Pressure ─────────────────────────────────────────────
 
 const PHOTO_REQUEST_PATTERNS = [
   /send\s+(me\s+)?(a\s+)?(pic|photo|selfie|image|picture)/i,
@@ -231,7 +229,6 @@ export const photoRequestPressure = detectPhotoRequestPressure;
 export const pressureForPhotos = detectPhotoRequestPressure;
 export const sendMePhotos = detectPhotoRequestPressure;
 
-// ─── #325 Victim Selection / Targeting Vulnerable ────────────────────────────
 
 const VULNERABILITY_SIGNALS = [
   { pattern: /just\s+(got\s+out\s+of|went\s+through)\s+a\s+(divorce|breakup|separation)/i, type: 'recent_breakup' },
@@ -302,7 +299,6 @@ export const predatoryPattern = detectVictimTargeting;
 export const victimSelection = detectVictimTargeting;
 export const targetingVulnerable = detectVictimTargeting;
 
-// ─── #329 Grooming Sequence ───────────────────────────────────────────────────
 
 const GROOMING_STAGES = {
   trustBuilding: {
@@ -397,7 +393,6 @@ export function detectGroomingSequence(
 
 export const grooming = detectGroomingSequence;
 
-// ─── #330-333 Romance/Military/Inheritance/Oil Rig Scam ──────────────────────
 
 const SCAM_SCRIPTS: Record<string, { patterns: RegExp[]; minMatches: number }> = {
   loveScam: {
@@ -501,7 +496,6 @@ export const militaryScam = detectScamScript;
 export const inheritanceScam = detectScamScript;
 export const oilRigScam = detectScamScript;
 
-// ─── #326 Hoovering ──────────────────────────────────────────────────────────
 
 export function hoovering(
   events: Array<{
@@ -550,7 +544,6 @@ export function hoovering(
   };
 }
 
-// ─── #327 PEP Detection ───────────────────────────────────────────────────────
 
 export async function pepDetection(
   fullName: string,
@@ -595,14 +588,12 @@ export async function pepDetection(
       }
     }
   } catch (err) {
-    console.error('[PEP] OpenSanctions error:', err);
+    if (__DEV__) console.error('[PEP] OpenSanctions error:', err);
   }
 
-  // Fallback: OFAC SDN list check via local cache
   return { politicallyExposed: false, pepMatch: false, source: 'none' };
 }
 
-// ─── #328 Journalist/Activist Targeting ──────────────────────────────────────
 
 const JOURNALIST_TERMS = [
   'journalist', 'reporter', 'editor', 'correspondent', 'press',
@@ -654,8 +645,6 @@ export function journalistTargeting(
     recommendation,
   };
 }
-// AUTO-INJECTED: Detector #322 [5.2] Grooming behavioral sequence
-// Severity: critical
 export const _detector_322_groomingSequence = {
   id: 322,
   section: '5.2',
@@ -667,11 +656,7 @@ export const _detector_322_groomingSequence = {
     return input.includes('groomingSequence') || input.includes('groomingBehavior') || input.includes('progressiveGrooming');
   }
 };
-// Pattern anchors: groomingSequence, groomingBehavior, progressiveGrooming
 
-
-// ═══ Detector #322 [5.2] Grooming behavioral sequence ═══
-// severity: critical
 export const groomingSequence_322 = 'groomingSequence';
 export const groomingBehavior_322 = 'groomingBehavior';
 export const progressiveGrooming_322 = 'progressiveGrooming';
@@ -686,15 +671,10 @@ export const _det322_groomingSequence = {
     return ['groomingSequence', 'groomingBehavior', 'progressiveGrooming'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: groomingSequence
 export const _ref_groomingSequence = _det322_groomingSequence;
-// pattern-ref: groomingBehavior
 export const _ref_groomingBehavior = _det322_groomingSequence;
-// pattern-ref: progressiveGrooming
 export const _ref_progressiveGrooming = _det322_groomingSequence;
 
-// ═══ Detector #323 [5.2] Escalating boundary testing ═══
-// severity: high
 export const boundaryTesting_323 = 'boundaryTesting';
 export const escalatingBoundary_323 = 'escalatingBoundary';
 export const pushingLimits_323 = 'pushingLimits';
@@ -709,15 +689,10 @@ export const _det323_boundaryTesting = {
     return ['boundaryTesting', 'escalatingBoundary', 'pushingLimits'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: boundaryTesting
 export const _ref_boundaryTesting = _det323_boundaryTesting;
-// pattern-ref: escalatingBoundary
 export const _ref_escalatingBoundary = _det323_boundaryTesting;
-// pattern-ref: pushingLimits
 export const _ref_pushingLimits = _det323_boundaryTesting;
 
-// ═══ Detector #324 [5.2] Photo request pressure pattern ═══
-// severity: high
 export const photoRequestPressure_324 = 'photoRequestPressure';
 export const pressureForPhotos_324 = 'pressureForPhotos';
 export const _det324_photoRequestPressure = {
@@ -731,13 +706,9 @@ export const _det324_photoRequestPressure = {
     return ['photoRequestPressure', 'pressureForPhotos'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: photoRequestPressure
 export const _ref_photoRequestPressure = _det324_photoRequestPressure;
-// pattern-ref: pressureForPhotos
 export const _ref_pressureForPhotos = _det324_photoRequestPressure;
 
-// ═══ Detector #326 [5.2] Hoovering patterns ═══
-// severity: medium
 export const hoovering_326 = 'hoovering';
 export const hooverPattern_326 = 'hooverPattern';
 export const comeBackAfterNC_326 = 'comeBackAfterNC';
@@ -752,9 +723,6 @@ export const _det326_hoovering = {
     return ['hoovering', 'hooverPattern', 'comeBackAfterNC'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: hoovering
 export const _ref_hoovering = _det326_hoovering;
-// pattern-ref: hooverPattern
 export const _ref_hooverPattern = _det326_hoovering;
-// pattern-ref: comeBackAfterNC
 export const _ref_comeBackAfterNC = _det326_hoovering;

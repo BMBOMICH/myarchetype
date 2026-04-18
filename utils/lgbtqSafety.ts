@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/lgbtqSafety.ts — FULL UPDATED
-// Covers: [19] LGBTQ+ safety features
-// [19] #604 Entrapment pattern detection
-// [19] Pronoun violation, conversion therapy, trans safety
-// [19] Disclosure risk, safe space, outing detection
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 const CRIM=new Set(['AF','BN','IR','MR','NG','PK','QA','SA','SO','YE','BD','BT','CM','EG','ET','GH','GN','ID','IQ','JM','KE','KW','LB','LY','MW','MY','MM','OM','SD','SY','TZ','TG','TN','TM','UG','UZ','ZM','ZW']);
@@ -30,7 +23,6 @@ const HOMO=[/\b(f+a+g+|f+a+g+o+t+|d+y+k+e+|tr+a+n+n+y+)\b/i,/that('s|'s)\s+(so\s
 export function detectHomophobia(msg:string){const t:string[]=[];for(const p of HOMO){const m=msg.match(p);if(m)t.push(m[0]);}if(t.length)writeAuditLog('lgbtq.homophobic_content',{terms:t}).catch(()=>{});return{detected:t.length>0,terms:t};}
 export const homophobicContent=detectHomophobia;
 
-// ─── #604 LGBTQ+ entrapment pattern detection ─────────────────
 export interface LGBTQEntrapmentResult{
   detected:boolean;
   confidence:number;
@@ -82,7 +74,6 @@ if(shouldHide)fieldsHidden.forEach(f=>delete r[f]);
 return r;}
 export const stripGenderIdentity=stripOrientation;export const redactSensitiveRegion=stripOrientation;
 
-// ─── [19] Pronoun violation detection ────────────────────────
 export interface PronounRespectResult{respectful:boolean;violations:string[];severity:'none'|'low'|'medium'|'high';action:'none'|'warn'|'restrict';}
 export function detectPronounViolation(msg:string,targetPronouns:{they?:boolean;she?:boolean;he?:boolean;xe?:boolean}):PronounRespectResult{
 const violations:string[]=[];
@@ -94,7 +85,6 @@ if(sev!=='none')writeAuditLog('lgbtq.pronoun_violation',{violations}).catch(()=>
 return{respectful:violations.length===0,violations,severity:sev,action:sev==='high'?'restrict':sev==='medium'?'warn':'none'};}
 export const pronounRespect=detectPronounViolation;
 
-// ─── [19] Conversion therapy content detection ────────────────
 export interface ConversionTherapyResult{detected:boolean;phrases:string[];severity:'none'|'medium'|'high'|'critical';action:'none'|'warn'|'block';}
 const CONVERSION_PATTERNS=[/pray\s+(away|out)\s+the\s+gay/i,/conversion\s+therapy/i,/ex.gay\s+(ministry|program|therapy)/i,/change\s+your\s+(orientation|sexuality)/i,/choose\s+not\s+to\s+be\s+(gay|bi|trans|lesbian)/i,/\b(cure|fix|heal)\b.*(gay|trans|lesbian|bi|homosexual)/i,/reparative\s+therapy/i,/sexual\s+reorientation/i];
 export function detectConversionTherapyContent(msg:string):ConversionTherapyResult{
@@ -104,7 +94,6 @@ if(sev!=='none')writeAuditLog('lgbtq.conversion_therapy_content',{phrases}).catc
 return{detected:phrases.length>0,phrases,severity:sev,action:sev==='critical'||sev==='high'?'block':sev==='medium'?'warn':'none'};}
 export const conversionTherapyDetect=detectConversionTherapyContent;
 
-// ─── [19] Disclosure risk assessment ─────────────────────────
 export interface DisclosureRiskResult{riskLevel:'none'|'low'|'medium'|'high';warnings:string[];safetyTips:string[];}
 export function assessDisclosureRisk(context:{isFirstMessage:boolean;matchVerified:boolean;locationRisk:'safe'|'caution'|'danger'|'extreme_danger';profileIsPublic:boolean;requestingPersonalInfo:boolean}):DisclosureRiskResult{
 const warnings:string[]=[];
@@ -116,7 +105,6 @@ const rl:DisclosureRiskResult['riskLevel']=warnings.length>=3?'high':warnings.le
 return{riskLevel:rl,warnings,safetyTips:rl!=='none'?['You control what you share and when','Trust your instincts — you don\'t have to disclose anything','Use our block/report if anyone pressures you']:[]};}
 export const lgbtqDisclosureRisk=assessDisclosureRisk;
 
-// ─── [19] Safe space verification ────────────────────────────
 export interface SafeSpaceVerifyResult{verified:boolean;signals:string[];trustScore:number;}
 export function verifySafeSpace(profile:{hasPronounsListed:boolean;hasInclusivityStatement:boolean;lgbtqFriendlyKeywords:boolean;hasNondiscriminationPolicy:boolean}):SafeSpaceVerifyResult{
 const signals:string[]=[];let score=0;
@@ -127,7 +115,6 @@ if(profile.hasNondiscriminationPolicy){signals.push('nondiscrimination_policy');
 return{verified:score>=50,signals,trustScore:Math.min(score,100)};}
 export const safeSpaceVerify=verifySafeSpace;
 
-// ─── [19] Trans safety features ──────────────────────────────
 export interface TransSafetyResult{deadnamingDetected:boolean;misgenderingDetected:boolean;threats:string[];severity:'none'|'low'|'medium'|'high';action:'none'|'warn'|'block';}
 export function detectTransSafetyViolation(msg:string,targetDeadname?:string,targetPronouns?:{they?:boolean;she?:boolean;he?:boolean}):TransSafetyResult{
 const threats:string[]=[];
@@ -140,7 +127,6 @@ if(sev!=='none')writeAuditLog('lgbtq.trans_safety_violation',{deadnaming,misgend
 return{deadnamingDetected:deadnaming,misgenderingDetected:misgendering,threats,severity:sev,action:sev==='high'?'block':sev==='medium'?'warn':'none'};}
 export const transSafety=detectTransSafetyViolation;export const deadnameDetect=detectTransSafetyViolation;
 
-// ─── [19] LGBTQ+ hate crime risk indicator ────────────────────
 export interface HateCrimeRiskResult{riskDetected:boolean;indicators:string[];urgency:'none'|'low'|'high'|'critical';action:'none'|'warn'|'block'|'alert_safety';}
 export function detectHateCrimeRisk(signals:{explicitThreats:boolean;locationDisclosed:boolean;meetupProposed:boolean;groupCoordination:boolean;weaponsMentioned:boolean;priorHateSpeech:boolean}):HateCrimeRiskResult{
 const indicators:string[]=[];

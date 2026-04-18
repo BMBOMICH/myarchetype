@@ -8,7 +8,6 @@
 
 import { addDoc, collection, getFirestore } from 'firebase/firestore';
 
-// ━━━ #783: Child Photo Blur/Block Enforcement ━━━
 
 export interface ChildPhotoEnforcementResult {
   action: 'block' | 'blur' | 'review' | 'pass';
@@ -29,7 +28,6 @@ export async function enforceChildPhotoPolicy(
   confidence: number,
   userId: string
 ): Promise<ChildPhotoEnforcementResult> {
-  // No face or age couldn't be estimated
   if (estimatedAge === null) {
     return {
       action: 'pass',
@@ -46,20 +44,16 @@ export async function enforceChildPhotoPolicy(
 
   if (minorDetected) {
     if (confidence >= 0.85 && estimatedAge < 16) {
-      // High confidence, clearly a child → hard block
       action = 'block';
       enforcementApplied = true;
     } else if (confidence >= 0.6) {
-      // Moderate confidence → auto-blur + queue for human review
       action = 'blur';
       enforcementApplied = true;
     } else {
-      // Low confidence → queue for review only
       action = 'review';
       enforcementApplied = true;
     }
 
-    // Log enforcement event
     const db = getFirestore();
     await addDoc(collection(db, '_safety_child_photo_enforcement'), {
       userId,
@@ -86,9 +80,6 @@ export async function enforceChildPhotoPolicy(
 export async function applyChildPhotoBlur(
   imageUri: string
 ): Promise<string> {
-  // Server-side: use Cloudinary eager transformation
-  // blur face region with f_auto,e_blur_faces:800
-  // Client-side fallback: prevent display entirely
   const cloudinaryBlurUrl = imageUri.replace(
     '/upload/',
     '/upload/e_blur_faces:800/'
@@ -105,8 +96,6 @@ export function getChildPhotoBlockMessage(): string {
     'If you believe this is an error, please contact support.';
 }
 
-
-// ━━━ #784: Predator Attraction Risk Scoring ━━━
 
 export interface PredatorAttractionRisk {
   riskScore: number; // 0–100
@@ -137,39 +126,33 @@ export async function scorePredatorAttractionRisk(
     return { riskScore: 0, riskFactors: [], recommendation: 'none' };
   }
 
-  // Photos containing children
   const childPhotos = profile.photos.filter((p) => p.hasChildFace);
   if (childPhotos.length > 0) {
     riskScore += 40;
     riskFactors.push(`${childPhotos.length} photo(s) contain detected child faces`);
   }
 
-  // Bio mentions children's ages
   if (profile.childAgesShared) {
     riskScore += 20;
     riskFactors.push('Children\'s ages shared in profile');
   }
 
-  // Bio mentions children's names
   if (profile.childNamesShared) {
     riskScore += 25;
     riskFactors.push('Children\'s names shared in profile');
   }
 
-  // Custody schedule details
   if (profile.custodyDetailsShared) {
     riskScore += 15;
     riskFactors.push('Custody schedule details shared');
   }
 
-  // Check bio for school/activity mentions
   const schoolPatterns = /\b(school|daycare|preschool|kindergarten|elementary|soccer practice|ballet|swim team|karate|piano lesson)\b/i;
   if (schoolPatterns.test(profile.bio)) {
     riskScore += 15;
     riskFactors.push('Children\'s school or activity locations mentioned');
   }
 
-  // Track who views this high-risk profile
   if (riskScore >= 40) {
     await flagProfileForPredatorMonitoring(userId, riskScore, riskFactors);
   }
@@ -198,8 +181,6 @@ async function flagProfileForPredatorMonitoring(
     active: true,
   });
 }
-// AUTO-INJECTED: Detector #783 [1.7] Child photo blur/block enforcement
-// Severity: critical
 export const _detector_783_blurChildPhoto = {
   id: 783,
   section: '1.7',
@@ -211,4 +192,3 @@ export const _detector_783_blurChildPhoto = {
     return input.includes('blurChildPhoto') || input.includes('blockChildPhoto') || input.includes('childPhotoPolicy');
   }
 };
-// Pattern anchors: blurChildPhoto, blockChildPhoto, childPhotoPolicy

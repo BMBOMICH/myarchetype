@@ -1,23 +1,8 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/remainingDetectors.ts — FULL UPDATED
-// Covers: [15.5] Algorithmic bias/discrimination
-// [16.1] Age-gate circumvention
-// [14] Threat intelligence feed
-// [16.1] #524,525,528,529 (re-exported from wellbeing)
-// [44] #641,642 Account selling / premium harassment
-// [10.1] Ghost/zombie profile detection
-// [11] Social verification
-// [12] Payment fraud detection
-// [13.1] API data exposure
-// [13.2] Mass scraping defense
-// [13.3] Platform cybersecurity
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 const API=process.env['EXPO_PUBLIC_API_URL']??'';
 const safeFetch=async<T>(ep:string,body?:unknown,t=8000):Promise<T|null>=>{const c=new AbortController();const id=setTimeout(()=>c.abort(),t);try{const r=await fetch(`${API}${ep}`,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:c.signal});if(!r.ok)return null;return r.json() as T;}catch{return null;}finally{clearTimeout(id);}};
 
-// ─── [15.5] Algorithmic Bias & Discrimination ─────────────────
 export interface FairnessMetrics{disparateImpact:number;equalizedOdds:number;demographicParity:number;passed:boolean;failedMetrics:string[];}
 export function measureFairness(outcomes:{demographic:string;positive:number;total:number}[]):FairnessMetrics{
 const rates=outcomes.map(o=>({demo:o.demographic,rate:o.total>0?o.positive/o.total:0}));
@@ -50,7 +35,6 @@ const detected=gini>0.2||Math.max(...rates.map(r=>r.matchRate))-Math.min(...rate
 if(detected)writeAuditLog('fairness.outcome_disparity',{gini,groups:rates.map(r=>r.name)}).catch(()=>{});
 return{disparityDetected:detected,groups:rates,overallGini:Math.round(gini*1000)/1000,recommendation:detected?`Gini coefficient ${gini.toFixed(3)} exceeds threshold. Review matching algorithm for demographic bias.`:'Outcome distribution is equitable across groups.'};}
 
-// ─── [16.1] Age-Gate Circumvention Detection ─────────────────
 export interface AgeGateCircumventResult{circumvented:boolean;signals:string[];action:'allow'|'reverify'|'suspend';confidence:number;recommendation:string;}
 export function detectAgeGateCircumvention(signals:{dobMismatch:boolean;behavioralAgeEstimate?:number;accountAgeDays:number;multipleAgeAttempts:boolean;vpnUsed:boolean;minorKeywordsDetected:boolean;deviceFingerprintLinkedToMinor?:boolean;schoolEmailDomain?:boolean}):AgeGateCircumventResult{
 const s:string[]=[];let confidence=0;
@@ -67,11 +51,10 @@ if(action!=='allow')writeAuditLog('age.gate_circumvention',{signals:s,confidence
 return{circumvented:s.length>=1,signals:s,action,confidence:Math.round(confidence*100)/100,recommendation:action==='suspend'?'High confidence minor attempting age bypass. Suspend and require verified ID.':action==='reverify'?'Age circumvention signals detected. Require re-verification via video selfie + ID.':'No circumvention detected.'};}
 export const ageGateCircumvent=detectAgeGateCircumvention;export const ageBypass=detectAgeGateCircumvention;export const ageGateEvasion=detectAgeGateCircumvention;
 
-// ─── [14] Threat Intelligence Feed Integration ───────────────
 export interface ThreatIntelFeedResult{threat:boolean;threatType?:string;severity:'none'|'low'|'medium'|'high'|'critical';sources:string[];indicators:string[];iocMatched:boolean;recommendedAction:string;}
 export async function checkThreatIntelFeed(indicator:{ip?:string;domain?:string;emailHash?:string;fileHash?:string;url?:string}):Promise<ThreatIntelFeedResult>{
 const [misp,opencti,abuseipdb]=await Promise.all([
-safeFetch<{threat?:boolean;type?:string;severity?:string;indicators?:string[]}>('/threat/misp',{indicator}),
+safeFetch<{threat?:boolean;type?:string;severity?:string;indicators?:string[]}>('/threat/misp',{indicator}).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
 safeFetch<{threat?:boolean;type?:string;severity?:string;indicators?:string[]}>('/threat/opencti',{indicator}),
 indicator.ip?safeFetch<{threat?:boolean;abuseScore?:number;categories?:string[]}>('/threat/abuseipdb',{ip:indicator.ip}):Promise.resolve(null),
 ]);
@@ -103,7 +86,6 @@ LOCAL_IOC_CACHE.set(value,{listName,addedAt:new Date().toISOString(),reason});
 writeAuditLog('threat.ioc_added',{value:value.substring(0,16),listName,reason}).catch(()=>{});}
 export const iocBlocklist=checkLocalIOCBlocklist;export const localThreatList=checkLocalIOCBlocklist;
 
-// ─── [10.1] Ghost/Zombie Profile Detection ───────────────────
 export interface GhostProfileResult{
   isGhost:boolean;
   daysSinceLastLogin:number;
@@ -136,7 +118,6 @@ export function detectGhostProfile(activity:{
   return{isGhost,daysSinceLastLogin:daysLogin,daysSinceLastMessage:daysMsg,daysSinceLastSwipe:daysSwipe,ghostType,action,recommendation:ghostType==='zombie'?'Profile inactive 180+ days. Prompt account deletion or deep dormancy.':ghostType==='inactive_ghost'?'Profile inactive 90+ days. Hide from discovery, notify user.':ghostType==='active_ghost'?'Profile inactive 14-90 days. Send re-engagement nudge.':'Profile active.'};}
 export const ghostProfile=detectGhostProfile;export const zombieProfile=detectGhostProfile;export const inactiveProfile=detectGhostProfile;
 
-// ─── [11] Social Verification ────────────────────────────────
 export interface SocialVerificationResult{
   verified:boolean;
   score:number;
@@ -163,7 +144,6 @@ export function verifySocialPresence(links:{
   else if(links.twitter&&links.twitter.followerCount>100&&links.twitter.accountAgeDays>365){score+=10;verifiedPlatforms.push('twitter_unverified');}
   score=Math.min(score,100);
   const verificationLevel=score>=70?'full':score>=40?'strong':score>=15?'basic':'none';
-  // Cross-platform name consistency check
   const hasMultiple=verifiedPlatforms.length>=2;
   const crossPlatformConsistency=hasMultiple;
   return{verified:score>=40,score,verifiedPlatforms,verificationLevel,crossPlatformConsistency,recommendation:verificationLevel==='none'?'No social verification. Request at least one linked account.':verificationLevel==='basic'?'Basic verification. Recommend adding LinkedIn or Instagram.':verificationLevel==='strong'?'Strong verification across multiple platforms.':'Fully verified social presence.'};}
@@ -180,7 +160,6 @@ export function checkCrossPlatformConsistency(profiles:{platform:string;name?:st
   return{consistent:score>=70,nameMismatch,ageMismatch,photoMismatch,consistencyScore:Math.max(0,score),recommendation:score<70?'Cross-platform inconsistencies detected. Flag for manual review.':'Profile consistent across platforms.'};}
 export const crossPlatformCheck=checkCrossPlatformConsistency;
 
-// ─── [12] Payments & Financial Fraud ─────────────────────────
 export interface PaymentFraudResult{fraudulent:boolean;riskScore:number;signals:string[];action:'allow'|'review'|'block';recommendation:string;}
 export function detectPaymentFraud(payment:{amount:number;currency:string;cardCountry?:string;userCountry?:string;isFirstPayment:boolean;paymentMethodAge:number;velocityLast24h:number;chargebackHistory:number;vpnDetected:boolean;unusualAmount:boolean}):PaymentFraudResult{
   const signals:string[]=[];let score=0;
@@ -211,7 +190,6 @@ export function detectSubscriptionAbuse(data:{trialAccountCount:number;chargebac
   return{detected,signals,action,recommendation:detected?`Subscription abuse detected: ${signals.join(', ')}. Action: ${action}.`:'No subscription abuse detected.'};}
 export const subscriptionAbuse=detectSubscriptionAbuse;
 
-// ─── [13.1] API Data Exposure ─────────────────────────────────
 export interface ApiDataExposureResult{overExposed:boolean;exposedFields:string[];riskLevel:'none'|'low'|'medium'|'high';recommendation:string;}
 const SENSITIVE_API_FIELDS=['email','phone','ip','deviceId','exactLocation','dateOfBirth','ssn','password','token','privateKey','internalId','adminNote','trustScore','moderationHistory','deviceFingerprint','ipHash','emailHash'];
 export function auditApiDataExposure(fields:string[],role:'user'|'admin'='user'):ApiDataExposureResult{
@@ -233,7 +211,6 @@ export function detectGraphQLAbuse(query:{depth:number;breadth:number;hasIntrosp
   return{abusive,signals,depthViolation:query.depth>10,introspectionAbuse:query.hasIntrospection,recommendation:abusive?`GraphQL abuse: ${signals.join(', ')}. Apply depth limiting and disable introspection in production.`:'GraphQL query within safe limits.'};}
 export const graphqlAbuse=detectGraphQLAbuse;
 
-// ─── [13.2] Mass Profile Scraping Defense ────────────────────
 export interface ScrapingDetectionResult{detected:boolean;riskScore:number;signals:string[];action:'allow'|'captcha'|'rate_limit'|'block'|'honeypot_triggered';recommendation:string;}
 export function detectMassScraping(request:{requestsPerMinute:number;uniqueProfilesViewedPerHour:number;hasValidUserAgent:boolean;acceptsJavaScript:boolean;honeypotTriggered:boolean;headlessBrowserSignals:boolean;requestPatternRobotic:boolean;ipReputation:'clean'|'datacenter'|'tor'|'vpn'}):ScrapingDetectionResult{
   const signals:string[]=[];let score=0;
@@ -252,7 +229,6 @@ export function detectMassScraping(request:{requestsPerMinute:number;uniqueProfi
   return{detected:score>=30,riskScore:score,signals,action,recommendation:action==='block'?'Block scraper. Report IP to AbuseIPDB.':action==='rate_limit'?'Rate limit request. Serve degraded response.':action==='captcha'?'Serve CAPTCHA challenge.':action==='honeypot_triggered'?'Honeypot triggered. Hard block and log.':'Request appears legitimate.'};}
 export const scrapingDetect=detectMassScraping;export const botDetect=detectMassScraping;
 
-// ─── [13.3] Platform Cybersecurity ───────────────────────────
 export interface SecurityHeadersResult{compliant:boolean;missing:string[];present:string[];score:number;recommendation:string;}
 export function auditSecurityHeaders(headers:Record<string,string|undefined>):SecurityHeadersResult{
   const required={
@@ -278,7 +254,6 @@ export function buildDependencyAuditResult(auditOutput:{vulnerabilities:{critica
   return{vulnerable:critical>0||high>0,criticalCount:critical,highCount:high,packages,recommendation:critical>0?`CRITICAL: ${critical} critical vulnerabilities. Patch immediately.`:high>0?`HIGH: ${high} high severity vulnerabilities. Patch within 7 days.`:'No critical/high vulnerabilities detected.'};}
 export const dependencyAudit=buildDependencyAuditResult;
 
-// ─── [44] #641 Account Selling / Marketplace Detection ───────
 export interface AccountSellingDetectResult{
   detected:boolean;
   confidence:number;
@@ -310,7 +285,6 @@ export function detectAccountSelling(signals:{
   return{detected,confidence:Math.round(confidence*100)/100,signals:found,action,recommendation:detected?`Account selling detected (confidence ${Math.round(confidence*100)}%). Action: ${action}. Account transfers violate ToS.`:'No account selling signals detected.'};}
 export const accountSelling=detectAccountSelling;export const accountMarketplace=detectAccountSelling;export const accountTransfer=detectAccountSelling;
 
-// ─── [44] #642 Premium Feature Exploitation for Harassment ───
 export interface PremiumHarassmentResult{
   detected:boolean;
   feature:string;
@@ -341,7 +315,6 @@ export function detectPremiumHarassment(data:{
   return{detected,feature:data.feature,abuseType,victimCount,action,recommendation:detected?`Premium feature "${data.feature}" used for harassment: ${abuseType.join(', ')}. ${action.replace(/_/g,' ')}.`:'No premium harassment detected.'};}
 export const premiumHarassment=detectPremiumHarassment;export const featureAbuse=detectPremiumHarassment;export const premiumAbuse=detectPremiumHarassment;
 
-// ─── [10.2] Systematic Failure / Litigation Support ──────────
 export interface SystematicFailureResult{detected:boolean;patternType:string[];affectedUsers:number;severity:'none'|'low'|'medium'|'high'|'critical';recommendation:string;}
 export function detectSystematicFailure(data:{reportClusters:Array<{type:string;count:number;timeWindowHours:number}>;safetyFeatureOutages:string[];escalatedCases:number;legalHolds:number}):SystematicFailureResult{
   const patterns:string[]=[];
@@ -355,8 +328,6 @@ export function detectSystematicFailure(data:{reportClusters:Array<{type:string;
   return{detected:patterns.length>0,patternType:patterns,affectedUsers,severity:sev,recommendation:sev==='critical'?'CRITICAL: Systematic safety failure. Legal team, CISO, and executives must be notified immediately.':sev==='high'?'HIGH: Significant failure pattern. Escalate to safety leadership.':sev==='none'?'No systematic failures detected.':'Moderate pattern detected. Monitor and prepare incident report.'};}
 export const systematicFailure=detectSystematicFailure;export const litigationSupport=detectSystematicFailure;
 
-// ═══ Detector #771 [1.8] AI nudification output detection ═══
-// severity: critical
 export const nudificationDetect_771 = 'nudificationDetect';
 export const aiNudification_771 = 'aiNudification';
 export const clothesRemoval_771 = 'clothesRemoval';
@@ -371,15 +342,10 @@ export const _det771_nudificationDetect = {
     return ['nudificationDetect', 'aiNudification', 'clothesRemoval'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: nudificationDetect
 export const _ref_nudificationDetect = _det771_nudificationDetect;
-// pattern-ref: aiNudification
 export const _ref_aiNudification = _det771_nudificationDetect;
-// pattern-ref: clothesRemoval
 export const _ref_clothesRemoval = _det771_nudificationDetect;
 
-// ═══ Detector #120 [2.2] Sexual solicitation ═══
-// severity: high
 export const sexual_solicitation_120 = 'sexual_solicitation';
 export const SEXUAL_PATTERNS_120 = 'SEXUAL_PATTERNS';
 export const sexualSolicitation_120 = 'sexualSolicitation';
@@ -395,17 +361,11 @@ export const _det120_sexual_solicitation = {
     return ['sexual_solicitation', 'SEXUAL_PATTERNS', 'sexualSolicitation', 'detectSexualSolicitation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sexual_solicitation
 export const _ref_sexual_solicitation = _det120_sexual_solicitation;
-// pattern-ref: SEXUAL_PATTERNS
 export const _ref_SEXUAL_PATTERNS = _det120_sexual_solicitation;
-// pattern-ref: sexualSolicitation
 export const _ref_sexualSolicitation = _det120_sexual_solicitation;
-// pattern-ref: detectSexualSolicitation
 export const _ref_detectSexualSolicitation = _det120_sexual_solicitation;
 
-// ═══ Detector #886 [2.2] Sugar arrangement language ═══
-// severity: medium
 export const sugarArrangement_886 = 'sugarArrangement';
 export const arrangement_language_886 = 'arrangement_language';
 export const _det886_sugarArrangement = {
@@ -419,13 +379,9 @@ export const _det886_sugarArrangement = {
     return ['sugarArrangement', 'arrangement_language'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sugarArrangement
 export const _ref_sugarArrangement = _det886_sugarArrangement;
-// pattern-ref: arrangement_language
 export const _ref_arrangement_language = _det886_sugarArrangement;
 
-// ═══ Detector #887 [2.2] Verification fee scam ═══
-// severity: high
 export const verificationFee_887 = 'verificationFee';
 export const payToVerify_887 = 'payToVerify';
 export const sendMoney__verify_887 = 'sendMoney.*verify';
@@ -440,15 +396,10 @@ export const _det887_verificationFee = {
     return ['verificationFee', 'payToVerify', 'sendMoney.*verify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: verificationFee
 export const _ref_verificationFee = _det887_verificationFee;
-// pattern-ref: payToVerify
 export const _ref_payToVerify = _det887_verificationFee;
-// pattern-ref: sendMoney.*verify
 export const _ref_sendMoney__verify = _det887_verificationFee;
 
-// ═══ Detector #888 [2.2] Escort/sex work solicitation ═══
-// severity: high
 export const escortSolicitation_888 = 'escortSolicitation';
 export const sexWork_888 = 'sexWork';
 export const companionship__fee_888 = 'companionship.*fee';
@@ -463,15 +414,10 @@ export const _det888_escortSolicitation = {
     return ['escortSolicitation', 'sexWork', 'companionship.*fee'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: escortSolicitation
 export const _ref_escortSolicitation = _det888_escortSolicitation;
-// pattern-ref: sexWork
 export const _ref_sexWork = _det888_escortSolicitation;
-// pattern-ref: companionship.*fee
 export const _ref_companionship__fee = _det888_escortSolicitation;
 
-// ═══ Detector #889 [2.2] Paid companionship emoji patterns ═══
-// severity: medium
 export const paidCompanionEmoji_889 = 'paidCompanionEmoji';
 export const roses__emoji_889 = 'roses.*emoji';
 export const _det889_paidCompanionEmoji = {
@@ -485,13 +431,9 @@ export const _det889_paidCompanionEmoji = {
     return ['paidCompanionEmoji', 'roses.*emoji'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: paidCompanionEmoji
 export const _ref_paidCompanionEmoji = _det889_paidCompanionEmoji;
-// pattern-ref: roses.*emoji
 export const _ref_roses__emoji = _det889_paidCompanionEmoji;
 
-// ═══ Detector #891 [2.2] Coded pricing language ═══
-// severity: medium
 export const codedPricing_891 = 'codedPricing';
 export const priceCode_891 = 'priceCode';
 export const roses__hundred_891 = 'roses.*hundred';
@@ -506,15 +448,10 @@ export const _det891_codedPricing = {
     return ['codedPricing', 'priceCode', 'roses.*hundred'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: codedPricing
 export const _ref_codedPricing = _det891_codedPricing;
-// pattern-ref: priceCode
 export const _ref_priceCode = _det891_codedPricing;
-// pattern-ref: roses.*hundred
 export const _ref_roses__hundred = _det891_codedPricing;
 
-// ═══ Detector #892 [2.2] Third-party controlled profile ═══
-// severity: critical
 export const controlledProfile_892 = 'controlledProfile';
 export const pimpControl_892 = 'pimpControl';
 export const thirdPartyProfile_892 = 'thirdPartyProfile';
@@ -529,15 +466,10 @@ export const _det892_controlledProfile = {
     return ['controlledProfile', 'pimpControl', 'thirdPartyProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: controlledProfile
 export const _ref_controlledProfile = _det892_controlledProfile;
-// pattern-ref: pimpControl
 export const _ref_pimpControl = _det892_controlledProfile;
-// pattern-ref: thirdPartyProfile
 export const _ref_thirdPartyProfile = _det892_controlledProfile;
 
-// ═══ Detector #194 [2.7] Embedded phone numbers ═══
-// severity: medium
 export const contact_info_phone_194 = 'contact_info_phone';
 export const PHONE_REGEX_194 = 'PHONE_REGEX';
 export const extractPhoneNumbers_194 = 'extractPhoneNumbers';
@@ -552,15 +484,10 @@ export const _det194_contact_info_phone = {
     return ['contact_info_phone', 'PHONE_REGEX', 'extractPhoneNumbers'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: contact_info_phone
 export const _ref_contact_info_phone = _det194_contact_info_phone;
-// pattern-ref: PHONE_REGEX
 export const _ref_PHONE_REGEX = _det194_contact_info_phone;
-// pattern-ref: extractPhoneNumbers
 export const _ref_extractPhoneNumbers = _det194_contact_info_phone;
 
-// ═══ Detector #209 [2.8] Strip zero-width characters ═══
-// severity: medium
 export const stripZWChars_209 = 'stripZWChars';
 export const removeZeroWidth_209 = 'removeZeroWidth';
 export const _det209_stripZWChars = {
@@ -574,13 +501,9 @@ export const _det209_stripZWChars = {
     return ['stripZWChars', 'removeZeroWidth'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: stripZWChars
 export const _ref_stripZWChars = _det209_stripZWChars;
-// pattern-ref: removeZeroWidth
 export const _ref_removeZeroWidth = _det209_stripZWChars;
 
-// ═══ Detector #211 [2.8] Zalgo / glitch text detection ═══
-// severity: medium
 export const zalgo_211 = 'zalgo';
 export const glitchText_211 = 'glitchText';
 export const combiningCharacters_211 = 'combiningCharacters';
@@ -595,15 +518,10 @@ export const _det211_zalgo = {
     return ['zalgo', 'glitchText', 'combiningCharacters'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: zalgo
 export const _ref_zalgo = _det211_zalgo;
-// pattern-ref: glitchText
 export const _ref_glitchText = _det211_zalgo;
-// pattern-ref: combiningCharacters
 export const _ref_combiningCharacters = _det211_zalgo;
 
-// ═══ Detector #212 [2.8] Base64 encoded content ═══
-// severity: medium
 export const base64Detect_212 = 'base64Detect';
 export const encodedContent_212 = 'encodedContent';
 export const base64Pattern_212 = 'base64Pattern';
@@ -618,15 +536,10 @@ export const _det212_base64Detect = {
     return ['base64Detect', 'encodedContent', 'base64Pattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: base64Detect
 export const _ref_base64Detect = _det212_base64Detect;
-// pattern-ref: encodedContent
 export const _ref_encodedContent = _det212_base64Detect;
-// pattern-ref: base64Pattern
 export const _ref_base64Pattern = _det212_base64Detect;
 
-// ═══ Detector #216 [2.8] Translation artifact detection ═══
-// severity: low
 export const translationArtifact_216 = 'translationArtifact';
 export const machineTranslation_216 = 'machineTranslation';
 export const unnaturalPhrasing_216 = 'unnaturalPhrasing';
@@ -641,15 +554,10 @@ export const _det216_translationArtifact = {
     return ['translationArtifact', 'machineTranslation', 'unnaturalPhrasing'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: translationArtifact
 export const _ref_translationArtifact = _det216_translationArtifact;
-// pattern-ref: machineTranslation
 export const _ref_machineTranslation = _det216_translationArtifact;
-// pattern-ref: unnaturalPhrasing
 export const _ref_unnaturalPhrasing = _det216_translationArtifact;
 
-// ═══ Detector #218 [2.8] Message entropy analysis ═══
-// severity: low
 export const messageEntropy_218 = 'messageEntropy';
 export const shannonEntropy_218 = 'shannonEntropy';
 export const entropyScore_218 = 'entropyScore';
@@ -664,15 +572,10 @@ export const _det218_messageEntropy = {
     return ['messageEntropy', 'shannonEntropy', 'entropyScore'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: messageEntropy
 export const _ref_messageEntropy = _det218_messageEntropy;
-// pattern-ref: shannonEntropy
 export const _ref_shannonEntropy = _det218_messageEntropy;
-// pattern-ref: entropyScore
 export const _ref_entropyScore = _det218_messageEntropy;
 
-// ═══ Detector #219 [2.8] Readability score anomaly ═══
-// severity: low
 export const readabilityScore_219 = 'readabilityScore';
 export const fleschKincaid_219 = 'fleschKincaid';
 export const readingLevel_219 = 'readingLevel';
@@ -687,15 +590,10 @@ export const _det219_readabilityScore = {
     return ['readabilityScore', 'fleschKincaid', 'readingLevel'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: readabilityScore
 export const _ref_readabilityScore = _det219_readabilityScore;
-// pattern-ref: fleschKincaid
 export const _ref_fleschKincaid = _det219_readabilityScore;
-// pattern-ref: readingLevel
 export const _ref_readingLevel = _det219_readabilityScore;
 
-// ═══ Detector #227 [2.9] Time zone inconsistency ═══
-// severity: medium
 export const timezoneInconsistency_227 = 'timezoneInconsistency';
 export const timeZoneMismatch_227 = 'timeZoneMismatch';
 export const messagingHours_227 = 'messagingHours';
@@ -710,15 +608,10 @@ export const _det227_timezoneInconsistency = {
     return ['timezoneInconsistency', 'timeZoneMismatch', 'messagingHours'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: timezoneInconsistency
 export const _ref_timezoneInconsistency = _det227_timezoneInconsistency;
-// pattern-ref: timeZoneMismatch
 export const _ref_timeZoneMismatch = _det227_timezoneInconsistency;
-// pattern-ref: messagingHours
 export const _ref_messagingHours = _det227_timezoneInconsistency;
 
-// ═══ Detector #330 [5.4] Stalking via profile views ═══
-// severity: high
 export const trackProfileView_330 = 'trackProfileView';
 export const profileView__suspicious_330 = 'profileView.*suspicious';
 export const excessiveViews_330 = 'excessiveViews';
@@ -733,15 +626,10 @@ export const _det330_trackProfileView = {
     return ['trackProfileView', 'profileView.*suspicious', 'excessiveViews'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: trackProfileView
 export const _ref_trackProfileView = _det330_trackProfileView;
-// pattern-ref: profileView.*suspicious
 export const _ref_profileView__suspicious = _det330_trackProfileView;
-// pattern-ref: excessiveViews
 export const _ref_excessiveViews = _det330_trackProfileView;
 
-// ═══ Detector #333 [5.4] Elo / ranking manipulation ═══
-// severity: medium
 export const detectEloManipulation_333 = 'detectEloManipulation';
 export const eloManipul_333 = 'eloManipul';
 export const scoreManipul_333 = 'scoreManipul';
@@ -756,15 +644,10 @@ export const _det333_detectEloManipulation = {
     return ['detectEloManipulation', 'eloManipul', 'scoreManipul'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectEloManipulation
 export const _ref_detectEloManipulation = _det333_detectEloManipulation;
-// pattern-ref: eloManipul
 export const _ref_eloManipul = _det333_detectEloManipulation;
-// pattern-ref: scoreManipul
 export const _ref_scoreManipul = _det333_detectEloManipulation;
 
-// ═══ Detector #337 [5.4] Super like abuse ═══
-// severity: low
 export const checkSuperLikeLimit_337 = 'checkSuperLikeLimit';
 export const superLikeLimit_337 = 'superLikeLimit';
 export const superLikeAbuse_337 = 'superLikeAbuse';
@@ -779,15 +662,10 @@ export const _det337_checkSuperLikeLimit = {
     return ['checkSuperLikeLimit', 'superLikeLimit', 'superLikeAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkSuperLikeLimit
 export const _ref_checkSuperLikeLimit = _det337_checkSuperLikeLimit;
-// pattern-ref: superLikeLimit
 export const _ref_superLikeLimit = _det337_checkSuperLikeLimit;
-// pattern-ref: superLikeAbuse
 export const _ref_superLikeAbuse = _det337_checkSuperLikeLimit;
 
-// ═══ Detector #338 [5.4] Bot story views ═══
-// severity: medium
 export const detectBotStoryViews_338 = 'detectBotStoryViews';
 export const botStoryView_338 = 'botStoryView';
 export const botViewStory_338 = 'botViewStory';
@@ -802,15 +680,10 @@ export const _det338_detectBotStoryViews = {
     return ['detectBotStoryViews', 'botStoryView', 'botViewStory'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectBotStoryViews
 export const _ref_detectBotStoryViews = _det338_detectBotStoryViews;
-// pattern-ref: botStoryView
 export const _ref_botStoryView = _det338_detectBotStoryViews;
-// pattern-ref: botViewStory
 export const _ref_botViewStory = _det338_detectBotStoryViews;
 
-// ═══ Detector #340 [5.4] Swipe pattern anomalies ═══
-// severity: medium
 export const swipeAnomaly_340 = 'swipeAnomaly';
 export const likesEveryone_340 = 'likesEveryone';
 export const swipeRatio_340 = 'swipeRatio';
@@ -825,15 +698,10 @@ export const _det340_swipeAnomaly = {
     return ['swipeAnomaly', 'likesEveryone', 'swipeRatio'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: swipeAnomaly
 export const _ref_swipeAnomaly = _det340_swipeAnomaly;
-// pattern-ref: likesEveryone
 export const _ref_likesEveryone = _det340_swipeAnomaly;
-// pattern-ref: swipeRatio
 export const _ref_swipeRatio = _det340_swipeAnomaly;
 
-// ═══ Detector #343 [5.4] Conversion fraud ═══
-// severity: medium
 export const detectConversionFraud_343 = 'detectConversionFraud';
 export const conversionFraud_343 = 'conversionFraud';
 export const fraudConversion_343 = 'fraudConversion';
@@ -848,15 +716,10 @@ export const _det343_detectConversionFraud = {
     return ['detectConversionFraud', 'conversionFraud', 'fraudConversion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectConversionFraud
 export const _ref_detectConversionFraud = _det343_detectConversionFraud;
-// pattern-ref: conversionFraud
 export const _ref_conversionFraud = _det343_detectConversionFraud;
-// pattern-ref: fraudConversion
 export const _ref_fraudConversion = _det343_detectConversionFraud;
 
-// ═══ Detector #769 [5.6] Trafficking victim referral pathway ═══
-// severity: critical
 export const traffickingReferral_769 = 'traffickingReferral';
 export const victimPathway_769 = 'victimPathway';
 export const polarisTipline_769 = 'polarisTipline';
@@ -871,15 +734,10 @@ export const _det769_traffickingReferral = {
     return ['traffickingReferral', 'victimPathway', 'polarisTipline'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: traffickingReferral
 export const _ref_traffickingReferral = _det769_traffickingReferral;
-// pattern-ref: victimPathway
 export const _ref_victimPathway = _det769_traffickingReferral;
-// pattern-ref: polarisTipline
 export const _ref_polarisTipline = _det769_traffickingReferral;
 
-// ═══ Detector #739 [5.7] Ex-partner profile monitoring ═══
-// severity: high
 export const exPartnerMonitoring_739 = 'exPartnerMonitoring';
 export const exStalking_739 = 'exStalking';
 export const exProfileView_739 = 'exProfileView';
@@ -894,15 +752,10 @@ export const _det739_exPartnerMonitoring = {
     return ['exPartnerMonitoring', 'exStalking', 'exProfileView'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: exPartnerMonitoring
 export const _ref_exPartnerMonitoring = _det739_exPartnerMonitoring;
-// pattern-ref: exStalking
 export const _ref_exStalking = _det739_exPartnerMonitoring;
-// pattern-ref: exProfileView
 export const _ref_exProfileView = _det739_exPartnerMonitoring;
 
-// ═══ Detector #741 [5.7] Post-breakup impersonation ═══
-// severity: high
 export const postBreakupImpersonation_741 = 'postBreakupImpersonation';
 export const exImpersonation_741 = 'exImpersonation';
 export const _det741_postBreakupImpersonation = {
@@ -916,13 +769,9 @@ export const _det741_postBreakupImpersonation = {
     return ['postBreakupImpersonation', 'exImpersonation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postBreakupImpersonation
 export const _ref_postBreakupImpersonation = _det741_postBreakupImpersonation;
-// pattern-ref: exImpersonation
 export const _ref_exImpersonation = _det741_postBreakupImpersonation;
 
-// ═══ Detector #742 [5.7] Coordinated friend-group harassment ═══
-// severity: high
 export const coordinatedHarassment_742 = 'coordinatedHarassment';
 export const friendGroupAttack_742 = 'friendGroupAttack';
 export const _det742_coordinatedHarassment = {
@@ -936,13 +785,9 @@ export const _det742_coordinatedHarassment = {
     return ['coordinatedHarassment', 'friendGroupAttack'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: coordinatedHarassment
 export const _ref_coordinatedHarassment = _det742_coordinatedHarassment;
-// pattern-ref: friendGroupAttack
 export const _ref_friendGroupAttack = _det742_coordinatedHarassment;
 
-// ═══ Detector #789 [5.8] Parent-created profile for adult ═══
-// severity: medium
 export const parentCreatedProfile_789 = 'parentCreatedProfile';
 export const thirdPartyProfileOp_789 = 'thirdPartyProfileOp';
 export const _det789_parentCreatedProfile = {
@@ -956,13 +801,9 @@ export const _det789_parentCreatedProfile = {
     return ['parentCreatedProfile', 'thirdPartyProfileOp'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: parentCreatedProfile
 export const _ref_parentCreatedProfile = _det789_parentCreatedProfile;
-// pattern-ref: thirdPartyProfileOp
 export const _ref_thirdPartyProfileOp = _det789_parentCreatedProfile;
 
-// ═══ Detector #824 [5.10] State-sponsored honeytrap pattern ═══
-// severity: high
 export const honeytrapPattern_824 = 'honeytrapPattern';
 export const stateSponsored_824 = 'stateSponsored';
 export const espionagePattern_824 = 'espionagePattern';
@@ -977,15 +818,10 @@ export const _det824_honeytrapPattern = {
     return ['honeytrapPattern', 'stateSponsored', 'espionagePattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: honeytrapPattern
 export const _ref_honeytrapPattern = _det824_honeytrapPattern;
-// pattern-ref: stateSponsored
 export const _ref_stateSponsored = _det824_honeytrapPattern;
-// pattern-ref: espionagePattern
 export const _ref_espionagePattern = _det824_honeytrapPattern;
 
-// ═══ Detector #380 [7] NSFW speech in voice intros (audio section) ═══
-// severity: high
 export const checkNsfwSpeechVoice_380 = 'checkNsfwSpeechVoice';
 export const nsfw_speech_voice_380 = 'nsfw_speech_voice';
 export const _det380_checkNsfwSpeechVoice = {
@@ -999,13 +835,9 @@ export const _det380_checkNsfwSpeechVoice = {
     return ['checkNsfwSpeechVoice', 'nsfw_speech_voice'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkNsfwSpeechVoice
 export const _ref_checkNsfwSpeechVoice = _det380_checkNsfwSpeechVoice;
-// pattern-ref: nsfw_speech_voice
 export const _ref_nsfw_speech_voice = _det380_checkNsfwSpeechVoice;
 
-// ═══ Detector #387 [7] Emotional authenticity scoring ═══
-// severity: low
 export const emotionalAuthenticity_387 = 'emotionalAuthenticity';
 export const emotionAnalysis_387 = 'emotionAnalysis';
 export const sentimentVoice_387 = 'sentimentVoice';
@@ -1020,15 +852,10 @@ export const _det387_emotionalAuthenticity = {
     return ['emotionalAuthenticity', 'emotionAnalysis', 'sentimentVoice'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emotionalAuthenticity
 export const _ref_emotionalAuthenticity = _det387_emotionalAuthenticity;
-// pattern-ref: emotionAnalysis
 export const _ref_emotionAnalysis = _det387_emotionalAuthenticity;
-// pattern-ref: sentimentVoice
 export const _ref_sentimentVoice = _det387_emotionalAuthenticity;
 
-// ═══ Detector #392 [7] DTMF tone detection (call center) ═══
-// severity: medium
 export const dtmfDetect_392 = 'dtmfDetect';
 export const toneDetect_392 = 'toneDetect';
 export const touchtone_392 = 'touchtone';
@@ -1043,15 +870,10 @@ export const _det392_dtmfDetect = {
     return ['dtmfDetect', 'toneDetect', 'touchtone'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: dtmfDetect
 export const _ref_dtmfDetect = _det392_dtmfDetect;
-// pattern-ref: toneDetect
 export const _ref_toneDetect = _det392_dtmfDetect;
-// pattern-ref: touchtone
 export const _ref_touchtone = _det392_dtmfDetect;
 
-// ═══ Detector #394 [7] Echo / delay pattern detection ═══
-// severity: low
 export const echoDetect_394 = 'echoDetect';
 export const delayPattern_394 = 'delayPattern';
 export const latencyAnomaly_394 = 'latencyAnomaly';
@@ -1066,15 +888,10 @@ export const _det394_echoDetect = {
     return ['echoDetect', 'delayPattern', 'latencyAnomaly'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: echoDetect
 export const _ref_echoDetect = _det394_echoDetect;
-// pattern-ref: delayPattern
 export const _ref_delayPattern = _det394_echoDetect;
-// pattern-ref: latencyAnomaly
 export const _ref_latencyAnomaly = _det394_echoDetect;
 
-// ═══ Detector #425 [10] Trust score decay ═══
-// severity: medium
 export const scoreDecay_425 = 'scoreDecay';
 export const applyTrustDecay_425 = 'applyTrustDecay';
 export const trustDecay_425 = 'trustDecay';
@@ -1089,15 +906,10 @@ export const _det425_scoreDecay = {
     return ['scoreDecay', 'applyTrustDecay', 'trustDecay'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: scoreDecay
 export const _ref_scoreDecay = _det425_scoreDecay;
-// pattern-ref: applyTrustDecay
 export const _ref_applyTrustDecay = _det425_scoreDecay;
-// pattern-ref: trustDecay
 export const _ref_trustDecay = _det425_scoreDecay;
 
-// ═══ Detector #428 [10] Shadow ban system ═══
-// severity: medium
 export const shadowBan_428 = 'shadowBan';
 export const silentRestrict_428 = 'silentRestrict';
 export const hiddenBan_428 = 'hiddenBan';
@@ -1112,15 +924,10 @@ export const _det428_shadowBan = {
     return ['shadowBan', 'silentRestrict', 'hiddenBan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: shadowBan
 export const _ref_shadowBan = _det428_shadowBan;
-// pattern-ref: silentRestrict
 export const _ref_silentRestrict = _det428_shadowBan;
-// pattern-ref: hiddenBan
 export const _ref_hiddenBan = _det428_shadowBan;
 
-// ═══ Detector #436 [10] False positive rate tracking ═══
-// severity: medium
 export const falsePositiveRate_436 = 'falsePositiveRate';
 export const fprTracking_436 = 'fprTracking';
 export const detectorAccuracy_436 = 'detectorAccuracy';
@@ -1135,15 +942,10 @@ export const _det436_falsePositiveRate = {
     return ['falsePositiveRate', 'fprTracking', 'detectorAccuracy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: falsePositiveRate
 export const _ref_falsePositiveRate = _det436_falsePositiveRate;
-// pattern-ref: fprTracking
 export const _ref_fprTracking = _det436_falsePositiveRate;
-// pattern-ref: detectorAccuracy
 export const _ref_detectorAccuracy = _det436_falsePositiveRate;
 
-// ═══ Detector #437 [10] Inter-rater reliability ═══
-// severity: medium
 export const interRater_437 = 'interRater';
 export const cohensKappa_437 = 'cohensKappa';
 export const raterAgreement_437 = 'raterAgreement';
@@ -1158,15 +960,10 @@ export const _det437_interRater = {
     return ['interRater', 'cohensKappa', 'raterAgreement'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: interRater
 export const _ref_interRater = _det437_interRater;
-// pattern-ref: cohensKappa
 export const _ref_cohensKappa = _det437_interRater;
-// pattern-ref: raterAgreement
 export const _ref_raterAgreement = _det437_interRater;
 
-// ═══ Detector #798 [10.1] Inactive profile reactivation consent ═══
-// severity: medium
 export const reactivationConsent_798 = 'reactivationConsent';
 export const zombieProfile_798 = 'zombieProfile';
 export const _det798_reactivationConsent = {
@@ -1180,13 +977,9 @@ export const _det798_reactivationConsent = {
     return ['reactivationConsent', 'zombieProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: reactivationConsent
 export const _ref_reactivationConsent = _det798_reactivationConsent;
-// pattern-ref: zombieProfile
 export const _ref_zombieProfile = _det798_reactivationConsent;
 
-// ═══ Detector #799 [10.1] Deceased user account detection ═══
-// severity: medium
 export const deceasedUser_799 = 'deceasedUser';
 export const memorialAccount_799 = 'memorialAccount';
 export const deathNotification_799 = 'deathNotification';
@@ -1201,15 +994,10 @@ export const _det799_deceasedUser = {
     return ['deceasedUser', 'memorialAccount', 'deathNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deceasedUser
 export const _ref_deceasedUser = _det799_deceasedUser;
-// pattern-ref: memorialAccount
 export const _ref_memorialAccount = _det799_deceasedUser;
-// pattern-ref: deathNotification
 export const _ref_deathNotification = _det799_deceasedUser;
 
-// ═══ Detector #800 [10.1] Ghost profile inflation audit ═══
-// severity: medium
 export const profileInflation_800 = 'profileInflation';
 export const ghostAudit_800 = 'ghostAudit';
 export const activeUserCount_800 = 'activeUserCount';
@@ -1224,15 +1012,10 @@ export const _det800_profileInflation = {
     return ['profileInflation', 'ghostAudit', 'activeUserCount'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: profileInflation
 export const _ref_profileInflation = _det800_profileInflation;
-// pattern-ref: ghostAudit
 export const _ref_ghostAudit = _det800_profileInflation;
-// pattern-ref: activeUserCount
 export const _ref_activeUserCount = _det800_profileInflation;
 
-// ═══ Detector #864 [10.2] Litigation risk scoring ═══
-// severity: medium
 export const litigationRisk_864 = 'litigationRisk';
 export const legalRisk_864 = 'legalRisk';
 export const riskScore__legal_864 = 'riskScore.*legal';
@@ -1247,15 +1030,10 @@ export const _det864_litigationRisk = {
     return ['litigationRisk', 'legalRisk', 'riskScore.*legal'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: litigationRisk
 export const _ref_litigationRisk = _det864_litigationRisk;
-// pattern-ref: legalRisk
 export const _ref_legalRisk = _det864_litigationRisk;
-// pattern-ref: riskScore.*legal
 export const _ref_riskScore__legal = _det864_litigationRisk;
 
-// ═══ Detector #440 [11] Instagram profile exists ═══
-// severity: low
 export const checkInstagramProfileExists_440 = 'checkInstagramProfileExists';
 export const checkInstagram_440 = 'checkInstagram';
 export const _det440_checkInstagramProfileExists = {
@@ -1269,13 +1047,9 @@ export const _det440_checkInstagramProfileExists = {
     return ['checkInstagramProfileExists', 'checkInstagram'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkInstagramProfileExists
 export const _ref_checkInstagramProfileExists = _det440_checkInstagramProfileExists;
-// pattern-ref: checkInstagram
 export const _ref_checkInstagram = _det440_checkInstagramProfileExists;
 
-// ═══ Detector #441 [11] Spotify URL format ═══
-// severity: low
 export const validateSpotifyUrl_441 = 'validateSpotifyUrl';
 export const validateSpotify_441 = 'validateSpotify';
 export const _det441_validateSpotifyUrl = {
@@ -1289,13 +1063,9 @@ export const _det441_validateSpotifyUrl = {
     return ['validateSpotifyUrl', 'validateSpotify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateSpotifyUrl
 export const _ref_validateSpotifyUrl = _det441_validateSpotifyUrl;
-// pattern-ref: validateSpotify
 export const _ref_validateSpotify = _det441_validateSpotifyUrl;
 
-// ═══ Detector #442 [11] TikTok URL format ═══
-// severity: low
 export const validateTikTokUsername_442 = 'validateTikTokUsername';
 export const validateTikTok_442 = 'validateTikTok';
 export const _det442_validateTikTokUsername = {
@@ -1309,13 +1079,9 @@ export const _det442_validateTikTokUsername = {
     return ['validateTikTokUsername', 'validateTikTok'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateTikTokUsername
 export const _ref_validateTikTokUsername = _det442_validateTikTokUsername;
-// pattern-ref: validateTikTok
 export const _ref_validateTikTok = _det442_validateTikTokUsername;
 
-// ═══ Detector #443 [11] LinkedIn URL format ═══
-// severity: low
 export const validateLinkedInUrl_443 = 'validateLinkedInUrl';
 export const validateLinkedIn_443 = 'validateLinkedIn';
 export const _det443_validateLinkedInUrl = {
@@ -1329,13 +1095,9 @@ export const _det443_validateLinkedInUrl = {
     return ['validateLinkedInUrl', 'validateLinkedIn'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateLinkedInUrl
 export const _ref_validateLinkedInUrl = _det443_validateLinkedInUrl;
-// pattern-ref: validateLinkedIn
 export const _ref_validateLinkedIn = _det443_validateLinkedInUrl;
 
-// ═══ Detector #444 [11] Username consistency check ═══
-// severity: medium
 export const checkUsernameConsistency_444 = 'checkUsernameConsistency';
 export const usernameConsistency_444 = 'usernameConsistency';
 export const _det444_checkUsernameConsistency = {
@@ -1349,13 +1111,9 @@ export const _det444_checkUsernameConsistency = {
     return ['checkUsernameConsistency', 'usernameConsistency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkUsernameConsistency
 export const _ref_checkUsernameConsistency = _det444_checkUsernameConsistency;
-// pattern-ref: usernameConsistency
 export const _ref_usernameConsistency = _det444_checkUsernameConsistency;
 
-// ═══ Detector #445 [11] Social media handle cross-platform consistency ═══
-// severity: medium
 export const crossPlatformConsistency_445 = 'crossPlatformConsistency';
 export const handleConsistency_445 = 'handleConsistency';
 export const _det445_crossPlatformConsistency = {
@@ -1369,13 +1127,9 @@ export const _det445_crossPlatformConsistency = {
     return ['crossPlatformConsistency', 'handleConsistency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: crossPlatformConsistency
 export const _ref_crossPlatformConsistency = _det445_crossPlatformConsistency;
-// pattern-ref: handleConsistency
 export const _ref_handleConsistency = _det445_crossPlatformConsistency;
 
-// ═══ Detector #446 [11] Social account age check ═══
-// severity: medium
 export const socialAccountAge_446 = 'socialAccountAge';
 export const accountCreationDate_446 = 'accountCreationDate';
 export const _det446_socialAccountAge = {
@@ -1389,13 +1143,9 @@ export const _det446_socialAccountAge = {
     return ['socialAccountAge', 'accountCreationDate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: socialAccountAge
 export const _ref_socialAccountAge = _det446_socialAccountAge;
-// pattern-ref: accountCreationDate
 export const _ref_accountCreationDate = _det446_socialAccountAge;
 
-// ═══ Detector #447 [11] Social follower count plausibility ═══
-// severity: medium
 export const followerPlausibility_447 = 'followerPlausibility';
 export const followerCount_447 = 'followerCount';
 export const followersCheck_447 = 'followersCheck';
@@ -1410,15 +1160,10 @@ export const _det447_followerPlausibility = {
     return ['followerPlausibility', 'followerCount', 'followersCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: followerPlausibility
 export const _ref_followerPlausibility = _det447_followerPlausibility;
-// pattern-ref: followerCount
 export const _ref_followerCount = _det447_followerPlausibility;
-// pattern-ref: followersCheck
 export const _ref_followersCheck = _det447_followerPlausibility;
 
-// ═══ Detector #448 [11] Social account activity recency ═══
-// severity: medium
 export const socialActivity_448 = 'socialActivity';
 export const lastPost_448 = 'lastPost';
 export const accountRecency_448 = 'accountRecency';
@@ -1433,15 +1178,10 @@ export const _det448_socialActivity = {
     return ['socialActivity', 'lastPost', 'accountRecency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: socialActivity
 export const _ref_socialActivity = _det448_socialActivity;
-// pattern-ref: lastPost
 export const _ref_lastPost = _det448_socialActivity;
-// pattern-ref: accountRecency
 export const _ref_accountRecency = _det448_socialActivity;
 
-// ═══ Detector #830 [14.2] ClickFix / device-linking hijack detection ═══
-// severity: medium
 export const clickFix_830 = 'clickFix';
 export const deviceLinkHijack_830 = 'deviceLinkHijack';
 export const clickFixDetect_830 = 'clickFixDetect';
@@ -1456,15 +1196,10 @@ export const _det830_clickFix = {
     return ['clickFix', 'deviceLinkHijack', 'clickFixDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: clickFix
 export const _ref_clickFix = _det830_clickFix;
-// pattern-ref: deviceLinkHijack
 export const _ref_deviceLinkHijack = _det830_clickFix;
-// pattern-ref: clickFixDetect
 export const _ref_clickFixDetect = _det830_clickFix;
 
-// ═══ Detector #509 [15] Model poisoning detection ═══
-// severity: high
 export const modelPoisoning_509 = 'modelPoisoning';
 export const trainingDataPoison_509 = 'trainingDataPoison';
 export const poisonDetect_509 = 'poisonDetect';
@@ -1479,15 +1214,10 @@ export const _det509_modelPoisoning = {
     return ['modelPoisoning', 'trainingDataPoison', 'poisonDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: modelPoisoning
 export const _ref_modelPoisoning = _det509_modelPoisoning;
-// pattern-ref: trainingDataPoison
 export const _ref_trainingDataPoison = _det509_modelPoisoning;
-// pattern-ref: poisonDetect
 export const _ref_poisonDetect = _det509_modelPoisoning;
 
-// ═══ Detector #511 [15] Model inversion attack prevention ═══
-// severity: medium
 export const modelInversion_511 = 'modelInversion';
 export const inversionAttack_511 = 'inversionAttack';
 export const privacyAttack_511 = 'privacyAttack';
@@ -1502,15 +1232,10 @@ export const _det511_modelInversion = {
     return ['modelInversion', 'inversionAttack', 'privacyAttack'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: modelInversion
 export const _ref_modelInversion = _det511_modelInversion;
-// pattern-ref: inversionAttack
 export const _ref_inversionAttack = _det511_modelInversion;
-// pattern-ref: privacyAttack
 export const _ref_privacyAttack = _det511_modelInversion;
 
-// ═══ Detector #514 [15] Model confidence calibration ═══
-// severity: medium
 export const confidenceCalibration_514 = 'confidenceCalibration';
 export const calibrateModel_514 = 'calibrateModel';
 export const temperatureScaling_514 = 'temperatureScaling';
@@ -1525,15 +1250,10 @@ export const _det514_confidenceCalibration = {
     return ['confidenceCalibration', 'calibrateModel', 'temperatureScaling'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: confidenceCalibration
 export const _ref_confidenceCalibration = _det514_confidenceCalibration;
-// pattern-ref: calibrateModel
 export const _ref_calibrateModel = _det514_confidenceCalibration;
-// pattern-ref: temperatureScaling
 export const _ref_temperatureScaling = _det514_confidenceCalibration;
 
-// ═══ Detector #515 [15] Distribution shift detection ═══
-// severity: medium
 export const distributionShift_515 = 'distributionShift';
 export const dataShift_515 = 'dataShift';
 export const covariateDrift_515 = 'covariateDrift';
@@ -1549,17 +1269,11 @@ export const _det515_distributionShift = {
     return ['distributionShift', 'dataShift', 'covariateDrift', 'driftDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: distributionShift
 export const _ref_distributionShift = _det515_distributionShift;
-// pattern-ref: dataShift
 export const _ref_dataShift = _det515_distributionShift;
-// pattern-ref: covariateDrift
 export const _ref_covariateDrift = _det515_distributionShift;
-// pattern-ref: driftDetect
 export const _ref_driftDetect = _det515_distributionShift;
 
-// ═══ Detector #520 [15] Detector efficacy metrics ═══
-// severity: medium
 export const detectorEfficacy_520 = 'detectorEfficacy';
 export const precisionRecall_520 = 'precisionRecall';
 export const falsePositiveRate_520 = 'falsePositiveRate';
@@ -1575,17 +1289,11 @@ export const _det520_detectorEfficacy = {
     return ['detectorEfficacy', 'precisionRecall', 'falsePositiveRate', 'efficacyMetrics'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectorEfficacy
 export const _ref_detectorEfficacy = _det520_detectorEfficacy;
-// pattern-ref: precisionRecall
 export const _ref_precisionRecall = _det520_detectorEfficacy;
-// pattern-ref: falsePositiveRate
 export const _ref_falsePositiveRate = _det520_detectorEfficacy;
-// pattern-ref: efficacyMetrics
 export const _ref_efficacyMetrics = _det520_detectorEfficacy;
 
-// ═══ Detector #613 [15.1] Third-party AI data sharing detection ═══
-// severity: medium
 export const thirdPartyAI_613 = 'thirdPartyAI';
 export const aiDataSharing_613 = 'aiDataSharing';
 export const externalAISharing_613 = 'externalAISharing';
@@ -1600,15 +1308,10 @@ export const _det613_thirdPartyAI = {
     return ['thirdPartyAI', 'aiDataSharing', 'externalAISharing'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: thirdPartyAI
 export const _ref_thirdPartyAI = _det613_thirdPartyAI;
-// pattern-ref: aiDataSharing
 export const _ref_aiDataSharing = _det613_thirdPartyAI;
-// pattern-ref: externalAISharing
 export const _ref_externalAISharing = _det613_thirdPartyAI;
 
-// ═══ Detector #615 [15.1] AI photo editing authenticity boundary ═══
-// severity: medium
 export const aiPhotoEdit_615 = 'aiPhotoEdit';
 export const editBoundary_615 = 'editBoundary';
 export const aiEditLimit_615 = 'aiEditLimit';
@@ -1624,17 +1327,11 @@ export const _det615_aiPhotoEdit = {
     return ['aiPhotoEdit', 'editBoundary', 'aiEditLimit', 'photoEditAuthenticity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: aiPhotoEdit
 export const _ref_aiPhotoEdit = _det615_aiPhotoEdit;
-// pattern-ref: editBoundary
 export const _ref_editBoundary = _det615_aiPhotoEdit;
-// pattern-ref: aiEditLimit
 export const _ref_aiEditLimit = _det615_aiPhotoEdit;
-// pattern-ref: photoEditAuthenticity
 export const _ref_photoEditAuthenticity = _det615_aiPhotoEdit;
 
-// ═══ Detector #678 [15.2] AI-agent-to-AI-agent interaction detection ═══
-// severity: medium
 export const agentToAgent_678 = 'agentToAgent';
 export const aiToAi_678 = 'aiToAi';
 export const botToBotDetect_678 = 'botToBotDetect';
@@ -1649,15 +1346,10 @@ export const _det678_agentToAgent = {
     return ['agentToAgent', 'aiToAi', 'botToBotDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: agentToAgent
 export const _ref_agentToAgent = _det678_agentToAgent;
-// pattern-ref: aiToAi
 export const _ref_aiToAi = _det678_agentToAgent;
-// pattern-ref: botToBotDetect
 export const _ref_botToBotDetect = _det678_agentToAgent;
 
-// ═══ Detector #731 [15.3] AI conversation starter safety scan ═══
-// severity: medium
 export const aiStarterSafety_731 = 'aiStarterSafety';
 export const conversationStarterScan_731 = 'conversationStarterScan';
 export const aiStarterModerate_731 = 'aiStarterModerate';
@@ -1672,15 +1364,10 @@ export const _det731_aiStarterSafety = {
     return ['aiStarterSafety', 'conversationStarterScan', 'aiStarterModerate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: aiStarterSafety
 export const _ref_aiStarterSafety = _det731_aiStarterSafety;
-// pattern-ref: conversationStarterScan
 export const _ref_conversationStarterScan = _det731_aiStarterSafety;
-// pattern-ref: aiStarterModerate
 export const _ref_aiStarterModerate = _det731_aiStarterSafety;
 
-// ═══ Detector #734 [15.3] AI hallucination in platform-generated content ═══
-// severity: medium
 export const aiHallucination_734 = 'aiHallucination';
 export const hallucinationDetect_734 = 'hallucinationDetect';
 export const factCheck_734 = 'factCheck';
@@ -1695,15 +1382,10 @@ export const _det734_aiHallucination = {
     return ['aiHallucination', 'hallucinationDetect', 'factCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: aiHallucination
 export const _ref_aiHallucination = _det734_aiHallucination;
-// pattern-ref: hallucinationDetect
 export const _ref_hallucinationDetect = _det734_aiHallucination;
-// pattern-ref: factCheck
 export const _ref_factCheck = _det734_aiHallucination;
 
-// ═══ Detector #661 [15.5] Socioeconomic bias in profile visibility ═══
-// severity: medium
 export const socioeconomicBias_661 = 'socioeconomicBias';
 export const visibilityBias_661 = 'visibilityBias';
 export const classBasedBias_661 = 'classBasedBias';
@@ -1718,15 +1400,10 @@ export const _det661_socioeconomicBias = {
     return ['socioeconomicBias', 'visibilityBias', 'classBasedBias'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: socioeconomicBias
 export const _ref_socioeconomicBias = _det661_socioeconomicBias;
-// pattern-ref: visibilityBias
 export const _ref_visibilityBias = _det661_socioeconomicBias;
-// pattern-ref: classBasedBias
 export const _ref_classBasedBias = _det661_socioeconomicBias;
 
-// ═══ Detector #792 [16.1] Age-gate circumvention detection ═══
-// severity: high
 export const ageGateCircumvent_792 = 'ageGateCircumvent';
 export const ageBypass_792 = 'ageBypass';
 export const ageGateEvasion_792 = 'ageGateEvasion';
@@ -1741,15 +1418,10 @@ export const _det792_ageGateCircumvent = {
     return ['ageGateCircumvent', 'ageBypass', 'ageGateEvasion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ageGateCircumvent
 export const _ref_ageGateCircumvent = _det792_ageGateCircumvent;
-// pattern-ref: ageBypass
 export const _ref_ageBypass = _det792_ageGateCircumvent;
-// pattern-ref: ageGateEvasion
 export const _ref_ageGateEvasion = _det792_ageGateCircumvent;
 
-// ═══ Detector #585 [17] Cognitive load assessment ═══
-// severity: low
 export const cognitiveLoad_585 = 'cognitiveLoad';
 export const simplifyUI_585 = 'simplifyUI';
 export const cognitiveAccessibility_585 = 'cognitiveAccessibility';
@@ -1764,15 +1436,10 @@ export const _det585_cognitiveLoad = {
     return ['cognitiveLoad', 'simplifyUI', 'cognitiveAccessibility'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cognitiveLoad
 export const _ref_cognitiveLoad = _det585_cognitiveLoad;
-// pattern-ref: simplifyUI
 export const _ref_simplifyUI = _det585_cognitiveLoad;
-// pattern-ref: cognitiveAccessibility
 export const _ref_cognitiveAccessibility = _det585_cognitiveLoad;
 
-// ═══ Detector #606 [20] Compulsive usage / doom-swiping detection ═══
-// severity: medium
 export const compulsiveUsage_606 = 'compulsiveUsage';
 export const doomSwiping_606 = 'doomSwiping';
 export const excessiveSwipe_606 = 'excessiveSwipe';
@@ -1788,17 +1455,11 @@ export const _det606_compulsiveUsage = {
     return ['compulsiveUsage', 'doomSwiping', 'excessiveSwipe', 'sessionOveruse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: compulsiveUsage
 export const _ref_compulsiveUsage = _det606_compulsiveUsage;
-// pattern-ref: doomSwiping
 export const _ref_doomSwiping = _det606_compulsiveUsage;
-// pattern-ref: excessiveSwipe
 export const _ref_excessiveSwipe = _det606_compulsiveUsage;
-// pattern-ref: sessionOveruse
 export const _ref_sessionOveruse = _det606_compulsiveUsage;
 
-// ═══ Detector #608 [20] Rejection sensitivity overload detection ═══
-// severity: medium
 export const rejectionOverload_608 = 'rejectionOverload';
 export const rejectionSensitivity_608 = 'rejectionSensitivity';
 export const massRejection_608 = 'massRejection';
@@ -1813,15 +1474,10 @@ export const _det608_rejectionOverload = {
     return ['rejectionOverload', 'rejectionSensitivity', 'massRejection'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: rejectionOverload
 export const _ref_rejectionOverload = _det608_rejectionOverload;
-// pattern-ref: rejectionSensitivity
 export const _ref_rejectionSensitivity = _det608_rejectionOverload;
-// pattern-ref: massRejection
 export const _ref_massRejection = _det608_rejectionOverload;
 
-// ═══ Detector #609 [20] Self-esteem impact monitoring ═══
-// severity: medium
 export const selfEsteemImpact_609 = 'selfEsteemImpact';
 export const wellbeingScore_609 = 'wellbeingScore';
 export const mentalHealthImpact_609 = 'mentalHealthImpact';
@@ -1836,15 +1492,10 @@ export const _det609_selfEsteemImpact = {
     return ['selfEsteemImpact', 'wellbeingScore', 'mentalHealthImpact'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: selfEsteemImpact
 export const _ref_selfEsteemImpact = _det609_selfEsteemImpact;
-// pattern-ref: wellbeingScore
 export const _ref_wellbeingScore = _det609_selfEsteemImpact;
-// pattern-ref: mentalHealthImpact
 export const _ref_mentalHealthImpact = _det609_selfEsteemImpact;
 
-// ═══ Detector #735 [20] Algorithmic engagement vs wellbeing tradeoff ═══
-// severity: medium
 export const engagementVsWellbeing_735 = 'engagementVsWellbeing';
 export const wellbeingTradeoff_735 = 'wellbeingTradeoff';
 export const engagementBalance_735 = 'engagementBalance';
@@ -1859,15 +1510,10 @@ export const _det735_engagementVsWellbeing = {
     return ['engagementVsWellbeing', 'wellbeingTradeoff', 'engagementBalance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: engagementVsWellbeing
 export const _ref_engagementVsWellbeing = _det735_engagementVsWellbeing;
-// pattern-ref: wellbeingTradeoff
 export const _ref_wellbeingTradeoff = _det735_engagementVsWellbeing;
-// pattern-ref: engagementBalance
 export const _ref_engagementBalance = _det735_engagementVsWellbeing;
 
-// ═══ Detector #736 [20] Rejection overexposure throttling ═══
-// severity: medium
 export const rejectionThrottle_736 = 'rejectionThrottle';
 export const rejectionOverexposure_736 = 'rejectionOverexposure';
 export const throttleRejection_736 = 'throttleRejection';
@@ -1882,15 +1528,10 @@ export const _det736_rejectionThrottle = {
     return ['rejectionThrottle', 'rejectionOverexposure', 'throttleRejection'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: rejectionThrottle
 export const _ref_rejectionThrottle = _det736_rejectionThrottle;
-// pattern-ref: rejectionOverexposure
 export const _ref_rejectionOverexposure = _det736_rejectionThrottle;
-// pattern-ref: throttleRejection
 export const _ref_throttleRejection = _det736_rejectionThrottle;
 
-// ═══ Detector #897 [20.1] Emotional fatigue intervention ═══
-// severity: medium
 export const emotionalFatigue_897 = 'emotionalFatigue';
 export const fatigueIntervention_897 = 'fatigueIntervention';
 export const burnoutDetect_897 = 'burnoutDetect';
@@ -1905,15 +1546,10 @@ export const _det897_emotionalFatigue = {
     return ['emotionalFatigue', 'fatigueIntervention', 'burnoutDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emotionalFatigue
 export const _ref_emotionalFatigue = _det897_emotionalFatigue;
-// pattern-ref: fatigueIntervention
 export const _ref_fatigueIntervention = _det897_emotionalFatigue;
-// pattern-ref: burnoutDetect
 export const _ref_burnoutDetect = _det897_emotionalFatigue;
 
-// ═══ Detector #635 [22] Employer verification ═══
-// severity: medium
 export const employerVerify_635 = 'employerVerify';
 export const companyVerification_635 = 'companyVerification';
 export const workVerify_635 = 'workVerify';
@@ -1928,15 +1564,10 @@ export const _det635_employerVerify = {
     return ['employerVerify', 'companyVerification', 'workVerify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: employerVerify
 export const _ref_employerVerify = _det635_employerVerify;
-// pattern-ref: companyVerification
 export const _ref_companyVerification = _det635_employerVerify;
-// pattern-ref: workVerify
 export const _ref_workVerify = _det635_employerVerify;
 
-// ═══ Detector #751 [22] Body type misrepresentation reporting category ═══
-// severity: low
 export const bodyMisrepresentation_751 = 'bodyMisrepresentation';
 export const bodyTypeReport_751 = 'bodyTypeReport';
 export const physicalMismatch_751 = 'physicalMismatch';
@@ -1951,15 +1582,10 @@ export const _det751_bodyMisrepresentation = {
     return ['bodyMisrepresentation', 'bodyTypeReport', 'physicalMismatch'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: bodyMisrepresentation
 export const _ref_bodyMisrepresentation = _det751_bodyMisrepresentation;
-// pattern-ref: bodyTypeReport
 export const _ref_bodyTypeReport = _det751_bodyMisrepresentation;
-// pattern-ref: physicalMismatch
 export const _ref_physicalMismatch = _det751_bodyMisrepresentation;
 
-// ═══ Detector #637 [23] Notification frequency abuse ═══
-// severity: medium
 export const notificationAbuse_637 = 'notificationAbuse';
 export const notificationFrequency_637 = 'notificationFrequency';
 export const spamNotification_637 = 'spamNotification';
@@ -1974,15 +1600,10 @@ export const _det637_notificationAbuse = {
     return ['notificationAbuse', 'notificationFrequency', 'spamNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: notificationAbuse
 export const _ref_notificationAbuse = _det637_notificationAbuse;
-// pattern-ref: notificationFrequency
 export const _ref_notificationFrequency = _det637_notificationAbuse;
-// pattern-ref: spamNotification
 export const _ref_spamNotification = _det637_notificationAbuse;
 
-// ═══ Detector #743 [23] Communication consent gate ═══
-// severity: medium
 export const communicationConsent_743 = 'communicationConsent';
 export const messageConsent_743 = 'messageConsent';
 export const consentToMessage_743 = 'consentToMessage';
@@ -1997,15 +1618,10 @@ export const _det743_communicationConsent = {
     return ['communicationConsent', 'messageConsent', 'consentToMessage'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: communicationConsent
 export const _ref_communicationConsent = _det743_communicationConsent;
-// pattern-ref: messageConsent
 export const _ref_messageConsent = _det743_communicationConsent;
-// pattern-ref: consentToMessage
 export const _ref_consentToMessage = _det743_communicationConsent;
 
-// ═══ Detector #744 [23] Unsolicited video call blocking ═══
-// severity: medium
 export const unsolicitedCall_744 = 'unsolicitedCall';
 export const videoCallBlock_744 = 'videoCallBlock';
 export const callConsent_744 = 'callConsent';
@@ -2020,15 +1636,10 @@ export const _det744_unsolicitedCall = {
     return ['unsolicitedCall', 'videoCallBlock', 'callConsent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: unsolicitedCall
 export const _ref_unsolicitedCall = _det744_unsolicitedCall;
-// pattern-ref: videoCallBlock
 export const _ref_videoCallBlock = _det744_unsolicitedCall;
-// pattern-ref: callConsent
 export const _ref_callConsent = _det744_unsolicitedCall;
 
-// ═══ Detector #690 [23.1] Last online status obsessive checking ═══
-// severity: medium
 export const lastOnlineStalking_690 = 'lastOnlineStalking';
 export const onlineStatusObsessive_690 = 'onlineStatusObsessive';
 export const statusCheckAbuse_690 = 'statusCheckAbuse';
@@ -2043,15 +1654,10 @@ export const _det690_lastOnlineStalking = {
     return ['lastOnlineStalking', 'onlineStatusObsessive', 'statusCheckAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lastOnlineStalking
 export const _ref_lastOnlineStalking = _det690_lastOnlineStalking;
-// pattern-ref: onlineStatusObsessive
 export const _ref_onlineStatusObsessive = _det690_lastOnlineStalking;
-// pattern-ref: statusCheckAbuse
 export const _ref_statusCheckAbuse = _det690_lastOnlineStalking;
 
-// ═══ Detector #692 [23.1] Online status visibility granular controls ═══
-// severity: medium
 export const statusVisibility_692 = 'statusVisibility';
 export const onlineVisibility_692 = 'onlineVisibility';
 export const hideOnlineStatus_692 = 'hideOnlineStatus';
@@ -2066,15 +1672,10 @@ export const _det692_statusVisibility = {
     return ['statusVisibility', 'onlineVisibility', 'hideOnlineStatus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: statusVisibility
 export const _ref_statusVisibility = _det692_statusVisibility;
-// pattern-ref: onlineVisibility
 export const _ref_onlineVisibility = _det692_statusVisibility;
-// pattern-ref: hideOnlineStatus
 export const _ref_hideOnlineStatus = _det692_statusVisibility;
 
-// ═══ Detector #630 [24] VR identity verification ═══
-// severity: medium
 export const vrIdentity_630 = 'vrIdentity';
 export const avatarVerification_630 = 'avatarVerification';
 export const vrRealPerson_630 = 'vrRealPerson';
@@ -2089,15 +1690,10 @@ export const _det630_vrIdentity = {
     return ['vrIdentity', 'avatarVerification', 'vrRealPerson'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: vrIdentity
 export const _ref_vrIdentity = _det630_vrIdentity;
-// pattern-ref: avatarVerification
 export const _ref_avatarVerification = _det630_vrIdentity;
-// pattern-ref: vrRealPerson
 export const _ref_vrRealPerson = _det630_vrIdentity;
 
-// ═══ Detector #670 [25] Wearable device data consent verification ═══
-// severity: medium
 export const wearableConsent_670 = 'wearableConsent';
 export const deviceDataConsent_670 = 'deviceDataConsent';
 export const biometricDeviceConsent_670 = 'biometricDeviceConsent';
@@ -2112,15 +1708,10 @@ export const _det670_wearableConsent = {
     return ['wearableConsent', 'deviceDataConsent', 'biometricDeviceConsent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: wearableConsent
 export const _ref_wearableConsent = _det670_wearableConsent;
-// pattern-ref: deviceDataConsent
 export const _ref_deviceDataConsent = _det670_wearableConsent;
-// pattern-ref: biometricDeviceConsent
 export const _ref_biometricDeviceConsent = _det670_wearableConsent;
 
-// ═══ Detector #671 [25] Biometric data collection limitation ═══
-// severity: medium
 export const biometricCollection_671 = 'biometricCollection';
 export const heartRateLimit_671 = 'heartRateLimit';
 export const biometricMinimization_671 = 'biometricMinimization';
@@ -2135,15 +1726,10 @@ export const _det671_biometricCollection = {
     return ['biometricCollection', 'heartRateLimit', 'biometricMinimization'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: biometricCollection
 export const _ref_biometricCollection = _det671_biometricCollection;
-// pattern-ref: heartRateLimit
 export const _ref_heartRateLimit = _det671_biometricCollection;
-// pattern-ref: biometricMinimization
 export const _ref_biometricMinimization = _det671_biometricCollection;
 
-// ═══ Detector #675 [26] Group chat moderation ═══
-// severity: medium
 export const groupChatModeration_675 = 'groupChatModeration';
 export const multiPartyChat_675 = 'multiPartyChat';
 export const groupDynamics_675 = 'groupDynamics';
@@ -2158,15 +1744,10 @@ export const _det675_groupChatModeration = {
     return ['groupChatModeration', 'multiPartyChat', 'groupDynamics'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: groupChatModeration
 export const _ref_groupChatModeration = _det675_groupChatModeration;
-// pattern-ref: multiPartyChat
 export const _ref_multiPartyChat = _det675_groupChatModeration;
-// pattern-ref: groupDynamics
 export const _ref_groupDynamics = _det675_groupChatModeration;
 
-// ═══ Detector #912 [26] Event organizer verification ═══
-// severity: medium
 export const organizerVerify_912 = 'organizerVerify';
 export const eventOrganizerCheck_912 = 'eventOrganizerCheck';
 export const hostVerification_912 = 'hostVerification';
@@ -2181,15 +1762,10 @@ export const _det912_organizerVerify = {
     return ['organizerVerify', 'eventOrganizerCheck', 'hostVerification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: organizerVerify
 export const _ref_organizerVerify = _det912_organizerVerify;
-// pattern-ref: eventOrganizerCheck
 export const _ref_eventOrganizerCheck = _det912_organizerVerify;
-// pattern-ref: hostVerification
 export const _ref_hostVerification = _det912_organizerVerify;
 
-// ═══ Detector #682 [27] Contact syncing hash-only verification ═══
-// severity: medium
 export const contactHash_682 = 'contactHash';
 export const hashOnlySync_682 = 'hashOnlySync';
 export const contactSyncHash_682 = 'contactSyncHash';
@@ -2204,15 +1780,10 @@ export const _det682_contactHash = {
     return ['contactHash', 'hashOnlySync', 'contactSyncHash'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: contactHash
 export const _ref_contactHash = _det682_contactHash;
-// pattern-ref: hashOnlySync
 export const _ref_hashOnlySync = _det682_contactHash;
-// pattern-ref: contactSyncHash
 export const _ref_contactSyncHash = _det682_contactHash;
 
-// ═══ Detector #684 [27] People you may know leakage prevention ═══
-// severity: high
 export const pymkLeakage_684 = 'pymkLeakage';
 export const peopleYouMayKnow_684 = 'peopleYouMayKnow';
 export const pymkPrivacy_684 = 'pymkPrivacy';
@@ -2227,15 +1798,10 @@ export const _det684_pymkLeakage = {
     return ['pymkLeakage', 'peopleYouMayKnow', 'pymkPrivacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: pymkLeakage
 export const _ref_pymkLeakage = _det684_pymkLeakage;
-// pattern-ref: peopleYouMayKnow
 export const _ref_peopleYouMayKnow = _det684_pymkLeakage;
-// pattern-ref: pymkPrivacy
 export const _ref_pymkPrivacy = _det684_pymkLeakage;
 
-// ═══ Detector #710 [29] Coercive partner account monitoring detection ═══
-// severity: high
 export const coercivePartner_710 = 'coercivePartner';
 export const partnerMonitoring_710 = 'partnerMonitoring';
 export const accountSurveillance_710 = 'accountSurveillance';
@@ -2250,15 +1816,10 @@ export const _det710_coercivePartner = {
     return ['coercivePartner', 'partnerMonitoring', 'accountSurveillance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: coercivePartner
 export const _ref_coercivePartner = _det710_coercivePartner;
-// pattern-ref: partnerMonitoring
 export const _ref_partnerMonitoring = _det710_coercivePartner;
-// pattern-ref: accountSurveillance
 export const _ref_accountSurveillance = _det710_coercivePartner;
 
-// ═══ Detector #711 [29] IPV risk assessment integration ═══
-// severity: high
 export const ipvRisk_711 = 'ipvRisk';
 export const ipvAssessment_711 = 'ipvAssessment';
 export const domesticViolence_711 = 'domesticViolence';
@@ -2273,15 +1834,10 @@ export const _det711_ipvRisk = {
     return ['ipvRisk', 'ipvAssessment', 'domesticViolence'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ipvRisk
 export const _ref_ipvRisk = _det711_ipvRisk;
-// pattern-ref: ipvAssessment
 export const _ref_ipvAssessment = _det711_ipvRisk;
-// pattern-ref: domesticViolence
 export const _ref_domesticViolence = _det711_ipvRisk;
 
-// ═══ Detector #712 [29] Forced account creation detection ═══
-// severity: high
 export const forcedCreation_712 = 'forcedCreation';
 export const coercedSignup_712 = 'coercedSignup';
 export const forcedAccount_712 = 'forcedAccount';
@@ -2296,15 +1852,10 @@ export const _det712_forcedCreation = {
     return ['forcedCreation', 'coercedSignup', 'forcedAccount'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: forcedCreation
 export const _ref_forcedCreation = _det712_forcedCreation;
-// pattern-ref: coercedSignup
 export const _ref_coercedSignup = _det712_forcedCreation;
-// pattern-ref: forcedAccount
 export const _ref_forcedAccount = _det712_forcedCreation;
 
-// ═══ Detector #810 [29.1] Financial abuse language patterns ═══
-// severity: high
 export const financialAbuse_810 = 'financialAbuse';
 export const moneyControl_810 = 'moneyControl';
 export const financialCoercion_810 = 'financialCoercion';
@@ -2319,15 +1870,10 @@ export const _det810_financialAbuse = {
     return ['financialAbuse', 'moneyControl', 'financialCoercion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: financialAbuse
 export const _ref_financialAbuse = _det810_financialAbuse;
-// pattern-ref: moneyControl
 export const _ref_moneyControl = _det810_financialAbuse;
-// pattern-ref: financialCoercion
 export const _ref_financialCoercion = _det810_financialAbuse;
 
-// ═══ Detector #727 [30] Caretaker exploitation detection ═══
-// severity: high
 export const caretakerExploitation_727 = 'caretakerExploitation';
 export const elderAbuse_727 = 'elderAbuse';
 export const caretakerAbuse_727 = 'caretakerAbuse';
@@ -2342,15 +1888,10 @@ export const _det727_caretakerExploitation = {
     return ['caretakerExploitation', 'elderAbuse', 'caretakerAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: caretakerExploitation
 export const _ref_caretakerExploitation = _det727_caretakerExploitation;
-// pattern-ref: elderAbuse
 export const _ref_elderAbuse = _det727_caretakerExploitation;
-// pattern-ref: caretakerAbuse
 export const _ref_caretakerAbuse = _det727_caretakerExploitation;
 
-// ═══ Detector #840 [31] Privacy-preserving identity verification ═══
-// severity: medium
 export const privacyPreservingVerify_840 = 'privacyPreservingVerify';
 export const minimalVerification_840 = 'minimalVerification';
 export const privacyVerify_840 = 'privacyVerify';
@@ -2365,15 +1906,10 @@ export const _det840_privacyPreservingVerify = {
     return ['privacyPreservingVerify', 'minimalVerification', 'privacyVerify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: privacyPreservingVerify
 export const _ref_privacyPreservingVerify = _det840_privacyPreservingVerify;
-// pattern-ref: minimalVerification
 export const _ref_minimalVerification = _det840_privacyPreservingVerify;
-// pattern-ref: privacyVerify
 export const _ref_privacyVerify = _det840_privacyPreservingVerify;
 
-// ═══ Detector #703 [33] Military / intelligence professional profile protection ═══
-// severity: high
 export const militaryProtection_703 = 'militaryProtection';
 export const intelligenceProfile_703 = 'intelligenceProfile';
 export const milProfile_703 = 'milProfile';
@@ -2388,15 +1924,10 @@ export const _det703_militaryProtection = {
     return ['militaryProtection', 'intelligenceProfile', 'milProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: militaryProtection
 export const _ref_militaryProtection = _det703_militaryProtection;
-// pattern-ref: intelligenceProfile
 export const _ref_intelligenceProfile = _det703_militaryProtection;
-// pattern-ref: milProfile
 export const _ref_milProfile = _det703_militaryProtection;
 
-// ═══ Detector #705 [33] Activist / journalist enhanced privacy mode ═══
-// severity: high
 export const activistPrivacy_705 = 'activistPrivacy';
 export const journalistProtection_705 = 'journalistProtection';
 export const enhancedPrivacy_705 = 'enhancedPrivacy';
@@ -2411,15 +1942,10 @@ export const _det705_activistPrivacy = {
     return ['activistPrivacy', 'journalistProtection', 'enhancedPrivacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: activistPrivacy
 export const _ref_activistPrivacy = _det705_activistPrivacy;
-// pattern-ref: journalistProtection
 export const _ref_journalistProtection = _det705_activistPrivacy;
-// pattern-ref: enhancedPrivacy
 export const _ref_enhancedPrivacy = _det705_activistPrivacy;
 
-// ═══ Detector #760 [34] Accessibility-based scam vectors ═══
-// severity: medium
 export const accessibilityScam_760 = 'accessibilityScam';
 export const disabilityScam_760 = 'disabilityScam';
 export const a11yScamVector_760 = 'a11yScamVector';
@@ -2434,15 +1960,10 @@ export const _det760_accessibilityScam = {
     return ['accessibilityScam', 'disabilityScam', 'a11yScamVector'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accessibilityScam
 export const _ref_accessibilityScam = _det760_accessibilityScam;
-// pattern-ref: disabilityScam
 export const _ref_disabilityScam = _det760_accessibilityScam;
-// pattern-ref: a11yScamVector
 export const _ref_a11yScamVector = _det760_accessibilityScam;
 
-// ═══ Detector #764 [35] Interfaith exploitation pattern ═══
-// severity: medium
 export const interfaithExploitation_764 = 'interfaithExploitation';
 export const religiousExploitation_764 = 'religiousExploitation';
 export const faithExploit_764 = 'faithExploit';
@@ -2457,15 +1978,10 @@ export const _det764_interfaithExploitation = {
     return ['interfaithExploitation', 'religiousExploitation', 'faithExploit'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: interfaithExploitation
 export const _ref_interfaithExploitation = _det764_interfaithExploitation;
-// pattern-ref: religiousExploitation
 export const _ref_religiousExploitation = _det764_interfaithExploitation;
-// pattern-ref: faithExploit
 export const _ref_faithExploit = _det764_interfaithExploitation;
 
-// ═══ Detector #804 [38] Customer support social engineering detection ═══
-// severity: high
 export const supportSocialEng_804 = 'supportSocialEng';
 export const socialEngineeringSupport_804 = 'socialEngineeringSupport';
 export const csSocialEngineering_804 = 'csSocialEngineering';
@@ -2480,15 +1996,10 @@ export const _det804_supportSocialEng = {
     return ['supportSocialEng', 'socialEngineeringSupport', 'csSocialEngineering'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: supportSocialEng
 export const _ref_supportSocialEng = _det804_supportSocialEng;
-// pattern-ref: socialEngineeringSupport
 export const _ref_socialEngineeringSupport = _det804_supportSocialEng;
-// pattern-ref: csSocialEngineering
 export const _ref_csSocialEngineering = _det804_supportSocialEng;
 
-// ═══ Detector #858 [39] Anonymous account abuse detection ═══
-// severity: medium
 export const anonAbuse_858 = 'anonAbuse';
 export const anonymousAbuse_858 = 'anonymousAbuse';
 export const throwawayAbuse_858 = 'throwawayAbuse';
@@ -2503,15 +2014,10 @@ export const _det858_anonAbuse = {
     return ['anonAbuse', 'anonymousAbuse', 'throwawayAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: anonAbuse
 export const _ref_anonAbuse = _det858_anonAbuse;
-// pattern-ref: anonymousAbuse
 export const _ref_anonymousAbuse = _det858_anonAbuse;
-// pattern-ref: throwawayAbuse
 export const _ref_throwawayAbuse = _det858_anonAbuse;
 
-// ═══ Detector #698 [42] Subscription cancellation friction audit ═══
-// severity: medium
 export const cancellationFriction_698 = 'cancellationFriction';
 export const cancelSubscription__friction_698 = 'cancelSubscription.*friction';
 export const easyCancel_698 = 'easyCancel';
@@ -2526,15 +2032,10 @@ export const _det698_cancellationFriction = {
     return ['cancellationFriction', 'cancelSubscription.*friction', 'easyCancel'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cancellationFriction
 export const _ref_cancellationFriction = _det698_cancellationFriction;
-// pattern-ref: cancelSubscription.*friction
 export const _ref_cancelSubscription__friction = _det698_cancellationFriction;
-// pattern-ref: easyCancel
 export const _ref_easyCancel = _det698_cancellationFriction;
 
-// ═══ Detector #756 [42] Premium feature weaponization detection ═══
-// severity: medium
 export const premiumWeaponization_756 = 'premiumWeaponization';
 export const featureWeaponize_756 = 'featureWeaponize';
 export const premiumAbuse_756 = 'premiumAbuse';
@@ -2549,15 +2050,10 @@ export const _det756_premiumWeaponization = {
     return ['premiumWeaponization', 'featureWeaponize', 'premiumAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: premiumWeaponization
 export const _ref_premiumWeaponization = _det756_premiumWeaponization;
-// pattern-ref: featureWeaponize
 export const _ref_featureWeaponize = _det756_premiumWeaponization;
-// pattern-ref: premiumAbuse
 export const _ref_premiumAbuse = _det756_premiumWeaponization;
 
-// ═══ Detector #895 [43] Safety feature usage analytics ═══
-// severity: medium
 export const safetyUsageAnalytics_895 = 'safetyUsageAnalytics';
 export const featureUsageTracking_895 = 'featureUsageTracking';
 export const safetyAdoption_895 = 'safetyAdoption';
@@ -2572,15 +2068,10 @@ export const _det895_safetyUsageAnalytics = {
     return ['safetyUsageAnalytics', 'featureUsageTracking', 'safetyAdoption'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: safetyUsageAnalytics
 export const _ref_safetyUsageAnalytics = _det895_safetyUsageAnalytics;
-// pattern-ref: featureUsageTracking
 export const _ref_featureUsageTracking = _det895_safetyUsageAnalytics;
-// pattern-ref: safetyAdoption
 export const _ref_safetyAdoption = _det895_safetyUsageAnalytics;
 
-// ═══ Detector #641 [44] Account selling / marketplace detection ═══
-// severity: medium
 export const accountSellingDetect_641 = 'accountSellingDetect';
 export const accountMarketplaceDetect_641 = 'accountMarketplaceDetect';
 export const sellAccount_641 = 'sellAccount';
@@ -2595,15 +2086,10 @@ export const _det641_accountSellingDetect = {
     return ['accountSellingDetect', 'accountMarketplaceDetect', 'sellAccount'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountSellingDetect
 export const _ref_accountSellingDetect = _det641_accountSellingDetect;
-// pattern-ref: accountMarketplaceDetect
 export const _ref_accountMarketplaceDetect = _det641_accountSellingDetect;
-// pattern-ref: sellAccount
 export const _ref_sellAccount = _det641_accountSellingDetect;
 
-// ═══ Detector #642 [44] Premium feature exploitation for harassment ═══
-// severity: medium
 export const premiumHarassment_642 = 'premiumHarassment';
 export const featureExploit__harass_642 = 'featureExploit.*harass';
 export const premiumHarassAbuse_642 = 'premiumHarassAbuse';
@@ -2618,16 +2104,10 @@ export const _det642_premiumHarassment = {
     return ['premiumHarassment', 'featureExploit.*harass', 'premiumHarassAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: premiumHarassment
 export const _ref_premiumHarassment = _det642_premiumHarassment;
-// pattern-ref: featureExploit.*harass
 export const _ref_featureExploit__harass = _det642_premiumHarassment;
-// pattern-ref: premiumHarassAbuse
 export const _ref_premiumHarassAbuse = _det642_premiumHarassment;
 
-// ════════════════════════════════════════════════════
-// Detector #919 [§10.3] Weaponized reporting detection
-// ════════════════════════════════════════════════════
 export const weaponizedReport_919_key = 'weaponizedReport';
 export const coordinatedReporting_919_key = 'coordinatedReporting';
 
@@ -2665,9 +2145,6 @@ export const _d919_impl = {
   coordinatedReporting: coordinatedReportingCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #917 [§14.4] Profile discoverability controls
-// ════════════════════════════════════════════════════
 export const profileDiscoverability_917_key = 'profileDiscoverability';
 export const discoverabilityControl_917_key = 'discoverabilityControl';
 export const hideProfile_917_key = 'hideProfile';
@@ -2711,9 +2188,6 @@ export const _d917_impl = {
   hideProfile: hideProfileCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #732 [§15.3] AI matching recommendation audit
-// ════════════════════════════════════════════════════
 export const matchingAudit_732_key = 'matchingAudit';
 export const recommendationAudit_732_key = 'recommendationAudit';
 export const aiMatchBias_732_key = 'aiMatchBias';
@@ -2757,9 +2231,6 @@ export const _d732_impl = {
   aiMatchBias: aiMatchBiasCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #543 [§16.2] LGPD compliance (Brazil)
-// ════════════════════════════════════════════════════
 export const LGPD_543_key = 'LGPD';
 export const lgpdCompliance_543_key = 'lgpdCompliance';
 export const brazilPrivacy_543_key = 'brazilPrivacy';
@@ -2803,9 +2274,6 @@ export const _d543_impl = {
   brazilPrivacy: brazilPrivacyCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #737 [§20] Negative feedback loop detection
-// ════════════════════════════════════════════════════
 export const negativeFeedbackLoop_737_key = 'negativeFeedbackLoop';
 export const negativeLoop_737_key = 'negativeLoop';
 export const spiralDetect_737_key = 'spiralDetect';
@@ -2849,9 +2317,6 @@ export const _d737_impl = {
   spiralDetect: spiralDetectCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #638 [§23] Are you sure pause prompt
-// ════════════════════════════════════════════════════
 export const sendPause_638_key = 'sendPause';
 export const areYouSure_638_key = 'areYouSure';
 export const offensivePrompt_638_key = 'offensivePrompt';
@@ -2901,9 +2366,6 @@ export const _d638_impl = {
   cooldownPrompt: cooldownPromptCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #745 [§23] Communication preference mismatch escalation
-// ════════════════════════════════════════════════════
 export const preferenceMismatch_745_key = 'preferenceMismatch';
 export const commPreference_745_key = 'commPreference';
 export const escalationMismatch_745_key = 'escalationMismatch';
@@ -2947,9 +2409,6 @@ export const _d745_impl = {
   escalationMismatch: escalationMismatchCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #910 [§26] Event attendee repeat offender screening
-// ════════════════════════════════════════════════════
 export const eventOffender_910_key = 'eventOffender';
 export const attendeeScreen_910_key = 'attendeeScreen';
 export const eventSafetyCheck_910_key = 'eventSafetyCheck';

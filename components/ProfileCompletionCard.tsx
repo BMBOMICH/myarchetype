@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
 import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
 
@@ -31,7 +32,7 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={() => void loadStrength()} accessibilityLabel="Retry loading profile strength" accessibilityRole="button">
+        <TouchableOpacity onPress={() = accessibilityLabel="button"> void loadStrength()} accessibilityLabel="Retry loading profile strength" accessibilityRole="button">
           <Text style={styles.retryText}>Tap to retry</Text>
         </TouchableOpacity>
       </View>
@@ -88,26 +89,26 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   container:            { backgroundColor: '#16213e', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#0f3460' },
   compactContainer:     { backgroundColor: '#16213e', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#0f3460' },
   header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   compactHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  title:                { fontSize: 16, fontWeight: '600', color: '#eee' },
-  compactLabel:         { fontSize: 14, fontWeight: '600', color: '#eee' },
+  title:                { fontSize: 16, fontWeight: '600', color: theme.colors.text },
+  compactLabel:         { fontSize: 14, fontWeight: '600', color: theme.colors.text },
   levelBadge:           { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12 },
   levelText:            { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   scoreRow:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  scoreText:            { color: '#888', fontSize: 13 },
+  scoreText:            { color: theme.colors.textSecondary, fontSize: 13 },
   percentage:           { fontSize: 20, fontWeight: 'bold' },
   compactPercentage:    { fontSize: 16, fontWeight: 'bold' },
   barContainer:         { marginBottom: 12 },
   barBackground:        { height: 8, backgroundColor: '#0f3460', borderRadius: 4, overflow: 'hidden' },
   barFill:              { height: '100%', borderRadius: 4 },
-  message:              { color: '#aaa', fontSize: 13, marginBottom: 12, lineHeight: 18 },
+  message:              { color: theme.colors.textSecondary, fontSize: 13, marginBottom: 12, lineHeight: 18 },
   recommendations:      { backgroundColor: '#0f3460', borderRadius: 10, padding: 12 },
   recommendationsTitle: { color: '#53a8b6', fontSize: 13, fontWeight: '600', marginBottom: 6 },
-  recommendationText:   { color: '#888', fontSize: 12, marginBottom: 4, lineHeight: 18 },
-  errorText:            { color: '#d9534f', fontSize: 13, textAlign: 'center', marginBottom: 8 },
+  recommendationText:   { color: theme.colors.textSecondary, fontSize: 12, marginBottom: 4, lineHeight: 18 },
+  errorText:            { color: theme.colors.error, fontSize: 13, textAlign: 'center', marginBottom: 8 },
   retryText:            { color: '#53a8b6', fontSize: 13, textAlign: 'center', fontWeight: '600' },
-});
+}));

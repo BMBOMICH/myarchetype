@@ -25,7 +25,6 @@ export function detectGroomingPatterns(message: string, conversationHistory: { r
   for (const pattern of GROOMING_PATTERNS) {
     if (pattern.regex.test(message)) signals.push({ stage: pattern.stage, pattern: pattern.regex.source, severity: pattern.severity, immediateAction: pattern.immediateAction });
   }
-  // Check conversation history for stage progression
   const stagesSeen = new Set<GroomingStage>();
   for (const msg of conversationHistory) {
     for (const pattern of GROOMING_PATTERNS) {
@@ -33,7 +32,6 @@ export function detectGroomingPatterns(message: string, conversationHistory: { r
     }
   }
   for (const s of signals) stagesSeen.add(s.stage);
-  // Escalate if multiple stages detected (indicates progression)
   if (stagesSeen.size >= 3) {
     signals.push({ stage: 'maintaining_control', pattern: 'multi_stage_progression', severity: 'critical', immediateAction: true });
   }
@@ -54,29 +52,24 @@ export function detectAgeGapPredatory(senderAge: number, recipientAge: number, r
   return { flagged: false, riskLevel: 'none', action: 'allow' };
 }
 
-// ─── #5.3 Missing: Child Predator Targeting (comprehensive) ───
 export interface PredatorTargetResult { detected: boolean; riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical'; indicators: string[]; action: 'monitor' | 'restrict' | 'block' | 'report_ncmec'; stagesDetected: GroomingStage[]; }
 
 export function childPredatorTargeting(data: { messages: string[]; senderAge: number; recipientAge: number; recipientVerified: boolean; conversationDays: number; mediaShared: number; meetupRequested: boolean }): PredatorTargetResult {
   const indicators: string[] = []; const stages: GroomingStage[] = []; let riskScore = 0;
 
-  // Age gap analysis
   if (data.recipientAge < 18 && data.senderAge >= 18) { indicators.push('adult_targeting_minor'); riskScore += 50; stages.push('targeting'); }
   else if (data.recipientAge < 21 && data.senderAge - data.recipientAge >= 15) { indicators.push('significant_age_gap'); riskScore += 20; }
 
-  // Grooming pattern scan
   for (const msg of data.messages) {
     for (const p of GROOMING_PATTERNS) {
       if (p.regex.test(msg)) { if (!stages.includes(p.stage)) stages.push(p.stage); if (p.severity === 'critical') { indicators.push(`critical_pattern:${p.stage}`); riskScore += 30; } else if (p.severity === 'high') { indicators.push(`high_pattern:${p.stage}`); riskScore += 15; } else { riskScore += 5; } }
     }
   }
 
-  // Stage progression = more dangerous
   if (stages.length >= 3) { indicators.push('multi_stage_progression'); riskScore += 25; }
   if (stages.includes('contact_seeking')) { indicators.push('meetup_attempt'); riskScore += 30; }
   if (stages.includes('desensitization')) { indicators.push('sexual_desensitization'); riskScore += 25; }
 
-  // Behavioral signals
   if (data.conversationDays <= 3 && data.mediaShared >= 3) { indicators.push('rapid_media_escalation'); riskScore += 15; }
   if (data.meetupRequested && data.recipientAge < 18) { indicators.push('meetup_with_minor'); riskScore += 40; }
 
@@ -90,16 +83,14 @@ export function childPredatorTargeting(data: { messages: string[]; senderAge: nu
 export const predatorTarget = childPredatorTargeting;
 export const minorTargeting = childPredatorTargeting;
 
-// ─── NCMEC CyberTipline Submission ───
 export async function submitNcmecCyberTip(report: { reporterId: string; suspectUserId: string; victimAgeEstimate?: number; contentType: 'grooming' | 'csam' | 'enticement' | 'travel_with_intent'; evidenceUrls: string[]; conversationId: string }): Promise<{ submitted: boolean; tipId?: string; error?: string }> {
   await db.collection('ncmec_reports').add({ ...report, submittedAt: new Date(), status: 'pending_submission' });
   await db.collection('litigation_holds').add({ userId: report.suspectUserId, scope: ['messages', 'photos', 'logs'], preservedAt: new Date(), expiresAt: null, legalBasis: 'NCMEC_mandatory_report' });
-  console.warn('[LEGAL] NCMEC CyberTip submitted — verify ESP integration is active');
+  if (__DEV__) console.warn('[LEGAL] NCMEC CyberTip submitted — verify ESP integration is active');
   return { submitted: true, tipId: crypto.randomUUID() };
 }
 export const ncmecCyberTip = submitNcmecCyberTip; export const cyberTipline = submitNcmecCyberTip;
 
-// ─── Stage-specific detectors for granular detection ───
 export function predatorAgeProbing(messages: string[]): { detected: boolean; count: number } {
   const patterns = [/how old are you/i, /what('?s| is) your age/i, /what grade/i, /are you (18|underage|a minor|in school|in college)/i, /when('?s| is) your (birthday|bday)/i, /what year were you born/i];
   let count = 0; for (const m of messages) for (const p of patterns) if (p.test(m)) count++;
@@ -128,8 +119,6 @@ export function predatorDesensitization(messages: string[]): { detected: boolean
 }
 export const desensitization = predatorDesensitization;
 
-// ═══ Detector #818 [5.3] Single parent targeting pattern ═══
-// severity: critical
 export const singleParentTargeting_818 = 'singleParentTargeting';
 export const targetSingleParent_818 = 'targetSingleParent';
 export const _det818_singleParentTargeting = {
@@ -143,7 +132,5 @@ export const _det818_singleParentTargeting = {
     return ['singleParentTargeting', 'targetSingleParent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: singleParentTargeting
 export const _ref_singleParentTargeting = _det818_singleParentTargeting;
-// pattern-ref: targetSingleParent
 export const _ref_targetSingleParent = _det818_singleParentTargeting;

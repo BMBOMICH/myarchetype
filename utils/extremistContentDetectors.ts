@@ -1,10 +1,8 @@
-// utils/extremistContentDetectors.ts
 import { logger } from './logger';
 
 export interface ExtremistImageryResult { flagged: boolean; matchType: 'hash_match' | 'symbol_detection' | 'clip_classification' | 'none'; confidence: number; category?: string; action: 'block' | 'review' | 'allow'; reportToGIFCT: boolean; }
 export interface ExtremistTextResult { flagged: boolean; category?: string; confidence: number; keywords: string[]; action: 'block' | 'review' | 'allow'; }
 
-// #079 Extremist imagery detection — multi-layer: hash → symbol → CLIP
 export async function detectExtremistImagery(imageUri: string, imageHash: string, serverUrl: string): Promise<ExtremistImageryResult> {
   try {
     const hr = await checkGIFCTHash(imageHash, serverUrl);

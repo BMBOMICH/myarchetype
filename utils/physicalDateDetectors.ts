@@ -1,4 +1,3 @@
-// file: utils/physicalDateDetectors.ts
 import { writeAuditLog } from './logger';
 
 export function neverChecksIn(uid:string,dates:number,checks:number){const r=dates>0?checks/dates:1;if(r<0.3&&dates>=3)writeAuditLog('date.never_checks_in',{userId:uid,rate:r}).catch(()=>{});return{skipCheckIn:r<0.3&&dates>=3,ignoredCheckIn:r===0&&dates>=2,complianceRate:r};}

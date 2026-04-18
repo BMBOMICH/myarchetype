@@ -1,9 +1,8 @@
-// file: utils/infrastructureSecurity.ts
 import { Platform } from 'react-native';
 import { writeAuditLog } from './logger';
 
 export const SSL_PINNING_CONFIG={sslPinning:{certs:['your_cert_sha256_here']},pkPinning:true,timeoutInterval:10000};
-export async function pinnedFetch(url:string,options:RequestInit={}):Promise<Response>{if(Platform.OS==='web')return fetch(url,options);try{return fetch(url,options);}catch(e){console.error('[Security] SSL pinning failed — possible MITM:',e);throw new Error('SSL_PINNING_FAILURE');}}
+if (__DEV__) export async function pinnedFetch(url:string,options:RequestInit={}):Promise<Response>{if(Platform.OS==='web')return fetch(url,options);try{return fetch(url,options);}catch(e){console.error('[Security] SSL pinning failed — possible MITM:',e);throw new Error('SSL_PINNING_FAILURE');}}
 export const TLS_CONFIG={MIN_TLS_VERSION:'TLSv1.2' as const,PREFERRED_TLS_VERSION:'TLSv1.3' as const,STRONG_CIPHERS:'TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256'};
 
 export function detectRequestSmuggling(req:{method:string;headers:Record<string,string>;body?:string;contentLength?:number;transferEncoding?:string}):{suspicious:boolean;indicators:string[];action:'allow'|'reject'|'investigate'}{
@@ -90,7 +89,6 @@ if(h['x-original-url'])i.push('x_original_url_present');const q=req.query??'';if
 const a=i.length>=2?'reject':i.length>=1?'sanitize':'allow';return{detected:i.length>0,indicators:i,action:a};}
 export const cacheAttack=cachePoisoning;
 
-// ─── [13.1] API Data Exposure ─────────────────────────────
 export interface ApiDataExposureResult{exposed:boolean;fields:string[];severity:'none'|'low'|'medium'|'high';recommendation:string;}
 const SENSITIVE_FIELDS=new Set(['password','passwordHash','ssn','creditCard','cvv','bankAccount','privateKey','secretKey','accessToken','refreshToken','mfaSecret','recoveryCode','dob','exactLocation','deviceId','ipAddress']);
 export function detectApiDataExposure(responseBody:Record<string,unknown>,endpoint:string):ApiDataExposureResult{
@@ -120,7 +118,6 @@ const req=new Set(requestedFields),min=new Set(minimumRequired),unnecessary=requ
 return{overfetch:unnecessary.length>5,requestedFields,unnecessaryFields:unnecessary,recommendation:unnecessary.length>5?`Remove ${unnecessary.length} unnecessary fields from API response. Use field selection/projection.`:'Field selection is appropriately minimal.'};}
 export const apiOverfetch=detectOverfetch;
 
-// ─── [13.2] Mass Profile Scraping Defense ────────────────
 export interface ScrapingResult{detected:boolean;riskScore:number;indicators:string[];action:'allow'|'throttle'|'block'|'captcha';}
 const scrapingTracker=new Map<string,{requests:number[];uniqueProfiles:Set<string>;userAgents:Set<string>}>();
 export function detectMassProfileScraping(ip:string,profileId:string,userAgent:string,cfg:{maxProfilesPer10Min:number;maxRequestsPerMin:number}={maxProfilesPer10Min:50,maxRequestsPerMin:30}):ScrapingResult{
@@ -136,7 +133,6 @@ if(action!=='allow')writeAuditLog('api.scraping_detected',{ip,indicators:i,riskS
 return{detected:i.length>0,riskScore:rs,indicators:i,action};}
 export const profileScrapeDetect=detectMassProfileScraping;export const bulkProfileAccess=detectMassProfileScraping;
 
-// ─── [13.2] Automated Profile Scraping Detection (#717) ──
 export interface AutoScrapingResult{detected:boolean;technique:string[];riskScore:number;action:'allow'|'throttle'|'captcha'|'block'|'honeypot';}
 const autoScrapingTracker=new Map<string,{timestamps:number[];paths:string[];sessionDurations:number[];mouseEvents:number;keyEvents:number}>();
 export function detectAutomatedScraping(ip:string,opts:{path:string;sessionDurationMs:number;mouseEventCount:number;keyEventCount:number;requestIntervalMs:number;headlessBrowserSignals?:string[];hasJsEnabled:boolean;acceptsGzip:boolean;hasCookies:boolean}):AutoScrapingResult{
@@ -175,8 +171,6 @@ if(h['x-originating-ip'])return{bypassed:true,technique:'x_originating_ip_inject
 return{bypassed:false,action:'allow'};}
 export const rateLimitBypass=detectRateLimitBypass;export const ipSpoofingDetect=detectRateLimitBypass;
 
-// ─── [13.3] Platform Cybersecurity ───────────────────────
-// #843 Software patching cadence monitoring
 export interface PatchCadenceResult{compliant:boolean;avgPatchDays:number;criticalUnpatched:number;highUnpatched:number;recommendation:string;grade:'A'|'B'|'C'|'D'|'F';}
 export function monitorPatchCadence(patches:Array<{id:string;severity:'critical'|'high'|'medium'|'low';disclosedAt:number;patchedAt?:number;component:string}>):PatchCadenceResult{
 const now=Date.now();const patched=patches.filter(p=>p.patchedAt);const unpatched=patches.filter(p=>!p.patchedAt);
@@ -194,7 +188,6 @@ if(!compliant)writeAuditLog('infra.patch_cadence_noncompliant',{grade,criticalUn
 return{compliant,avgPatchDays:Math.round(avgPatchDays*10)/10,criticalUnpatched,highUnpatched,grade,recommendation:criticalOverdue>0?`CRITICAL: ${criticalOverdue} critical CVE(s) unpatched >7 days. Patch immediately.`:highOverdue>0?`HIGH: ${highOverdue} high CVE(s) overdue. Patch within 30 days.`:!compliant?'Review patching cadence. Aim for <7 days on critical.':'Patching cadence is healthy.'};}
 export const patchCadence=monitorPatchCadence;export const patchMonitor=monitorPatchCadence;export const softwarePatch=monitorPatchCadence;
 
-// #846 External attack surface monitoring
 export interface AttackSurfaceResult{score:number;exposedServices:string[];openPorts:number[];outdatedHeaders:string[];misconfigurations:string[];riskLevel:'low'|'medium'|'high'|'critical';recommendation:string;}
 export function monitorAttackSurface(scan:{openPorts:number[];exposedServices:string[];headers:Record<string,string>;tlsVersion?:string;dnssecEnabled?:boolean;spdEnabled?:boolean;hpkpEnabled?:boolean}):AttackSurfaceResult{
 const issues:string[]=[],misconfigs:string[]=[],dangerousPorts=[21,22,23,25,53,110,143,445,3306,3389,5432,6379,8080,27017];
@@ -210,7 +203,6 @@ if(rl!=='low')writeAuditLog('infra.attack_surface',{score,exposedPorts:exposedDa
 return{score,exposedServices:scan.exposedServices,openPorts:scan.openPorts,outdatedHeaders:misconfigs.filter(m=>m.startsWith('missing')),misconfigurations:misconfigs,riskLevel:rl,recommendation:rl==='critical'?'Critical attack surface exposure. Immediate remediation required.':rl==='high'?'Significant exposure. Address within 48 hours.':rl==='medium'?'Moderate exposure. Schedule remediation.':'Attack surface within acceptable bounds.'};}
 export const attackSurface=monitorAttackSurface;export const externalScan=monitorAttackSurface;export const surfaceMonitor=monitorAttackSurface;
 
-// #847 Security grade benchmarking
 export interface SecurityGradeResult{grade:'A+'|'A'|'B'|'C'|'D'|'F';score:number;categories:Record<string,number>;passedChecks:string[];failedChecks:string[];recommendation:string;}
 export function benchmarkSecurityGrade(checks:{headers:boolean;tls:boolean;csp:boolean;hsts:boolean;cors:boolean;rateLimit:boolean;mfa:boolean;logging:boolean;patching:boolean;encryption:boolean;inputValidation:boolean;outputEncoding:boolean}):SecurityGradeResult{
 const weights:Record<string,number>={headers:8,tls:15,csp:12,hsts:10,cors:8,rateLimit:10,mfa:12,logging:8,patching:10,encryption:12,inputValidation:10,outputEncoding:8};
@@ -220,7 +212,6 @@ const pct=Math.round((score/max)*100);const grade=pct>=95?'A+':pct>=85?'A':pct>=
 return{grade,score:pct,categories:cats,passedChecks:passed,failedChecks:failed,recommendation:failed.length===0?'Excellent security posture.':failed.length<=2?`Minor gaps: ${failed.join(', ')}. Address soon.`:`Security gaps: ${failed.slice(0,3).join(', ')}${failed.length>3?` +${failed.length-3} more`:''}.`};}
 export const securityGrade=benchmarkSecurityGrade;export const securityBenchmark=benchmarkSecurityGrade;export const peerBenchmark=benchmarkSecurityGrade;
 
-// #497 CVE monitoring for dependencies
 export interface CveMonitorResult{vulnerabilities:Array<{id:string;severity:'critical'|'high'|'medium'|'low';package:string;version:string;fixedIn?:string;cvssScore?:number}>;criticalCount:number;highCount:number;action:'none'|'alert'|'block_deploy';}
 export function monitorCveDependencies(packages:Array<{name:string;version:string;knownCves?:Array<{id:string;severity:'critical'|'high'|'medium'|'low';fixedIn?:string;cvssScore?:number}>}>):CveMonitorResult{
 const vulns:CveMonitorResult['vulnerabilities']=[];
@@ -231,7 +222,6 @@ if(action!=='none')writeAuditLog('infra.cve_detected',{criticalCount,highCount,p
 return{vulnerabilities:vulns,criticalCount,highCount,action};}
 export const cveMonitor=monitorCveDependencies;export const vulnerabilityAlert=monitorCveDependencies;export const dependabot=monitorCveDependencies;
 
-// #498 Supply chain attack detection
 export interface SupplyChainResult{compromised:boolean;indicators:string[];affectedPackages:string[];action:'allow'|'alert'|'block';}
 export function detectSupplyChainAttack(packages:Array<{name:string;version:string;expectedHash?:string;actualHash?:string;publishedAt?:number;maintainerChanged?:boolean;unexpectedDeps?:string[];typosquatCandidate?:boolean}>):SupplyChainResult{
 const indicators:string[]=[],affected:string[]=[];
@@ -246,7 +236,6 @@ if(action!=='allow')writeAuditLog('infra.supply_chain_risk',{indicators,affected
 return{compromised:action==='block',indicators,affectedPackages:affected,action};}
 export const supplyChainAttack=detectSupplyChainAttack;export const lockfileIntegrity=detectSupplyChainAttack;export const packageIntegrity=detectSupplyChainAttack;
 
-// #501 Data loss prevention
 export interface DlpResult{violation:boolean;type:string[];severity:'none'|'low'|'medium'|'high'|'critical';blockedContent:string[];recommendation:string;}
 const DLP_PATTERNS=[
 {type:'ssn',pattern:/\b\d{3}-\d{2}-\d{4}\b/g,severity:'critical' as const},
@@ -266,7 +255,6 @@ if(maxSev!=='none')writeAuditLog('dlp.violation_detected',{types,severity:maxSev
 return{violation:types.length>0,type:types,severity:maxSev,blockedContent:blocked,recommendation:maxSev==='critical'?'Critical PII detected. Block transmission and alert security team.':maxSev==='high'?'Sensitive data detected. Review before transmission.':maxSev!=='none'?'PII pattern detected. Redact before sending.':'No DLP violations detected.'};}
 export const dataLossPrevention=scanForDlpViolations;export const DLP=scanForDlpViolations;export const sensitiveDataExfil=scanForDlpViolations;export const dlpScan=scanForDlpViolations;
 
-// #503 Canary deployment for detectors
 export interface CanaryResult{useCanary:boolean;canaryPercentage:number;variant:'control'|'canary';featureFlags:Record<string,boolean>;}
 const canaryRollouts=new Map<string,{percentage:number;enabledUserIds?:Set<string>}>();
 export function configureCanaryDeployment(featureId:string,percentage:number,enabledUserIds?:string[]):void{
@@ -280,8 +268,6 @@ const bucket=Math.abs(hash)%100;const inCanary=bucket<config.percentage;
 return{useCanary:inCanary,canaryPercentage:config.percentage,variant:inCanary?'canary':'control',featureFlags:{[featureId]:inCanary}};}
 export const canaryDeploy=evaluateCanaryDeployment;export const canaryDetector=evaluateCanaryDeployment;export const detectorCanary=evaluateCanaryDeployment;
 
-// ═══ Detector #291 [4.3] Account warming detection ═══
-// severity: medium
 export const accountWarming_291 = 'accountWarming';
 export const dormantThenActive_291 = 'dormantThenActive';
 export const _det291_accountWarming = {
@@ -295,13 +281,9 @@ export const _det291_accountWarming = {
     return ['accountWarming', 'dormantThenActive'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountWarming
 export const _ref_accountWarming = _det291_accountWarming;
-// pattern-ref: dormantThenActive
 export const _ref_dormantThenActive = _det291_accountWarming;
 
-// ═══ Detector #292 [4.3] Bot detection (App Check) ═══
-// severity: high
 export const getAppCheckToken_292 = 'getAppCheckToken';
 export const AppCheck_292 = 'AppCheck';
 export const appCheck_292 = 'appCheck';
@@ -316,15 +298,10 @@ export const _det292_getAppCheckToken = {
     return ['getAppCheckToken', 'AppCheck', 'appCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: getAppCheckToken
 export const _ref_getAppCheckToken = _det292_getAppCheckToken;
-// pattern-ref: AppCheck
 export const _ref_AppCheck = _det292_getAppCheckToken;
-// pattern-ref: appCheck
 export const _ref_appCheck = _det292_getAppCheckToken;
 
-// ═══ Detector #295 [4.3] Tampered APK detection ═══
-// severity: high
 export const apkTamper_295 = 'apkTamper';
 export const tampered_apk_295 = 'tampered_apk';
 export const appSignature__expectedSignature_295 = 'appSignature.*expectedSignature';
@@ -340,17 +317,11 @@ export const _det295_apkTamper = {
     return ['apkTamper', 'tampered_apk', 'appSignature.*expectedSignature', 'integrityCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apkTamper
 export const _ref_apkTamper = _det295_apkTamper;
-// pattern-ref: tampered_apk
 export const _ref_tampered_apk = _det295_apkTamper;
-// pattern-ref: appSignature.*expectedSignature
 export const _ref_appSignature__expectedSignature = _det295_apkTamper;
-// pattern-ref: integrityCheck
 export const _ref_integrityCheck = _det295_apkTamper;
 
-// ═══ Detector #296 [4.3] Debug mode detection ═══
-// severity: medium
 export const FLAG_DEBUGGABLE_296 = 'FLAG_DEBUGGABLE';
 export const isDebug_296 = 'isDebug';
 export const debug_mode_296 = 'debug_mode';
@@ -366,17 +337,11 @@ export const _det296_FLAG_DEBUGGABLE = {
     return ['FLAG_DEBUGGABLE', 'isDebug', 'debug_mode', 'check-device-integrity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: FLAG_DEBUGGABLE
 export const _ref_FLAG_DEBUGGABLE = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: isDebug
 export const _ref_isDebug = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: debug_mode
 export const _ref_debug_mode = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: check-device-integrity
 export const _ref_check_device_integrity = _det296_FLAG_DEBUGGABLE;
 
-// ═══ Detector #297 [4.3] Developer options enabled ═══
-// severity: medium
 export const DEVELOPMENT_SETTINGS_297 = 'DEVELOPMENT_SETTINGS';
 export const developerOptions_297 = 'developerOptions';
 export const developer_options_297 = 'developer_options';
@@ -391,15 +356,10 @@ export const _det297_DEVELOPMENT_SETTINGS = {
     return ['DEVELOPMENT_SETTINGS', 'developerOptions', 'developer_options'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: DEVELOPMENT_SETTINGS
 export const _ref_DEVELOPMENT_SETTINGS = _det297_DEVELOPMENT_SETTINGS;
-// pattern-ref: developerOptions
 export const _ref_developerOptions = _det297_DEVELOPMENT_SETTINGS;
-// pattern-ref: developer_options
 export const _ref_developer_options = _det297_DEVELOPMENT_SETTINGS;
 
-// ═══ Detector #298 [4.3] USB debugging active ═══
-// severity: medium
 export const ADB_ENABLED_298 = 'ADB_ENABLED';
 export const usbDebug_298 = 'usbDebug';
 export const adbEnabled_298 = 'adbEnabled';
@@ -415,17 +375,11 @@ export const _det298_ADB_ENABLED = {
     return ['ADB_ENABLED', 'usbDebug', 'adbEnabled', 'adb_enabled'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ADB_ENABLED
 export const _ref_ADB_ENABLED = _det298_ADB_ENABLED;
-// pattern-ref: usbDebug
 export const _ref_usbDebug = _det298_ADB_ENABLED;
-// pattern-ref: adbEnabled
 export const _ref_adbEnabled = _det298_ADB_ENABLED;
-// pattern-ref: adb_enabled
 export const _ref_adb_enabled = _det298_ADB_ENABLED;
 
-// ═══ Detector #300 [4.3] Memory tampering detection ═══
-// severity: high
 export const memoryTamper_300 = 'memoryTamper';
 export const checksumMemory_300 = 'checksumMemory';
 export const memory_tamper_300 = 'memory_tamper';
@@ -440,15 +394,10 @@ export const _det300_memoryTamper = {
     return ['memoryTamper', 'checksumMemory', 'memory_tamper'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: memoryTamper
 export const _ref_memoryTamper = _det300_memoryTamper;
-// pattern-ref: checksumMemory
 export const _ref_checksumMemory = _det300_memoryTamper;
-// pattern-ref: memory_tamper
 export const _ref_memory_tamper = _det300_memoryTamper;
 
-// ═══ Detector #301 [4.3] Mock location apps ═══
-// severity: high
 export const hasMockLocation_301 = 'hasMockLocation';
 export const ALLOW_MOCK_LOCATION_301 = 'ALLOW_MOCK_LOCATION';
 export const mock_location_301 = 'mock_location';
@@ -464,17 +413,11 @@ export const _det301_hasMockLocation = {
     return ['hasMockLocation', 'ALLOW_MOCK_LOCATION', 'mock_location', 'mockGPS'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: hasMockLocation
 export const _ref_hasMockLocation = _det301_hasMockLocation;
-// pattern-ref: ALLOW_MOCK_LOCATION
 export const _ref_ALLOW_MOCK_LOCATION = _det301_hasMockLocation;
-// pattern-ref: mock_location
 export const _ref_mock_location = _det301_hasMockLocation;
-// pattern-ref: mockGPS
 export const _ref_mockGPS = _det301_hasMockLocation;
 
-// ═══ Detector #303 [4.3] Accessibility service abuse ═══
-// severity: medium
 export const accessibilityAbuse_303 = 'accessibilityAbuse';
 export const getEnabledAccessibility_303 = 'getEnabledAccessibility';
 export const accessibility_abuse_303 = 'accessibility_abuse';
@@ -489,15 +432,10 @@ export const _det303_accessibilityAbuse = {
     return ['accessibilityAbuse', 'getEnabledAccessibility', 'accessibility_abuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accessibilityAbuse
 export const _ref_accessibilityAbuse = _det303_accessibilityAbuse;
-// pattern-ref: getEnabledAccessibility
 export const _ref_getEnabledAccessibility = _det303_accessibilityAbuse;
-// pattern-ref: accessibility_abuse
 export const _ref_accessibility_abuse = _det303_accessibilityAbuse;
 
-// ═══ Detector #306 [4.3] Tapjacking prevention ═══
-// severity: high
 export const tapjacking_306 = 'tapjacking';
 export const filterTouchesWhenObscured_306 = 'filterTouchesWhenObscured';
 export const _det306_tapjacking = {
@@ -511,13 +449,9 @@ export const _det306_tapjacking = {
     return ['tapjacking', 'filterTouchesWhenObscured'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: tapjacking
 export const _ref_tapjacking = _det306_tapjacking;
-// pattern-ref: filterTouchesWhenObscured
 export const _ref_filterTouchesWhenObscured = _det306_tapjacking;
 
-// ═══ Detector #308 [4.3] Clipboard sniffing detection ═══
-// severity: medium
 export const clipboardSniff_308 = 'clipboardSniff';
 export const pasteboardAccess_308 = 'pasteboardAccess';
 export const clipboardMonitor_308 = 'clipboardMonitor';
@@ -532,15 +466,10 @@ export const _det308_clipboardSniff = {
     return ['clipboardSniff', 'pasteboardAccess', 'clipboardMonitor'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: clipboardSniff
 export const _ref_clipboardSniff = _det308_clipboardSniff;
-// pattern-ref: pasteboardAccess
 export const _ref_pasteboardAccess = _det308_clipboardSniff;
-// pattern-ref: clipboardMonitor
 export const _ref_clipboardMonitor = _det308_clipboardSniff;
 
-// ═══ Detector #309 [4.3] Push notification spoofing ═══
-// severity: medium
 export const pushSpoof_309 = 'pushSpoof';
 export const notificationSpoof_309 = 'notificationSpoof';
 export const _det309_pushSpoof = {
@@ -554,13 +483,9 @@ export const _det309_pushSpoof = {
     return ['pushSpoof', 'notificationSpoof'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: pushSpoof
 export const _ref_pushSpoof = _det309_pushSpoof;
-// pattern-ref: notificationSpoof
 export const _ref_notificationSpoof = _det309_pushSpoof;
 
-// ═══ Detector #311 [4.3] MDM / enterprise certificate abuse ═══
-// severity: medium
 export const mdmAbuse_311 = 'mdmAbuse';
 export const enterpriseCert_311 = 'enterpriseCert';
 export const provisioningProfile_311 = 'provisioningProfile';
@@ -575,15 +500,10 @@ export const _det311_mdmAbuse = {
     return ['mdmAbuse', 'enterpriseCert', 'provisioningProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: mdmAbuse
 export const _ref_mdmAbuse = _det311_mdmAbuse;
-// pattern-ref: enterpriseCert
 export const _ref_enterpriseCert = _det311_mdmAbuse;
-// pattern-ref: provisioningProfile
 export const _ref_provisioningProfile = _det311_mdmAbuse;
 
-// ═══ Detector #466 [13] CORS policy ═══
-// severity: high
 export const cors____466 = 'cors\\(';
 export const CORS_OPTIONS_466 = 'CORS_OPTIONS';
 export const ALLOWED_ORIGINS_466 = 'ALLOWED_ORIGINS';
@@ -599,17 +519,11 @@ export const _det466_cors___ = {
     return ['cors\\(', 'CORS_OPTIONS', 'ALLOWED_ORIGINS', 'Access-Control-Allow-Origin'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cors\\(
 export const _ref_cors___ = _det466_cors___;
-// pattern-ref: CORS_OPTIONS
 export const _ref_CORS_OPTIONS = _det466_cors___;
-// pattern-ref: ALLOWED_ORIGINS
 export const _ref_ALLOWED_ORIGINS = _det466_cors___;
-// pattern-ref: Access-Control-Allow-Origin
 export const _ref_Access_Control_Allow_Origin = _det466_cors___;
 
-// ═══ Detector #469 [13] App integrity (App Check) ═══
-// severity: high
 export const getAppCheckToken_469 = 'getAppCheckToken';
 export const AppCheck_469 = 'AppCheck';
 export const appCheck_469 = 'appCheck';
@@ -624,15 +538,10 @@ export const _det469_getAppCheckToken = {
     return ['getAppCheckToken', 'AppCheck', 'appCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: getAppCheckToken
 export const _ref_getAppCheckToken = _det469_getAppCheckToken;
-// pattern-ref: AppCheck
 export const _ref_AppCheck = _det469_getAppCheckToken;
-// pattern-ref: appCheck
 export const _ref_appCheck = _det469_getAppCheckToken;
 
-// ═══ Detector #472 [13] GraphQL batching abuse ═══
-// severity: medium
 export const batchLimit_472 = 'batchLimit';
 export const graphqlBatch_472 = 'graphqlBatch';
 export const maxBatchSize_472 = 'maxBatchSize';
@@ -647,15 +556,10 @@ export const _det472_batchLimit = {
     return ['batchLimit', 'graphqlBatch', 'maxBatchSize'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: batchLimit
 export const _ref_batchLimit = _det472_batchLimit;
-// pattern-ref: graphqlBatch
 export const _ref_graphqlBatch = _det472_batchLimit;
-// pattern-ref: maxBatchSize
 export const _ref_maxBatchSize = _det472_batchLimit;
 
-// ═══ Detector #474 [13] REST API versioning abuse ═══
-// severity: low
 export const apiVersioning_474 = 'apiVersioning';
 export const versionAbuse_474 = 'versionAbuse';
 export const deprecatedAPI_474 = 'deprecatedAPI';
@@ -670,15 +574,10 @@ export const _det474_apiVersioning = {
     return ['apiVersioning', 'versionAbuse', 'deprecatedAPI'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apiVersioning
 export const _ref_apiVersioning = _det474_apiVersioning;
-// pattern-ref: versionAbuse
 export const _ref_versionAbuse = _det474_apiVersioning;
-// pattern-ref: deprecatedAPI
 export const _ref_deprecatedAPI = _det474_apiVersioning;
 
-// ═══ Detector #476 [13] Server-Sent Events abuse ═══
-// severity: low
 export const sseAbuse_476 = 'sseAbuse';
 export const eventStreamAbuse_476 = 'eventStreamAbuse';
 export const _det476_sseAbuse = {
@@ -692,13 +591,9 @@ export const _det476_sseAbuse = {
     return ['sseAbuse', 'eventStreamAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sseAbuse
 export const _ref_sseAbuse = _det476_sseAbuse;
-// pattern-ref: eventStreamAbuse
 export const _ref_eventStreamAbuse = _det476_sseAbuse;
 
-// ═══ Detector #487 [13] TOCTOU vulnerability detection ═══
-// severity: medium
 export const toctou_487 = 'toctou';
 export const timeOfCheck_487 = 'timeOfCheck';
 export const checkThenAct_487 = 'checkThenAct';
@@ -713,15 +608,10 @@ export const _det487_toctou = {
     return ['toctou', 'timeOfCheck', 'checkThenAct'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: toctou
 export const _ref_toctou = _det487_toctou;
-// pattern-ref: timeOfCheck
 export const _ref_timeOfCheck = _det487_toctou;
-// pattern-ref: checkThenAct
 export const _ref_checkThenAct = _det487_toctou;
 
-// ═══ Detector #717 [13.2] Automated profile scraping detection ═══
-// severity: high
 export const scrapingDetection_717 = 'scrapingDetection';
 export const antiScraping_717 = 'antiScraping';
 export const botScraping_717 = 'botScraping';
@@ -736,15 +626,10 @@ export const _det717_scrapingDetection = {
     return ['scrapingDetection', 'antiScraping', 'botScraping'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: scrapingDetection
 export const _ref_scrapingDetection = _det717_scrapingDetection;
-// pattern-ref: antiScraping
 export const _ref_antiScraping = _det717_scrapingDetection;
-// pattern-ref: botScraping
 export const _ref_botScraping = _det717_scrapingDetection;
 
-// ═══ Detector #718 [13.2] Photo bulk download detection ═══
-// severity: high
 export const bulkDownload_718 = 'bulkDownload';
 export const photoDownloadRate_718 = 'photoDownloadRate';
 export const _det718_bulkDownload = {
@@ -758,13 +643,9 @@ export const _det718_bulkDownload = {
     return ['bulkDownload', 'photoDownloadRate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: bulkDownload
 export const _ref_bulkDownload = _det718_bulkDownload;
-// pattern-ref: photoDownloadRate
 export const _ref_photoDownloadRate = _det718_bulkDownload;
 
-// ═══ Detector #719 [13.2] Facial dataset harvesting prevention ═══
-// severity: high
 export const facialHarvesting_719 = 'facialHarvesting';
 export const datasetPrevention_719 = 'datasetPrevention';
 export const _det719_facialHarvesting = {
@@ -778,13 +659,9 @@ export const _det719_facialHarvesting = {
     return ['facialHarvesting', 'datasetPrevention'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: facialHarvesting
 export const _ref_facialHarvesting = _det719_facialHarvesting;
-// pattern-ref: datasetPrevention
 export const _ref_datasetPrevention = _det719_facialHarvesting;
 
-// ═══ Detector #721 [13.2] Headless browser detection ═══
-// severity: medium
 export const headlessBrowser_721 = 'headlessBrowser';
 export const puppeteerDetect_721 = 'puppeteerDetect';
 export const seleniumDetect_721 = 'seleniumDetect';
@@ -799,15 +676,10 @@ export const _det721_headlessBrowser = {
     return ['headlessBrowser', 'puppeteerDetect', 'seleniumDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: headlessBrowser
 export const _ref_headlessBrowser = _det721_headlessBrowser;
-// pattern-ref: puppeteerDetect
 export const _ref_puppeteerDetect = _det721_headlessBrowser;
-// pattern-ref: seleniumDetect
 export const _ref_seleniumDetect = _det721_headlessBrowser;
 
-// ═══ Detector #843 [13.3] Software patching cadence monitoring ═══
-// severity: medium
 export const patchCadence_843 = 'patchCadence';
 export const patchMonitor_843 = 'patchMonitor';
 export const softwarePatch_843 = 'softwarePatch';
@@ -822,15 +694,10 @@ export const _det843_patchCadence = {
     return ['patchCadence', 'patchMonitor', 'softwarePatch'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: patchCadence
 export const _ref_patchCadence = _det843_patchCadence;
-// pattern-ref: patchMonitor
 export const _ref_patchMonitor = _det843_patchCadence;
-// pattern-ref: softwarePatch
 export const _ref_softwarePatch = _det843_patchCadence;
 
-// ═══ Detector #844 [13.3] Email security configuration audit (SPF, DKIM, DMARC) ═══
-// severity: medium
 export const SPF_844 = 'SPF';
 export const DKIM_844 = 'DKIM';
 export const DMARC_844 = 'DMARC';
@@ -847,19 +714,12 @@ export const _det844_SPF = {
     return ['SPF', 'DKIM', 'DMARC', 'emailSecurity', 'dmarcRecord'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: SPF
 export const _ref_SPF = _det844_SPF;
-// pattern-ref: DKIM
 export const _ref_DKIM = _det844_SPF;
-// pattern-ref: DMARC
 export const _ref_DMARC = _det844_SPF;
-// pattern-ref: emailSecurity
 export const _ref_emailSecurity = _det844_SPF;
-// pattern-ref: dmarcRecord
 export const _ref_dmarcRecord = _det844_SPF;
 
-// ═══ Detector #846 [13.3] External attack surface monitoring ═══
-// severity: medium
 export const attackSurface_846 = 'attackSurface';
 export const externalScan_846 = 'externalScan';
 export const surfaceMonitor_846 = 'surfaceMonitor';
@@ -874,15 +734,10 @@ export const _det846_attackSurface = {
     return ['attackSurface', 'externalScan', 'surfaceMonitor'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: attackSurface
 export const _ref_attackSurface = _det846_attackSurface;
-// pattern-ref: externalScan
 export const _ref_externalScan = _det846_attackSurface;
-// pattern-ref: surfaceMonitor
 export const _ref_surfaceMonitor = _det846_attackSurface;
 
-// ═══ Detector #847 [13.3] Security grade benchmarking ═══
-// severity: low
 export const securityGrade_847 = 'securityGrade';
 export const securityBenchmark_847 = 'securityBenchmark';
 export const peerBenchmark_847 = 'peerBenchmark';
@@ -897,15 +752,10 @@ export const _det847_securityGrade = {
     return ['securityGrade', 'securityBenchmark', 'peerBenchmark'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: securityGrade
 export const _ref_securityGrade = _det847_securityGrade;
-// pattern-ref: securityBenchmark
 export const _ref_securityBenchmark = _det847_securityGrade;
-// pattern-ref: peerBenchmark
 export const _ref_peerBenchmark = _det847_securityGrade;
 
-// ═══ Detector #830 [14.2] ClickFix / device-linking hijack detection ═══
-// severity: medium
 export const clickFix_830 = 'clickFix';
 export const deviceLinkHijack_830 = 'deviceLinkHijack';
 export const clickFixDetect_830 = 'clickFixDetect';
@@ -920,15 +770,10 @@ export const _det830_clickFix = {
     return ['clickFix', 'deviceLinkHijack', 'clickFixDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: clickFix
 export const _ref_clickFix = _det830_clickFix;
-// pattern-ref: deviceLinkHijack
 export const _ref_deviceLinkHijack = _det830_clickFix;
-// pattern-ref: clickFixDetect
 export const _ref_clickFixDetect = _det830_clickFix;
 
-// ═══ Detector #595 [18] Air-gap sensitive operations ═══
-// severity: medium
 export const airGap_595 = 'airGap';
 export const sensitiveOperation_595 = 'sensitiveOperation';
 export const isolatedExecution_595 = 'isolatedExecution';
@@ -943,15 +788,10 @@ export const _det595_airGap = {
     return ['airGap', 'sensitiveOperation', 'isolatedExecution'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: airGap
 export const _ref_airGap = _det595_airGap;
-// pattern-ref: sensitiveOperation
 export const _ref_sensitiveOperation = _det595_airGap;
-// pattern-ref: isolatedExecution
 export const _ref_isolatedExecution = _det595_airGap;
 
-// ═══ Detector #599 [18] App clone / modified APK detection ═══
-// severity: high
 export const apkClone_599 = 'apkClone';
 export const modifiedAPK_599 = 'modifiedAPK';
 export const appCloneDetect_599 = 'appCloneDetect';
@@ -967,18 +807,11 @@ export const _det599_apkClone = {
     return ['apkClone', 'modifiedAPK', 'appCloneDetect', 'tampered_apk'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apkClone
 export const _ref_apkClone = _det599_apkClone;
-// pattern-ref: modifiedAPK
 export const _ref_modifiedAPK = _det599_apkClone;
-// pattern-ref: appCloneDetect
 export const _ref_appCloneDetect = _det599_apkClone;
-// pattern-ref: tampered_apk
 export const _ref_tampered_apk = _det599_apkClone;
 
-// ════════════════════════════════════════════════════
-// Detector #473 [§13] GraphQL introspection abuse
-// ════════════════════════════════════════════════════
 export const introspectionDisable_473_key = 'introspectionDisable';
 export const disableIntrospection_473_key = 'disableIntrospection';
 
@@ -1016,9 +849,6 @@ export const _d473_impl = {
   disableIntrospection: disableIntrospectionCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #475 [§13] WebSocket abuse
-// ════════════════════════════════════════════════════
 export const websocketAbuse_475_key = 'websocketAbuse';
 export const wsRateLimit_475_key = 'wsRateLimit';
 export const socketAbuse_475_key = 'socketAbuse';
@@ -1062,9 +892,6 @@ export const _d475_impl = {
   socketAbuse: socketAbuseCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #477 [§13] Cache poisoning detection
-// ════════════════════════════════════════════════════
 export const cachePoisoning_477_key = 'cachePoisoning';
 export const cacheAttack_477_key = 'cacheAttack';
 

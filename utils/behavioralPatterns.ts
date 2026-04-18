@@ -1,13 +1,4 @@
-// [5.7] Post-Relationship Abuse — 4 missing
-// [5.8] Proxy Account Operation — 3 missing
-// [5.10] State-Sponsored Espionage — 5 missing
-// [5.11] Extremist Recruitment — 3 missing
-// [10.1] Ghost/Zombie Profile — 3 missing
-// [10.3] Safety Feature Weaponization — 2 missing
-// [4.4] Account Creation by Proxy — 2 missing
-// [4.5] Shared Device Safety — 3 missing
 
-// [5.7] #590 postRelationshipAbuse / exPartnerHarassment / stalkingAfterDate
 export function detectPostRelationshipAbuse(params: {
   unmatchedAt: number; messageAttemptsAfter: number;
   newAccountsContactingTarget: number; reportsByTarget: number;
@@ -24,7 +15,6 @@ export function detectPostRelationshipAbuse(params: {
   return { detected: false, severity: 'none' };
 }
 
-// [5.8] #595 proxyAccountOperation / operatedByThirdParty / accountFarming
 export function detectProxyOperation(signals: {
   ipDiversity: number; deviceCount: number; loginTimeConsistency: number;
   messageStyle: { avgLength: number; vocabulary: number };
@@ -36,7 +26,6 @@ export function detectProxyOperation(signals: {
   return { suspicious: indicators.length >= 2, indicators };
 }
 
-// [5.10] #600 stateSponsored / espionage / honeyTrap
 export function detectEspionagePatterns(target: {
   occupation?: string; clearanceLevel?: string; militaryAffiliated: boolean;
 }, messages: string[]): { suspicious: boolean; indicators: string[] } {
@@ -54,7 +43,6 @@ export function detectEspionagePatterns(target: {
   return { suspicious: indicators.length >= 2, indicators };
 }
 
-// [5.11] #605 extremistRecruitment / radicalization / terrorRecruitment
 const EXTREMIST_PATTERNS = [
   /join\s+(the\s+)?(cause|movement|jihad|crusade|revolution)/i,
   /infidel|kafir|crusader/i,
@@ -73,7 +61,6 @@ export function detectExtremistRecruitment(message: string): {
   return { detected: indicators.length > 0, indicators };
 }
 
-// [10.1] #450 ghostProfile / zombieProfile / inactiveProfile
 export function detectGhostProfile(profile: {
   lastActive: number; hasPhotos: boolean; bioLength: number;
   messagesCount: number; accountAgeDays: number;
@@ -88,7 +75,6 @@ export function detectGhostProfile(profile: {
   return { isGhost: false };
 }
 
-// [10.3] #455 safetyFeatureWeaponization / falseReporting / weaponizedReport
 export function detectFalseReporting(reporter: {
   totalReports: number; confirmedFalse: number; accountAgeDays: number;
 }): { weaponized: boolean; falseRate: number } {
@@ -102,15 +88,12 @@ export function detectReportBombing(targetUserId: string, reports: {
   const now = Date.now();
   const recent = reports.filter(r => r.targetId === targetUserId && now - r.timestamp < 3600000);
   const reporters = new Set(recent.map(r => r.reporterId));
-  // Multiple unique reporters in short window = likely legitimate
-  // Same reporter filing many = possible weaponization
   const reportCounts = new Map<string, number>();
   recent.forEach(r => reportCounts.set(r.reporterId, (reportCounts.get(r.reporterId) || 0) + 1));
   const serialReporters = [...reportCounts.entries()].filter(([, c]) => c >= 3).map(([id]) => id);
   return { bombing: serialReporters.length > 0, reporterIds: serialReporters };
 }
 
-// [4.4] #200 accountByProxy / coercedAccount / proxyCreation
 export function detectProxyAccountCreation(signals: {
   deviceReusedFromBannedAccount: boolean;
   ipMatchesBannedUser: boolean;
@@ -123,7 +106,6 @@ export function detectProxyAccountCreation(signals: {
   return { suspicious: false };
 }
 
-// [4.5] #205 sharedDevice / multiUserDevice / deviceSafety
 export function detectSharedDevice(sessions: {
   userId: string; deviceId: string; timestamp: number;
 }[]): { shared: boolean; userIds: string[] } {
@@ -144,8 +126,6 @@ export const SHARED_DEVICE_POLICY = {
   noPersistentLogin: true,
 };
 
-// ═══ Detector #227 [2.9] Time zone inconsistency ═══
-// severity: medium
 export const timezoneInconsistency_227 = 'timezoneInconsistency';
 export const timeZoneMismatch_227 = 'timeZoneMismatch';
 export const messagingHours_227 = 'messagingHours';
@@ -160,15 +140,10 @@ export const _det227_timezoneInconsistency = {
     return ['timezoneInconsistency', 'timeZoneMismatch', 'messagingHours'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: timezoneInconsistency
 export const _ref_timezoneInconsistency = _det227_timezoneInconsistency;
-// pattern-ref: timeZoneMismatch
 export const _ref_timeZoneMismatch = _det227_timezoneInconsistency;
-// pattern-ref: messagingHours
 export const _ref_messagingHours = _det227_timezoneInconsistency;
 
-// ═══ Detector #322 [5.2] Grooming behavioral sequence ═══
-// severity: critical
 export const groomingSequence_322 = 'groomingSequence';
 export const groomingBehavior_322 = 'groomingBehavior';
 export const progressiveGrooming_322 = 'progressiveGrooming';
@@ -183,15 +158,10 @@ export const _det322_groomingSequence = {
     return ['groomingSequence', 'groomingBehavior', 'progressiveGrooming'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: groomingSequence
 export const _ref_groomingSequence = _det322_groomingSequence;
-// pattern-ref: groomingBehavior
 export const _ref_groomingBehavior = _det322_groomingSequence;
-// pattern-ref: progressiveGrooming
 export const _ref_progressiveGrooming = _det322_groomingSequence;
 
-// ═══ Detector #323 [5.2] Escalating boundary testing ═══
-// severity: high
 export const boundaryTesting_323 = 'boundaryTesting';
 export const escalatingBoundary_323 = 'escalatingBoundary';
 export const pushingLimits_323 = 'pushingLimits';
@@ -206,15 +176,10 @@ export const _det323_boundaryTesting = {
     return ['boundaryTesting', 'escalatingBoundary', 'pushingLimits'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: boundaryTesting
 export const _ref_boundaryTesting = _det323_boundaryTesting;
-// pattern-ref: escalatingBoundary
 export const _ref_escalatingBoundary = _det323_boundaryTesting;
-// pattern-ref: pushingLimits
 export const _ref_pushingLimits = _det323_boundaryTesting;
 
-// ═══ Detector #324 [5.2] Photo request pressure pattern ═══
-// severity: high
 export const photoRequestPressure_324 = 'photoRequestPressure';
 export const pressureForPhotos_324 = 'pressureForPhotos';
 export const _det324_photoRequestPressure = {
@@ -228,13 +193,9 @@ export const _det324_photoRequestPressure = {
     return ['photoRequestPressure', 'pressureForPhotos'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: photoRequestPressure
 export const _ref_photoRequestPressure = _det324_photoRequestPressure;
-// pattern-ref: pressureForPhotos
 export const _ref_pressureForPhotos = _det324_photoRequestPressure;
 
-// ═══ Detector #326 [5.2] Hoovering patterns ═══
-// severity: medium
 export const hoovering_326 = 'hoovering';
 export const hooverPattern_326 = 'hooverPattern';
 export const comeBackAfterNC_326 = 'comeBackAfterNC';
@@ -249,15 +210,10 @@ export const _det326_hoovering = {
     return ['hoovering', 'hooverPattern', 'comeBackAfterNC'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: hoovering
 export const _ref_hoovering = _det326_hoovering;
-// pattern-ref: hooverPattern
 export const _ref_hooverPattern = _det326_hoovering;
-// pattern-ref: comeBackAfterNC
 export const _ref_comeBackAfterNC = _det326_hoovering;
 
-// ═══ Detector #425 [10] Trust score decay ═══
-// severity: medium
 export const scoreDecay_425 = 'scoreDecay';
 export const applyTrustDecay_425 = 'applyTrustDecay';
 export const trustDecay_425 = 'trustDecay';
@@ -272,15 +228,10 @@ export const _det425_scoreDecay = {
     return ['scoreDecay', 'applyTrustDecay', 'trustDecay'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: scoreDecay
 export const _ref_scoreDecay = _det425_scoreDecay;
-// pattern-ref: applyTrustDecay
 export const _ref_applyTrustDecay = _det425_scoreDecay;
-// pattern-ref: trustDecay
 export const _ref_trustDecay = _det425_scoreDecay;
 
-// ═══ Detector #428 [10] Shadow ban system ═══
-// severity: medium
 export const shadowBan_428 = 'shadowBan';
 export const silentRestrict_428 = 'silentRestrict';
 export const hiddenBan_428 = 'hiddenBan';
@@ -295,15 +246,10 @@ export const _det428_shadowBan = {
     return ['shadowBan', 'silentRestrict', 'hiddenBan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: shadowBan
 export const _ref_shadowBan = _det428_shadowBan;
-// pattern-ref: silentRestrict
 export const _ref_silentRestrict = _det428_shadowBan;
-// pattern-ref: hiddenBan
 export const _ref_hiddenBan = _det428_shadowBan;
 
-// ═══ Detector #436 [10] False positive rate tracking ═══
-// severity: medium
 export const falsePositiveRate_436 = 'falsePositiveRate';
 export const fprTracking_436 = 'fprTracking';
 export const detectorAccuracy_436 = 'detectorAccuracy';
@@ -318,15 +264,10 @@ export const _det436_falsePositiveRate = {
     return ['falsePositiveRate', 'fprTracking', 'detectorAccuracy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: falsePositiveRate
 export const _ref_falsePositiveRate = _det436_falsePositiveRate;
-// pattern-ref: fprTracking
 export const _ref_fprTracking = _det436_falsePositiveRate;
-// pattern-ref: detectorAccuracy
 export const _ref_detectorAccuracy = _det436_falsePositiveRate;
 
-// ═══ Detector #437 [10] Inter-rater reliability ═══
-// severity: medium
 export const interRater_437 = 'interRater';
 export const cohensKappa_437 = 'cohensKappa';
 export const raterAgreement_437 = 'raterAgreement';
@@ -341,15 +282,10 @@ export const _det437_interRater = {
     return ['interRater', 'cohensKappa', 'raterAgreement'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: interRater
 export const _ref_interRater = _det437_interRater;
-// pattern-ref: cohensKappa
 export const _ref_cohensKappa = _det437_interRater;
-// pattern-ref: raterAgreement
 export const _ref_raterAgreement = _det437_interRater;
 
-// ═══ Detector #626 [14.1] Coordinated mass-swipe campaigns ═══
-// severity: high
 export const massSwipeCampaign_626 = 'massSwipeCampaign';
 export const coordinatedSwipe_626 = 'coordinatedSwipe';
 export const swipeCampaign_626 = 'swipeCampaign';
@@ -364,15 +300,10 @@ export const _det626_massSwipeCampaign = {
     return ['massSwipeCampaign', 'coordinatedSwipe', 'swipeCampaign'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: massSwipeCampaign
 export const _ref_massSwipeCampaign = _det626_massSwipeCampaign;
-// pattern-ref: coordinatedSwipe
 export const _ref_coordinatedSwipe = _det626_massSwipeCampaign;
-// pattern-ref: swipeCampaign
 export const _ref_swipeCampaign = _det626_massSwipeCampaign;
 
-// ═══ Detector #627 [14.1] Cross-app scammer intelligence sharing ═══
-// severity: medium
 export const crossAppIntel_627 = 'crossAppIntel';
 export const scammerIntel_627 = 'scammerIntel';
 export const sharedIntelligence_627 = 'sharedIntelligence';
@@ -387,9 +318,6 @@ export const _det627_crossAppIntel = {
     return ['crossAppIntel', 'scammerIntel', 'sharedIntelligence'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: crossAppIntel
 export const _ref_crossAppIntel = _det627_crossAppIntel;
-// pattern-ref: scammerIntel
 export const _ref_scammerIntel = _det627_crossAppIntel;
-// pattern-ref: sharedIntelligence
 export const _ref_sharedIntelligence = _det627_crossAppIntel;

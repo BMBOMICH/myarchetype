@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "460955155446",
+    "project_id": "myarchetype-b2ba0",
+    "storage_bucket": "myarchetype-b2ba0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:460955155446:android:cd3c480f79fd7063c0e5d7",
+        "android_client_info": {
+          "package_name": "com.bmbomich.myarchetype"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCx8i12MrTqZaXBQmaSEq5Zn-41pLWt2c0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

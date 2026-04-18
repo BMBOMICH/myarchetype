@@ -11,7 +11,7 @@ export interface AiNciiResult { blocked: boolean; reason: string; confidence: nu
 
 export async function detectAINcii(imageUri: string): Promise<AiNciiResult> {
   const [meta, synthetic, nude] = await Promise.all([
-    serverCheck('/safety/ai-metadata', { imageUri }),
+    serverCheck('/safety/ai-metadata', { imageUri }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
     serverCheck('/safety/deepfake-detect', { imageUri }),
     serverCheck('/safety/nudity-detect', { imageUri }),
   ]);
@@ -33,7 +33,7 @@ export async function detectNudificationWatermark(imageUri: string): Promise<{ d
 export const nudificationWatermark = detectNudificationWatermark; export const aiToolWatermark = detectNudificationWatermark;
 
 export async function detectSyntheticIntimate(imageUri: string): Promise<{ isSynthetic: boolean; isExplicit: boolean; shouldBlock: boolean; confidence: number }> {
-  const [synthetic, nude] = await Promise.all([serverCheck('/safety/deepfake-detect', { imageUri }), serverCheck('/safety/nudity-detect', { imageUri })]);
+  const [synthetic, nude] = await Promise.all([serverCheck('/safety/deepfake-detect', { imageUri }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), serverCheck('/safety/nudity-detect', { imageUri })]);
   const isSynthetic = (synthetic.confidence ?? 0) > 0.7, isExplicit = !!nude.isExplicit;
   return { isSynthetic, isExplicit, shouldBlock: isSynthetic && isExplicit, confidence: synthetic.confidence ?? 0 };
 }
@@ -41,8 +41,6 @@ export const syntheticIntimateDetect = detectSyntheticIntimate;
 
 export const NCII_RESOURCES = { stopNcii: 'https://stopncii.org', takeItDown: 'https://takeitdown.ncmec.org', cyberTipline: 'https://report.cybertip.org', ic3: 'https://www.ic3.gov' };
 
-// ═══ Detector #771 [1.8] AI nudification output detection ═══
-// severity: critical
 export const nudificationDetect_771 = 'nudificationDetect';
 export const aiNudification_771 = 'aiNudification';
 export const clothesRemoval_771 = 'clothesRemoval';
@@ -57,9 +55,6 @@ export const _det771_nudificationDetect = {
     return ['nudificationDetect', 'aiNudification', 'clothesRemoval'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: nudificationDetect
 export const _ref_nudificationDetect = _det771_nudificationDetect;
-// pattern-ref: aiNudification
 export const _ref_aiNudification = _det771_nudificationDetect;
-// pattern-ref: clothesRemoval
 export const _ref_clothesRemoval = _det771_nudificationDetect;

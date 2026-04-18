@@ -60,7 +60,6 @@ export async function saveUserInterests(interests: string[]): Promise<{ success:
   const user = auth.currentUser;
   if (!user) return { success: false };
 
-  // Limit to 15 interests
   const limitedInterests = interests.slice(0, 15);
 
   try {

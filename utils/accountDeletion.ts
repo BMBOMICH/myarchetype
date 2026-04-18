@@ -1,5 +1,3 @@
-// Covers: #646 Data deletion verification post-account-removal
-// [37] #807 Account export data sanitization
 
 import { deleteUser, getAuth } from 'firebase/auth';
 import { collection, doc, getDocs, getFirestore, query, where, writeBatch } from 'firebase/firestore';
@@ -11,7 +9,6 @@ const COLLECTIONS_TO_DELETE = [
   'dailyQuestions', 'achievements', 'streaks', 'superLikes',
 ];
 
-// Fields to keep in audit log (hashed only)
 const AUDIT_RETENTION_DAYS = 90;
 
 export async function deleteAccount(userId: string): Promise<{
@@ -26,7 +23,6 @@ export async function deleteAccount(userId: string): Promise<{
   const cleared: string[] = [];
   let filesDeleted = 0;
 
-  // 1. Delete Firestore documents
   for (const col of COLLECTIONS_TO_DELETE) {
     try {
       const q = query(collection(db, col), where('userId', '==', userId));
@@ -36,7 +32,6 @@ export async function deleteAccount(userId: string): Promise<{
         snap.docs.forEach(d => batch.delete(d.ref));
         await batch.commit();
       }
-      // Also check where user appears as other party
       const q2 = query(collection(db, col), where('otherUserId', '==', userId));
       const snap2 = await getDocs(q2);
       if (!snap2.empty) {
@@ -45,12 +40,11 @@ export async function deleteAccount(userId: string): Promise<{
         await batch.commit();
       }
       cleared.push(col);
-    } catch (e: any) {
+    } catch (e: unknown) {
       errors.push(`${col}: ${e.message}`);
     }
   }
 
-  // 2. Delete Storage files
   try {
     const storageRef = ref(storage, `users/${userId}`);
     const listResult = await listAll(storageRef);
@@ -58,7 +52,6 @@ export async function deleteAccount(userId: string): Promise<{
       await deleteObject(item);
       filesDeleted++;
     }
-    // Nested folders
     for (const prefix of listResult.prefixes) {
       const nested = await listAll(prefix);
       for (const item of nested.items) {
@@ -66,11 +59,10 @@ export async function deleteAccount(userId: string): Promise<{
         filesDeleted++;
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (!e.message?.includes('not-found')) errors.push(`storage: ${e.message}`);
   }
 
-  // 3. Audit log (hashed UID only, for compliance)
   try {
     const crypto = await import('expo-crypto');
     const hashedUid = await crypto.digestStringAsync(
@@ -87,24 +79,22 @@ export async function deleteAccount(userId: string): Promise<{
       retainUntil: new Date(Date.now() + AUDIT_RETENTION_DAYS * 86400000).toISOString(),
     });
     await batch.commit();
-  } catch (e: any) {
+  } catch (e: unknown) {
     errors.push(`audit: ${e.message}`);
   }
 
-  // 4. Delete Auth account last
   try {
     const auth = getAuth();
     if (auth.currentUser?.uid === userId) {
       await deleteUser(auth.currentUser);
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     errors.push(`auth: ${e.message}`);
   }
 
   return { success: errors.length === 0, collectionsCleared: cleared, filesDeleted, errors };
 }
 
-// Export sanitized data (GDPR right to portability)
 export async function exportUserData(userId: string): Promise<Record<string, any>> {
   const db = getFirestore();
   const exportData: Record<string, any> = {};
@@ -115,7 +105,6 @@ export async function exportUserData(userId: string): Promise<Record<string, any
       const snap = await getDocs(q);
       exportData[col] = snap.docs.map(d => {
         const data = d.data();
-        // Redact other users' PII
         delete data.otherUserEmail;
         delete data.otherUserPhone;
         if (data.otherUserId) data.otherUserId = '[redacted]';

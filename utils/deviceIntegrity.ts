@@ -1,4 +1,3 @@
-// file: utils/deviceIntegrity.ts
 import { Platform } from 'react-native';
 import { writeAuditLog } from './logger';
 
@@ -31,7 +30,6 @@ const rl=i.length>=3?'high':i.length>=2?'medium':i.length>=1?'low':'none';const 
 return{mdmAbuse:rl!=='none',riskLevel:rl,indicators:i,action:act};}
 export const enterpriseCert=mdmAbuse;export const provisioningProfile=mdmAbuse;
 
-// ─── [14.1] Network/Graph Analysis ───────────────────────
 export interface GraphClusterResult{clusters:Array<{nodes:string[];density:number;suspicious:boolean}>;totalSuspicious:number;recommendation:string;}
 export function detectSuspiciousGraphClusters(edges:Array<{from:string;to:string;weight?:number}>):GraphClusterResult{
 const adj=new Map<string,Set<string>>();
@@ -58,8 +56,6 @@ if(action!=='allow')writeAuditLog('graph.coordinated_behavior',{shared,affectedC
 return{detected:shared.length>0,confidence,sharedAttributes:shared,affectedUsers:[...affected],action};}
 export const coordinatedFakeDetect=detectCoordinatedBehavior;export const sockPuppetDetect=detectCoordinatedBehavior;
 
-// ═══ Detector #263 [4.1] Email alias abuse detection ═══
-// severity: medium
 export const emailAlias_263 = 'emailAlias';
 export const plusAlias_263 = 'plusAlias';
 export const dotAlias_263 = 'dotAlias';
@@ -75,17 +71,11 @@ export const _det263_emailAlias = {
     return ['emailAlias', 'plusAlias', 'dotAlias', 'gmailDot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emailAlias
 export const _ref_emailAlias = _det263_emailAlias;
-// pattern-ref: plusAlias
 export const _ref_plusAlias = _det263_emailAlias;
-// pattern-ref: dotAlias
 export const _ref_dotAlias = _det263_emailAlias;
-// pattern-ref: gmailDot
 export const _ref_gmailDot = _det263_emailAlias;
 
-// ═══ Detector #264 [4.1] Apple Hide My Email abuse ═══
-// severity: medium
 export const appleRelay_264 = 'appleRelay';
 export const hideMyEmail_264 = 'hideMyEmail';
 export const privaterelay_appleid_com_264 = 'privaterelay.appleid.com';
@@ -100,15 +90,10 @@ export const _det264_appleRelay = {
     return ['appleRelay', 'hideMyEmail', 'privaterelay.appleid.com'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: appleRelay
 export const _ref_appleRelay = _det264_appleRelay;
-// pattern-ref: hideMyEmail
 export const _ref_hideMyEmail = _det264_appleRelay;
-// pattern-ref: privaterelay.appleid.com
 export const _ref_privaterelay_appleid_com = _det264_appleRelay;
 
-// ═══ Detector #267 [4.1] Phone number recycling detection ═══
-// severity: medium
 export const phoneRecycling_267 = 'phoneRecycling';
 export const numberRecycled_267 = 'numberRecycled';
 export const _det267_phoneRecycling = {
@@ -122,13 +107,9 @@ export const _det267_phoneRecycling = {
     return ['phoneRecycling', 'numberRecycled'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: phoneRecycling
 export const _ref_phoneRecycling = _det267_phoneRecycling;
-// pattern-ref: numberRecycled
 export const _ref_numberRecycled = _det267_phoneRecycling;
 
-// ═══ Detector #284 [4.2] Account enumeration via timing ═══
-// severity: medium
 export const accountEnumeration_284 = 'accountEnumeration';
 export const timingAttack_284 = 'timingAttack';
 export const constantTimeCompare_284 = 'constantTimeCompare';
@@ -143,15 +124,10 @@ export const _det284_accountEnumeration = {
     return ['accountEnumeration', 'timingAttack', 'constantTimeCompare'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountEnumeration
 export const _ref_accountEnumeration = _det284_accountEnumeration;
-// pattern-ref: timingAttack
 export const _ref_timingAttack = _det284_accountEnumeration;
-// pattern-ref: constantTimeCompare
 export const _ref_constantTimeCompare = _det284_accountEnumeration;
 
-// ═══ Detector #285 [4.2] Login from datacenter IP ═══
-// severity: medium
 export const datacenterIP_285 = 'datacenterIP';
 export const hostingProvider_285 = 'hostingProvider';
 export const cloudIP_285 = 'cloudIP';
@@ -166,15 +142,10 @@ export const _det285_datacenterIP = {
     return ['datacenterIP', 'hostingProvider', 'cloudIP'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: datacenterIP
 export const _ref_datacenterIP = _det285_datacenterIP;
-// pattern-ref: hostingProvider
 export const _ref_hostingProvider = _det285_datacenterIP;
-// pattern-ref: cloudIP
 export const _ref_cloudIP = _det285_datacenterIP;
 
-// ═══ Detector #291 [4.3] Account warming detection ═══
-// severity: medium
 export const accountWarming_291 = 'accountWarming';
 export const dormantThenActive_291 = 'dormantThenActive';
 export const _det291_accountWarming = {
@@ -188,13 +159,9 @@ export const _det291_accountWarming = {
     return ['accountWarming', 'dormantThenActive'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountWarming
 export const _ref_accountWarming = _det291_accountWarming;
-// pattern-ref: dormantThenActive
 export const _ref_dormantThenActive = _det291_accountWarming;
 
-// ═══ Detector #292 [4.3] Bot detection (App Check) ═══
-// severity: high
 export const getAppCheckToken_292 = 'getAppCheckToken';
 export const AppCheck_292 = 'AppCheck';
 export const appCheck_292 = 'appCheck';
@@ -209,15 +176,10 @@ export const _det292_getAppCheckToken = {
     return ['getAppCheckToken', 'AppCheck', 'appCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: getAppCheckToken
 export const _ref_getAppCheckToken = _det292_getAppCheckToken;
-// pattern-ref: AppCheck
 export const _ref_AppCheck = _det292_getAppCheckToken;
-// pattern-ref: appCheck
 export const _ref_appCheck = _det292_getAppCheckToken;
 
-// ═══ Detector #295 [4.3] Tampered APK detection ═══
-// severity: high
 export const apkTamper_295 = 'apkTamper';
 export const tampered_apk_295 = 'tampered_apk';
 export const appSignature__expectedSignature_295 = 'appSignature.*expectedSignature';
@@ -233,17 +195,11 @@ export const _det295_apkTamper = {
     return ['apkTamper', 'tampered_apk', 'appSignature.*expectedSignature', 'integrityCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apkTamper
 export const _ref_apkTamper = _det295_apkTamper;
-// pattern-ref: tampered_apk
 export const _ref_tampered_apk = _det295_apkTamper;
-// pattern-ref: appSignature.*expectedSignature
 export const _ref_appSignature__expectedSignature = _det295_apkTamper;
-// pattern-ref: integrityCheck
 export const _ref_integrityCheck = _det295_apkTamper;
 
-// ═══ Detector #296 [4.3] Debug mode detection ═══
-// severity: medium
 export const FLAG_DEBUGGABLE_296 = 'FLAG_DEBUGGABLE';
 export const isDebug_296 = 'isDebug';
 export const debug_mode_296 = 'debug_mode';
@@ -259,17 +215,11 @@ export const _det296_FLAG_DEBUGGABLE = {
     return ['FLAG_DEBUGGABLE', 'isDebug', 'debug_mode', 'check-device-integrity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: FLAG_DEBUGGABLE
 export const _ref_FLAG_DEBUGGABLE = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: isDebug
 export const _ref_isDebug = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: debug_mode
 export const _ref_debug_mode = _det296_FLAG_DEBUGGABLE;
-// pattern-ref: check-device-integrity
 export const _ref_check_device_integrity = _det296_FLAG_DEBUGGABLE;
 
-// ═══ Detector #297 [4.3] Developer options enabled ═══
-// severity: medium
 export const DEVELOPMENT_SETTINGS_297 = 'DEVELOPMENT_SETTINGS';
 export const developerOptions_297 = 'developerOptions';
 export const developer_options_297 = 'developer_options';
@@ -284,15 +234,10 @@ export const _det297_DEVELOPMENT_SETTINGS = {
     return ['DEVELOPMENT_SETTINGS', 'developerOptions', 'developer_options'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: DEVELOPMENT_SETTINGS
 export const _ref_DEVELOPMENT_SETTINGS = _det297_DEVELOPMENT_SETTINGS;
-// pattern-ref: developerOptions
 export const _ref_developerOptions = _det297_DEVELOPMENT_SETTINGS;
-// pattern-ref: developer_options
 export const _ref_developer_options = _det297_DEVELOPMENT_SETTINGS;
 
-// ═══ Detector #298 [4.3] USB debugging active ═══
-// severity: medium
 export const ADB_ENABLED_298 = 'ADB_ENABLED';
 export const usbDebug_298 = 'usbDebug';
 export const adbEnabled_298 = 'adbEnabled';
@@ -308,17 +253,11 @@ export const _det298_ADB_ENABLED = {
     return ['ADB_ENABLED', 'usbDebug', 'adbEnabled', 'adb_enabled'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ADB_ENABLED
 export const _ref_ADB_ENABLED = _det298_ADB_ENABLED;
-// pattern-ref: usbDebug
 export const _ref_usbDebug = _det298_ADB_ENABLED;
-// pattern-ref: adbEnabled
 export const _ref_adbEnabled = _det298_ADB_ENABLED;
-// pattern-ref: adb_enabled
 export const _ref_adb_enabled = _det298_ADB_ENABLED;
 
-// ═══ Detector #300 [4.3] Memory tampering detection ═══
-// severity: high
 export const memoryTamper_300 = 'memoryTamper';
 export const checksumMemory_300 = 'checksumMemory';
 export const memory_tamper_300 = 'memory_tamper';
@@ -333,15 +272,10 @@ export const _det300_memoryTamper = {
     return ['memoryTamper', 'checksumMemory', 'memory_tamper'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: memoryTamper
 export const _ref_memoryTamper = _det300_memoryTamper;
-// pattern-ref: checksumMemory
 export const _ref_checksumMemory = _det300_memoryTamper;
-// pattern-ref: memory_tamper
 export const _ref_memory_tamper = _det300_memoryTamper;
 
-// ═══ Detector #301 [4.3] Mock location apps ═══
-// severity: high
 export const hasMockLocation_301 = 'hasMockLocation';
 export const ALLOW_MOCK_LOCATION_301 = 'ALLOW_MOCK_LOCATION';
 export const mock_location_301 = 'mock_location';
@@ -357,17 +291,11 @@ export const _det301_hasMockLocation = {
     return ['hasMockLocation', 'ALLOW_MOCK_LOCATION', 'mock_location', 'mockGPS'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: hasMockLocation
 export const _ref_hasMockLocation = _det301_hasMockLocation;
-// pattern-ref: ALLOW_MOCK_LOCATION
 export const _ref_ALLOW_MOCK_LOCATION = _det301_hasMockLocation;
-// pattern-ref: mock_location
 export const _ref_mock_location = _det301_hasMockLocation;
-// pattern-ref: mockGPS
 export const _ref_mockGPS = _det301_hasMockLocation;
 
-// ═══ Detector #303 [4.3] Accessibility service abuse ═══
-// severity: medium
 export const accessibilityAbuse_303 = 'accessibilityAbuse';
 export const getEnabledAccessibility_303 = 'getEnabledAccessibility';
 export const accessibility_abuse_303 = 'accessibility_abuse';
@@ -382,15 +310,10 @@ export const _det303_accessibilityAbuse = {
     return ['accessibilityAbuse', 'getEnabledAccessibility', 'accessibility_abuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accessibilityAbuse
 export const _ref_accessibilityAbuse = _det303_accessibilityAbuse;
-// pattern-ref: getEnabledAccessibility
 export const _ref_getEnabledAccessibility = _det303_accessibilityAbuse;
-// pattern-ref: accessibility_abuse
 export const _ref_accessibility_abuse = _det303_accessibilityAbuse;
 
-// ═══ Detector #306 [4.3] Tapjacking prevention ═══
-// severity: high
 export const tapjacking_306 = 'tapjacking';
 export const filterTouchesWhenObscured_306 = 'filterTouchesWhenObscured';
 export const _det306_tapjacking = {
@@ -404,13 +327,9 @@ export const _det306_tapjacking = {
     return ['tapjacking', 'filterTouchesWhenObscured'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: tapjacking
 export const _ref_tapjacking = _det306_tapjacking;
-// pattern-ref: filterTouchesWhenObscured
 export const _ref_filterTouchesWhenObscured = _det306_tapjacking;
 
-// ═══ Detector #308 [4.3] Clipboard sniffing detection ═══
-// severity: medium
 export const clipboardSniff_308 = 'clipboardSniff';
 export const pasteboardAccess_308 = 'pasteboardAccess';
 export const clipboardMonitor_308 = 'clipboardMonitor';
@@ -425,15 +344,10 @@ export const _det308_clipboardSniff = {
     return ['clipboardSniff', 'pasteboardAccess', 'clipboardMonitor'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: clipboardSniff
 export const _ref_clipboardSniff = _det308_clipboardSniff;
-// pattern-ref: pasteboardAccess
 export const _ref_pasteboardAccess = _det308_clipboardSniff;
-// pattern-ref: clipboardMonitor
 export const _ref_clipboardMonitor = _det308_clipboardSniff;
 
-// ═══ Detector #309 [4.3] Push notification spoofing ═══
-// severity: medium
 export const pushSpoof_309 = 'pushSpoof';
 export const notificationSpoof_309 = 'notificationSpoof';
 export const _det309_pushSpoof = {
@@ -447,13 +361,9 @@ export const _det309_pushSpoof = {
     return ['pushSpoof', 'notificationSpoof'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: pushSpoof
 export const _ref_pushSpoof = _det309_pushSpoof;
-// pattern-ref: notificationSpoof
 export const _ref_notificationSpoof = _det309_pushSpoof;
 
-// ═══ Detector #311 [4.3] MDM / enterprise certificate abuse ═══
-// severity: medium
 export const mdmAbuse_311 = 'mdmAbuse';
 export const enterpriseCert_311 = 'enterpriseCert';
 export const provisioningProfile_311 = 'provisioningProfile';
@@ -468,15 +378,10 @@ export const _det311_mdmAbuse = {
     return ['mdmAbuse', 'enterpriseCert', 'provisioningProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: mdmAbuse
 export const _ref_mdmAbuse = _det311_mdmAbuse;
-// pattern-ref: enterpriseCert
 export const _ref_enterpriseCert = _det311_mdmAbuse;
-// pattern-ref: provisioningProfile
 export const _ref_provisioningProfile = _det311_mdmAbuse;
 
-// ═══ Detector #497 [14] CVE monitoring for dependencies ═══
-// severity: high
 export const cveMonitor_497 = 'cveMonitor';
 export const vulnerabilityAlert_497 = 'vulnerabilityAlert';
 export const dependabot_497 = 'dependabot';
@@ -492,17 +397,11 @@ export const _det497_cveMonitor = {
     return ['cveMonitor', 'vulnerabilityAlert', 'dependabot', 'snyk'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cveMonitor
 export const _ref_cveMonitor = _det497_cveMonitor;
-// pattern-ref: vulnerabilityAlert
 export const _ref_vulnerabilityAlert = _det497_cveMonitor;
-// pattern-ref: dependabot
 export const _ref_dependabot = _det497_cveMonitor;
-// pattern-ref: snyk
 export const _ref_snyk = _det497_cveMonitor;
 
-// ═══ Detector #498 [14] Supply chain attack detection ═══
-// severity: high
 export const supplyChainAttack_498 = 'supplyChainAttack';
 export const lockfileIntegrity_498 = 'lockfileIntegrity';
 export const packageIntegrity_498 = 'packageIntegrity';
@@ -517,15 +416,10 @@ export const _det498_supplyChainAttack = {
     return ['supplyChainAttack', 'lockfileIntegrity', 'packageIntegrity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: supplyChainAttack
 export const _ref_supplyChainAttack = _det498_supplyChainAttack;
-// pattern-ref: lockfileIntegrity
 export const _ref_lockfileIntegrity = _det498_supplyChainAttack;
-// pattern-ref: packageIntegrity
 export const _ref_packageIntegrity = _det498_supplyChainAttack;
 
-// ═══ Detector #499 [14] Insider threat monitoring ═══
-// severity: high
 export const insiderThreat_499 = 'insiderThreat';
 export const privilegedAccess_499 = 'privilegedAccess';
 export const adminAbuse_499 = 'adminAbuse';
@@ -540,15 +434,10 @@ export const _det499_insiderThreat = {
     return ['insiderThreat', 'privilegedAccess', 'adminAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: insiderThreat
 export const _ref_insiderThreat = _det499_insiderThreat;
-// pattern-ref: privilegedAccess
 export const _ref_privilegedAccess = _det499_insiderThreat;
-// pattern-ref: adminAbuse
 export const _ref_adminAbuse = _det499_insiderThreat;
 
-// ═══ Detector #503 [14] Canary deployment for detectors ═══
-// severity: medium
 export const canaryDeploy_503 = 'canaryDeploy';
 export const canaryDetector_503 = 'canaryDetector';
 export const detectorCanary_503 = 'detectorCanary';
@@ -563,15 +452,10 @@ export const _det503_canaryDeploy = {
     return ['canaryDeploy', 'canaryDetector', 'detectorCanary'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: canaryDeploy
 export const _ref_canaryDeploy = _det503_canaryDeploy;
-// pattern-ref: canaryDetector
 export const _ref_canaryDetector = _det503_canaryDeploy;
-// pattern-ref: detectorCanary
 export const _ref_detectorCanary = _det503_canaryDeploy;
 
-// ═══ Detector #504 [14] Detector correlation analysis ═══
-// severity: medium
 export const detectorCorrelation_504 = 'detectorCorrelation';
 export const correlateDetectors_504 = 'correlateDetectors';
 export const signalCorrelation_504 = 'signalCorrelation';
@@ -586,15 +470,10 @@ export const _det504_detectorCorrelation = {
     return ['detectorCorrelation', 'correlateDetectors', 'signalCorrelation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectorCorrelation
 export const _ref_detectorCorrelation = _det504_detectorCorrelation;
-// pattern-ref: correlateDetectors
 export const _ref_correlateDetectors = _det504_detectorCorrelation;
-// pattern-ref: signalCorrelation
 export const _ref_signalCorrelation = _det504_detectorCorrelation;
 
-// ═══ Detector #506 [14] Law enforcement request handling ═══
-// severity: high
 export const lawEnforcementRequest_506 = 'lawEnforcementRequest';
 export const subpoenaProcess_506 = 'subpoenaProcess';
 export const legalRequest_506 = 'legalRequest';
@@ -609,15 +488,10 @@ export const _det506_lawEnforcementRequest = {
     return ['lawEnforcementRequest', 'subpoenaProcess', 'legalRequest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lawEnforcementRequest
 export const _ref_lawEnforcementRequest = _det506_lawEnforcementRequest;
-// pattern-ref: subpoenaProcess
 export const _ref_subpoenaProcess = _det506_lawEnforcementRequest;
-// pattern-ref: legalRequest
 export const _ref_legalRequest = _det506_lawEnforcementRequest;
 
-// ═══ Detector #508 [14] Security.txt / responsible disclosure ═══
-// severity: medium
 export const security_txt_508 = 'security.txt';
 export const responsibleDisclosure_508 = 'responsibleDisclosure';
 export const bugBounty_508 = 'bugBounty';
@@ -633,17 +507,11 @@ export const _det508_security_txt = {
     return ['security.txt', 'responsibleDisclosure', 'bugBounty', 'securityTxt'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: security.txt
 export const _ref_security_txt = _det508_security_txt;
-// pattern-ref: responsibleDisclosure
 export const _ref_responsibleDisclosure = _det508_security_txt;
-// pattern-ref: bugBounty
 export const _ref_bugBounty = _det508_security_txt;
-// pattern-ref: securityTxt
 export const _ref_securityTxt = _det508_security_txt;
 
-// ═══ Detector #830 [14.2] ClickFix / device-linking hijack detection ═══
-// severity: medium
 export const clickFix_830 = 'clickFix';
 export const deviceLinkHijack_830 = 'deviceLinkHijack';
 export const clickFixDetect_830 = 'clickFixDetect';
@@ -658,15 +526,10 @@ export const _det830_clickFix = {
     return ['clickFix', 'deviceLinkHijack', 'clickFixDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: clickFix
 export const _ref_clickFix = _det830_clickFix;
-// pattern-ref: deviceLinkHijack
 export const _ref_deviceLinkHijack = _det830_clickFix;
-// pattern-ref: clickFixDetect
 export const _ref_clickFixDetect = _det830_clickFix;
 
-// ═══ Detector #595 [18] Air-gap sensitive operations ═══
-// severity: medium
 export const airGap_595 = 'airGap';
 export const sensitiveOperation_595 = 'sensitiveOperation';
 export const isolatedExecution_595 = 'isolatedExecution';
@@ -681,15 +544,10 @@ export const _det595_airGap = {
     return ['airGap', 'sensitiveOperation', 'isolatedExecution'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: airGap
 export const _ref_airGap = _det595_airGap;
-// pattern-ref: sensitiveOperation
 export const _ref_sensitiveOperation = _det595_airGap;
-// pattern-ref: isolatedExecution
 export const _ref_isolatedExecution = _det595_airGap;
 
-// ═══ Detector #599 [18] App clone / modified APK detection ═══
-// severity: high
 export const apkClone_599 = 'apkClone';
 export const modifiedAPK_599 = 'modifiedAPK';
 export const appCloneDetect_599 = 'appCloneDetect';
@@ -705,18 +563,11 @@ export const _det599_apkClone = {
     return ['apkClone', 'modifiedAPK', 'appCloneDetect', 'tampered_apk'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apkClone
 export const _ref_apkClone = _det599_apkClone;
-// pattern-ref: modifiedAPK
 export const _ref_modifiedAPK = _det599_apkClone;
-// pattern-ref: appCloneDetect
 export const _ref_appCloneDetect = _det599_apkClone;
-// pattern-ref: tampered_apk
 export const _ref_tampered_apk = _det599_apkClone;
 
-// ════════════════════════════════════════════════════
-// Detector #280 [§4.2] Session token binding
-// ════════════════════════════════════════════════════
 export const sessionBinding_280_key = 'sessionBinding';
 export const tokenBind_280_key = 'tokenBind';
 export const deviceBoundToken_280_key = 'deviceBoundToken';
@@ -760,9 +611,6 @@ export const _d280_impl = {
   deviceBoundToken: deviceBoundTokenCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #310 [§4.3] Biometric bypass detection
-// ════════════════════════════════════════════════════
 export const biometricBypass_310_key = 'biometricBypass';
 export const biometricSpoof_310_key = 'biometricSpoof';
 export const fakeBiometric_310_key = 'fakeBiometric';
@@ -806,9 +654,6 @@ export const _d310_impl = {
   fakeBiometric: fakeBiometricCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #802 [§4.5] Auto-logout on shared device
-// ════════════════════════════════════════════════════
 export const autoLogout_802_key = 'autoLogout';
 export const sharedDeviceLogout_802_key = 'sharedDeviceLogout';
 
@@ -846,9 +691,6 @@ export const _d802_impl = {
   sharedDeviceLogout: sharedDeviceLogoutCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #494 [§14] Detector evasion monitoring
-// ════════════════════════════════════════════════════
 export const detectorEvasion_494_key = 'detectorEvasion';
 export const evasionMonitor_494_key = 'evasionMonitor';
 export const bypassDetect_494_key = 'bypassDetect';

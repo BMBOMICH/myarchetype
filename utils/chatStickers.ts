@@ -65,7 +65,6 @@ export function getStickerPack(packId: string): StickerPack | undefined {
 }
 
 export function searchStickers(query: string): string[] {
-  // Simple emoji search based on common associations
   const searchMap: { [key: string]: string[] } = {
     'love': ['❤️', '💕', '💖', '💗', '😍', '🥰', '😘', '💋'],
     'heart': ['❤️', '💕', '💖', '💗', '💓', '💞', '💘', '💝'],

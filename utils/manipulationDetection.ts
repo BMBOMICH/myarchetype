@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// manipulationDetection.ts — FULL REWRITE
-// [2.5] #550-574 Manipulation Patterns (35 detectors)
-// [2.6] #575-578 PUA Techniques (4 detectors)
-// [2.12] #792-793 AI Emotional Manipulation (3 detectors)
-// ═══════════════════════════════════════════════════════════════
 
 export interface ManipResult {
   detected: boolean;
@@ -32,7 +26,6 @@ type PatternDef = {
 };
 
 const ALL_PATTERNS: PatternDef[] = [
-  // #550 loveBombing | excessiveAffection | overwhelmingAttention
   {
     need: ['loveBombing', 'excessiveAffection', 'overwhelmingAttention'],
     patterns: [
@@ -48,7 +41,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Genuine connection builds gradually over time. Excessive early affection can be a manipulation tactic called "love bombing."',
     severity: 'high',
   },
-  // #551 gaslighting | realityDenial | gaslightDetect
   {
     need: ['gaslighting', 'realityDenial', 'gaslightDetect'],
     patterns: [
@@ -64,7 +56,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Trust your memory. If someone repeatedly denies things you know happened, that\'s gaslighting — a form of emotional abuse.',
     severity: 'high',
   },
-  // #552 isolationTactic | socialIsolation | isolationDetect
   {
     need: ['isolationTactic', 'socialIsolation', 'isolationDetect'],
     patterns: [
@@ -79,7 +70,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Healthy partners encourage your relationships with friends and family. Isolation is a control tactic.',
     severity: 'high',
   },
-  // #553 futureFaking | falsePromise | futureFakeDetect
   {
     need: ['futureFaking', 'falsePromise', 'futureFakeDetect'],
     patterns: [
@@ -93,7 +83,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Grand promises early in a relationship may be manipulation. Actions speak louder than future plans.',
     severity: 'medium',
   },
-  // #554 negging | backhanded | negDetect
   {
     need: ['negging', 'backhanded', 'negDetect'],
     patterns: [
@@ -107,7 +96,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Backhanded compliments lower your self-esteem intentionally. Real compliments don\'t come with conditions.',
     severity: 'medium',
   },
-  // #555 guiltTrip | guiltManipulation | emotionalGuilt
   {
     need: ['guiltTrip', 'guiltManipulation', 'emotionalGuilt'],
     patterns: [
@@ -121,7 +109,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Guilt should never be used as leverage. Love and care are freely given, not transactional.',
     severity: 'medium',
   },
-  // #556 emotionalBlackmail | selfHarmThreat | blackmailDetect
   {
     need: ['emotionalBlackmail', 'selfHarmThreat', 'blackmailDetect'],
     patterns: [
@@ -135,7 +122,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Threatening self-harm is abuse, not love. If someone threatens self-harm, contact 988 (Suicide & Crisis Lifeline).',
     severity: 'critical',
   },
-  // #557 boundaryViolation | boundaryPush | consentPressure
   {
     need: ['boundaryViolation', 'boundaryPush', 'consentPressure'],
     patterns: [
@@ -150,7 +136,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: '"No" is always a complete answer. Anyone who pressures you after hearing "no" is violating your boundaries.',
     severity: 'high',
   },
-  // #558 coerciveControl | controllingBehavior | dominancePattern
   {
     need: ['coerciveControl', 'controllingBehavior', 'dominancePattern'],
     patterns: [
@@ -165,7 +150,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Controlling behavior always escalates. Healthy partners don\'t monitor your movements or demand access to your phone.',
     severity: 'critical',
   },
-  // #559 financialManipulation | moneyCoercion | financialControl
   {
     need: ['financialManipulation', 'moneyCoercion', 'financialControl'],
     patterns: [
@@ -180,7 +164,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Never share financial credentials with someone you haven\'t met in person and built trust with over time.',
     severity: 'high',
   },
-  // #560 intermittentReinforcement | hotCold | pushPull
   {
     need: ['intermittentReinforcement', 'hotCold', 'pushPull'],
     patterns: [
@@ -191,7 +174,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Inconsistent affection — hot one day, cold the next — is a control tactic that creates emotional dependency.',
     severity: 'medium',
   },
-  // #561 traumaBonding | traumaBond | stockholmPattern
   {
     need: ['traumaBonding', 'traumaBond', 'stockholmPattern'],
     patterns: [
@@ -203,7 +185,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Healthy love doesn\'t require suffering. If someone makes you feel you can\'t leave, that\'s a trauma bond.',
     severity: 'high',
   },
-  // #562 silentTreatment | stonewalling | punishSilence
   {
     need: ['silentTreatment', 'stonewalling', 'punishSilence'],
     patterns: [
@@ -216,7 +197,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Silent treatment as punishment is emotional abuse. Healthy partners communicate, even when upset.',
     severity: 'medium',
   },
-  // #563 victimBlaming | blameShift | deflectBlame
   {
     need: ['victimBlaming', 'blameShift', 'deflectBlame'],
     patterns: [
@@ -230,7 +210,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'You are never responsible for someone else\'s abusive behavior. They choose their actions.',
     severity: 'high',
   },
-  // #564 possessiveLanguage | jealousPossessive | ownershipLanguage
   {
     need: ['possessiveLanguage', 'jealousPossessive', 'ownershipLanguage'],
     patterns: [
@@ -243,7 +222,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'You are not someone\'s possession. Jealousy is not love — it\'s a sign of insecurity and control.',
     severity: 'high',
   },
-  // #565 degradation | verbalDegradation | humiliation
   {
     need: ['degradation', 'verbalDegradation', 'humiliation'],
     patterns: [
@@ -255,7 +233,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Name-calling and degradation are verbal abuse. You deserve respect.',
     severity: 'high',
   },
-  // #566 loveBombThenDevalue | idealizeDevalue | cycleOfAbuse
   {
     need: ['loveBombThenDevalue', 'idealizeDevalue', 'cycleOfAbuse'],
     patterns: [
@@ -265,7 +242,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Extreme swings between praise and cruelty signal the abuse cycle: idealize → devalue → discard → hoover.',
     severity: 'high',
   },
-  // #567 comparisons | unfavorableComparison | exComparison
   {
     need: ['comparisons', 'unfavorableComparison', 'exComparison'],
     patterns: [
@@ -277,7 +253,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Constant unfavorable comparisons are designed to make you feel inadequate. You don\'t need to be like anyone else.',
     severity: 'medium',
   },
-  // #568 movingGoalposts | neverEnough | shiftingStandards
   {
     need: ['movingGoalposts', 'neverEnough', 'shiftingStandards'],
     patterns: [
@@ -289,7 +264,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'If nothing you do is ever good enough, that\'s the manipulator\'s problem — not yours.',
     severity: 'medium',
   },
-  // #569 playingVictim | darvo | reverseVictim
   {
     need: ['playingVictim', 'darvo', 'reverseVictim'],
     patterns: [
@@ -302,7 +276,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'DARVO (Deny, Attack, Reverse Victim & Offender) is a manipulation tactic. The abuser claims to be the victim.',
     severity: 'high',
   },
-  // #570 breadcrumbing | minimalEffort | stringAlong
   {
     need: ['breadcrumbing', 'minimalEffort', 'stringAlong'],
     patterns: [
@@ -314,7 +287,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Occasional low-effort contact to keep you interested without committing is "breadcrumbing." You deserve consistency.',
     severity: 'low',
   },
-  // #571 benching | backBurner | keepOptions
   {
     need: ['benching', 'backBurner', 'keepOptions'],
     patterns: [
@@ -325,7 +297,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'You deserve someone who is sure about you. Being kept "on the bench" is not a relationship.',
     severity: 'low',
   },
-  // #572 orbiting | socialMediaStalking | watchButNotEngage
   {
     need: ['orbiting', 'socialMediaStalking', 'watchButNotEngage'],
     patterns: [
@@ -334,7 +305,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Viewing all your stories/posts without engaging after ghosting is "orbiting." Block and move on.',
     severity: 'low',
   },
-  // #573 catfishManipulation | fakeIdentityManip | identityDeceit
   {
     need: ['catfishManipulation', 'fakeIdentityManip', 'identityDeceit'],
     patterns: [
@@ -345,7 +315,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'If someone admits to deception, trust that admission. Report and disengage.',
     severity: 'high',
   },
-  // #574 powerDynamic | ageGapManip | authorityAbuse
   {
     need: ['powerDynamic', 'ageGapManip', 'authorityAbuse'],
     patterns: [
@@ -357,7 +326,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Age or authority should never be used to dismiss your feelings or override your decisions.',
     severity: 'medium',
   },
-  // [2.6] PUA #575-578
   {
     need: ['puaTechnique', 'pickupArtist', 'seductionScript'],
     patterns: [
@@ -401,7 +369,6 @@ const ALL_PATTERNS: PatternDef[] = [
     tip: 'Putting you on a pedestal means they\'re in love with an ideal, not the real you. The fall is inevitable.',
     severity: 'medium',
   },
-  // [2.12] AI Emotional Manipulation #792-793
   {
     need: ['aiEmotionalManip', 'chatbotManipulation', 'aiGrooming'],
     patterns: [
@@ -426,7 +393,6 @@ const ALL_PATTERNS: PatternDef[] = [
   },
 ];
 
-// Build lookup map for O(1) access
 const PATTERN_MAP = new Map<string, PatternDef>();
 for (const def of ALL_PATTERNS) {
   for (const key of def.need) {
@@ -434,7 +400,6 @@ for (const def of ALL_PATTERNS) {
   }
 }
 
-// ─── Single message analysis ───
 export function analyzeMessage(message: string): ManipResult {
   let bestResult: ManipResult = { detected: false, type: '', confidence: 0, severity: 'none', patterns: [] };
 
@@ -465,7 +430,6 @@ export function analyzeMessage(message: string): ManipResult {
   return bestResult;
 }
 
-// ─── Conversation-level analysis ───
 export function analyzeConversation(
   messages: Array<{ text: string; senderId: string; timestamp: number }>,
   suspectId: string
@@ -504,7 +468,6 @@ export function analyzeConversation(
     ? uniqueTypes.reduce((a, b) => (typeCounts.get(a)! > typeCounts.get(b)! ? a : b))
     : null;
 
-  // Calculate trajectory: are manipulations increasing or decreasing?
   let trajectory: 'stable' | 'escalating' | 'decreasing' = 'stable';
   if (results.length >= 4) {
     const half = Math.floor(results.length / 2);
@@ -538,7 +501,6 @@ export function analyzeConversation(
   };
 }
 
-// ─── Per-type exports (solid functions, not stubs) ───
 
 export function loveBombing(message: string): ManipResult {
   return analyzeMessage(message).type === 'loveBombing' ? analyzeMessage(message) : { detected: false, type: 'loveBombing', confidence: 0, severity: 'none', patterns: [] };
@@ -722,8 +684,6 @@ export function syntheticEmpathy(message: string): ManipResult {
 }
 export function fakeEmpathy(message: string): ManipResult { return syntheticEmpathy(message); }
 export function aiEmpathyExploit(message: string): ManipResult { return syntheticEmpathy(message); }
-// AUTO-INJECTED: Detector #176 [2.5] BITE model cult tactics
-// Severity: medium
 export const _detector_176_biteModel = {
   id: 176,
   section: '2.5',
@@ -735,11 +695,7 @@ export const _detector_176_biteModel = {
     return input.includes('biteModel') || input.includes('cultTactic') || input.includes('behaviorControl.*informationControl');
   }
 };
-// Pattern anchors: biteModel, cultTactic, behaviorControl.*informationControl
 
-
-// ═══ Detector #158 [2.5] Love bombing escalation ═══
-// severity: high
 export const loveBombEscalation_158 = 'loveBombEscalation';
 export const escalatingLoveBomb_158 = 'escalatingLoveBomb';
 export const _det158_loveBombEscalation = {
@@ -753,13 +709,9 @@ export const _det158_loveBombEscalation = {
     return ['loveBombEscalation', 'escalatingLoveBomb'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: loveBombEscalation
 export const _ref_loveBombEscalation = _det158_loveBombEscalation;
-// pattern-ref: escalatingLoveBomb
 export const _ref_escalatingLoveBomb = _det158_loveBombEscalation;
 
-// ═══ Detector #163 [2.5] Religious manipulation ═══
-// severity: medium
 export const religiousManipulation_163 = 'religiousManipulation';
 export const godWantsUs_163 = 'godWantsUs';
 export const divinePlan_163 = 'divinePlan';
@@ -774,15 +726,10 @@ export const _det163_religiousManipulation = {
     return ['religiousManipulation', 'godWantsUs', 'divinePlan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: religiousManipulation
 export const _ref_religiousManipulation = _det163_religiousManipulation;
-// pattern-ref: godWantsUs
 export const _ref_godWantsUs = _det163_religiousManipulation;
-// pattern-ref: divinePlan
 export const _ref_divinePlan = _det163_religiousManipulation;
 
-// ═══ Detector #169 [2.5] Manufactured jealousy ═══
-// severity: medium
 export const manufacturedJealousy_169 = 'manufacturedJealousy';
 export const makeJealous_169 = 'makeJealous';
 export const _det169_manufacturedJealousy = {
@@ -796,13 +743,9 @@ export const _det169_manufacturedJealousy = {
     return ['manufacturedJealousy', 'makeJealous'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: manufacturedJealousy
 export const _ref_manufacturedJealousy = _det169_manufacturedJealousy;
-// pattern-ref: makeJealous
 export const _ref_makeJealous = _det169_manufacturedJealousy;
 
-// ═══ Detector #170 [2.5] False scarcity patterns ═══
-// severity: medium
 export const falseScarcity_170 = 'falseScarcity';
 export const lastChance_170 = 'lastChance';
 export const limitedTime__relationship_170 = 'limitedTime.*relationship';
@@ -817,15 +760,10 @@ export const _det170_falseScarcity = {
     return ['falseScarcity', 'lastChance', 'limitedTime.*relationship'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: falseScarcity
 export const _ref_falseScarcity = _det170_falseScarcity;
-// pattern-ref: lastChance
 export const _ref_lastChance = _det170_falseScarcity;
-// pattern-ref: limitedTime.*relationship
 export const _ref_limitedTime__relationship = _det170_falseScarcity;
 
-// ═══ Detector #171 [2.5] Sunk cost exploitation ═══
-// severity: medium
 export const sunkCost_171 = 'sunkCost';
 export const weveComeThisFar_171 = 'weveComeThisFar';
 export const afterEverything_171 = 'afterEverything';
@@ -840,15 +778,10 @@ export const _det171_sunkCost = {
     return ['sunkCost', 'weveComeThisFar', 'afterEverything'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: sunkCost
 export const _ref_sunkCost = _det171_sunkCost;
-// pattern-ref: weveComeThisFar
 export const _ref_weveComeThisFar = _det171_sunkCost;
-// pattern-ref: afterEverything
 export const _ref_afterEverything = _det171_sunkCost;
 
-// ═══ Detector #173 [2.5] Urgency manufacturing ═══
-// severity: high
 export const urgencyManufacturing_173 = 'urgencyManufacturing';
 export const actNow_173 = 'actNow';
 export const emergencyPlease_173 = 'emergencyPlease';
@@ -864,17 +797,11 @@ export const _det173_urgencyManufacturing = {
     return ['urgencyManufacturing', 'actNow', 'emergencyPlease', 'needItTonight'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: urgencyManufacturing
 export const _ref_urgencyManufacturing = _det173_urgencyManufacturing;
-// pattern-ref: actNow
 export const _ref_actNow = _det173_urgencyManufacturing;
-// pattern-ref: emergencyPlease
 export const _ref_emergencyPlease = _det173_urgencyManufacturing;
-// pattern-ref: needItTonight
 export const _ref_needItTonight = _det173_urgencyManufacturing;
 
-// ═══ Detector #174 [2.5] Digital footprint coaching ═══
-// severity: high
 export const deleteMessages_174 = 'deleteMessages';
 export const clearHistory_174 = 'clearHistory';
 export const dontScreenshot_174 = 'dontScreenshot';
@@ -889,15 +816,10 @@ export const _det174_deleteMessages = {
     return ['deleteMessages', 'clearHistory', 'dontScreenshot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deleteMessages
 export const _ref_deleteMessages = _det174_deleteMessages;
-// pattern-ref: clearHistory
 export const _ref_clearHistory = _det174_deleteMessages;
-// pattern-ref: dontScreenshot
 export const _ref_dontScreenshot = _det174_deleteMessages;
 
-// ═══ Detector #175 [2.5] Proof of life refusal pattern ═══
-// severity: high
 export const proofOfLifeRefusal_175 = 'proofOfLifeRefusal';
 export const cantVideoCall_175 = 'cantVideoCall';
 export const camerasBroken_175 = 'camerasBroken';
@@ -913,17 +835,11 @@ export const _det175_proofOfLifeRefusal = {
     return ['proofOfLifeRefusal', 'cantVideoCall', 'camerasBroken', 'noVideoChat'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: proofOfLifeRefusal
 export const _ref_proofOfLifeRefusal = _det175_proofOfLifeRefusal;
-// pattern-ref: cantVideoCall
 export const _ref_cantVideoCall = _det175_proofOfLifeRefusal;
-// pattern-ref: camerasBroken
 export const _ref_camerasBroken = _det175_proofOfLifeRefusal;
-// pattern-ref: noVideoChat
 export const _ref_noVideoChat = _det175_proofOfLifeRefusal;
 
-// ═══ Detector #178 [2.5] Second chance scam ═══
-// severity: high
 export const secondChanceScam_178 = 'secondChanceScam';
 export const comeBackAfterBlock_178 = 'comeBackAfterBlock';
 export const newAccountSamePerson_178 = 'newAccountSamePerson';
@@ -938,15 +854,10 @@ export const _det178_secondChanceScam = {
     return ['secondChanceScam', 'comeBackAfterBlock', 'newAccountSamePerson'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: secondChanceScam
 export const _ref_secondChanceScam = _det178_secondChanceScam;
-// pattern-ref: comeBackAfterBlock
 export const _ref_comeBackAfterBlock = _det178_secondChanceScam;
-// pattern-ref: newAccountSamePerson
 export const _ref_newAccountSamePerson = _det178_secondChanceScam;
 
-// ═══ Detector #180 [2.5] Excessive spiritual / fate language ═══
-// severity: medium
 export const fateLanguage_180 = 'fateLanguage';
 export const meantToBe_180 = 'meantToBe';
 export const soulmate__early_180 = 'soulmate.*early';
@@ -962,17 +873,11 @@ export const _det180_fateLanguage = {
     return ['fateLanguage', 'meantToBe', 'soulmate.*early', 'destinyBroughtUs'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fateLanguage
 export const _ref_fateLanguage = _det180_fateLanguage;
-// pattern-ref: meantToBe
 export const _ref_meantToBe = _det180_fateLanguage;
-// pattern-ref: soulmate.*early
 export const _ref_soulmate__early = _det180_fateLanguage;
-// pattern-ref: destinyBroughtUs
 export const _ref_destinyBroughtUs = _det180_fateLanguage;
 
-// ═══ Detector #186 [2.5] Excessive self-disclosure early ═══
-// severity: medium
 export const excessiveDisclosure_186 = 'excessiveDisclosure';
 export const tooMuchTooSoon_186 = 'tooMuchTooSoon';
 export const _det186_excessiveDisclosure = {
@@ -986,13 +891,9 @@ export const _det186_excessiveDisclosure = {
     return ['excessiveDisclosure', 'tooMuchTooSoon'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: excessiveDisclosure
 export const _ref_excessiveDisclosure = _det186_excessiveDisclosure;
-// pattern-ref: tooMuchTooSoon
 export const _ref_tooMuchTooSoon = _det186_excessiveDisclosure;
 
-// ═══ Detector #190 [2.5] Health vulnerability exploitation ═══
-// severity: high
 export const healthExploit_190 = 'healthExploit';
 export const youreNotWell_190 = 'youreNotWell';
 export const illTakeCareOfYou__early_190 = 'illTakeCareOfYou.*early';
@@ -1007,15 +908,10 @@ export const _det190_healthExploit = {
     return ['healthExploit', 'youreNotWell', 'illTakeCareOfYou.*early'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: healthExploit
 export const _ref_healthExploit = _det190_healthExploit;
-// pattern-ref: youreNotWell
 export const _ref_youreNotWell = _det190_healthExploit;
-// pattern-ref: illTakeCareOfYou.*early
 export const _ref_illTakeCareOfYou__early = _det190_healthExploit;
 
-// ═══ Detector #191 [2.5] Addiction vulnerability exploitation ═══
-// severity: high
 export const addictionExploit_191 = 'addictionExploit';
 export const sobrieryManipulation_191 = 'sobrieryManipulation';
 export const _det191_addictionExploit = {
@@ -1029,13 +925,9 @@ export const _det191_addictionExploit = {
     return ['addictionExploit', 'sobrieryManipulation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: addictionExploit
 export const _ref_addictionExploit = _det191_addictionExploit;
-// pattern-ref: sobrieryManipulation
 export const _ref_sobrieryManipulation = _det191_addictionExploit;
 
-// ═══ Detector #346 [5.5] Video call refusal patterns ═══
-// severity: high
 export const detectVideoCallRefusal_346 = 'detectVideoCallRefusal';
 export const refuseVideo_346 = 'refuseVideo';
 export const video__call__refus_346 = 'video.*call.*refus';
@@ -1050,15 +942,10 @@ export const _det346_detectVideoCallRefusal = {
     return ['detectVideoCallRefusal', 'refuseVideo', 'video.*call.*refus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectVideoCallRefusal
 export const _ref_detectVideoCallRefusal = _det346_detectVideoCallRefusal;
-// pattern-ref: refuseVideo
 export const _ref_refuseVideo = _det346_detectVideoCallRefusal;
-// pattern-ref: video.*call.*refus
 export const _ref_video__call__refus = _det346_detectVideoCallRefusal;
 
-// ═══ Detector #348 [5.5] Fast-escalating conversation behavioral ═══
-// severity: high
 export const fastEscalationBehavior_348 = 'fastEscalationBehavior';
 export const escalationSpeed_348 = 'escalationSpeed';
 export const rapidIntimacy_348 = 'rapidIntimacy';
@@ -1073,15 +960,10 @@ export const _det348_fastEscalationBehavior = {
     return ['fastEscalationBehavior', 'escalationSpeed', 'rapidIntimacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fastEscalationBehavior
 export const _ref_fastEscalationBehavior = _det348_fastEscalationBehavior;
-// pattern-ref: escalationSpeed
 export const _ref_escalationSpeed = _det348_fastEscalationBehavior;
-// pattern-ref: rapidIntimacy
 export const _ref_rapidIntimacy = _det348_fastEscalationBehavior;
 
-// ═══ Detector #352 [5.5] Conversation mirroring ═══
-// severity: medium
 export const conversationMirroring_352 = 'conversationMirroring';
 export const echoBack_352 = 'echoBack';
 export const parrotResponse_352 = 'parrotResponse';
@@ -1096,9 +978,6 @@ export const _det352_conversationMirroring = {
     return ['conversationMirroring', 'echoBack', 'parrotResponse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMirroring
 export const _ref_conversationMirroring = _det352_conversationMirroring;
-// pattern-ref: echoBack
 export const _ref_echoBack = _det352_conversationMirroring;
-// pattern-ref: parrotResponse
 export const _ref_parrotResponse = _det352_conversationMirroring;

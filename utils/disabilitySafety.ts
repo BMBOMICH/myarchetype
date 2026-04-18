@@ -1,4 +1,3 @@
-// file: utils/disabilitySafety.ts
 import { writeAuditLog } from './logger';
 
 export interface CognitiveTargetingResult{detected:boolean;confidence:number;patterns:string[];categories:string[];riskLevel:'none'|'low'|'medium'|'high'|'critical';recommendations:string[];shouldFlag:boolean;}
@@ -28,7 +27,6 @@ if(rl!=='none')rec.push('Talk to someone you trust about this conversation — a
 if(rl==='critical'||rl==='high')void writeAuditLog('safety.cognitive_targeting',{riskLevel:rl,categories:cats,confidence:c}).catch(()=>{});
 return{detected:pats.length>=1,confidence:c,patterns:pats,categories:cats,riskLevel:rl,recommendations:rec,shouldFlag:c>=0.4};}
 
-// ─── [34] #758 Disability fetishization / devotee exploitation ─
 export interface DisabilityFetishizationResult {
   detected: boolean;
   confidence: number;
@@ -45,7 +43,6 @@ const FETISHIZATION_PATTERNS: Array<{
   weight: number;
   description: string;
 }> = [
-  // Devotee / objectifying interest
   {
     p: /i('m| am)\s+(a\s+)?(devotee|amputee\s+lover|wheelchair\s+fetish|disability\s+fetish)/i,
     type: 'devotee_self_identification',
@@ -82,14 +79,12 @@ const FETISHIZATION_PATTERNS: Array<{
     weight: 0.85,
     description: 'Exclusively targeting disabled people',
   },
-  // Savior complex (often paired with exploitation)
   {
     p: /i\s+(can\s+take\s+care\s+of|want\s+to\s+help|will\s+look\s+after)\s+you\s+because\s+(of\s+your\s+disability|you('re|\s+are)\s+(disabled|in\s+a\s+wheelchair|blind|deaf))/i,
     type: 'savior_disability_exploitation',
     weight: 0.7,
     description: 'Savior complex tied to disability',
   },
-  // Inspiration objectification
   {
     p: /you('re|\s+are)\s+(so\s+)?(inspiring|brave|courageous|amazing)\s+(just\s+)?(for|because\s+you'?re?)\s+(living\s+with|having|being\s+disabled)/i,
     type: 'inspiration_objectification',
@@ -114,7 +109,6 @@ export function detectDisabilityFetishization(
     }
   }
 
-  // Context signals
   if (context?.isFirstMessage && types.includes('disability_sexualization')) {
     totalWeight += 0.2;
     indicators.push('sexualization_on_first_contact');
@@ -162,7 +156,6 @@ export const disabilityFetish = detectDisabilityFetishization;
 export const devoteeExploitation = detectDisabilityFetishization;
 export const fetishizationDetect = detectDisabilityFetishization;
 
-// ─── [34] #760 Accessibility-based scam vectors ───────────────
 export interface AccessibilityScamResult {
   detected: boolean;
   confidence: number;
@@ -179,7 +172,6 @@ const ACCESSIBILITY_SCAM_PATTERNS: Array<{
   weight: number;
   description: string;
 }> = [
-  // Exploiting assistive technology dependencies
   {
     p: /i('ll| will)\s+(help\s+you\s+read|read\s+this\s+for\s+you|guide\s+you\s+through)\s+(the\s+)?(contract|agreement|form|document|payment)/i,
     type: 'document_exploitation_via_assistance',
@@ -198,7 +190,6 @@ const ACCESSIBILITY_SCAM_PATTERNS: Array<{
     weight: 0.85,
     description: 'Leveraging disability to demand trust',
   },
-  // Caregiver / helper financial scam
   {
     p: /i('ll| will)\s+(manage|handle|take\s+care\s+of)\s+(your\s+)?(money|finances|bank\s+account|payment|bills?|disability\s+(check|payment|benefit))/i,
     type: 'financial_control_via_assistance',
@@ -211,7 +202,6 @@ const ACCESSIBILITY_SCAM_PATTERNS: Array<{
     weight: 0.95,
     description: 'Attempting to redirect disability benefits',
   },
-  // Communication channel exploitation
   {
     p: /your\s+(screen\s+reader|hearing\s+aid|aac\s+device|communication\s+device)\s+(can'?t|won'?t|doesn'?t)\s+(show|detect|read|catch)\s+(this|what\s+i'?m\s+sending)/i,
     type: 'at_exploitation',
@@ -224,21 +214,18 @@ const ACCESSIBILITY_SCAM_PATTERNS: Array<{
     weight: 0.8,
     description: 'Using interpreter role as leverage',
   },
-  // Fake accessibility services
   {
     p: /\b(free|special|exclusive)\s+(accessibility|disability|adaptive)\s+(service|app|tool|support)\s+(for\s+you)?\s*(—|–|:)?\s*(send|give|pay|download|click)/i,
     type: 'fake_accessibility_service',
     weight: 0.8,
     description: 'Offering fake accessibility services as lure',
   },
-  // Government / benefit impersonation
   {
     p: /\b(social\s+security|medicare|medicaid|disability\s+office|dva|ndis|pip)\b.*\b(calling|contacting|payment\s+due|verify|suspended)/i,
     type: 'government_impersonation',
     weight: 0.85,
     description: 'Impersonating disability benefits authorities',
   },
-  // Isolation through disability narrative
   {
     p: /your\s+(family|doctor|caregiver|social\s+worker)\s+(don'?t|doesn'?t|can'?t|won'?t)\s+(understand|know\s+what'?s?\s+best)\s+(for\s+someone\s+like\s+you|for\s+(disabled|blind|deaf))/i,
     type: 'isolation_via_disability_narrative',
@@ -268,7 +255,6 @@ export function detectAccessibilityScam(
     }
   }
 
-  // Context multipliers
   if (context?.userHasDeclaredDisability && types.length > 0) {
     totalWeight *= 1.2;
     indicators.push('targeting_known_disabled_user');
@@ -285,7 +271,6 @@ export function detectAccessibilityScam(
     confidence >= 0.4 ? 'medium' :
     confidence >= 0.15 ? 'low' : 'none';
 
-  // Build adapted warning based on context
   let adaptedWarning = '';
   if (riskLevel !== 'none') {
     if (types.includes('benefit_theft')) {
@@ -344,8 +329,6 @@ if(s.disabilityType==='motor')acc.push('Voice commands','Switch access support',
 if(s.disabilityType==='cognitive')acc.push('Simplified UI mode','Clear language','Decision support');
 res.push('National Disability Rights Network: ndrn.org','Disability Rights Section: ada.gov','Crisis Text Line: Text HOME to 741741');
 return{safe:iss.length===0,issues:iss,accommodations:acc,resources:res};}
-// AUTO-INJECTED: Detector #759 [34] Cognitive disability targeting detection
-// Severity: high
 export const _detector_759_cognitiveTargeting = {
   id: 759,
   section: '34',
@@ -357,11 +340,7 @@ export const _detector_759_cognitiveTargeting = {
     return input.includes('cognitiveTargeting') || input.includes('intellectualDisability.*target') || input.includes('vulnerableTargeting');
   }
 };
-// Pattern anchors: cognitiveTargeting, intellectualDisability.*target, vulnerableTargeting
 
-
-// ═══ Detector #760 [34] Accessibility-based scam vectors ═══
-// severity: medium
 export const accessibilityScam_760 = 'accessibilityScam';
 export const disabilityScam_760 = 'disabilityScam';
 export const a11yScamVector_760 = 'a11yScamVector';
@@ -376,9 +355,6 @@ export const _det760_accessibilityScam = {
     return ['accessibilityScam', 'disabilityScam', 'a11yScamVector'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accessibilityScam
 export const _ref_accessibilityScam = _det760_accessibilityScam;
-// pattern-ref: disabilityScam
 export const _ref_disabilityScam = _det760_accessibilityScam;
-// pattern-ref: a11yScamVector
 export const _ref_a11yScamVector = _det760_accessibilityScam;

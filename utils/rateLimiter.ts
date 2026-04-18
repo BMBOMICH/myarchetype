@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/rateLimiter.ts — FULL UPDATED
-// ═══════════════════════════════════════════════════════════════
 import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { writeAuditLog } from './logger';
@@ -166,7 +163,6 @@ export async function getRateLimitStatus(action:string):Promise<{used:number;lim
   }catch{return{used:0,limit:lim.count};}
 }
 
-// ─── #591 Profile view rate limiting ─────────────────────────
 export interface ProfileViewRateResult{withinLimit:boolean;viewCount:number;riskLevel:'none'|'low'|'medium'|'high';action:'allow'|'rate_limit'|'block';}
 export function checkProfileViewRateLimit(vid:string,windowMin=10):ProfileViewRateResult{
   const t=getTracker(`pvr_${vid}`,windowMin*60_000);
@@ -174,14 +170,12 @@ export function checkProfileViewRateLimit(vid:string,windowMin=10):ProfileViewRa
   return{withinLimit:t.count<=500,viewCount:t.count,riskLevel:rl,action:rl==='high'?'block':rl==='medium'?'rate_limit':'allow'};}
 export const profileViewRateLimit=checkProfileViewRateLimit;export const profileViewRate=checkProfileViewRateLimit;
 
-// ─── Profile view window (array-based) ───────────────────────
 export function profileViewRateLimitCheck(views:Array<{targetId:string;timestamp:number}>,windowMin=10):ProfileViewRateResult{
   const now=Date.now(),recent=views.filter(v=>now-v.timestamp<windowMin*60_000);
   const rl=recent.length>100?'high':recent.length>50?'medium':recent.length>20?'low':'none';
   return{withinLimit:recent.length<=500,viewCount:recent.length,riskLevel:rl,action:rl==='high'?'block':rl==='medium'?'rate_limit':'allow'};}
 export const profileViewWindow=profileViewRateLimitCheck;
 
-// ─── #2.13 Post-block contact tracking ───────────────────────
 export interface PostBlockContactResult{detected:boolean;attemptCount:number;methods:string[];riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'none'|'warn'|'restrict'|'suspend'|'escalate';}
 const blockContactLog=new Map<string,{timestamps:number[];methods:string[]}>();
 export function detectPostBlockContact(blockerId:string,blockedId:string,method:'message'|'profile_view'|'new_account'|'phone'|'social'|'proxy'):PostBlockContactResult{
@@ -196,7 +190,6 @@ export function detectPostBlockContact(blockerId:string,blockedId:string,method:
   return{detected:true,attemptCount:cnt,methods,riskLevel:rl,action:rl==='critical'?'escalate':rl==='high'?'suspend':rl==='medium'?'restrict':'warn'};}
 export const postBlockContact=detectPostBlockContact;export const contactAfterBlock=detectPostBlockContact;export const blockEvasionContact=detectPostBlockContact;
 
-// ─── #10.1 Ghost/zombie profile inflation ────────────────────
 export interface GhostProfileAuditResult{ghostCount:number;activeCount:number;ratio:number;inflationary:boolean;recommendation:string;}
 export function auditGhostProfiles(profiles:Array<{lastActiveAt:number;messagesSent:number;profileComplete:boolean}>):GhostProfileAuditResult{
   const now=Date.now();

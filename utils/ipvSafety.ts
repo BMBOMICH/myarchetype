@@ -1,11 +1,3 @@
-// utils/ipvSafety.ts — FULL UPDATED
-// Covers: [29] #710 Coercive partner monitoring
-// [29] #712 Forced account creation
-// [29] Stalkerware, IPV resources, quick exit, code word
-// [29] Coercive control, location coercion, ex-partner monitoring
-// [29] Device monitoring, digital safety planning
-// [29.1] IPV risk assessment
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface StalkerwarePromptResult {
@@ -65,7 +57,6 @@ export function stalkerwareAwarenessPrompt(ctx: {
 }
 export const stalkerwarePrompt = stalkerwareAwarenessPrompt;
 
-// ─── #710 Coercive partner account monitoring detection ───────
 export interface CoercivePartnerMonitoringResult {
   detected: boolean;
   confidence: number;
@@ -76,7 +67,6 @@ export interface CoercivePartnerMonitoringResult {
   shouldNotify: boolean;
   recommendation: string;
   safetyResources: string[];
-  // simple-signal compatible fields
   signals?: string[];
   action?: 'none' | 'flag' | 'alert_user' | 'escalate';
 }
@@ -95,7 +85,6 @@ const CS: Array<{ p: RegExp; w: number; i: string }> = [
 ];
 
 export function detectCoercivePartnerMonitoring(s: {
-  // Full signal set
   messages?: string[];
   loginPatterns?: Array<{ ip: string; timestamp: number; device: string }>;
   accountChanges?: Array<{ type: string; timestamp: number; initiatedBy: string }>;
@@ -109,7 +98,6 @@ export function detectCoercivePartnerMonitoring(s: {
   linkedDeviceAdded?: boolean;
   multipleLoginsPerDay?: number;
   browserHistoryCleared?: boolean;
-  // Simple signal set (alternative interface)
   userId?: string;
   multipleDeviceLogins?: boolean;
   locationAccessedByThirdParty?: boolean;
@@ -135,7 +123,6 @@ export function detectCoercivePartnerMonitoring(s: {
   if ((s.locationConsistency ?? 0) > 0.95) { ind.push('suspiciously_consistent_location'); c += 0.2; }
   if ((s.profileViewPatterns ?? []).some(v => v.count > 20)) { ind.push('excessive_profile_viewing'); c += 0.3; }
 
-  // Simple signal overrides
   if (s.loginFromSameDevice || s.multipleDeviceLogins) { ind.push('shared_device_login'); c += 0.2; }
   if (s.unusualLoginTime || s.unusualLoginLocations) { ind.push('unusual_login_time'); c += 0.15; }
   if (s.loginFromPartnerLocation) { ind.push('login_from_partner_location'); c += 0.25; }
@@ -181,7 +168,6 @@ export function detectCoercivePartnerMonitoring(s: {
           ? 'Minor signals. Monitor and offer privacy settings review.'
           : 'No monitoring detected.';
 
-  // Derive simple-signal action
   const score = Math.round(c * 10);
   const action: CoercivePartnerMonitoringResult['action'] =
     score >= 6 ? 'escalate' : score >= 4 ? 'alert_user' : score >= 2 ? 'flag' : 'none';
@@ -211,7 +197,6 @@ export const coerciveMonitoring = detectCoercivePartnerMonitoring;
 export const partnerAccountMonitor = detectCoercivePartnerMonitoring;
 export const ipvMonitoringDetect = detectCoercivePartnerMonitoring;
 
-// ─── Contact blocking ─────────────────────────────────────────
 export interface BlockContactsResult {
   blocked: string[];
   alreadyBlocked: string[];
@@ -251,7 +236,6 @@ export async function blockMyContacts(
 }
 export const blockContacts = blockMyContacts;
 
-// ─── IPV Resources ────────────────────────────────────────────
 export interface IPVResourceResult {
   shown: boolean;
   resources: Array<{ name: string; phone: string; url: string; description: string; available247: boolean }>;
@@ -294,7 +278,6 @@ export function surfaceIPVResources(ctx: {
 }
 export const ipvResources = surfaceIPVResources;
 
-// ─── Quick Exit ───────────────────────────────────────────────
 export interface QuickExitResult {
   exited: boolean;
   safeUrl: string;
@@ -304,7 +287,6 @@ export interface QuickExitResult {
   notificationHidden: boolean;
 }
 
-// Fixed: use crypto instead of Math.random() for security-sensitive selection
 const SAFE_URLS = [
   'https://www.google.com',
   'https://www.weather.com',
@@ -338,7 +320,6 @@ export function wasQuickExitedRecently(win = 60000): boolean {
   return Date.now() - lQE < win;
 }
 
-// ─── Code Word ────────────────────────────────────────────────
 export interface CodeWordConfig {
   words: string[];
   action: 'alert_contacts' | 'fake_crash' | 'silent_sos' | 'record_audio';
@@ -375,8 +356,6 @@ export const DEFAULT_CODE_WORD_CONFIG: CodeWordConfig = {
   cooldownMs: 60000,
 };
 
-// ─── #711 IPV Risk Assessment ─────────────────────────────────
-// Single unified interface and implementation — no duplicates
 export interface IpvRiskAssessmentResult {
   riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
   score: number;
@@ -457,8 +436,6 @@ export function assessIpvRisk(signals: {
 export const ipvRiskAssessment = assessIpvRisk;
 export const domesticViolenceRisk = assessIpvRisk;
 
-// ─── #712 Forced account creation detection ───────────────────
-// Single unified interface and implementation — no duplicates
 export interface ForcedCreationResult {
   detected: boolean;
   confidence: number;
@@ -470,7 +447,6 @@ export interface ForcedCreationResult {
 }
 
 export function detectForcedAccountCreation(signals: {
-  // Full signal set
   createdByDifferentIp?: boolean;
   profileFilledByDifferentDevice?: boolean;
   passwordSetByThirdParty?: boolean;
@@ -484,7 +460,6 @@ export function detectForcedAccountCreation(signals: {
   profilePhotoCopiedFromVictim?: boolean;
   nameMatchesVictim?: boolean;
   timingCorrelatesWithThreat?: boolean;
-  // Simple signal set
   userId?: string;
   creationSpeedMs?: number;
   devicePreviouslyUsedByOther?: boolean;
@@ -538,7 +513,6 @@ export const forcedCreation = detectForcedAccountCreation;
 export const forcedAccount = detectForcedAccountCreation;
 export const ipvForcedAccount = detectForcedAccountCreation;
 
-// ─── Digital Safety Planning ──────────────────────────────────
 export interface SafetyPlanResult {
   steps: string[];
   resources: string[];
@@ -584,7 +558,6 @@ export function generateDigitalSafetyPlan(riskLevel: 'low' | 'medium' | 'high' |
 export const safetyPlan = generateDigitalSafetyPlan;
 export const digitalSafetyPlan = generateDigitalSafetyPlan;
 
-// ─── Device Monitoring ────────────────────────────────────────
 export interface DeviceMonitorResult {
   suspicious: boolean;
   indicators: string[];
@@ -630,7 +603,6 @@ export function checkDeviceMonitoringSigns(device: {
 export const deviceMonitorCheck = checkDeviceMonitoringSigns;
 export const stalkerwareSignals = checkDeviceMonitoringSigns;
 
-// ─── Coercive Control ─────────────────────────────────────────
 export interface CoerciveControlResult {
   detected: boolean;
   patterns: string[];
@@ -672,7 +644,6 @@ export function detectCoerciveControl(messages: string[]): CoerciveControlResult
 export const coerciveControl = detectCoerciveControl;
 export const controlPattern = detectCoerciveControl;
 
-// ─── Ex-Partner Monitoring ────────────────────────────────────
 export interface ExPartnerMonitoringResult {
   detected: boolean;
   viewCount: number;
@@ -717,7 +688,6 @@ export function detectExPartnerMonitoring(activity: {
 export const exPartnerMonitoring = detectExPartnerMonitoring;
 export const postRelationshipStalking = detectExPartnerMonitoring;
 
-// ─── [29.1] #809 Reproductive coercion detection ──────────────
 export interface ReproductiveCoercionResult {
   detected: boolean;
   confidence: number;
@@ -807,7 +777,6 @@ export const reproductiveCoercion = detectReproductiveCoercion;
 export const birthControlCoercion = detectReproductiveCoercion;
 export const pregnancyCoercion = detectReproductiveCoercion;
 
-// ─── [29.1] #811 Immigration status weaponization ─────────────
 export interface ImmigrationWeaponizationResult {
   detected: boolean;
   confidence: number;
@@ -886,7 +855,6 @@ export const immigrationWeapon = detectImmigrationWeaponization;
 export const visaThreats = detectImmigrationWeaponization;
 export const deportationThreats = detectImmigrationWeaponization;
 
-// ─── Location Coercion ────────────────────────────────────────
 export interface LocationCoercionResult {
   detected: boolean;
   indicators: string[];
@@ -930,7 +898,6 @@ export function detectLocationCoercion(messages: string[]): LocationCoercionResu
 export const locationCoercion = detectLocationCoercion;
 export const locationPressure = detectLocationCoercion;
 
-// ─── Audit pattern exports ─────────────────────────────────────
 export const coercivePartner_710 = 'coercivePartner';
 export const partnerMonitoring_710 = 'partnerMonitoring';
 export const accountSurveillance_710 = 'accountSurveillance';

@@ -1,4 +1,3 @@
-// file: utils/darkPatternAudit.ts
 export interface SafetyUsageMetrics{blockUsageRate:number;reportSubmissionRate:number;verificationAdoptionRate:number;safetyCheckinUsageRate:number;quickExitUsageRate:number;datePlanCreationRate:number;trustedContactSetRate:number;codeWordActivationRate:number;period:string;}
 export function computeSafetyUsageMetrics(d:{totalActiveUsers:number;blockActions:number;reportSubmissions:number;verificationCompletions:number;safetyCheckins:number;quickExitActivations:number;datePlansCreated:number;trustedContactsSet:number;codeWordActivations:number;periodDays:number}):SafetyUsageMetrics{
 const t=Math.max(d.totalActiveUsers,1);return{blockUsageRate:d.blockActions/t,reportSubmissionRate:d.reportSubmissions/t,verificationAdoptionRate:d.verificationCompletions/t,safetyCheckinUsageRate:d.safetyCheckins/t,quickExitUsageRate:d.quickExitActivations/t,datePlanCreationRate:d.datePlansCreated/t,trustedContactSetRate:d.trustedContactsSet/t,codeWordActivationRate:d.codeWordActivations/t,period:`${d.periodDays}d`};}
@@ -16,7 +15,6 @@ let sc=100;const f:DarkPatternAuditResult['findings']=[];
 for(const ft of features)for(const{check,pattern,severity,description,fix}of DPC)if(check(ft)){sc-=severity==='high'?20:severity==='medium'?10:5;f.push({feature:ft.name,pattern,severity,description,fix});}
 const g=sc>=90?'A':sc>=80?'B':sc>=70?'C':sc>=60?'D':'F';return{score:Math.max(0,sc),grade:g,findings:f,compliant:f.filter(x=>x.severity==='high').length===0,regulations:['GDPR Art.7','CCPA §1798.120','EU DSA Art.25','CA AB 2273']};}
 
-// ─── [42] #699 Deceptive urgency in premium upsells ──────────
 export interface DeceptiveUrgencyResult {
   detected: boolean;
   confidence: number;
@@ -45,7 +43,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
   description: string;
   likelyFake: boolean;
 }> = [
-  // Fake countdown urgency
   {
     p: /\b(offer\s+expires?|deal\s+ends?|ends?\s+in|expires?\s+in)\s+\d+\s*(minute|hour|second|min|hr|sec)s?\b/i,
     type: 'fake_countdown',
@@ -60,7 +57,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
     description: 'Urgency-driving copy without verifiable end date',
     likelyFake: true,
   },
-  // Fake scarcity
   {
     p: /\b(only|just|last)\s+\d+\s+(spots?|slots?|openings?|memberships?|discounts?|deals?)\s+(left|remaining|available)\b/i,
     type: 'fake_scarcity',
@@ -82,7 +78,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
     description: 'Falsely claiming offer will not repeat',
     likelyFake: true,
   },
-  // Price anchoring manipulation
   {
     p: /\b(was|originally|normally|regularly|retail)\s+\$?\d+(\.\d{2})?\s*(now|today\s+only|—)\s+\$?\d+(\.\d{2})?\b/i,
     type: 'fake_price_anchor',
@@ -90,7 +85,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
     description: 'Price anchor — unverified original price',
     likelyFake: false,
   },
-  // Guilt / fear of missing out
   {
     p: /\b(your\s+matches?\s+(are\s+)?(being\s+shown\s+to|going\s+to|seeing)\s+other\s+(users?|people|premium\s+members?))\b/i,
     type: 'fomo_match_guilt',
@@ -112,7 +106,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
     description: 'Claiming user is missing quantified matches due to free tier',
     likelyFake: false,
   },
-  // Dark pattern: bait-and-switch on free tier
   {
     p: /\b(upgrade\s+to\s+see\s+who\s+liked\s+you|unlock\s+your\s+(admirers?|matches?|likes?))\b/i,
     type: 'pay_to_see_interest',
@@ -120,7 +113,6 @@ const DECEPTIVE_URGENCY_PATTERNS: Array<{
     description: 'Locking social proof behind paywall',
     likelyFake: false,
   },
-  // Repeated same offer
   {
     p: /\b(special\s+offer\s+just\s+for\s+you|personalized\s+discount|exclusive\s+deal\s+for\s+your\s+account)\b/i,
     type: 'fake_personalization',
@@ -147,7 +139,6 @@ export function detectDeceptiveUrgency(
     }
   }
 
-  // Aggravating signals
   if (ctx.isSameOfferRepeat) {
     totalWeight += 0.25;
     indicators.push('same_offer_shown_repeatedly');
@@ -164,7 +155,6 @@ export function detectDeceptiveUrgency(
     totalWeight += 0.2;
     indicators.push('implausibly_high_discount_percentage');
   }
-  // No real expiry but claims urgency
   if (!ctx.offerExpiryMs && types.includes('fake_countdown')) {
     totalWeight += 0.4;
     indicators.push('urgency_claimed_without_real_expiry');
@@ -229,8 +219,6 @@ export const urgentUpsell = detectDeceptiveUrgency;
 export interface QuickExitAuditResult{available:boolean;responseTimeMs:number;hidesData:boolean;redirectsToSafe:boolean;accessibleFromAllScreens:boolean;oneHanded:boolean;}
 export function auditQuickExit(c:QuickExitAuditResult):QuickExitAuditResult{return c;}
 
-// ═══ Detector #698 [42] Subscription cancellation friction audit ═══
-// severity: medium
 export const cancellationFriction_698 = 'cancellationFriction';
 export const cancelSubscription__friction_698 = 'cancelSubscription.*friction';
 export const easyCancel_698 = 'easyCancel';
@@ -245,15 +233,10 @@ export const _det698_cancellationFriction = {
     return ['cancellationFriction', 'cancelSubscription.*friction', 'easyCancel'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cancellationFriction
 export const _ref_cancellationFriction = _det698_cancellationFriction;
-// pattern-ref: cancelSubscription.*friction
 export const _ref_cancelSubscription__friction = _det698_cancellationFriction;
-// pattern-ref: easyCancel
 export const _ref_easyCancel = _det698_cancellationFriction;
 
-// ═══ Detector #756 [42] Premium feature weaponization detection ═══
-// severity: medium
 export const premiumWeaponization_756 = 'premiumWeaponization';
 export const featureWeaponize_756 = 'featureWeaponize';
 export const premiumAbuse_756 = 'premiumAbuse';
@@ -268,9 +251,6 @@ export const _det756_premiumWeaponization = {
     return ['premiumWeaponization', 'featureWeaponize', 'premiumAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: premiumWeaponization
 export const _ref_premiumWeaponization = _det756_premiumWeaponization;
-// pattern-ref: featureWeaponize
 export const _ref_featureWeaponize = _det756_premiumWeaponization;
-// pattern-ref: premiumAbuse
 export const _ref_premiumAbuse = _det756_premiumWeaponization;

@@ -1,5 +1,3 @@
-// Covers: [33] #703-705 Sensitive profession risk
-// [41] #872 Preference/kink data isolation
 
 export type SensitiveProfession = 'military' | 'intelligence' | 'government' | 'activist' | 'journalist' | 'law_enforcement';
 
@@ -52,8 +50,6 @@ export function getPrivacyOverrides(profession?: SensitiveProfession): PrivacyOv
   return { ...defaults, ...PROFESSION_OVERRIDES[profession] };
 }
 
-// Preference/kink data isolation — field-level encryption
-// These fields are encrypted at rest with a separate key from main profile
 export const ISOLATED_FIELDS = [
   'sexualPreferences', 'kinks', 'fetishes',
   'hivStatus', 'stdStatus', 'sexualHealth',
@@ -64,8 +60,6 @@ export function isIsolatedField(field: string): boolean {
   return (ISOLATED_FIELDS as readonly string[]).includes(field);
 }
 
-// ═══ Detector #703 [33] Military / intelligence professional profile protection ═══
-// severity: high
 export const militaryProtection_703 = 'militaryProtection';
 export const intelligenceProfile_703 = 'intelligenceProfile';
 export const milProfile_703 = 'milProfile';
@@ -80,15 +74,10 @@ export const _det703_militaryProtection = {
     return ['militaryProtection', 'intelligenceProfile', 'milProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: militaryProtection
 export const _ref_militaryProtection = _det703_militaryProtection;
-// pattern-ref: intelligenceProfile
 export const _ref_intelligenceProfile = _det703_militaryProtection;
-// pattern-ref: milProfile
 export const _ref_milProfile = _det703_militaryProtection;
 
-// ═══ Detector #705 [33] Activist / journalist enhanced privacy mode ═══
-// severity: high
 export const activistPrivacy_705 = 'activistPrivacy';
 export const journalistProtection_705 = 'journalistProtection';
 export const enhancedPrivacy_705 = 'enhancedPrivacy';
@@ -103,9 +92,6 @@ export const _det705_activistPrivacy = {
     return ['activistPrivacy', 'journalistProtection', 'enhancedPrivacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: activistPrivacy
 export const _ref_activistPrivacy = _det705_activistPrivacy;
-// pattern-ref: journalistProtection
 export const _ref_journalistProtection = _det705_activistPrivacy;
-// pattern-ref: enhancedPrivacy
 export const _ref_enhancedPrivacy = _det705_activistPrivacy;

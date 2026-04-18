@@ -9,7 +9,6 @@
  * #119 — codedHate | dogWhistle | coded_hate
  */
 
-// ━━━ #111: Transphobic Slurs ━━━
 
 const TRANSPHOBIC_TERMS = [
   'tranny', 'trannies', 'shemale', 'he-she', 'it', 'trap',
@@ -34,8 +33,6 @@ export function transphobicSlur(text: string): {
 }
 
 
-// ━━━ #112: Misogynistic Language ━━━
-
 const MISOGYNY_TERMS = [
   'bitch', 'slut', 'whore', 'cunt', 'ho', 'thot', 'hoe',
   'gold digger', 'attention whore', 'feminazi', 'crazy woman',
@@ -58,8 +55,6 @@ export function misogynistic(text: string): {
   };
 }
 
-
-// ━━━ #113: Antisemitic Language ━━━
 
 const ANTISEMITIC_TERMS = [
   'kike', 'yid', 'heeb', 'hymie', 'jewess',
@@ -86,8 +81,6 @@ export function antisemitic(text: string): {
 }
 
 
-// ━━━ #114: Islamophobic Language ━━━
-
 const ISLAMOPHOBIC_TERMS = [
   'muzzie', 'muzzies', 'sandnigger', 'raghead', 'towelhead',
   'camel jockey', 'paki', 'goatfucker', 'terrorist religion',
@@ -113,8 +106,6 @@ export function islamophobic(text: string): {
 }
 
 
-// ━━━ #115: Ableist Slurs ━━━
-
 const ABLEIST_TERMS = [
   'retard', 'retarded', 'tard', 'spaz', 'spastic', 'cripple',
   'gimp', 'invalid', 'psycho', 'lunatic', 'crazy', 'insane',
@@ -139,8 +130,6 @@ export function ableist(text: string): {
 }
 
 
-// ━━━ #117: Micro-Aggression Detection ━━━
-
 const MICROAGGRESSION_PATTERNS = [
   /where are you (really )?from/i,
   /you('re| are) so (articulate|well.spoken) for/i,
@@ -162,8 +151,6 @@ export function microAggression(text: string): {
   };
 }
 
-
-// ━━━ #119: Coded Hate Speech / Dog Whistles ━━━
 
 const DOG_WHISTLE_TERMS: Record<string, string> = {
   '1488': 'white supremacist code (14 words + Heil Hitler)',
@@ -198,8 +185,6 @@ export function codedHate(text: string): {
   };
 }
 
-// ═══ Detector #110 [2.1] Homophobic slurs ═══
-// severity: high
 export const homophobic_slur_110 = 'homophobic_slur';
 export const homophob_110 = 'homophob';
 export const _det110_homophobic_slur = {
@@ -213,7 +198,5 @@ export const _det110_homophobic_slur = {
     return ['homophobic_slur', 'homophob'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: homophobic_slur
 export const _ref_homophobic_slur = _det110_homophobic_slur;
-// pattern-ref: homophob
 export const _ref_homophob = _det110_homophobic_slur;

@@ -1,14 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/profileFieldSafety.ts — FULL UPDATED
-// Covers: [22] #631-635, #751 Profile field semantic abuse
-// [32] #706-708 Progressive profile disclosure
-// [5.9] Married/relationship deception via fields
-// [31] #840 Privacy-preserving identity verification
-// [33] #703 Military/intelligence protection
-// [33] #705 Activist/journalist enhanced privacy
-// [39] #858 Anonymous account abuse
-// [39] #859 Pseudonymous reputation persistence
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface FieldValidation{valid:boolean;warnings:{field:string;issue:string}[];}
@@ -17,7 +6,6 @@ const SUSPICIOUS_OCCUPATIONS=[/oil\s+rig/i,/military\s+contractor/i,/gem\s+(deal
 const HEIGHT_RANGE={min:120,max:230};
 const WEIGHT_RANGE={min:30,max:250};
 
-// ─── #631 Occupation field fraud ────────────────────────────
 export interface OccupationFraudResult{suspicious:boolean;occupation:string;reasons:string[];riskLevel:'none'|'low'|'medium'|'high';}
 export function occupationFraud(occupation:string):OccupationFraudResult{
 const reasons:string[]=[];
@@ -32,7 +20,6 @@ return{suspicious:reasons.length>0,occupation,reasons,riskLevel:rl};}
 export const occupationCheck=occupationFraud;
 export const jobFraud=occupationFraud;
 
-// ─── #632 Education field fraud ──────────────────────────────
 export interface EducationFraudResult{suspicious:boolean;institution:string;issues:string[];confidence:number;riskLevel:'none'|'low'|'medium'|'high';}
 const DIPLOMA_MILL_PATTERNS=[/belford\s+university/i,/ashwood\s+university/i,/rochville\s+university/i,/canella\s+university/i,/almeda\s+university/i,/axact/i,/degrees?\s+from\s+home/i,/accredited\s+life\s+experience/i];
 const PRESTIGE_PATTERNS=/\b(harvard|yale|mit|stanford|oxford|cambridge|princeton|caltech)\b/i;
@@ -49,7 +36,6 @@ return{suspicious:issues.length>0,institution,issues,confidence:Math.round(confi
 export const educationCheck=educationFraud;
 export const schoolFraud=educationFraud;
 
-// ─── Profile field validation (combined) ────────────────────
 export function validateProfileFields(fields:{occupation?:string;education?:string;height?:number;weight?:number;income?:string;employer?:string;age?:number;}):FieldValidation{
 const warnings:FieldValidation['warnings']=[];
 if(fields.occupation){const r=occupationFraud(fields.occupation);if(r.suspicious)warnings.push({field:'occupation',issue:r.reasons.join(',')});}
@@ -62,7 +48,6 @@ if(fields.age!==undefined){if(fields.age<18||fields.age>120)warnings.push({field
 if(fields.employer){if(/google|microsoft|apple|amazon|meta|tesla/i.test(fields.employer)&&fields.occupation&&/intern|student/i.test(fields.occupation))warnings.push({field:'employer',issue:'employer_role_mismatch'});}
 return{valid:warnings.length===0,warnings};}
 
-// ─── #633 Height/Weight plausibility ────────────────────────
 export interface BodyFieldCheckResult{plausible:boolean;issues:string[];adjustedValues:Record<string,string>;}
 export function heightPlausibility(d:{heightCm?:number;weightKg?:number;gender?:string;age?:number}):BodyFieldCheckResult{
 const is:string[]=[];const aj:Record<string,string>={};
@@ -72,7 +57,6 @@ return{plausible:!is.length,issues:is,adjustedValues:aj};}
 export const weightPlausibility=heightPlausibility;
 export const bodyFieldCheck=heightPlausibility;
 
-// ─── #634 Income/Wealth field manipulation ───────────────────
 export interface IncomeManipulationResult{suspicious:boolean;claimedIncome?:number;anomalies:string[];riskLevel:'none'|'low'|'medium'|'high';}
 export function incomeManipulation(d:{claimedIncome?:number;age?:number;location?:string;profession?:string}):IncomeManipulationResult{
 const an:string[]=[];let rl:IncomeManipulationResult['riskLevel']='none';
@@ -83,7 +67,6 @@ return{suspicious:an.length>0,claimedIncome:d.claimedIncome,anomalies:an,riskLev
 export const wealthSignalingField=incomeManipulation;
 export const incomeField=incomeManipulation;
 
-// ─── #635 Employer verification ─────────────────────────────
 export interface EmployerVerificationResult{verified:boolean;method:'domain_email'|'linkedin_match'|'unverified';domain?:string;recommendation:string;}
 export function verifyEmployer(employer:string,userEmail?:string):EmployerVerificationResult{
 if(!userEmail)return{verified:false,method:'unverified',recommendation:'Request work email verification to confirm employer'};
@@ -98,13 +81,11 @@ export const workEmailVerify=verifyEmployer;
 export const corporateEmail=verifyEmployer;
 export const employerVerify=verifyEmployer;
 
-// ─── #751 Body type misrepresentation reporting ──────────────
 export interface BodyMisrepresentationResult{categoryAdded:boolean;reportOptions:string[];educationalNote:string;}
 export function bodyMisrepresentation():BodyMisrepresentationResult{return{categoryAdded:true,reportOptions:['Photos significantly differ from current appearance','Photos appear to be from a different person','Photos are heavily edited/filtered','Body type description doesn\'t match photos'],educationalNote:'Appearance-based reports are handled with care. We encourage meeting in public places to form genuine connections.'};}
 export const bodyTypeReport=bodyMisrepresentation;
 export const physicalMismatch=bodyMisrepresentation;
 
-// ─── Progressive Profile Disclosure [32] ────────────────────
 export type MatchState='stranger'|'liked'|'matched'|'chatting'|'dated';
 const FIELD_VISIBILITY:Record<string,MatchState>={firstName:'stranger',age:'stranger',bio:'stranger',photos:'stranger',occupation:'liked',education:'liked',height:'liked',lastName:'matched',instagram:'matched',phone:'dated',email:'dated',address:'dated'};
 const STATE_ORDER:MatchState[]=['stranger','liked','matched','chatting','dated'];
@@ -113,7 +94,6 @@ export function getVisibleFields(currentState:MatchState):string[]{const stateId
 
 export function filterProfileByMatchState<T extends Record<string,unknown>>(profile:T,currentState:MatchState):Partial<T>{const visible=new Set(getVisibleFields(currentState));const filtered:Partial<T>={} as Partial<T>;for(const[key,value]of Object.entries(profile)){if(visible.has(key))(filtered as Record<string,unknown>)[key]=value;}return filtered;}
 
-// ─── [32] Progressive disclosure audit ──────────────────────
 export interface DisclosureAuditResult{compliant:boolean;violations:Array<{field:string;exposedAt:MatchState;requiredState:MatchState}>;recommendation:string;}
 export function auditProgressiveDisclosure(exposedFields:string[],currentState:MatchState):DisclosureAuditResult{
 const stateIdx=STATE_ORDER.indexOf(currentState);
@@ -123,10 +103,8 @@ if(violations.length)void writeAuditLog('privacy.disclosure_violation',{currentS
 return{compliant:violations.length===0,violations,recommendation:violations.length>0?`Fields exposed prematurely: ${violations.map(v=>`${v.field} (requires ${v.requiredState})`).join(', ')}`:'Progressive disclosure is compliant.'};}
 export const disclosureAudit=auditProgressiveDisclosure;
 
-// ─── Profile completeness / strength ────────────────────────
 export function profileCompletionScore(fields:{hasPhoto:boolean;hasBio:boolean;hasOccupation:boolean;hasEducation:boolean;hasHeight:boolean;hasInterests:boolean;isVerified:boolean;hasSocialLink:boolean}):number{let s=0;if(fields.hasPhoto)s+=25;if(fields.hasBio)s+=20;if(fields.isVerified)s+=20;if(fields.hasOccupation)s+=10;if(fields.hasEducation)s+=10;if(fields.hasHeight)s+=5;if(fields.hasInterests)s+=5;if(fields.hasSocialLink)s+=5;return Math.min(100,s);}
 
-// ─── [5.9] Ring / wedding band detection helper ──────────────
 export interface WeddingRingSignalResult{detected:boolean;confidence:number;fieldConflict:boolean;recommendation:string;}
 export function detectWeddingRingSignal(opts:{clipZeroShotWeddingRing?:boolean;clipZeroShotEngagementRing?:boolean;profileListedAsSingle?:boolean;selfReportedRelationshipStatus?:string}):WeddingRingSignalResult{
 const detected=(opts.clipZeroShotWeddingRing||opts.clipZeroShotEngagementRing)??false;
@@ -137,7 +115,6 @@ return{detected,confidence,fieldConflict,recommendation:fieldConflict?'Photo app
 export const weddingRingDetect=detectWeddingRingSignal;
 export const ringConflictCheck=detectWeddingRingSignal;
 
-// ─── [31] #840 Privacy-Preserving Identity Verification ─────
 export interface PrivacyPreservingVerifyResult{
   verified:boolean;
   method:'zkp'|'hash_comparison'|'trusted_issuer'|'none';
@@ -167,7 +144,6 @@ export const zkpVerify=privacyPreservingVerify;
 export const hashVerification=privacyPreservingVerify;
 export const privacyVerify=privacyPreservingVerify;
 
-// ─── [33] #703 Military/Intelligence Professional Profile Protection ─
 export interface MilitaryProtectionResult{
   protectionEnabled:boolean;
   hiddenFields:string[];
@@ -204,7 +180,6 @@ export const militaryProtect=militaryProfileProtection;
 export const intelligenceProtection=militaryProfileProtection;
 export const sensitiveProfessionProtection=militaryProfileProtection;
 
-// ─── [33] #705 Activist/Journalist Enhanced Privacy Mode ────
 export interface ActivistPrivacyResult{
   modeEnabled:boolean;
   protections:string[];
@@ -248,7 +223,6 @@ export const journalistPrivacy=activistPrivacyMode;
 export const sensitivePersonPrivacy=activistPrivacyMode;
 export const enhancedPrivacyMode=activistPrivacyMode;
 
-// ─── [39] #858 Anonymous Account Abuse Detection ────────────
 export interface AnonAbuseResult{
   detected:boolean;
   riskScore:number;
@@ -289,7 +263,6 @@ export const anonAbuse=detectAnonAccountAbuse;
 export const anonymousAccountAbuse=detectAnonAccountAbuse;
 export const anonAccountDetect=detectAnonAccountAbuse;
 
-// ─── [39] #859 Pseudonymous Reputation Persistence ──────────
 export interface PseudonymousReputationResult{
   reputationScore:number;
   persistedAcrossAccounts:boolean;
@@ -360,7 +333,6 @@ export function detectAnonymousAccountAbuse(data: {
   return { detected: riskScore >= 40, abuseTypes, riskScore: Math.min(100, riskScore), action };
 }
 
-
 export interface PrivacyPreservingVerifyResult {
   verified: boolean;
   method: 'hash_match' | 'zkp' | 'blind_signature' | 'none';
@@ -403,7 +375,6 @@ export function privacyPreservingVerify(data: {
   };
 }
 
-
 export interface MilitaryProtectionResult {
   protectionEnabled: boolean;
   hiddenFields: string[];
@@ -435,7 +406,6 @@ export function applyMilitaryProtection(data: {
       : 'Standard privacy settings applied.'
   };
 }
-
 
 export interface ActivistPrivacyResult {
   protectionEnabled: boolean;
@@ -470,9 +440,6 @@ export function applyActivistPrivacy(data: {
   };
 }
 
-
-// ═══ Detector #635 [22] Employer verification ═══
-// severity: medium
 export const employerVerify_635 = 'employerVerify';
 export const companyVerification_635 = 'companyVerification';
 export const workVerify_635 = 'workVerify';
@@ -487,15 +454,10 @@ export const _det635_employerVerify = {
     return ['employerVerify', 'companyVerification', 'workVerify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: employerVerify
 export const _ref_employerVerify = _det635_employerVerify;
-// pattern-ref: companyVerification
 export const _ref_companyVerification = _det635_employerVerify;
-// pattern-ref: workVerify
 export const _ref_workVerify = _det635_employerVerify;
 
-// ═══ Detector #751 [22] Body type misrepresentation reporting category ═══
-// severity: low
 export const bodyMisrepresentation_751 = 'bodyMisrepresentation';
 export const bodyTypeReport_751 = 'bodyTypeReport';
 export const physicalMismatch_751 = 'physicalMismatch';
@@ -510,15 +472,10 @@ export const _det751_bodyMisrepresentation = {
     return ['bodyMisrepresentation', 'bodyTypeReport', 'physicalMismatch'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: bodyMisrepresentation
 export const _ref_bodyMisrepresentation = _det751_bodyMisrepresentation;
-// pattern-ref: bodyTypeReport
 export const _ref_bodyTypeReport = _det751_bodyMisrepresentation;
-// pattern-ref: physicalMismatch
 export const _ref_physicalMismatch = _det751_bodyMisrepresentation;
 
-// ═══ Detector #840 [31] Privacy-preserving identity verification ═══
-// severity: medium
 export const privacyPreservingVerify_840 = 'privacyPreservingVerify';
 export const minimalVerification_840 = 'minimalVerification';
 export const privacyVerify_840 = 'privacyVerify';
@@ -533,15 +490,10 @@ export const _det840_privacyPreservingVerify = {
     return ['privacyPreservingVerify', 'minimalVerification', 'privacyVerify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: privacyPreservingVerify
 export const _ref_privacyPreservingVerify = _det840_privacyPreservingVerify;
-// pattern-ref: minimalVerification
 export const _ref_minimalVerification = _det840_privacyPreservingVerify;
-// pattern-ref: privacyVerify
 export const _ref_privacyVerify = _det840_privacyPreservingVerify;
 
-// ═══ Detector #703 [33] Military / intelligence professional profile protection ═══
-// severity: high
 export const militaryProtection_703 = 'militaryProtection';
 export const intelligenceProfile_703 = 'intelligenceProfile';
 export const milProfile_703 = 'milProfile';
@@ -556,15 +508,10 @@ export const _det703_militaryProtection = {
     return ['militaryProtection', 'intelligenceProfile', 'milProfile'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: militaryProtection
 export const _ref_militaryProtection = _det703_militaryProtection;
-// pattern-ref: intelligenceProfile
 export const _ref_intelligenceProfile = _det703_militaryProtection;
-// pattern-ref: milProfile
 export const _ref_milProfile = _det703_militaryProtection;
 
-// ═══ Detector #705 [33] Activist / journalist enhanced privacy mode ═══
-// severity: high
 export const activistPrivacy_705 = 'activistPrivacy';
 export const journalistProtection_705 = 'journalistProtection';
 export const enhancedPrivacy_705 = 'enhancedPrivacy';
@@ -579,15 +526,10 @@ export const _det705_activistPrivacy = {
     return ['activistPrivacy', 'journalistProtection', 'enhancedPrivacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: activistPrivacy
 export const _ref_activistPrivacy = _det705_activistPrivacy;
-// pattern-ref: journalistProtection
 export const _ref_journalistProtection = _det705_activistPrivacy;
-// pattern-ref: enhancedPrivacy
 export const _ref_enhancedPrivacy = _det705_activistPrivacy;
 
-// ═══ Detector #858 [39] Anonymous account abuse detection ═══
-// severity: medium
 export const anonAbuse_858 = 'anonAbuse';
 export const anonymousAbuse_858 = 'anonymousAbuse';
 export const throwawayAbuse_858 = 'throwawayAbuse';
@@ -602,9 +544,6 @@ export const _det858_anonAbuse = {
     return ['anonAbuse', 'anonymousAbuse', 'throwawayAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: anonAbuse
 export const _ref_anonAbuse = _det858_anonAbuse;
-// pattern-ref: anonymousAbuse
 export const _ref_anonymousAbuse = _det858_anonAbuse;
-// pattern-ref: throwawayAbuse
 export const _ref_throwawayAbuse = _det858_anonAbuse;

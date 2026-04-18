@@ -38,7 +38,6 @@ export async function checkPhotoFreshness(): Promise<PhotoFreshnessResult> {
       (now.getTime() - photoDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    // Check if we already reminded recently
     if (lastPhotoReminder) {
       const reminderDate = new Date(lastPhotoReminder);
       const daysSinceReminder = Math.floor(

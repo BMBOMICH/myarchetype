@@ -11,7 +11,6 @@ export interface ProfileStrengthResult {
   accountAgeDays: number; verificationBadge: ReturnType<typeof getVerificationBadgeConfig>;
 }
 
-// #102: Ghost profile detection
 export function detectGhostProfile(data: { lastSeen?: { toMillis?: () => number } | string; photos?: string[]; bio?: string }): { isGhost: boolean; daysSinceActive: number } {
   const lastMs = typeof data.lastSeen === 'object' && data.lastSeen !== null && typeof data.lastSeen.toMillis === 'function'
     ? data.lastSeen.toMillis()
@@ -21,7 +20,6 @@ export function detectGhostProfile(data: { lastSeen?: { toMillis?: () => number 
   return { isGhost: days > 30 && minimal, daysSinceActive: days };
 }
 
-// #174: Account age gate
 export function checkAccountAgeGate(createdAt?: string | number, action?: string): { allowed: boolean; isNew: boolean; ageDays: number; hoursRemaining: number; restrictions: string[] } {
   const created = typeof createdAt === 'number' ? createdAt : createdAt ? new Date(createdAt).getTime() : Date.now();
   const ageMs = Date.now() - created;
@@ -40,7 +38,6 @@ export function checkAccountAgeGate(createdAt?: string | number, action?: string
 }
 export const accountAgeGate = checkAccountAgeGate;
 
-// #155: Trust score decay
 export function applyTrustDecay(currentScore: number, violations: Array<{ timestamp: string; severity: 'low' | 'medium' | 'high' | 'critical' }>, windowDays = 30): number {
   const cutoff = Date.now() - windowDays * 86_400_000;
   const rates: Record<string, number> = { low: 2, medium: 5, high: 15, critical: 30 };

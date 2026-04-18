@@ -1,4 +1,3 @@
-// file: utils/aiSystemSafety.ts
 import { writeAuditLog } from './logger';
 const fetchSafe=async(u:string,o:RequestInit,t=8000)=>{const c=new AbortController();const id=setTimeout(()=>c.abort(),t);try{return await fetch(u,{...o,signal:c.signal});}finally{clearTimeout(id);}};
 
@@ -83,7 +82,6 @@ return{decision:r.flagged?'content_flagged':'content_allowed',factors:f,confiden
 export interface AIConsentConfig{matchingAlgorithm:boolean;photoAnalysis:boolean;messageModeration:boolean;personalityInsights:boolean;voiceAnalysis:boolean;}
 export const DEFAULT_AI_CONSENT:AIConsentConfig={matchingAlgorithm:true,photoAnalysis:true,messageModeration:true,personalityInsights:false,voiceAnalysis:false};
 
-// ─── [15.3] AI-Powered Infrastructure Safety ─────────────
 export interface AiAnomalyResult{anomaly:boolean;score:number;indicators:string[];action:'allow'|'flag'|'block';}
 export function detectAiTrafficAnomaly(requests:Array<{endpoint:string;responseTimeMs:number;statusCode:number;timestamp:number}>):AiAnomalyResult{
 if(requests.length<10)return{anomaly:false,score:0,indicators:[],action:'allow'};
@@ -127,7 +125,6 @@ for(const[pattern,label]of patterns){if(pattern.test(clean)){removed.push(label)
 return{sanitized:removed.length>0,original:output,clean:clean.trim(),removedPatterns:removed};}
 export const aiOutputSanitize=sanitizeAiOutput;
 
-// ─── [15.4] AI Scam Detection Failure Modes ──────────────
 export interface SlowBurnResult{detected:boolean;conversationAgedays:number;benignPhaseDays:number;financialRequestDetected:boolean;riskScore:number;}
 export function detectSlowBurnScam(messages:Array<{text:string;timestamp:number;fromUser:boolean}>,financialKeywords:string[]=['send money','wire transfer','crypto','bitcoin','gift card','investment','trading platform']):SlowBurnResult{
 if(messages.length<5)return{detected:false,conversationAgedays:0,benignPhaseDays:0,financialRequestDetected:false,riskScore:0};

@@ -1,4 +1,3 @@
-// utils/secondLook.ts
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { logger } from './logger';
@@ -41,7 +40,7 @@ async function cleanupOldSkippedProfiles(userId: string): Promise<void> {
     ));
     if (snapshot.size <= MAX_SKIPPED_STORED) return;
     const toDelete = snapshot.docs.slice(0, snapshot.size - MAX_SKIPPED_STORED);
-    await Promise.all(toDelete.map((d) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
+    await Promise.all(toDelete.map((d).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
   } catch (error) {
     logger.error('Error cleaning up skipped profiles:', error);
   }
@@ -76,7 +75,7 @@ export async function removeFromSkipped(skippedUserId: string): Promise<void> {
       where('userId', '==', user.uid),
       where('skippedUserId', '==', skippedUserId)
     ));
-    await Promise.all(snapshot.docs.map((d) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
+    await Promise.all(snapshot.docs.map((d).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) => deleteDoc(doc(db, 'skippedProfiles', d.id))));
   } catch (error) {
     logger.error('Error removing from skipped:', error);
   }

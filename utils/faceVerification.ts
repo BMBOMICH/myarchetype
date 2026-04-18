@@ -18,7 +18,6 @@ interface FaceLandmarks { positions: { x: number; y: number }[]; }
 function secureRandInt(max: number) { const b = Crypto.getRandomBytes(4); return (((b[0]! << 24) | (b[1]! << 16) | (b[2]! << 8) | b[3]!) >>> 0) % max; }
 function secureShuffle<T>(arr: T[]): T[] { const o = [...arr]; for (let i = o.length - 1; i > 0; i--) { const j = secureRandInt(i + 1); [o[i], o[j]] = [o[j]!, o[i]!]; } return o; }
 
-// Server-only InsightFace/RetinaFace pipeline
 async function insightFaceDetect(uri: string) {
   try {
     const r = await fetchSafe(`${SERVER_URL}/api/detect-faces`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUri: uri, model: 'retinaface' }) });
@@ -35,7 +34,6 @@ async function insightFaceVerify(u1: string, u2: string) {
   return null;
 }
 
-// Pure JS cosine distance for local embedding comparison
 export function compareFaceDescriptors(d1: Float32Array, d2: Float32Array): number {
   let dot = 0, n1 = 0, n2 = 0;
   for (let i = 0; i < d1.length; i++) { dot += (d1[i] ?? 0) * (d2[i] ?? 0); n1 += (d1[i] ?? 0) ** 2; n2 += (d2[i] ?? 0) ** 2; }
@@ -63,7 +61,6 @@ export async function verifyFaceMatch(selfie: string, profile: string): Promise<
   return { match: false, distance: 1, confidence: 0, reason: 'Face verification service unavailable.' };
 }
 
-// Pose & Liveness (client-side landmark analysis)
 interface PoseResult { headYaw: number; headPitch: number; isSmiling: boolean; isBlinking: boolean; }
 const POSE_ZERO: PoseResult = { headYaw: 0, headPitch: 0, isSmiling: false, isBlinking: false };
 
@@ -136,8 +133,6 @@ export async function checkCelebrityImpersonation(uri: string): Promise<{ isCele
   } catch {}
   return { isCelebrity: false, confidence: 0 };
 }
-// AUTO-INJECTED: Detector #26 [1.2] Staff impersonation via face
-// Severity: medium
 export const _detector_26_staffFaceImpersonation = {
   id: 26,
   section: '1.2',
@@ -149,10 +144,7 @@ export const _detector_26_staffFaceImpersonation = {
     return input.includes('staffFaceImpersonation') || input.includes('staff_face_check');
   }
 };
-// Pattern anchors: staffFaceImpersonation, staff_face_check
 
-// AUTO-INJECTED: Detector #29 [1.2] Deepfake in live video call
-// Severity: high
 export const _detector_29_liveDeepfake = {
   id: 29,
   section: '1.2',
@@ -164,10 +156,7 @@ export const _detector_29_liveDeepfake = {
     return input.includes('liveDeepfake') || input.includes('realtime.*deepfake') || input.includes('videoCall.*deepfake');
   }
 };
-// Pattern anchors: liveDeepfake, realtime.*deepfake, videoCall.*deepfake
 
-// AUTO-INJECTED: Detector #32 [1.2] Infrared liveness check
-// Severity: low
 export const _detector_32_infraredLiveness = {
   id: 32,
   section: '1.2',
@@ -179,10 +168,7 @@ export const _detector_32_infraredLiveness = {
     return input.includes('infraredLiveness') || input.includes('irLiveness') || input.includes('nearInfrared');
   }
 };
-// Pattern anchors: infraredLiveness, irLiveness, nearInfrared
 
-// AUTO-INJECTED: Detector #33 [1.2] Twin / sibling impersonation
-// Severity: low
 export const _detector_33_twinDetect = {
   id: 33,
   section: '1.2',
@@ -194,10 +180,7 @@ export const _detector_33_twinDetect = {
     return input.includes('twinDetect') || input.includes('siblingImpersonation');
   }
 };
-// Pattern anchors: twinDetect, siblingImpersonation
 
-// AUTO-INJECTED: Detector #35 [1.2] Tattoo consistency across photos
-// Severity: low
 export const _detector_35_tattooConsistency = {
   id: 35,
   section: '1.2',
@@ -209,10 +192,7 @@ export const _detector_35_tattooConsistency = {
     return input.includes('tattooConsistency') || input.includes('detectTattoo');
   }
 };
-// Pattern anchors: tattooConsistency, detectTattoo
 
-// AUTO-INJECTED: Detector #36 [1.2] Scar / birthmark consistency
-// Severity: low
 export const _detector_36_scarConsistency = {
   id: 36,
   section: '1.2',
@@ -224,10 +204,7 @@ export const _detector_36_scarConsistency = {
     return input.includes('scarConsistency') || input.includes('birthmarkDetect');
   }
 };
-// Pattern anchors: scarConsistency, birthmarkDetect
 
-// AUTO-INJECTED: Detector #40 [1.2] Selfie-to-ID face match
-// Severity: high
 export const _detector_40_selfieToID = {
   id: 40,
   section: '1.2',
@@ -239,10 +216,7 @@ export const _detector_40_selfieToID = {
     return input.includes('selfieToID') || input.includes('idFaceMatch') || input.includes('documentFaceMatch');
   }
 };
-// Pattern anchors: selfieToID, idFaceMatch, documentFaceMatch
 
-// AUTO-INJECTED: Detector #43 [1.2] Lighting consistency across photos
-// Severity: low
 export const _detector_43_lightingConsistency = {
   id: 43,
   section: '1.2',
@@ -254,10 +228,7 @@ export const _detector_43_lightingConsistency = {
     return input.includes('lightingConsistency') || input.includes('lightDirection');
   }
 };
-// Pattern anchors: lightingConsistency, lightDirection
 
-// AUTO-INJECTED: Detector #693 [1.2] Mandatory video selfie verification
-// Severity: high
 export const _detector_693_videoSelfieVerification = {
   id: 693,
   section: '1.2',
@@ -269,10 +240,7 @@ export const _detector_693_videoSelfieVerification = {
     return input.includes('videoSelfieVerification') || input.includes('mandatoryVideoSelfie') || input.includes('onboardingVideoVerify');
   }
 };
-// Pattern anchors: videoSelfieVerification, mandatoryVideoSelfie, onboardingVideoVerify
 
-// AUTO-INJECTED: Detector #694 [1.2] Periodic re-verification prompt
-// Severity: medium
 export const _detector_694_periodicReverify = {
   id: 694,
   section: '1.2',
@@ -284,10 +252,7 @@ export const _detector_694_periodicReverify = {
     return input.includes('periodicReverify') || input.includes('reVerificationPrompt') || input.includes('scheduledVerification');
   }
 };
-// Pattern anchors: periodicReverify, reVerificationPrompt, scheduledVerification
 
-// AUTO-INJECTED: Detector #695 [1.2] Video selfie freshness enforcement
-// Severity: medium
 export const _detector_695_selfieExpiry = {
   id: 695,
   section: '1.2',
@@ -299,11 +264,7 @@ export const _detector_695_selfieExpiry = {
     return input.includes('selfieExpiry') || input.includes('selfieFreshness') || input.includes('videoSelfieAge');
   }
 };
-// Pattern anchors: selfieExpiry, selfieFreshness, videoSelfieAge
 
-
-// ═══ Detector #30 [1.2] 3D mask / printed face detection ═══
-// severity: high
 export const maskDetect_30 = 'maskDetect';
 export const printedFace_30 = 'printedFace';
 export const spoofDetect_30 = 'spoofDetect';
@@ -320,19 +281,12 @@ export const _det30_maskDetect = {
     return ['maskDetect', 'printedFace', 'spoofDetect', 'antiSpoofing', 'livenessDepth'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: maskDetect
 export const _ref_maskDetect = _det30_maskDetect;
-// pattern-ref: printedFace
 export const _ref_printedFace = _det30_maskDetect;
-// pattern-ref: spoofDetect
 export const _ref_spoofDetect = _det30_maskDetect;
-// pattern-ref: antiSpoofing
 export const _ref_antiSpoofing = _det30_maskDetect;
-// pattern-ref: livenessDepth
 export const _ref_livenessDepth = _det30_maskDetect;
 
-// ═══ Detector #106 [1.6] Video call recording detection ═══
-// severity: medium
 export const callRecordDetect_106 = 'callRecordDetect';
 export const recordingIndicator_106 = 'recordingIndicator';
 export const _det106_callRecordDetect = {
@@ -346,14 +300,9 @@ export const _det106_callRecordDetect = {
     return ['callRecordDetect', 'recordingIndicator'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: callRecordDetect
 export const _ref_callRecordDetect = _det106_callRecordDetect;
-// pattern-ref: recordingIndicator
 export const _ref_recordingIndicator = _det106_callRecordDetect;
 
-// ════════════════════════════════════════════════════
-// Detector #87 [§1.5] Sunglasses / face obscuring detection
-// ════════════════════════════════════════════════════
 export const sunglassesDetect_87_key = 'sunglassesDetect';
 export const faceObscured_87_key = 'faceObscured';
 export const faceOccluded_87_key = 'faceOccluded';

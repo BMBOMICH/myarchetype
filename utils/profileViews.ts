@@ -48,9 +48,6 @@ export interface StalkingAlert {
   reason: string;
 }
 
-// ═════════════════════════════════════════════════════════
-// #100 + #175: Record a profile view with stalking detection
-// ═════════════════════════════════════════════════════════
 
 /**
  * Record that a user viewed a profile.
@@ -62,10 +59,8 @@ export async function recordProfileView(
   const viewer = auth.currentUser;
   if (!viewer) return { recorded: false };
 
-  // Don't record self-views
   if (viewer.uid === viewedUserId) return { recorded: false };
 
-  // #175: Rate limiting
   const stalkCheck = trackProfileView(viewer.uid, viewedUserId);
 
   let stalkingAlert: StalkingAlert | undefined;
@@ -79,7 +74,6 @@ export async function recordProfileView(
       reason: `${stalkCheck.viewCount} profile views in 1 hour — possible stalking behavior.`,
     };
 
-    // Log to audit trail
     await writeAuditLog('safety.content_flagged', {
       type: 'stalking_view_pattern',
       viewerId: viewer.uid,
@@ -90,13 +84,11 @@ export async function recordProfileView(
     logger.warn('[profileViews] Stalking pattern detected:', stalkingAlert.reason);
   }
 
-  // #175: Block excessive views
   if (stalkCheck.viewCount > 20) {
     return { recorded: false, stalkingAlert };
   }
 
   try {
-    // Get viewer's display info
     const viewerDoc = await getDoc(doc(db, 'users', viewer.uid));
     const viewerData = viewerDoc.exists() ? viewerDoc.data() : {};
 
@@ -115,9 +107,6 @@ export async function recordProfileView(
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// Get profile view stats
-// ═════════════════════════════════════════════════════════
 
 export async function getProfileViewStats(
   userId?: string
@@ -140,7 +129,7 @@ export async function getProfileViewStats(
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const [totalSnap, todaySnap, weekSnap, recentSnap] = await Promise.all([
-      getDocs(query(viewsCol, where('viewedUserId', '==', targetId))),
+      getDocs(query(viewsCol, where('viewedUserId', '==', targetId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }))),
       getDocs(
         query(
           viewsCol,

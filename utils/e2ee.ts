@@ -67,17 +67,17 @@ async function delVal(key: string): Promise<void> {
 
 export async function generateAndStoreE2EEKeypair(): Promise<LocalE2EEKeypair> {
   const kp = nacl.box.keyPair(), publicKey = b64Enc(kp.publicKey), secretKey = b64Enc(kp.secretKey);
-  await Promise.all([setVal(PUB_KEY, publicKey), setVal(SEC_KEY, secretKey)]);
+  await Promise.all([setVal(PUB_KEY, publicKey).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), setVal(SEC_KEY, secretKey)]);
   return { publicKey, secretKey, version: KEY_VER };
 }
 export async function getLocalE2EEKeypair(): Promise<LocalE2EEKeypair | null> {
-  const [publicKey, secretKey] = await Promise.all([getVal(PUB_KEY), getVal(SEC_KEY)]);
+  const [publicKey, secretKey] = await Promise.all([getVal(PUB_KEY).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), getVal(SEC_KEY)]);
   return publicKey && secretKey ? { publicKey, secretKey, version: KEY_VER } : null;
 }
 export async function ensureLocalE2EEKeypair(): Promise<LocalE2EEKeypair> {
   return (await getLocalE2EEKeypair()) ?? generateAndStoreE2EEKeypair();
 }
-export async function clearLocalE2EEKeys(): Promise<void> { await Promise.all([delVal(PUB_KEY), delVal(SEC_KEY)]); }
+export async function clearLocalE2EEKeys(): Promise<void> { await Promise.all([delVal(PUB_KEY).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), delVal(SEC_KEY)]); }
 
 export async function rotateE2EEKeys(): Promise<{ success: boolean; publicKey?: string; error?: string }> {
   const user = auth.currentUser; if (!user) return { success: false, error: 'Not authenticated' };
@@ -150,7 +150,7 @@ export async function encryptTextForRecipient(plaintext: string, recipientUserId
   if (!plaintext.trim()) throw new Error('Missing plaintext');
   const scanResult = await scanBeforeEncrypt(plaintext);
   if (!scanResult.safe) throw new Error(`Content blocked: ${scanResult.reason}`);
-  const [local, remote] = await Promise.all([ensureLocalE2EEKeypair(), getRemoteE2EEPublicKey(recipientUserId)]);
+  const [local, remote] = await Promise.all([ensureLocalE2EEKeypair().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), getRemoteE2EEPublicKey(recipientUserId)]);
   if (!remote?.encryptionPublicKey) throw new Error('Recipient has no E2EE public key');
   const nonce = nacl.randomBytes(nacl.box.nonceLength);
   const encrypted = nacl.box(utf8Enc(plaintext), nonce, b64Dec(remote.encryptionPublicKey), b64Dec(local.secretKey));
@@ -175,7 +175,7 @@ export async function establishSignalSession(recipientUserId: string): Promise<S
   return { sessionId, established: true, doubleRatchetActive: true, forwardSecrecy: true };
 }
 export async function getSafetyNumbers(myUserId: string, theirUserId: string): Promise<{ safetyNumber: string; verified: boolean }> {
-  const [local, remote] = await Promise.all([ensureLocalE2EEKeypair(), getRemoteE2EEPublicKey(theirUserId)]);
+  const [local, remote] = await Promise.all([ensureLocalE2EEKeypair().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), getRemoteE2EEPublicKey(theirUserId)]);
   if (!remote?.encryptionPublicKey) return { safetyNumber: '', verified: false };
   const ids = [myUserId, theirUserId].sort();
   const keys = ids[0] === myUserId ? [local.publicKey, remote.encryptionPublicKey] : [remote.encryptionPublicKey, local.publicKey];

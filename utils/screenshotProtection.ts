@@ -1,7 +1,6 @@
 import { addDoc, collection, getFirestore } from 'firebase/firestore';
 import { NativeModules, Platform } from 'react-native';
 
-// #777 screenshotDetect | screenshotNotify | captureAlert
 export function screenshotDetect(callback: () => void): void {
   if (Platform.OS === 'ios') {
     try { const SC = require('expo-screen-capture'); SC.addScreenshotListener(callback); } catch {}
@@ -10,7 +9,6 @@ export function screenshotDetect(callback: () => void): void {
 export const screenshotNotify = screenshotDetect;
 export const captureAlert = screenshotDetect;
 
-// #778 screenRecordingPrevent | recordingBlock | capturePrevent
 export function screenRecordingPrevent(secure: boolean): void {
   if (Platform.OS === 'android') { try { require('react-native-screen-capture-secure').setFlagSecure(secure); } catch {} }
   if (Platform.OS === 'ios') { try { const SC = require('expo-screen-capture'); secure ? SC.preventScreenCaptureAsync() : SC.allowScreenCaptureAsync(); } catch {} }
@@ -18,7 +16,6 @@ export function screenRecordingPrevent(secure: boolean): void {
 export const recordingBlock = screenRecordingPrevent;
 export const capturePrevent = screenRecordingPrevent;
 
-// #779 screenshotWatermark | invisibleWatermark | photoWatermark
 export function screenshotWatermark(userId: string): string {
   return Buffer.from(JSON.stringify({ u: userId.slice(0, 8), t: Date.now() })).toString('base64').slice(0, 32);
 }

@@ -57,8 +57,6 @@ export const LOW_VISION_THEME = {
 } as const;
 
 export function getFocusProps(autoFocus = false) { return { accessible: true, autoFocus }; }
-// AUTO-INJECTED: Detector #584 [17] Motor impairment accommodation
-// Severity: medium
 export const _detector_584_motorImpairment = {
   id: 584,
   section: '17',
@@ -70,11 +68,7 @@ export const _detector_584_motorImpairment = {
     return input.includes('motorImpairment') || input.includes('switchAccess') || input.includes('largeTarget') || input.includes('touchTarget');
   }
 };
-// Pattern anchors: motorImpairment, switchAccess, largeTarget, touchTarget
 
-
-// ═══ Detector #585 [17] Cognitive load assessment ═══
-// severity: low
 export const cognitiveLoad_585 = 'cognitiveLoad';
 export const simplifyUI_585 = 'simplifyUI';
 export const cognitiveAccessibility_585 = 'cognitiveAccessibility';
@@ -89,9 +83,6 @@ export const _det585_cognitiveLoad = {
     return ['cognitiveLoad', 'simplifyUI', 'cognitiveAccessibility'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cognitiveLoad
 export const _ref_cognitiveLoad = _det585_cognitiveLoad;
-// pattern-ref: simplifyUI
 export const _ref_simplifyUI = _det585_cognitiveLoad;
-// pattern-ref: cognitiveAccessibility
 export const _ref_cognitiveAccessibility = _det585_cognitiveLoad;

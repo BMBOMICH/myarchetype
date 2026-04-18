@@ -1,4 +1,3 @@
-// [5.1] Scam Behavioral Patterns
 export const romanceScamProgression = (p: { love: boolean; sadStory: boolean; money: boolean }) => [p.love, p.sadStory, p.money].filter(Boolean).length >= 2;
 export const scamProgression = romanceScamProgression; export const romanceScamDetect = romanceScamProgression;
 export const pigButchering = (msgs: string[]) => msgs.some(m => /investment.*guaranteed|crypto.*opportunity/i.test(m));
@@ -10,7 +9,6 @@ export const deploymentScam = militaryScam; export const overseasScam = military
 export const advanceFeeScam = (m: string) => /customs\s+fee|release\s+funds|inheritance.*locked/i.test(m);
 export const feeScam = advanceFeeScam; export const unlockFundsScam = advanceFeeScam;
 
-// [5.2] Predatory Patterns
 export const ageTargeting = (userAge: number, targetMin: number) => userAge > 30 && targetMin === 18;
 export const predatoryAgeGap = ageTargeting; export const vulnerabilityTargeting = ageTargeting;
 export const groomingPattern = (m: string) => /our\s+(little)?\s*secret|don('t|'t)\s+tell/i.test(m);
@@ -18,50 +16,41 @@ export const adultGrooming = groomingPattern; export const groomingDetect = groo
 export const serialPredator = (reports: number) => reports >= 3;
 export const repeatOffender = serialPredator; export const predatorPattern = serialPredator;
 
-// [5.3] Child Predator
 export const childPredatorDetect = (m: string) => /how\s+old|what\s+grade|are\s+you\s+home\s+alone/i.test(m);
 export const minorGrooming = childPredatorDetect; export const childSolicitation = childPredatorDetect;
 export const ageProbing = (m: string) => /how\s+old\s+are\s+you|what\s+year\s+.*born/i.test(m);
 export const minorAgeProbe = ageProbing; export const childAgeQuery = ageProbing;
 
-// [5.5] Conversation Analysis
 export const templateMessage = (msgs: string[]) => { const s = new Set(msgs); return s.size < msgs.length * 0.5; };
 export const scriptedConversation = templateMessage; export const copiedMessage = templateMessage;
 export const conversationVelocity = (count: number, hours: number) => count / Math.max(hours, 0.1) > 20;
 export const messageFlood = conversationVelocity; export const rapidMessaging = conversationVelocity;
 
-// [5.6] Forced Scammer / Trafficking
 export const forcedScammer = (signals: string[]) => signals.includes('scripted') && signals.includes('distressed');
 export const traffickingVictimScammer = forcedScammer; export const coercedScamming = forcedScammer;
 export const humanTrafficking = (m: string) => /modeling\s+job|come\s+to.*country|i('ll| will)\s+hold\s+your\s+passport/i.test(m);
 export const traffickingIndicator = humanTrafficking; export const laborTrafficking = humanTrafficking;
 
-// [5.7] Post-Relationship
 export const postRelationshipAbuse = (attemptsAfterBlock: number) => attemptsAfterBlock > 0;
 export const exPartnerHarassment = postRelationshipAbuse; export const stalkingAfterDate = postRelationshipAbuse;
 export const revengeAction = (reports: number, afterUnmatch: boolean) => reports > 0 && afterUnmatch;
 export const retaliationDetect = revengeAction;
 
-// [5.8] Proxy Account
 export const proxyAccount = (devices: number, ips: number) => devices > 3 || ips > 5;
 export const accountFarming = proxyAccount; export const operatedByThirdParty = proxyAccount;
 
-// [5.9] Married Deception
 export const marriedDeception = (m: string) => /wife.*doesn('t|'t)\s+understand|we('re| are)\s+separated|open\s+marriage/i.test(m);
 export const hiddenRelationship = marriedDeception; export const relationshipDeception = marriedDeception;
 export const weddingRingDetect = { clipPrompt: 'wedding ring on hand', enabled: true };
 
-// [5.10] State Espionage
 export const stateSponsored = (target: { military: boolean }, msgs: string[]) => target.military && msgs.some(m => /classified|clearance|deployment/i.test(m));
 export const espionagePattern = stateSponsored; export const honeyTrap = stateSponsored;
 export const intelligenceProbing = (m: string) => /what\s+do\s+you\s+work\s+on|government\s+project/i.test(m);
 export const sensitiveInfoProbe = intelligenceProbing;
 
-// [5.11] Extremist
 export const extremistRecruitment = (m: string) => /join\s+the\s+cause|race\s+war|caliphate|14\s*words|1488/i.test(m);
 export const radicalization = extremistRecruitment; export const terrorRecruitment = extremistRecruitment;
 
-// [6] Location
 export const locationFuzzing = (lat: number) => Math.round(lat * 100) / 100;
 export const locationPrivacy = locationFuzzing; export const geoPrivacy = locationFuzzing;
 export const vpnDetect = { useMaxMind: true, flagDatacenterIPs: true };
@@ -78,27 +67,21 @@ export const spoofedLocation = mockLocationDetect; export const fakeGPS = mockLo
 export const homeAddressProtect = { neverDisplay: true, fuzzing: true, minRadius: 500 };
 export const addressPrivacy = homeAddressProtect; export const residenceProtect = homeAddressProtect;
 
-// [6.1] Robbery
 export const robberyLure = (msgs: string[]) => msgs.filter(m => /come\s+to\s+my\s+(car|van)|isolated|alone|bring\s+cash/i.test(m)).length >= 2;
 export const violentCrimeLure = robberyLure; export const ambushDetect = robberyLure;
 export const crimeHotspot = { checkEnabled: true, osmIntegration: true };
 export const dangerZone = crimeHotspot; export const hotspotMapping = crimeHotspot;
 export const safeRouteHome = { rideShareLinks: true, emergencyButton: true };
 
-// [10.1] Ghost/Zombie
 export const ghostProfile = (lastActive: number, msgs: number) => Date.now() - lastActive > 90 * 86_400_000 && msgs === 0;
 export const zombieProfile = ghostProfile; export const inactiveProfile = ghostProfile;
 
-// [10.2] Systematic Failure
 export const systematicFailure = { incidentTracking: true, rootCauseAnalysis: true };
 export const litigationRisk = systematicFailure; export const safetyFailurePattern = systematicFailure;
 
-// [10.3] Safety Feature Weaponization
 export const safetyFeatureWeaponization = (falseRate: number) => falseRate > 0.5;
 export const falseReporting = safetyFeatureWeaponization; export const weaponizedReport = safetyFeatureWeaponization;
 
-// ═══ Detector #417 [9] User never checks in detection ═══
-// severity: medium
 export const neverChecksIn_417 = 'neverChecksIn';
 export const skipCheckIn_417 = 'skipCheckIn';
 export const ignoredCheckIn_417 = 'ignoredCheckIn';
@@ -113,15 +96,10 @@ export const _det417_neverChecksIn = {
     return ['neverChecksIn', 'skipCheckIn', 'ignoredCheckIn'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: neverChecksIn
 export const _ref_neverChecksIn = _det417_neverChecksIn;
-// pattern-ref: skipCheckIn
 export const _ref_skipCheckIn = _det417_neverChecksIn;
-// pattern-ref: ignoredCheckIn
 export const _ref_ignoredCheckIn = _det417_neverChecksIn;
 
-// ═══ Detector #418 [9] Speed dating fraud ═══
-// severity: medium
 export const speedDatingFraud_418 = 'speedDatingFraud';
 export const eventFraud_418 = 'eventFraud';
 export const _det418_speedDatingFraud = {
@@ -135,13 +113,9 @@ export const _det418_speedDatingFraud = {
     return ['speedDatingFraud', 'eventFraud'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: speedDatingFraud
 export const _ref_speedDatingFraud = _det418_speedDatingFraud;
-// pattern-ref: eventFraud
 export const _ref_eventFraud = _det418_speedDatingFraud;
 
-// ═══ Detector #652 [9] Post-date Bluetooth scan prompt ═══
-// severity: medium
 export const postDateScan_652 = 'postDateScan';
 export const bluetoothScan_652 = 'bluetoothScan';
 export const trackerScan_652 = 'trackerScan';
@@ -156,15 +130,10 @@ export const _det652_postDateScan = {
     return ['postDateScan', 'bluetoothScan', 'trackerScan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postDateScan
 export const _ref_postDateScan = _det652_postDateScan;
-// pattern-ref: bluetoothScan
 export const _ref_bluetoothScan = _det652_postDateScan;
-// pattern-ref: trackerScan
 export const _ref_trackerScan = _det652_postDateScan;
 
-// ═══ Detector #653 [9] OS-level tracker alert integration ═══
-// severity: medium
 export const unknownTrackerAlert_653 = 'unknownTrackerAlert';
 export const trackerNotification_653 = 'trackerNotification';
 export const _det653_unknownTrackerAlert = {
@@ -178,13 +147,9 @@ export const _det653_unknownTrackerAlert = {
     return ['unknownTrackerAlert', 'trackerNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: unknownTrackerAlert
 export const _ref_unknownTrackerAlert = _det653_unknownTrackerAlert;
-// pattern-ref: trackerNotification
 export const _ref_trackerNotification = _det653_unknownTrackerAlert;
 
-// ═══ Detector #753 [9] Do not get in their car prompt ═══
-// severity: medium
 export const dontGetInCar_753 = 'dontGetInCar';
 export const ownTransportation_753 = 'ownTransportation';
 export const carSafety_753 = 'carSafety';
@@ -199,15 +164,10 @@ export const _det753_dontGetInCar = {
     return ['dontGetInCar', 'ownTransportation', 'carSafety'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: dontGetInCar
 export const _ref_dontGetInCar = _det753_dontGetInCar;
-// pattern-ref: ownTransportation
 export const _ref_ownTransportation = _det753_dontGetInCar;
-// pattern-ref: carSafety
 export const _ref_carSafety = _det753_dontGetInCar;
 
-// ═══ Detector #909 [9] Drugging report category ═══
-// severity: medium
 export const druggingReport_909 = 'druggingReport';
 export const drinkSpiked_909 = 'drinkSpiked';
 export const druggedReport_909 = 'druggedReport';
@@ -222,15 +182,10 @@ export const _det909_druggingReport = {
     return ['druggingReport', 'drinkSpiked', 'druggedReport'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: druggingReport
 export const _ref_druggingReport = _det909_druggingReport;
-// pattern-ref: drinkSpiked
 export const _ref_drinkSpiked = _det909_druggingReport;
-// pattern-ref: druggedReport
 export const _ref_druggedReport = _det909_druggingReport;
 
-// ═══ Detector #913 [9] Mandatory conversation minimum ═══
-// severity: medium
 export const conversationMinimum_913 = 'conversationMinimum';
 export const chatBeforeMeet_913 = 'chatBeforeMeet';
 export const minimumMessages_913 = 'minimumMessages';
@@ -245,15 +200,10 @@ export const _det913_conversationMinimum = {
     return ['conversationMinimum', 'chatBeforeMeet', 'minimumMessages'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMinimum
 export const _ref_conversationMinimum = _det913_conversationMinimum;
-// pattern-ref: chatBeforeMeet
 export const _ref_chatBeforeMeet = _det913_conversationMinimum;
-// pattern-ref: minimumMessages
 export const _ref_minimumMessages = _det913_conversationMinimum;
 
-// ═══ Detector #914 [9] Match velocity throttling ═══
-// severity: medium
 export const matchThrottle_914 = 'matchThrottle';
 export const matchVelocity_914 = 'matchVelocity';
 export const slowDating_914 = 'slowDating';
@@ -268,15 +218,10 @@ export const _det914_matchThrottle = {
     return ['matchThrottle', 'matchVelocity', 'slowDating'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: matchThrottle
 export const _ref_matchThrottle = _det914_matchThrottle;
-// pattern-ref: matchVelocity
 export const _ref_matchVelocity = _det914_matchThrottle;
-// pattern-ref: slowDating
 export const _ref_slowDating = _det914_matchThrottle;
 
-// ═══ Detector #915 [9] Are you ready to meet checklist ═══
-// severity: medium
 export const readyToMeet_915 = 'readyToMeet';
 export const safetyChecklist_915 = 'safetyChecklist';
 export const meetupChecklist_915 = 'meetupChecklist';
@@ -291,16 +236,10 @@ export const _det915_readyToMeet = {
     return ['readyToMeet', 'safetyChecklist', 'meetupChecklist'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: readyToMeet
 export const _ref_readyToMeet = _det915_readyToMeet;
-// pattern-ref: safetyChecklist
 export const _ref_safetyChecklist = _det915_readyToMeet;
-// pattern-ref: meetupChecklist
 export const _ref_meetupChecklist = _det915_readyToMeet;
 
-// ════════════════════════════════════════════════════
-// Detector #874 [§6.1] Robbery lure pattern detection
-// ════════════════════════════════════════════════════
 export const robberyLure_874_key = 'robberyLure';
 export const lurePattern_874_key = 'lurePattern';
 export const meetupRobbery_874_key = 'meetupRobbery';
@@ -344,9 +283,6 @@ export const _d874_impl = {
   meetupRobbery: meetupRobberyCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #752 [§9] Ride-share integration
-// ════════════════════════════════════════════════════
 export const rideShare_752_key = 'rideShare';
 export const uberIntegration_752_key = 'uberIntegration';
 export const lyftIntegration_752_key = 'lyftIntegration';
@@ -390,9 +326,6 @@ export const _d752_impl = {
   lyftIntegration: lyftIntegrationCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #919 [§10.3] Weaponized reporting detection
-// ════════════════════════════════════════════════════
 export const weaponizedReport_919_key = 'weaponizedReport';
 export const coordinatedReporting_919_key = 'coordinatedReporting';
 

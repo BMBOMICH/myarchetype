@@ -2,7 +2,6 @@ import { comprehensiveDateSafetyCheck, comprehensiveLoginCheck, comprehensiveMes
 import { checkForCodeWord, quickExit, type CodeWordConfig } from './ipvSafety';
 import { writeAuditLog } from './logger';
 
-// ─── Types ───
 export interface SafetyMiddlewareConfig { serverUrl: string; codeWordConfig?: CodeWordConfig; enablePhotoCheck: boolean; enableMessageCheck: boolean; enableLoginCheck: boolean; enableRegistrationCheck: boolean; enableProfileCheck: boolean; autoBlockCritical: boolean; logAllChecks: boolean; }
 export const DEFAULT_CONFIG: SafetyMiddlewareConfig = { serverUrl: '', enablePhotoCheck: true, enableMessageCheck: true, enableLoginCheck: true, enableRegistrationCheck: true, enableProfileCheck: true, autoBlockCritical: true, logAllChecks: false };
 
@@ -11,7 +10,6 @@ const listeners: SafetyCallback[] = [];
 export function onSafetyEvent(cb: SafetyCallback) { listeners.push(cb); return () => { const i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); }; }
 function emit(action: SafetyAction, reasons: string[], riskScore: number, source: string) { for (const cb of listeners) cb({ action, reasons, riskScore, source }); }
 
-// ─── Photo Upload Middleware ───
 export async function checkPhotoUpload(imageUri: string, imageHash: string, userId: string, context: 'profile' | 'story' | 'chat' | 'id_document', config: SafetyMiddlewareConfig = DEFAULT_CONFIG): Promise<{ allowed: boolean; shouldBlur: boolean; reasons: string[] }> {
   if (!config.enablePhotoCheck) return { allowed: true, shouldBlur: false, reasons: [] };
   try {
@@ -25,11 +23,9 @@ export async function checkPhotoUpload(imageUri: string, imageHash: string, user
   }
 }
 
-// ─── Message Send Middleware ───
 export async function checkMessageSend(text: string, senderId: string, recipientId: string, isFirstMessage: boolean, conversationDays: number, config: SafetyMiddlewareConfig = DEFAULT_CONFIG, extra?: { sessions?: Array<{ accountId: string; ip: string; timestamp: number; messagesSent: number }>; messageHistory?: string[]; senderAge?: number; recipientAge?: number }): Promise<{ allowed: boolean; shouldWarn: boolean; warningMessage?: string; reasons: string[]; riskScore: number }> {
   if (!config.enableMessageCheck) return { allowed: true, shouldWarn: false, reasons: [], riskScore: 0 };
   try {
-    // Code word check (highest priority)
     if (config.codeWordConfig) { const cw = checkForCodeWord(text, config.codeWordConfig); if (cw.detected) { writeAuditLog('safety.code_word_activated', { word: cw.word, action: cw.action, userId: senderId }).catch(() => {}); return { allowed: true, shouldWarn: false, reasons: ['code_word_activated'], riskScore: 0 }; } }
 
     const result = await comprehensiveMessageCheck(text, isFirstMessage, conversationDays, config.serverUrl, extra?.sessions, extra?.messageHistory, extra?.senderAge, extra?.recipientAge);
@@ -53,7 +49,6 @@ export async function checkMessageSend(text: string, senderId: string, recipient
   }
 }
 
-// ─── Login Middleware ───
 export async function checkLogin(login: { userId: string; ip: string; userAgent: string; deviceId: string; location: string; session: { originalIp: string; currentIp: string; originalUserAgent: string; currentUserAgent: string; originalLocation?: string; currentLocation?: string } }, deviceSignals: { suBinaryPresent: boolean; buildTagsTestKeys: boolean; writableSystemPartition: boolean; unknownSourcesEnabled: boolean; playIntegrityFailed: boolean }, locationData: { ipCountry: string; profileCountry: string; ipLat: number; ipLng: number; profileLat: number; profileLng: number; knownCountries: string[] }, accountSignals: { newDeviceLogin: boolean; newLocationLogin: boolean; passwordChanged: boolean; emailChanged: boolean; phoneChanged: boolean; rapidProfileChanges: boolean; unusualLoginTime: boolean }, config: SafetyMiddlewareConfig = DEFAULT_CONFIG): Promise<{ allowed: boolean; requireMFA: boolean; requireReauth: boolean; reasons: string[]; riskScore: number }> {
   if (!config.enableLoginCheck) return { allowed: true, requireMFA: false, requireReauth: false, reasons: [], riskScore: 0 };
   try {
@@ -69,7 +64,6 @@ export async function checkLogin(login: { userId: string; ip: string; userAgent:
   }
 }
 
-// ─── Registration Middleware ───
 export async function checkRegistration(reg: { email: string; phone: string; ip: string; deviceFingerprint: string; password: string }, config: SafetyMiddlewareConfig = DEFAULT_CONFIG): Promise<{ allowed: boolean; requireExtraVerification: boolean; reasons: string[]; riskScore: number }> {
   if (!config.enableRegistrationCheck) return { allowed: true, requireExtraVerification: false, reasons: [], riskScore: 0 };
   try {
@@ -84,7 +78,6 @@ export async function checkRegistration(reg: { email: string; phone: string; ip:
   }
 }
 
-// ─── Profile Update Middleware ───
 export async function checkProfileUpdate(updates: { bio?: string; age?: number; photos?: string[]; location?: string }, config: SafetyMiddlewareConfig = DEFAULT_CONFIG): Promise<{ allowed: boolean; warnings: string[]; reasons: string[]; riskScore: number }> {
   if (!config.enableProfileCheck) return { allowed: true, warnings: [], reasons: [], riskScore: 0 };
   try {
@@ -98,17 +91,14 @@ export async function checkProfileUpdate(updates: { bio?: string; age?: number; 
   }
 }
 
-// ─── Date Safety Middleware ───
 export function checkDateSafety(date: { venueName?: string; venuePublic: boolean; meetupTime: number; shareLocation: boolean; trustedContactSet: boolean; firstDate: boolean; otherPersonVerified: boolean; otherPersonReportCount: number }): { safe: boolean; warnings: string[]; resources: string[]; riskScore: number } {
   const result = comprehensiveDateSafetyCheck(date);
   if (!result.safe) emit('review', result.warnings, result.riskScore, 'date_safety');
   return { safe: result.safe, warnings: result.warnings, resources: result.resources, riskScore: result.riskScore };
 }
 
-// ─── Quick Exit Handler ───
 export function handleQuickExit(): void { quickExit(true); }
 
-// ─── Batch Message Analysis (for conversation review) ───
 export interface BatchMessageResult { totalMessages: number; flagged: number; riskCategories: Record<string, number>; highestRiskScore: number; action: SafetyAction; }
 
 export async function batchAnalyzeMessages(messages: Array<{ text: string; senderId: string; timestamp: number }>, config: SafetyMiddlewareConfig = DEFAULT_CONFIG): Promise<BatchMessageResult> {

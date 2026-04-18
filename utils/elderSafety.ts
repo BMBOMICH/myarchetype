@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// elderSafety.ts — [30] Elder-Specific Fraud Protection
-// Upgrades: #723
-// ═══════════════════════════════════════════════════════════════
 
 import { writeAuditLog } from './logger';
 
@@ -165,8 +161,6 @@ export function analyzeForElderScam(msg: string, age?: number): ElderSafetyResul
 
 export const elderScamAnalysis = analyzeForElderScam;
 export const detectElderFraud = analyzeForElderScam;
-// AUTO-INJECTED: Detector #726 [30] Simplified reporting flow
-// Severity: medium
 export const _detector_726_simplifiedReport = {
   id: 726,
   section: '30',
@@ -178,11 +172,7 @@ export const _detector_726_simplifiedReport = {
     return input.includes('simplifiedReport') || input.includes('easyReport') || input.includes('accessibleReport');
   }
 };
-// Pattern anchors: simplifiedReport, easyReport, accessibleReport
 
-
-// ═══ Detector #727 [30] Caretaker exploitation detection ═══
-// severity: high
 export const caretakerExploitation_727 = 'caretakerExploitation';
 export const elderAbuse_727 = 'elderAbuse';
 export const caretakerAbuse_727 = 'caretakerAbuse';
@@ -197,9 +187,6 @@ export const _det727_caretakerExploitation = {
     return ['caretakerExploitation', 'elderAbuse', 'caretakerAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: caretakerExploitation
 export const _ref_caretakerExploitation = _det727_caretakerExploitation;
-// pattern-ref: elderAbuse
 export const _ref_elderAbuse = _det727_caretakerExploitation;
-// pattern-ref: caretakerAbuse
 export const _ref_caretakerAbuse = _det727_caretakerExploitation;

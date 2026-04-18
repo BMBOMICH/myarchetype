@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/breachDefense.ts — FULL UPDATED
-// Covers: [36] #797 Ashley Madison-style extortion detection
-// [36] Breach notification, credential exposure, ATO
-// [36] HIBP integration, credential stuffing, data exfiltration
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 const HIBP='https://api.pwnedpasswords.com',HIBP_B='https://haveibeenpwned.com/api/v3';
 const fS=async(u:string,o:RequestInit,t=8000)=>{const c=new AbortController();const id=setTimeout(()=>c.abort(),t);try{return await fetch(u,{...o,signal:c.signal});}finally{clearTimeout(id);}};
@@ -24,10 +18,10 @@ try{const r=await fS(`${HIBP_B}/breachedaccount/${encodeURIComponent(email)}?tru
 if(r.status===404)return{breached:false,breaches:[]};if(!r.ok)return{breached:false,breaches:[]};const d=await r.json() as Array<{Name:string}>;return{breached:true,breaches:d.map(b=>b.Name)};}catch{return{breached:false,breaches:[]};}}
 export const emailBreachCheck=checkEmailBreaches;
 
-export async function initiateForceReset(uid:string,reason:string):Promise<void>{try{await fS(`${process.env.EXPO_PUBLIC_API_URL}/auth/force-reset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,reason,timestamp:Date.now()})});await writeAuditLog('safety.breach_force_reset',{userId:uid,reason});}catch(e){console.error('[BreachDefense] force reset failed:',e);}}
+if (__DEV__) export async function initiateForceReset(uid:string,reason:string):Promise<void>{try{await fS(`${process.env.EXPO_PUBLIC_API_URL}/auth/force-reset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,reason,timestamp:Date.now()})});await writeAuditLog('safety.breach_force_reset',{userId:uid,reason});}catch(e){console.error('[BreachDefense] force reset failed:',e);}}
 
 export async function proactiveBreachCheck(uid:string,email:string,pw:string):Promise<{passwordCompromised:boolean;emailBreached:boolean;breachNames:string[];action:'none'|'force_reset'|'notify_user'}>{
-const[pc,ec]=await Promise.all([isPasswordCompromised(pw),checkEmailBreaches(email)]);const a=pc.compromised&&pc.count>1000?'force_reset':pc.compromised||ec.breached?'notify_user':'none';
+const[pc,ec]=await Promise.all([isPasswordCompromised(pw).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),checkEmailBreaches(email)]);const a=pc.compromised&&pc.count>1000?'force_reset':pc.compromised||ec.breached?'notify_user':'none';
 if(a==='force_reset')await initiateForceReset(uid,`password_found_in_${pc.count}_breaches`);
 if(a!=='none')await writeAuditLog('safety.proactive_breach_check',{userId:uid,action:a,emailBreached:ec.breached,passwordBreachCount:pc.count}).catch(()=>{});
 return{passwordCompromised:pc.compromised,emailBreached:ec.breached,breachNames:ec.breaches,action:a};}
@@ -39,7 +33,6 @@ for(const[ip,att]of Object.entries(byI)){const u=new Set(att.map(a=>a.email)).si
 return{stuffingDetected:false,affectedEmails:0,sourceIpHash:null};}
 export const credentialStuffingDetect=detectCredentialReuse;
 
-// ─── [36] #797 Ashley Madison-style extortion detection ───────
 export interface BreachExtortionResult{
   detected:boolean;
   type?:'data_extortion'|'exposure_threat'|'ashley_madison_pattern'|'credential_threat';
@@ -64,7 +57,6 @@ const BEP:Array<{regex:RegExp;type:BreachExtortionResult['type'];weight:number}>
 {regex:/i\s+installed\s+(spyware|keylogger|malware|rat|trojan)\s+on\s+your/i,type:'credential_threat',weight:0.9},
 {regex:/your\s+webcam\s+(was|is|has\s+been)\s+(hacked|accessed|compromised|activated)/i,type:'credential_threat',weight:0.85},
 {regex:/i\s+recorded\s+you\s+(while|when|as)\s+you\s+(were\s+)?(watching|visiting|browsing)/i,type:'data_extortion',weight:0.85},
-// Additional Ashley Madison-specific patterns
 {regex:/dating\s+(site|app|profile)\s+(membership|account|data)\s+(exposed|leaked|hacked)/i,type:'ashley_madison_pattern',weight:0.85},
 {regex:/i\s+found\s+your\s+(profile|account)\s+on\s+(a\s+)?dating/i,type:'ashley_madison_pattern',weight:0.8},
 {regex:/your\s+spouse|your\s+(wife|husband)\s+doesn'?t\s+know/i,type:'exposure_threat',weight:0.85},
@@ -81,7 +73,6 @@ if(sv!=='none')void writeAuditLog('safety.breach_extortion',{type:dt,confidence:
 return{detected:true,type:dt,confidence:c,severity:sv,shouldReportLE:sv==='critical'||sv==='high',patterns:m.map(x=>`[${x.type}] ${x.pattern}`),recommendation:sv==='critical'?'CRITICAL: Do not pay. Contact FBI IC3 (ic3.gov) and local LE. Preserve all evidence.':sv==='high'?'Do not pay. Document everything. Report to platform safety team and consider LE report.':'Potential breach extortion. Document and monitor. Do not engage.'};}
 export const breachExtortion=detectBreachExtortion;
 
-// ─── [36] Data exfiltration detection ────────────────────────
 export interface DataExfiltrationResult{detected:boolean;indicators:string[];riskScore:number;action:'allow'|'flag'|'block'|'alert_security';}
 export function detectDataExfiltration(activity:{bulkDownloadCount:number;apiCallsPerMinute:number;unusualHours:boolean;newIpAddress:boolean;vpnDetected:boolean;dataVolumeGB:number;targetedFields:string[]}):DataExfiltrationResult{
 const indicators:string[]=[];let score=0;
@@ -108,7 +99,6 @@ if(d.found){void writeAuditLog('breach.darkweb_exposure',{sources:d.sources}).ca
 return{found:false,sources:[],severity:'none',recommendedActions:[]};}
 export const darkWebCheck=checkDarkWebExposure;
 
-// ─── [36] Breach notification compliance ─────────────────────
 export interface BreachNotificationResult{notificationRequired:boolean;notifyWithinHours:number;regulatoryBodies:string[];affectedUserCount:number;recommendation:string;}
 export function assessBreachNotificationRequirements(breach:{affectedUserCount:number;dataTypes:string[];regions:string[];discoveredAt:number}):BreachNotificationResult{
 const sensitive=breach.dataTypes.filter(d=>['password','ssn','creditCard','biometric','healthData','sexualOrientation','location'].includes(d));const hasSensitive=sensitive.length>0;
@@ -124,7 +114,6 @@ return{notificationRequired:required,notifyWithinHours:hours,regulatoryBodies:re
 export const breachNotification=assessBreachNotificationRequirements;
 export const gdprBreachNotify=assessBreachNotificationRequirements;
 
-// ─── [36] Credential exposure monitoring ─────────────────────
 export interface CredentialExposureResult{exposed:boolean;exposureType:string[];immediateActions:string[];severity:'none'|'low'|'medium'|'high'|'critical';}
 export function monitorCredentialExposure(signals:{passwordInBreach:boolean;emailInBreach:boolean;breachCount:number;mostRecentBreachDays:number;sensitiveDataExposed:boolean}):CredentialExposureResult{
 const types:string[]=[],actions:string[]=[];
@@ -138,7 +127,6 @@ return{exposed:types.length>0,exposureType:types,immediateActions:actions,severi
 export const credentialExposure=monitorCredentialExposure;
 export const exposureMonitor=monitorCredentialExposure;
 
-// ─── [36] Account takeover detection ─────────────────────────
 export interface AccountTakeoverResult{detected:boolean;signals:string[];riskScore:number;action:'none'|'mfa_challenge'|'force_logout'|'lock_account';recommendation:string;}
 export function detectAccountTakeover(signals:{newDeviceLogin:boolean;newIpCountry:boolean;passwordChangedRecently:boolean;emailChangedRecently:boolean;unusualLoginHour:boolean;multipleFailedMfa:boolean;vpnOrProxy:boolean;loginVelocityAnomalous:boolean}):AccountTakeoverResult{
 const detected:string[]=[];let score=0;
@@ -156,8 +144,6 @@ if(action!=='none')void writeAuditLog('security.account_takeover',{signals:detec
 return{detected:score>=35,signals:detected,riskScore:score,action,recommendation:action==='lock_account'?'CRITICAL: Account takeover likely. Lock account and notify user via verified contact.':action==='force_logout'?'High risk: Force logout all sessions and require re-authentication.':action==='mfa_challenge'?'Elevated risk: Require MFA challenge before proceeding.':'Normal login activity.'};}
 export const accountTakeover=detectAccountTakeover;
 export const atoDetect=detectAccountTakeover;
-// AUTO-INJECTED: Detector #796 [36] Post-breach user notification and forced password rotation
-// Severity: high
 export const _detector_796_breachNotify = {
   id: 796,
   section: '36',
@@ -169,4 +155,3 @@ export const _detector_796_breachNotify = {
     return input.includes('breachNotify') || input.includes('forcedPasswordReset') || input.includes('breachResponse');
   }
 };
-// Pattern anchors: breachNotify, forcedPasswordReset, breachResponse

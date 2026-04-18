@@ -10,7 +10,6 @@
  * #754 — transportationBarrier | noTransportation | controlMechanism
  */
 
-// ━━━ #364: Hotel/Motel Detection ━━━
 
 export async function motelDetect(
   lat: number,
@@ -22,7 +21,6 @@ export async function motelDetect(
   name: string | null;
 }> {
   try {
-    // OpenStreetMap Overpass API — query amenity=hotel/motel
     const overpassQuery = `
       [out:json][timeout:10];
       (
@@ -58,8 +56,6 @@ export async function motelDetect(
 }
 
 
-// ━━━ #366: Recurring Location with Different Matches ━━━
-
 export function recurringLocation(
   meetingLocations: Array<{
     lat: number;
@@ -81,7 +77,6 @@ export function recurringLocation(
       const dist = haversineMeters(loc.lat, loc.lng, cluster.lat, cluster.lng);
       if (dist <= radiusMeters) {
         cluster.matchIds.add(loc.matchId);
-        // Update centroid
         cluster.lat = (cluster.lat + loc.lat) / 2;
         cluster.lng = (cluster.lng + loc.lng) / 2;
         added = true;
@@ -104,8 +99,6 @@ export function recurringLocation(
   };
 }
 
-
-// ━━━ #369: Speed of Location Change ━━━
 
 export function postDateSpeed(
   locations: Array<{ lat: number; lng: number; timestamp: number }>
@@ -142,8 +135,6 @@ export function postDateSpeed(
 }
 
 
-// ━━━ #371: Border Crossing ━━━
-
 export async function borderCrossing(
   prevIp: string,
   currentIp: string
@@ -152,10 +143,9 @@ export async function borderCrossing(
   fromCountry: string | null;
   toCountry: string | null;
 }> {
-  // GeoLite2 country change detection
   try {
     const [prevCountry, currentCountry] = await Promise.all([
-      getCountryFromIp(prevIp),
+      getCountryFromIp(prevIp).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
       getCountryFromIp(currentIp),
     ]);
 
@@ -170,7 +160,6 @@ export async function borderCrossing(
 }
 
 async function getCountryFromIp(ip: string): Promise<string | null> {
-  // GeoLite2 via local database or API
   try {
     const response = await fetch(
       `${process.env.GEOIP_API_URL}/country/${ip}`
@@ -183,8 +172,6 @@ async function getCountryFromIp(ip: string): Promise<string | null> {
   return null;
 }
 
-
-// ━━━ #374: Late Night First Meeting ━━━
 
 export function lateNightMeeting(
   proposedMeetingTime: Date,
@@ -215,8 +202,6 @@ export function lateNightMeeting(
 }
 
 
-// ━━━ #418: Speed Dating Fraud ━━━
-
 export function speedDatingFraud(
   eventSignups: Array<{
     userId: string;
@@ -233,14 +218,12 @@ export function speedDatingFraud(
   const patterns: string[] = [];
   const suspiciousUsers: string[] = [];
 
-  // Pattern: Paid but didn't check in (chargeback fraud)
   const paidNoShow = eventSignups.filter(s => s.paidAmount > 0 && !s.checkedIn);
   if (paidNoShow.length >= 3) {
     patterns.push('Multiple paid no-shows — potential chargeback fraud');
     paidNoShow.forEach(u => suspiciousUsers.push(u.userId));
   }
 
-  // Pattern: Same user signed up for many events in short period
   const byUser: Record<string, number> = {};
   for (const signup of eventSignups) {
     byUser[signup.userId] = (byUser[signup.userId] ?? 0) + 1;
@@ -259,8 +242,6 @@ export function speedDatingFraud(
   };
 }
 
-
-// ━━━ #419: Recurring Same Meeting Location ━━━
 
 export function recurringSameLocation(
   meetingHistory: Array<{
@@ -307,8 +288,6 @@ export function recurringSameLocation(
 }
 
 
-// ━━━ #754: Transportation Control Mechanism ━━━
-
 const TRANSPORTATION_CONTROL_PATTERNS = [
   /i('ll| will) (pick you up|drive you|give you a ride)/i,
   /don't worry about (getting|transport|a ride|an uber|a taxi)/i,
@@ -354,8 +333,6 @@ export function transportationBarrier(
   };
 }
 
-
-// ━━━ Shared utility ━━━
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   return haversineKm(lat1, lng1, lat2, lng2) * 1000;

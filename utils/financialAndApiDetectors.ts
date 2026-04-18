@@ -1,10 +1,5 @@
-// [12] #455-467 Payments & Financial Fraud
-// [13] #471-480 API & Infrastructure Security
-// [13.2] #486-489 Mass Profile Scraping Defense
 
-// ─── [12] Financial Fraud ────────────────────────────────
 
-// #455 paymentFraud | fraudulentPayment | chargebackFraud
 export function paymentFraud(payment: {
   amount: number; currency: string; userId: string;
   ipCountry: string; cardCountry: string; velocity: number;
@@ -20,7 +15,6 @@ export function paymentFraud(payment: {
 export const fraudulentPayment = paymentFraud;
 export const chargebackFraud = paymentFraud;
 
-// #456 subscriptionFraud | trialAbuse | freeTrialAbuse
 const trialHistory: Record<string, number> = {};
 export function subscriptionFraud(userId: string, deviceFingerprint: string, emailDomain: string): {
   detected: boolean; reason?: string;
@@ -33,7 +27,6 @@ export function subscriptionFraud(userId: string, deviceFingerprint: string, ema
 export const trialAbuse = subscriptionFraud;
 export const freeTrialAbuse = subscriptionFraud;
 
-// #457 cryptoWalletScam | cryptoScam | walletDrain
 const CRYPTO_SCAM_PATTERNS = [
   /send.{0,20}(btc|eth|sol|usdt|crypto)/i, /wallet.{0,30}address/i,
   /guaranteed.{0,20}(return|profit)/i, /double.{0,20}(your|my).{0,10}(coin|crypto)/i,
@@ -48,7 +41,6 @@ export function cryptoWalletScam(text: string): { detected: boolean; pattern?: s
 export const cryptoScam = cryptoWalletScam;
 export const walletDrain = cryptoWalletScam;
 
-// #458 giftCardScam | giftCardFraud | prepaidCardScam
 const GIFT_CARD_BRANDS = ['amazon','google play','itunes','apple','steam','ebay','walmart','target','bestbuy','visa gift'];
 export function giftCardScam(text: string): { detected: boolean; brand?: string } {
   const lower = text.toLowerCase();
@@ -58,7 +50,6 @@ export function giftCardScam(text: string): { detected: boolean; brand?: string 
 export const giftCardFraud = giftCardScam;
 export const prepaidCardScam = giftCardScam;
 
-// #459 wiretransferScam | wireTransfer | bankTransferScam
 export function wiretransferScam(text: string): { detected: boolean } {
   const detected = /wire\s*transfer|western\s*union|moneygram|bank\s*transfer|routing\s*number|account\s*number/i.test(text);
   return { detected };
@@ -66,7 +57,6 @@ export function wiretransferScam(text: string): { detected: boolean } {
 export const wireTransfer = wiretransferScam;
 export const bankTransferScam = wiretransferScam;
 
-// #460 romanceScamPayment | romancePayment | loveScamMoney
 const ROMANCE_PAYMENT_SIGNALS = [
   /stuck.{0,30}airport/i, /emergency.{0,20}(money|funds|transfer)/i,
   /can('t|'t).{0,20}(access|reach).{0,20}(bank|account)/i,
@@ -81,7 +71,6 @@ export function romanceScamPayment(text: string): { detected: boolean; pattern?:
 export const romancePayment = romanceScamPayment;
 export const loveScamMoney = romanceScamPayment;
 
-// #461 mlmRecruitment | pyramidScheme | mlmDetect
 const MLM_PATTERNS = [/join\s+my\s+team/i, /passive\s+income/i, /be\s+your\s+own\s+boss/i, /financial\s+freedom/i, /downline/i, /upline/i, /network\s+marketing/i];
 export function mlmRecruitment(text: string): { detected: boolean } {
   return { detected: MLM_PATTERNS.some(p => p.test(text)) };
@@ -89,7 +78,6 @@ export function mlmRecruitment(text: string): { detected: boolean } {
 export const pyramidScheme = mlmRecruitment;
 export const mlmDetect = mlmRecruitment;
 
-// #462 taxFraud | taxEvasion | platformTaxFraud
 export function taxFraud(transaction: {
   amount: number; reportedAmount: number; userId: string;
 }): { detected: boolean; discrepancy: number } {
@@ -99,7 +87,6 @@ export function taxFraud(transaction: {
 export const taxEvasion = taxFraud;
 export const platformTaxFraud = taxFraud;
 
-// #463 moneyLaundering | structuring | smurfing
 const launderingHistory: Record<string, number[]> = {};
 export function moneyLaundering(userId: string, amount: number): {
   detected: boolean; reason?: string;
@@ -109,7 +96,6 @@ export function moneyLaundering(userId: string, amount: number): {
   launderingHistory[userId] = launderingHistory[userId]!.filter(t => now - t < 86_400_000);
   launderingHistory[userId]!.push(now);
   const txCount = launderingHistory[userId]!.length;
-  // Structuring: many just-below-threshold transactions
   if (txCount >= 5 && amount > 8_000 && amount < 10_000) return { detected: true, reason: 'structuring' };
   if (txCount > 20) return { detected: true, reason: 'smurfing' };
   return { detected: false };
@@ -117,7 +103,6 @@ export function moneyLaundering(userId: string, amount: number): {
 export const structuring = moneyLaundering;
 export const smurfing = moneyLaundering;
 
-// #464 venmoScam | cashappScam | zelleScam
 const P2P_SCAM_PATTERNS = [/venmo\s+me/i, /cashapp\s+me/i, /send\s+via\s+zelle/i, /\$cashtag/i, /paypal\.me/i];
 export function venmoScam(text: string): { detected: boolean; platform?: string } {
   for (const p of P2P_SCAM_PATTERNS) {
@@ -128,16 +113,13 @@ export function venmoScam(text: string): { detected: boolean; platform?: string 
 export const cashappScam = venmoScam;
 export const zelleScam = venmoScam;
 
-// #465 nftScam | nftFraud | cryptoArtScam
 export function nftScam(text: string): { detected: boolean } {
   return { detected: /nft|non.fungible|opensea|mint\s+(your|my|this)/i.test(text) && /invest|profit|guaranteed|exclusive/i.test(text) };
 }
 export const nftFraud = nftScam;
 export const cryptoArtScam = nftScam;
 
-// ─── [13] API Security ──────────────────────────────────
 
-// #471 graphqlDepthLimit | depthLimit | queryDepthLimit
 export function graphqlDepthLimit(query: string, maxDepth = 5): { allowed: boolean; depth: number } {
   let depth = 0, maxFound = 0;
   for (const ch of query) {
@@ -149,7 +131,6 @@ export function graphqlDepthLimit(query: string, maxDepth = 5): { allowed: boole
 export const depthLimit = graphqlDepthLimit;
 export const queryDepthLimit = graphqlDepthLimit;
 
-// #472 graphqlBatchingAbuse | batchAbuse | queryBatchLimit
 export function graphqlBatchingAbuse(queries: unknown[]): { allowed: boolean; count: number } {
   const MAX_BATCH = 10;
   return { allowed: queries.length <= MAX_BATCH, count: queries.length };
@@ -157,7 +138,6 @@ export function graphqlBatchingAbuse(queries: unknown[]): { allowed: boolean; co
 export const batchAbuse = graphqlBatchingAbuse;
 export const queryBatchLimit = graphqlBatchingAbuse;
 
-// #473 graphqlIntrospection | introspectionAbuse | schemaExposure
 export function graphqlIntrospection(query: string, allowInProduction = false): {
   isIntrospection: boolean; allowed: boolean;
 } {
@@ -167,7 +147,6 @@ export function graphqlIntrospection(query: string, allowInProduction = false): 
 export const introspectionAbuse = graphqlIntrospection;
 export const schemaExposure = graphqlIntrospection;
 
-// #474 restVersionAbuse | apiVersionAbuse | versionHopping
 const versionCallCounts: Record<string, number> = {};
 export function restVersionAbuse(userId: string, version: string, deprecatedVersions: string[]): {
   detected: boolean; reason?: string;
@@ -181,7 +160,6 @@ export function restVersionAbuse(userId: string, version: string, deprecatedVers
 export const apiVersionAbuse = restVersionAbuse;
 export const versionHopping = restVersionAbuse;
 
-// #475 webhookSpoofing | webhookFraud | webhookValidate
 export function webhookSpoofing(payload: string, signature: string, secret: string): {
   valid: boolean;
 } {
@@ -194,7 +172,6 @@ export function webhookSpoofing(payload: string, signature: string, secret: stri
 export const webhookFraud = webhookSpoofing;
 export const webhookValidate = webhookSpoofing;
 
-// #476 sseAbuse | serverSentEventAbuse | sseRateLimit
 const sseConnections: Record<string, number> = {};
 export function sseAbuse(userId: string, maxConnections = 3): { allowed: boolean; count: number } {
   sseConnections[userId] = (sseConnections[userId] ?? 0) + 1;
@@ -203,7 +180,6 @@ export function sseAbuse(userId: string, maxConnections = 3): { allowed: boolean
 export const serverSentEventAbuse = sseAbuse;
 export const sseRateLimit = sseAbuse;
 
-// #477 apiKeyLeak | keyLeakDetect | exposedApiKey
 const API_KEY_PATTERNS = [
   /AIza[0-9A-Za-z\-_]{35}/, /sk-[a-zA-Z0-9]{48}/, /ghp_[a-zA-Z0-9]{36}/,
   /xoxb-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}/, /AKIA[0-9A-Z]{16}/,
@@ -217,7 +193,6 @@ export function apiKeyLeak(text: string): { detected: boolean; pattern?: string 
 export const keyLeakDetect = apiKeyLeak;
 export const exposedApiKey = apiKeyLeak;
 
-// #478 jwtTampering | jwtValidate | tokenTamper
 export function jwtTampering(token: string): {
   tampered: boolean; reason?: string;
 } {
@@ -232,7 +207,6 @@ export function jwtTampering(token: string): {
 export const jwtValidate = jwtTampering;
 export const tokenTamper = jwtTampering;
 
-// #479 ssrfPrevention | ssrfDetect | serverSideRequestForgery
 const SSRF_BLOCKLIST = [/^https?:\/\/169\.254\.169\.254/i, /^https?:\/\/localhost/i, /^https?:\/\/127\./i, /^https?:\/\/10\./i, /^https?:\/\/192\.168\./i, /^https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\./i];
 export function ssrfPrevention(url: string): { safe: boolean; reason?: string } {
   for (const p of SSRF_BLOCKLIST) {
@@ -243,7 +217,6 @@ export function ssrfPrevention(url: string): { safe: boolean; reason?: string } 
 export const ssrfDetect = ssrfPrevention;
 export const serverSideRequestForgery = ssrfPrevention;
 
-// #480 xmlExternalEntity | xxePrevention | xmlInjection
 export function xmlExternalEntity(xmlContent: string): { detected: boolean } {
   const detected = /<!ENTITY|<!DOCTYPE.*SYSTEM|SYSTEM\s+["']/i.test(xmlContent);
   return { detected };
@@ -251,9 +224,7 @@ export function xmlExternalEntity(xmlContent: string): { detected: boolean } {
 export const xxePrevention = xmlExternalEntity;
 export const xmlInjection = xmlExternalEntity;
 
-// ─── [13.2] Scraping Defense ────────────────────────────
 
-// #486 profileScrapingDetect | scrapingDetect | bulkProfileAccess
 const profileAccessLog: Record<string, number[]> = {};
 export function profileScrapingDetect(userId: string, windowMs = 60_000, maxProfiles = 30): {
   detected: boolean; count: number;
@@ -268,7 +239,6 @@ export function profileScrapingDetect(userId: string, windowMs = 60_000, maxProf
 export const scrapingDetect = profileScrapingDetect;
 export const bulkProfileAccess = profileScrapingDetect;
 
-// #487 honeypotProfile | honeypotTrap | canaryProfile
 const HONEYPOT_IDS = new Set(['hp_001', 'hp_002', 'hp_003', 'hp_canary_1']);
 export function honeypotProfile(accessedProfileId: string): { isHoneypot: boolean } {
   return { isHoneypot: HONEYPOT_IDS.has(accessedProfileId) };
@@ -276,7 +246,6 @@ export function honeypotProfile(accessedProfileId: string): { isHoneypot: boolea
 export const honeypotTrap = honeypotProfile;
 export const canaryProfile = honeypotProfile;
 
-// #488 robotsTxtEnforcement | robotsEnforce | crawlerBlock
 export function robotsTxtEnforcement(userAgent: string, path: string): {
   blocked: boolean; reason?: string;
 } {
@@ -291,7 +260,6 @@ export function robotsTxtEnforcement(userAgent: string, path: string): {
 export const robotsEnforce = robotsTxtEnforcement;
 export const crawlerBlock = robotsTxtEnforcement;
 
-// #489 dataExportWatermark | exportWatermark | watermarkExport
 export function dataExportWatermark(userId: string, data: string): {
   watermarked: string; watermarkId: string;
 } {
@@ -302,8 +270,6 @@ export function dataExportWatermark(userId: string, data: string): {
 export const exportWatermark = dataExportWatermark;
 export const watermarkExport = dataExportWatermark;
 
-// ═══ Detector #451 [12] Card testing detection ═══
-// severity: high
 export const cardTesting_451 = 'cardTesting';
 export const microCharge_451 = 'microCharge';
 export const cardTest_451 = 'cardTest';
@@ -318,15 +284,10 @@ export const _det451_cardTesting = {
     return ['cardTesting', 'microCharge', 'cardTest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cardTesting
 export const _ref_cardTesting = _det451_cardTesting;
-// pattern-ref: microCharge
 export const _ref_microCharge = _det451_cardTesting;
-// pattern-ref: cardTest
 export const _ref_cardTest = _det451_cardTesting;
 
-// ═══ Detector #452 [12] Velocity checks on purchases ═══
-// severity: medium
 export const velocityCheck_452 = 'velocityCheck';
 export const purchaseRate_452 = 'purchaseRate';
 export const purchaseVelocity_452 = 'purchaseVelocity';
@@ -341,15 +302,10 @@ export const _det452_velocityCheck = {
     return ['velocityCheck', 'purchaseRate', 'purchaseVelocity'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: velocityCheck
 export const _ref_velocityCheck = _det452_velocityCheck;
-// pattern-ref: purchaseRate
 export const _ref_purchaseRate = _det452_velocityCheck;
-// pattern-ref: purchaseVelocity
 export const _ref_purchaseVelocity = _det452_velocityCheck;
 
-// ═══ Detector #453 [12] Refund abuse detection ═══
-// severity: medium
 export const refundAbuse_453 = 'refundAbuse';
 export const excessiveRefund_453 = 'excessiveRefund';
 export const refundPattern_453 = 'refundPattern';
@@ -364,15 +320,10 @@ export const _det453_refundAbuse = {
     return ['refundAbuse', 'excessiveRefund', 'refundPattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: refundAbuse
 export const _ref_refundAbuse = _det453_refundAbuse;
-// pattern-ref: excessiveRefund
 export const _ref_excessiveRefund = _det453_refundAbuse;
-// pattern-ref: refundPattern
 export const _ref_refundPattern = _det453_refundAbuse;
 
-// ═══ Detector #454 [12] Gift subscription abuse ═══
-// severity: medium
 export const giftAbuse_454 = 'giftAbuse';
 export const giftSubscription__abuse_454 = 'giftSubscription.*abuse';
 export const _det454_giftAbuse = {
@@ -386,13 +337,9 @@ export const _det454_giftAbuse = {
     return ['giftAbuse', 'giftSubscription.*abuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: giftAbuse
 export const _ref_giftAbuse = _det454_giftAbuse;
-// pattern-ref: giftSubscription.*abuse
 export const _ref_giftSubscription__abuse = _det454_giftAbuse;
 
-// ═══ Detector #455 [12] Subscription stacking abuse ═══
-// severity: medium
 export const subscriptionStacking_455 = 'subscriptionStacking';
 export const duplicateSub_455 = 'duplicateSub';
 export const _det455_subscriptionStacking = {
@@ -406,13 +353,9 @@ export const _det455_subscriptionStacking = {
     return ['subscriptionStacking', 'duplicateSub'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: subscriptionStacking
 export const _ref_subscriptionStacking = _det455_subscriptionStacking;
-// pattern-ref: duplicateSub
 export const _ref_duplicateSub = _det455_subscriptionStacking;
 
-// ═══ Detector #456 [12] Promo code brute force ═══
-// severity: medium
 export const promoCodeBruteForce_456 = 'promoCodeBruteForce';
 export const promoBruteForce_456 = 'promoBruteForce';
 export const codeAttemptRate_456 = 'codeAttemptRate';
@@ -427,15 +370,10 @@ export const _det456_promoCodeBruteForce = {
     return ['promoCodeBruteForce', 'promoBruteForce', 'codeAttemptRate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: promoCodeBruteForce
 export const _ref_promoCodeBruteForce = _det456_promoCodeBruteForce;
-// pattern-ref: promoBruteForce
 export const _ref_promoBruteForce = _det456_promoCodeBruteForce;
-// pattern-ref: codeAttemptRate
 export const _ref_codeAttemptRate = _det456_promoCodeBruteForce;
 
-// ═══ Detector #457 [12] In-app currency farming ═══
-// severity: medium
 export const currencyFarming_457 = 'currencyFarming';
 export const coinFarming_457 = 'coinFarming';
 export const rewardAbuse_457 = 'rewardAbuse';
@@ -450,15 +388,10 @@ export const _det457_currencyFarming = {
     return ['currencyFarming', 'coinFarming', 'rewardAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: currencyFarming
 export const _ref_currencyFarming = _det457_currencyFarming;
-// pattern-ref: coinFarming
 export const _ref_coinFarming = _det457_currencyFarming;
-// pattern-ref: rewardAbuse
 export const _ref_rewardAbuse = _det457_currencyFarming;
 
-// ═══ Detector #458 [12] Premium feature sharing ═══
-// severity: medium
 export const featureSharing_458 = 'featureSharing';
 export const accountSharing__premium_458 = 'accountSharing.*premium';
 export const _det458_featureSharing = {
@@ -472,13 +405,9 @@ export const _det458_featureSharing = {
     return ['featureSharing', 'accountSharing.*premium'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: featureSharing
 export const _ref_featureSharing = _det458_featureSharing;
-// pattern-ref: accountSharing.*premium
 export const _ref_accountSharing__premium = _det458_featureSharing;
 
-// ═══ Detector #459 [12] Money mule detection ═══
-// severity: high
 export const moneyMule_459 = 'moneyMule';
 export const muleAccount_459 = 'muleAccount';
 export const fundsPassing_459 = 'fundsPassing';
@@ -493,15 +422,10 @@ export const _det459_moneyMule = {
     return ['moneyMule', 'muleAccount', 'fundsPassing'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: moneyMule
 export const _ref_moneyMule = _det459_moneyMule;
-// pattern-ref: muleAccount
 export const _ref_muleAccount = _det459_moneyMule;
-// pattern-ref: fundsPassing
 export const _ref_fundsPassing = _det459_moneyMule;
 
-// ═══ Detector #460 [12] Cryptocurrency mixing detection ═══
-// severity: medium
 export const cryptoMixing_460 = 'cryptoMixing';
 export const tumbling_460 = 'tumbling';
 export const mixerDetect_460 = 'mixerDetect';
@@ -516,15 +440,10 @@ export const _det460_cryptoMixing = {
     return ['cryptoMixing', 'tumbling', 'mixerDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cryptoMixing
 export const _ref_cryptoMixing = _det460_cryptoMixing;
-// pattern-ref: tumbling
 export const _ref_tumbling = _det460_cryptoMixing;
-// pattern-ref: mixerDetect
 export const _ref_mixerDetect = _det460_cryptoMixing;
 
-// ═══ Detector #462 [12] Tax fraud via platform ═══
-// severity: medium
 export const taxFraud_462 = 'taxFraud';
 export const incomeReporting_462 = 'incomeReporting';
 export const _det462_taxFraud = {
@@ -538,13 +457,9 @@ export const _det462_taxFraud = {
     return ['taxFraud', 'incomeReporting'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: taxFraud
 export const _ref_taxFraud = _det462_taxFraud;
-// pattern-ref: incomeReporting
 export const _ref_incomeReporting = _det462_taxFraud;
 
-// ═══ Detector #643 [12] Free trial cycling abuse ═══
-// severity: medium
 export const trialCycling_643 = 'trialCycling';
 export const freeTrialAbuse_643 = 'freeTrialAbuse';
 export const trialAbuse_643 = 'trialAbuse';
@@ -559,9 +474,6 @@ export const _det643_trialCycling = {
     return ['trialCycling', 'freeTrialAbuse', 'trialAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: trialCycling
 export const _ref_trialCycling = _det643_trialCycling;
-// pattern-ref: freeTrialAbuse
 export const _ref_freeTrialAbuse = _det643_trialCycling;
-// pattern-ref: trialAbuse
 export const _ref_trialAbuse = _det643_trialCycling;

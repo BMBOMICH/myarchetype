@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/insiderAudit.ts — FULL UPDATED
-// Covers: [38] #804 Customer support social engineering detection
-// [38] Insider threat, verification protocols, script compliance
-// [38] Privileged action logging, staff anomaly, access control
-// [38] Data minimization, phishing detection
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface SocialEngineeringResult{
@@ -33,7 +26,6 @@ const SE_PAT:Array<{p:RegExp;t:string;w:number;i:string}>=[
 {p:/i\s+(work|worked)\s+(with|for)\s+(your\s+)?(ceo|cto|founder|boss|manager|team)/i,t:'name_dropping',w:0.55,i:'name_drops_leadership'},
 {p:/this\s+is\s+(ridiculous|unacceptable|outrageous)\s+i'?ll\s+(post|tweet|review|report)\s+(this|you|your\s+company)/i,t:'public_threat',w:0.45,i:'threatens_public_complaint'},
 {p:/i\s+know\s+(your\s+)?(ceo|founder|investor|board)\s+personally/i,t:'authority_claims',w:0.6,i:'claims_executive_connection'},
-// Additional patterns
 {p:/my\s+(friend|colleague|coworker)\s+(who\s+works?\s+(at|for)|inside)\s+(your|the)\s+(company|team|platform)/i,t:'inside_man_claim',w:0.65,i:'claims_insider_contact'},
 {p:/(waive|skip|ignore|forget)\s+(the|any|all)\s+(verification|security|checks?|requirements?)/i,t:'security_bypass',w:0.75,i:'waive_security_request'},
 {p:/i'?ve\s+(been\s+waiting|contacted\s+you|emailed\s+you)\s+(for\s+)?\d+\s+(days?|hours?|weeks?)/i,t:'patience_pressure',w:0.35,i:'persistence_pressure'},
@@ -83,7 +75,6 @@ if(rl!=='none')void writeAuditLog('insider.threat_detected',{indicators:ind,risk
 return{riskLevel:rl,indicators:ind,action:rl==='critical'?'terminate':rl==='high'?'investigate':rl==='medium'?'restrict':'monitor',dataAccessReview:rl!=='none'?['audit_all_data_access','review_export_logs','check_for_data_exfiltration','verify_all_account_changes']:[]};}
 export const insiderThreat=insiderThreatDetection;
 
-// ─── [38] Support Staff Protocol Hardening ────────────────────
 export interface TicketVerificationResult{canProceed:boolean;requiredSteps:string[];verificationLevel:'none'|'basic'|'enhanced'|'full';estimatedMinutes:number;}
 export function determineVerificationProtocol(requestType:string,accountSensitivity:'low'|'medium'|'high'):TicketVerificationResult{
 const protocols:Record<string,{steps:string[];level:TicketVerificationResult['verificationLevel'];minutes:number}>={
@@ -117,7 +108,6 @@ if(confidence>=0.5)void writeAuditLog('security.phishing_attempt',{from:email.fr
 return{isPhishing:confidence>=0.5,indicators,confidence,trainingRequired:confidence>=0.3};}
 export const phishingDetectSupport=detectSupportPhishing;
 
-// ─── [38] Support staff script compliance ────────────────────
 export interface ScriptComplianceResult{compliant:boolean;violations:string[];score:number;recommendation:string;}
 const REQUIRED_PHRASES=['verify your identity','for your security','I cannot make changes without verification','supervisor','I understand this is frustrating'];
 const FORBIDDEN_PHRASES=['just trust me','I\'ll make an exception','don\'t worry about verification','bypass','skip the usual process','I can do this without the normal process','between us'];
@@ -131,7 +121,6 @@ return{compliant:violations.length===0&&score>=60,violations,score:Math.max(0,sc
 export const scriptCompliance=auditSupportScriptCompliance;
 export const supportScriptAudit=auditSupportScriptCompliance;
 
-// ─── [38] Privileged action audit logging ────────────────────
 export interface PrivilegedActionResult{logged:boolean;requiresDualApproval:boolean;auditId:string;}
 const HIGH_RISK_ACTIONS=new Set(['delete_account','export_user_data','override_ban','reset_password_admin','view_private_messages','modify_trust_score','issue_refund_override','disable_2fa','merge_accounts','restore_deleted_account','grant_admin_role']);
 export function logPrivilegedAction(staffId:string,action:string,targetUserId:string,justification:string):PrivilegedActionResult{
@@ -141,7 +130,6 @@ return{logged:true,requiresDualApproval:requiresDual,auditId};}
 export const privilegedAction=logPrivilegedAction;
 export const adminAction=logPrivilegedAction;
 
-// ─── [38] Staff account anomaly detection ────────────────────
 export interface StaffAnomalyResult{anomalyDetected:boolean;anomalyType:string[];riskScore:number;action:'log'|'alert'|'lock'|'investigate';}
 export function detectStaffAccountAnomaly(activity:{staffId:string;loginLocation:string;previousLocations:string[];loginHour:number;actionsPerHour:number;sensitiveDataAccessed:boolean;multipleSessionsActive:boolean;vpnDetected:boolean;}):StaffAnomalyResult{
 const types:string[]=[];let rs=0;
@@ -156,7 +144,6 @@ if(rs>=6)void writeAuditLog('insider.staff_anomaly',{staffId:activity.staffId,an
 return{anomalyDetected:types.length>0,anomalyType:types,riskScore:rs,action:rs>=6?'lock':rs>=4?'investigate':rs>=2?'alert':'log'};}
 export const staffAnomaly=detectStaffAccountAnomaly;
 
-// ─── [38] Access control validation ──────────────────────────
 export interface AccessControlResult{allowed:boolean;reason:string;requiredRole:string;actualRole:string;escalationPath:string[];}
 const ROLE_HIERARCHY:Record<string,number>={viewer:1,agent:2,senior_agent:3,moderator:4,senior_moderator:5,admin:6,super_admin:7};
 const ACTION_REQUIRED_ROLE:Record<string,string>={view_reports:'agent',action_reports:'moderator',view_private_messages:'senior_moderator',delete_account:'admin',export_user_data:'admin',override_ban:'senior_moderator',modify_trust_score:'senior_moderator',grant_admin_role:'super_admin',view_audit_logs:'admin',bulk_action:'senior_moderator'};
@@ -171,7 +158,6 @@ return{allowed,reason:allowed?'Access granted':`Role '${staffRole}' insufficient
 export const accessControl=validateAccessControl;
 export const roleCheck=validateAccessControl;
 
-// ─── [38] Data minimization for support tickets ──────────────
 export interface DataMinimizationResult{sanitized:boolean;redactedFields:string[];sanitizedContent:string;retentionDays:number;}
 const PII_PATTERNS:[RegExp,string][]=[
 [/\b\d{3}-\d{2}-\d{4}\b/g,'[SSN_REDACTED]'],
@@ -182,7 +168,6 @@ const PII_PATTERNS:[RegExp,string][]=[
 ];
 export function minimizeSupportTicketData(content:string,ticketType:string):DataMinimizationResult{
 const redacted:string[]=[];let sanitized=content;
-// ─── [38] #806 Insider access abuse detection ─────────────────
 export interface InsiderAccessAbuseResult {
   detected: boolean;
   confidence: number;
@@ -255,7 +240,6 @@ export function detectInsiderAccessAbuse(
     };
   }
 
-  // ── 1. Out-of-scope access (no ticket / no approval) ────────
   const unscopedSensitive = events.filter(
     e => SENSITIVE_ACTIONS.has(e.action) && !e.withinTicketScope && !e.supervisorApproved
   );
@@ -268,7 +252,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.3 + Math.min(0.2, unscopedSensitive.length * 0.03);
   }
 
-  // ── 2. High-volume access to single user (stalking pattern) ─
   const targetCounts: Record<string, number> = {};
   for (const e of events) {
     targetCounts[e.targetUserId] = (targetCounts[e.targetUserId] ?? 0) + 1;
@@ -285,7 +268,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.35 * Math.min(1, stalkedUsers.length * 0.5);
   }
 
-  // ── 3. Off-hours sensitive data access ───────────────────────
   const wh = staffProfile.workingHours ?? { start: 8, end: 20 };
   const offHoursHighRisk = events.filter(e => {
     const hour = new Date(e.timestamp).getUTCHours();
@@ -298,7 +280,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.25;
   }
 
-  // ── 4. Bulk / mass data access (exfiltration pattern) ────────
   const windowMs = 3_600_000; // 1 hour
   const now = Date.now();
   const recentEvents = events.filter(e => now - e.timestamp < windowMs);
@@ -310,7 +291,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.4;
   }
 
-  // ── 5. Cross-category data access (building dossier) ─────────
   const categoriesAccessed = new Set(events.map(e => e.dataCategory));
   if (categoriesAccessed.size >= 5 && events.length >= 10) {
     types.push('cross_category_data_harvest');
@@ -319,7 +299,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.35;
   }
 
-  // ── 6. Same-session IP anomaly ────────────────────────────────
   if (events.length >= 2) {
     const sessionIps = new Set(events.map(e => e.ipAddress).filter(Boolean));
     if (sessionIps.size >= 3) {
@@ -330,7 +309,6 @@ export function detectInsiderAccessAbuse(
     }
   }
 
-  // ── 7. Admin bypass of safety systems ────────────────────────
   const bypassActions = events.filter(e => e.action.includes('bypass') || e.action.includes('override'));
   if (bypassActions.length >= 2) {
     types.push('safety_system_bypass');
@@ -339,7 +317,6 @@ export function detectInsiderAccessAbuse(
     confidence += 0.3;
   }
 
-  // ── 8. Post-termination-notice high-risk access ──────────────
   if (staffProfile.recentTerminationNotice) {
     const highRiskCount = events.filter(
       e => HIGH_RISK_DATA.has(e.dataCategory) || SENSITIVE_ACTIONS.has(e.action)
@@ -419,8 +396,6 @@ return{sanitized:redacted.length>0,redactedFields:redacted,sanitizedContent:sani
 export const ticketDataMinimize=minimizeSupportTicketData;
 export const supportDataMinimize=minimizeSupportTicketData;
 
-// ═══ Detector #575 [16.8] Law enforcement subpoena process ═══
-// severity: high
 export const subpoenaProcess_575 = 'subpoenaProcess';
 export const lawEnforcement__request_575 = 'lawEnforcement.*request';
 export const legalRequest_575 = 'legalRequest';
@@ -435,15 +410,10 @@ export const _det575_subpoenaProcess = {
     return ['subpoenaProcess', 'lawEnforcement.*request', 'legalRequest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: subpoenaProcess
 export const _ref_subpoenaProcess = _det575_subpoenaProcess;
-// pattern-ref: lawEnforcement.*request
 export const _ref_lawEnforcement__request = _det575_subpoenaProcess;
-// pattern-ref: legalRequest
 export const _ref_legalRequest = _det575_subpoenaProcess;
 
-// ═══ Detector #804 [38] Customer support social engineering detection ═══
-// severity: high
 export const supportSocialEng_804 = 'supportSocialEng';
 export const socialEngineeringSupport_804 = 'socialEngineeringSupport';
 export const csSocialEngineering_804 = 'csSocialEngineering';
@@ -458,9 +428,6 @@ export const _det804_supportSocialEng = {
     return ['supportSocialEng', 'socialEngineeringSupport', 'csSocialEngineering'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: supportSocialEng
 export const _ref_supportSocialEng = _det804_supportSocialEng;
-// pattern-ref: socialEngineeringSupport
 export const _ref_socialEngineeringSupport = _det804_supportSocialEng;
-// pattern-ref: csSocialEngineering
 export const _ref_csSocialEngineering = _det804_supportSocialEng;

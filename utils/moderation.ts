@@ -30,7 +30,6 @@ const EMOJI_SEQ = [{p:/🍃🔥|🌿🔥|🍁💨|❄️👃|🏔️👃|⛷️�
 export const detectEmojiCodedLanguage = (t: string) => { const m: Array<{category:string;meaning?:string}> = []; for(const s of EMOJI_SEQ) if(s.p.test(t)) m.push({category:s.c}); return {detected:m.length>0,matches:m}; };
 export const preprocessText = (t: string) => normalizeLeetSpeak(normalizeConfusables(normalizeUnicode(stripZeroWidthChars(t))));
 
-// ═══ IMAGE / VIDEO MODERATION ═══
 let nsfwModel: any = null, nsfwLoad: Promise<any> | null = null, modelReady = false;
 export const preloadSafetyModel = async () => { if (!IS_WEB) return false; try { return !!(await loadModel()); } catch { return false; } };
 export const isSafetyModelReady = () => modelReady;
@@ -114,7 +113,6 @@ export async function runFullImageScan(u: string, ctx: 'profile'|'chat'|'edit'|'
   return {safe:true,reason:'OK'};
 }
 
-// ═══ TEXT MODERATION ═══
 interface HP { p: RegExp; c: string; r: string; s: 'low'|'medium'|'high'|'critical'; }
 const PROF = new Set(['fuck','shit','bitch','ass','damn','dick','cock','pussy','cunt','bastard','whore','slut','asshole','motherfucker','bullshit','goddamn','piss','crap','douche','twat','wanker','prick']);
 const hasProfanity = (t: string) => t.toLowerCase().replace(/[^a-z\s]/g,'').split(/\s+/).some(w => PROF.has(w));

@@ -1,4 +1,3 @@
-// file: utils/datingStats.ts
 import{collection,doc,getDoc,getDocs,query,where}from'firebase/firestore';import{auth,db}from'../firebaseConfig';import{detectImpossibleTravel}from'./location';import{logger,writeAuditLog}from'./logger';import{checkTextSafety}from'./moderation';import{analyzeMessageTiming}from'./rateLimiter';
 
 export interface DatingStats{likesSent:number;likesReceived:number;matchRate:number;totalMatches:number;activeMatches:number;expiredMatches:number;profileViews:number;profileViewRate:number;bestPhoto:number|null;averageResponseTime:number;messagesSent:number;messagesReceived:number;conversationRate:number;averageRating:number;totalRatings:number;trustScore:number;peakActivityHour:number;averageSwipesPerDay:number;meetupRate:number;secondDateRate:number;}
@@ -53,12 +52,12 @@ return{userId:tid,romanceScamScore:rss,unmatchRate:ur,reportRate:rr,isGhostProfi
 
 export async function calculateDatingStats():Promise<DatingStats>{
 const u=auth.currentUser;if(!u)return emptyStats();try{
-const[ud,lsS,lrS,mS,cS,rS]=await Promise.all([getDoc(doc(db,'users',u.uid)),getDocs(query(collection(db,'likes'),where('fromUserId','==',u.uid))),getDocs(query(collection(db,'likes'),where('toUserId','==',u.uid))),getDocs(query(collection(db,'likes'),where('fromUserId','==',u.uid),where('status','==','matched'))),getDocs(collection(db,'chats')),getDocs(query(collection(db,'ratings'),where('ratedUserId','==',u.uid)))]);
+const[ud,lsS,lrS,mS,cS,rS]=await Promise.all([getDoc(doc(db,'users',u.uid).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })),getDocs(query(collection(db,'likes'),where('fromUserId','==',u.uid))),getDocs(query(collection(db,'likes'),where('toUserId','==',u.uid))),getDocs(query(collection(db,'likes'),where('fromUserId','==',u.uid),where('status','==','matched'))),getDocs(collection(db,'chats')),getDocs(query(collection(db,'ratings'),where('ratedUserId','==',u.uid)))]);
 const uData=ud.exists()?ud.data():{},ls=lsS.size,lr=lrS.size,tm=mS.size,mr=ls>0?(tm/ls)*100:0;
-const amr=await Promise.all(mS.docs.map(async md=>{const mid=md.data().toUserId as string,cid=[u.uid,mid].sort().join('_');const ms=await getDocs(collection(db,'chats',cid,'messages'));return ms.empty?0:1;}));
+const amr=await Promise.all(mS.docs.map(async md=>{const mid=md.data().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }).toUserId as string,cid=[u.uid,mid].sort().join('_');const ms=await getDocs(collection(db,'chats',cid,'messages'));return ms.empty?0:1;}));
 const am=amr.reduce((s,v)=>s+v,0);
 const rc=cS.docs.filter(d=>d.id.includes(u.uid));
-const cmr=await Promise.all(rc.map(cd=>getDocs(collection(db,'chats',cd.id,'messages'))));
+const cmr=await Promise.all(rc.map(cd=>getDocs(collection(db,'chats',cd.id,'messages').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }))));
 let msnt=0,mrcv=0;const mTimes:number[]=[];for(const ms of cmr)ms.forEach(m=>{const d=m.data();if(d.senderId===u.uid){msnt++;if(d.createdAt?.toMillis)mTimes.push(d.createdAt.toMillis());}else mrcv++;});
 const tc=analyzeMessageTiming(mTimes);if(tc.isBot)logger.warn('[datingStats] Bot-like timing detected');
 const pah=mTimes.length>0?(()=>{const hc=new Array(24).fill(0) as number[];mTimes.forEach(t=>{hc[new Date(t).getHours()]!++;});return hc.indexOf(Math.max(...hc));})():0;

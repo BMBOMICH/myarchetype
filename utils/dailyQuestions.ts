@@ -1,4 +1,3 @@
-// utils/dailyQuestions.ts
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { checkDailyQuestionAnswer, detectEmojiCodedLanguage, detectEmojiSpam } from './moderation';
@@ -62,7 +61,6 @@ export async function saveUserAnswer(questionId: string, answer: string): Promis
   if (answer.length > 500) return { success: false, error: 'Answer must be under 500 characters.' };
   const es = detectEmojiSpam(answer, 0.6);
   if (es.isSpam) return { success: false, error: 'Too many emojis. Please write a real answer.' };
-  // #53: emoji-coded language
   const ec = detectEmojiCodedLanguage(answer);
   if (ec.detected) return { success: false, error: 'This content is not allowed.' };
   const m = checkDailyQuestionAnswer(answer);

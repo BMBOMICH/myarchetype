@@ -5,7 +5,6 @@ const srv = async <T>(p: string, b?: any) => {
   finally { clearTimeout(id); }
 };
 
-// [1.1] NSFW
 export const nsfwVideo = (uri: string) => srv('/safety/nsfw-video', { uri });
 export const nsfwVideoFrame = nsfwVideo; export const explicitVideoDetect = nsfwVideo;
 export const nudityGranular = (uri: string) => srv('/safety/nudenet-granular', { uri });
@@ -17,7 +16,6 @@ export const consensualNsfw = consentualExplicitShare; export const explicitCons
 export const nsfwAppeal = { enabled: true, humanReview: true, responseTime: '24h' };
 export const falsePositiveNsfw = nsfwAppeal; export const nsfwFalseFlag = nsfwAppeal;
 
-// [1.2] Identity
 export const livenessDetection = (uri: string) => srv('/safety/liveness', { uri });
 export const antiSpoofing = livenessDetection; export const livenessChallenge = livenessDetection;
 export const faceConsistency = (uris: string[]) => srv('/safety/face-consistency', { uris });
@@ -37,7 +35,6 @@ export const facialAgeCheck = ageVerificationPhoto; export const ageEstimationVe
 export const reverseImageSearch = (uri: string) => srv('/safety/reverse-search', { uri });
 export const stolenPhotoDetect = reverseImageSearch; export const imageOriginCheck = reverseImageSearch;
 
-// [1.3] AI Generated
 export const aiGeneratedPhoto = (uri: string) => srv('/safety/ai-detect', { uri });
 export const syntheticPhoto = aiGeneratedPhoto; export const generatedFaceDetect = aiGeneratedPhoto;
 export const deepfakePhoto = (uri: string) => srv('/safety/deepfake', { uri });
@@ -51,7 +48,6 @@ export const contentCredentials = c2paVerify; export const provenanceCheck = c2p
 export const photoManipulation = (uri: string) => srv('/safety/ela', { uri });
 export const errorLevelAnalysis = photoManipulation; export const editDetection = photoManipulation;
 
-// [1.4] Dangerous Content
 export const weaponDetect = (uri: string) => srv('/safety/weapon', { uri });
 export const gunDetect = weaponDetect; export const knifeDetect = weaponDetect;
 export const drugDetect = (uri: string) => srv('/safety/drug', { uri });
@@ -61,7 +57,6 @@ export const extremistSymbol = hateSymbol; export const hateImagery = hateSymbol
 export const violenceImagery = (uri: string) => srv('/safety/violence-image', { uri });
 export const goreDetect = violenceImagery; export const graphicContent = violenceImagery;
 
-// [1.5] Photo Quality
 export const photoQuality = (uri: string) => srv('/safety/photo-quality', { uri });
 export const blurryPhotoDetect = photoQuality; export const lowResolution = photoQuality;
 export const stockPhotoDetect = (uri: string) => srv('/safety/stock-photo', { uri });
@@ -69,14 +64,11 @@ export const catalogPhoto = stockPhotoDetect; export const professionalStock = s
 export const screenshotPhoto = (uri: string) => srv('/safety/screenshot-detect', { uri });
 export const appScreenshot = screenshotPhoto; export const socialMediaCapture = screenshotPhoto;
 
-// [1.6] Camera
 export const virtualCameraDetect = { checkDeviceList: true, flagOBS: true, flagManyCam: true };
 export const fakeCameraDetect = virtualCameraDetect;
 export const greenScreenDetect = (uri: string) => srv('/safety/greenscreen', { uri });
 export const uniformBackground = greenScreenDetect;
 
-// ═══ Detector #62 [1.3] Image provenance (C2PA/Content Credentials) ═══
-// severity: medium
 export const c2pa_62 = 'c2pa';
 export const contentCredentials_62 = 'contentCredentials';
 export const contentAuthenticity_62 = 'contentAuthenticity';
@@ -92,17 +84,11 @@ export const _det62_c2pa = {
     return ['c2pa', 'contentCredentials', 'contentAuthenticity', 'provenance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: c2pa
 export const _ref_c2pa = _det62_c2pa;
-// pattern-ref: contentCredentials
 export const _ref_contentCredentials = _det62_c2pa;
-// pattern-ref: contentAuthenticity
 export const _ref_contentAuthenticity = _det62_c2pa;
-// pattern-ref: provenance
 export const _ref_provenance = _det62_c2pa;
 
-// ═══ Detector #91 [1.5] Aspect ratio manipulation ═══
-// severity: low
 export const aspectRatio_91 = 'aspectRatio';
 export const stretchDetect_91 = 'stretchDetect';
 export const squishDetect_91 = 'squishDetect';
@@ -117,16 +103,10 @@ export const _det91_aspectRatio = {
     return ['aspectRatio', 'stretchDetect', 'squishDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: aspectRatio
 export const _ref_aspectRatio = _det91_aspectRatio;
-// pattern-ref: stretchDetect
 export const _ref_stretchDetect = _det91_aspectRatio;
-// pattern-ref: squishDetect
 export const _ref_squishDetect = _det91_aspectRatio;
 
-// ════════════════════════════════════════════════════
-// Detector #53 [§1.3] Green screen background detection
-// ════════════════════════════════════════════════════
 export const greenScreen_53_key = 'greenScreen';
 export const chromaKey_53_key = 'chromaKey';
 export const detectGreenScreen_53_key = 'detectGreenScreen';
@@ -170,9 +150,6 @@ export const _d53_impl = {
   detectGreenScreen: detectGreenScreenCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #61 [§1.3] Stock photo detection
-// ════════════════════════════════════════════════════
 export const stockPhoto_61_key = 'stockPhoto';
 export const watermarkDetect_61_key = 'watermarkDetect';
 export const stockImage_61_key = 'stockImage';
@@ -228,9 +205,6 @@ export const _d61_impl = {
   gettyImages: gettyImagesCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #750 [§1.3] Filter/AR effect transparency labeling
-// ════════════════════════════════════════════════════
 export const filterLabel_750_key = 'filterLabel';
 export const arEffectLabel_750_key = 'arEffectLabel';
 export const filterTransparency_750_key = 'filterTransparency';
@@ -274,9 +248,6 @@ export const _d750_impl = {
   filterTransparency: filterTransparencyCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #87 [§1.5] Sunglasses / face obscuring detection
-// ════════════════════════════════════════════════════
 export const sunglassesDetect_87_key = 'sunglassesDetect';
 export const faceObscured_87_key = 'faceObscured';
 export const faceOccluded_87_key = 'faceOccluded';
@@ -320,9 +291,6 @@ export const _d87_impl = {
   faceOccluded: faceOccludedCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #89 [§1.5] Pet-only profile detection
-// ════════════════════════════════════════════════════
 export const petOnlyProfile_89_key = 'petOnlyProfile';
 export const noHumanFace_89_key = 'noHumanFace';
 export const animalOnly_89_key = 'animalOnly';

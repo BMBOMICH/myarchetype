@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { createMMKV } from 'react-native-mmkv';
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { db } from '../firebaseConfig';
 
-export const signalStorage = new MMKV({ id: 'signal-protocol-store' });
+export const signalStorage = createMMKV({ id: 'signal-protocol-store' });
 
 const getIdKey = (uid: string) => `sig_id_${uid}`;
 const getPreKeyPrefix = (uid: string) => `sig_pre_${uid}_`;
@@ -37,7 +38,7 @@ export async function generatePreKeyBundle(uid: string, count = 50): Promise<Pre
     keys.push({ id, publicKey: naclUtil.encodeBase64(kp.publicKey), secretKey: naclUtil.encodeBase64(kp.secretKey), used: false });
     batch.push(setDoc(doc(db, 'users', uid, 'prekeys', id.toString()), { publicKey: naclUtil.encodeBase64(kp.publicKey), used: false, createdAt: serverTimestamp() }));
   }
-  await Promise.all(batch);
+  await Promise.all(batch).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   return keys;
 }
 

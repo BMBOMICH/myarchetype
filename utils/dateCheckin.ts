@@ -146,7 +146,7 @@ async function triggerSOSAlert(checkin: DateCheckin): Promise<void> {
         `They were on a date with: ${checkin.matchName}\nLocation: ${checkin.location}${mapsLink}\n` +
         `Time: ${new Date().toLocaleString()}\n\nPlease call them or emergency services immediately!`;
       const sep = Platform.OS === 'ios' ? '&' : '?';
-      setTimeout(() => Linking.openURL(`sms:${checkin.emergencyContact!.phone}${sep}body=${encodeURIComponent(msg)}`), 2000);
+      setTimeout(() => Linking.openURL(`sms:${checkin.emergencyContact?.phone}${sep}body=${encodeURIComponent(msg)}`), 2000);
     }
   } catch (error: unknown) { logger.error('[dateCheckin] triggerSOSAlert error:', error); }
 }

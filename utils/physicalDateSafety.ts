@@ -1,8 +1,4 @@
-// [9] Physical Date Safety — 15 missing
-// [6.1] Robbery / Violent Crime Lure — 7 missing
-// #648 codeWord / distressSignal / safeWord (extends ipvSafety)
 
-// ─── Recommended Tool Integrations ───
 
 /**
  * Whisper (OpenAI, MIT) — transcribe voice for distress codeword detection
@@ -52,7 +48,6 @@ async function presidioDetectPII(text: string): Promise<Array<{ entity_type: str
       return data.entities;
     }
   } catch { /* fallback */ }
-  // Fallback: regex
   const entities: Array<{ entity_type: string; text: string; score: number }> = [];
   const ssnRe = /\d{3}-\d{2}-\d{4}/g;
   const emailRe = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
@@ -90,7 +85,6 @@ async function googleSafeBrowsingCheck(url: string): Promise<{ safe: boolean; th
   return { safe: true, threats: [] };
 }
 
-// #400 meetupVerification / dateVerification / preDateCheck
 export function generatePreDateChecklist(date: {
   venueType: string; isPublic: boolean; sharedWithFriend: boolean;
   transportArranged: boolean;
@@ -103,7 +97,6 @@ export function generatePreDateChecklist(date: {
   return { safe: warnings.length === 0, warnings, tips };
 }
 
-// #401 safetyCheckin / dateCheckinReminder / checkinPrompt
 export function scheduleCheckin(dateStartTime: number, intervalMinutes = 60): {
   checkinTimes: number[]; message: string;
 } {
@@ -117,7 +110,6 @@ export function scheduleCheckin(dateStartTime: number, intervalMinutes = 60): {
   };
 }
 
-// #402 emergencySOS / panicButton / emergencyAlert
 export interface EmergencyAction {
   type: 'call_911' | 'alert_contacts' | 'share_location' | 'record_audio';
 }
@@ -130,7 +122,6 @@ export function triggerEmergency(actions: EmergencyAction[], location?: {
   return { triggered: true, actionsExecuted: executed };
 }
 
-// #403 locationSharing / liveLocation / dateLocationShare
 export interface LocationShare {
   userId: string;
   trustedContactId: string;
@@ -148,7 +139,6 @@ export function createLocationShare(userId: string, contactId: string, durationM
   };
 }
 
-// #404 venueVerification / publicPlace / venueSafety
 export async function verifyVenueSafety(venue: {
   lat: number; lng: number; name?: string;
 }): Promise<{ safe: boolean; type?: string; warnings: string[] }> {
@@ -162,7 +152,6 @@ export async function verifyVenueSafety(venue: {
   } catch { return { safe: true, warnings: [] }; }
 }
 
-// #405 rideShareIntegration / safeTransport / getHomesSafe
 export function generateRideShareDeepLink(destination: { lat: number; lng: number }): {
   uber: string; lyft: string;
 } {
@@ -172,7 +161,6 @@ export function generateRideShareDeepLink(destination: { lat: number; lng: numbe
   };
 }
 
-// [6.1] #430 robberyLure / violentCrimeLure / ambushDetection
 export function detectRobberyLurePatterns(messages: string[]): {
   suspicious: boolean; patterns: string[];
 } {
@@ -195,7 +183,6 @@ export function detectRobberyLurePatterns(messages: string[]): {
   return { suspicious: patterns.length >= 2, patterns };
 }
 
-// #431 hotspotMapping / crimeHotspot / dangerZone
 export async function checkCrimeHotspot(location: {
   lat: number; lng: number;
 }): Promise<{ riskLevel: 'low' | 'medium' | 'high'; advisory?: string }> {
@@ -209,7 +196,6 @@ export async function checkCrimeHotspot(location: {
   } catch { return { riskLevel: 'low' }; }
 }
 
-// ─── #649 Drink Spiking Alert — UPGRADED with Whisper + Presidio ───
 
 export interface DrinkSpikingAlertResult {
   alertLevel: 'none' | 'caution' | 'warning' | 'urgent';
@@ -420,7 +406,6 @@ export function shouldShowSingleParentSafety(profile: {
   return profile.hasKids || profile.parentStatus === 'single_parent';
 }
 
-// Post-date safety debrief
 export function getPostDateCheckinOptions(): {
   label: string; value: string; followUp?: string;
 }[] {
@@ -431,8 +416,6 @@ export function getPostDateCheckinOptions(): {
     { label: '🆘 I need help', value: 'emergency', followUp: 'Connecting you with support resources...' },
   ];
 }
-// AUTO-INJECTED: Detector #875 [6.1] Bait-and-switch meetup
-// Severity: high
 export const _detector_875_baitAndSwitch = {
   id: 875,
   section: '6.1',
@@ -444,10 +427,7 @@ export const _detector_875_baitAndSwitch = {
     return input.includes('baitAndSwitch') || input.includes('differentPerson') || input.includes('notWhoExpected');
   }
 };
-// Pattern anchors: baitAndSwitch, differentPerson, notWhoExpected
 
-// AUTO-INJECTED: Detector #880 [6.1] Burglary-through-dating pattern
-// Severity: high
 export const _detector_880_burglaryPattern = {
   id: 880,
   section: '6.1',
@@ -459,11 +439,7 @@ export const _detector_880_burglaryPattern = {
     return input.includes('burglaryPattern') || input.includes('homeAddressExploit') || input.includes('casTheJoint');
   }
 };
-// Pattern anchors: burglaryPattern, homeAddressExploit, casTheJoint
 
-
-// ═══ Detector #356 [6] IP vs GPS mismatch ═══
-// severity: high
 export const checkIPGPSMismatch_356 = 'checkIPGPSMismatch';
 export const ipGPSMismatch_356 = 'ipGPSMismatch';
 export const ipMismatch_356 = 'ipMismatch';
@@ -478,15 +454,10 @@ export const _det356_checkIPGPSMismatch = {
     return ['checkIPGPSMismatch', 'ipGPSMismatch', 'ipMismatch'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkIPGPSMismatch
 export const _ref_checkIPGPSMismatch = _det356_checkIPGPSMismatch;
-// pattern-ref: ipGPSMismatch
 export const _ref_ipGPSMismatch = _det356_checkIPGPSMismatch;
-// pattern-ref: ipMismatch
 export const _ref_ipMismatch = _det356_checkIPGPSMismatch;
 
-// ═══ Detector #358 [6] Impossible travel between check-ins ═══
-// severity: high
 export const checkImpossibleCheckin_358 = 'checkImpossibleCheckin';
 export const impossibleCheckin_358 = 'impossibleCheckin';
 export const travelSpeed_358 = 'travelSpeed';
@@ -501,15 +472,10 @@ export const _det358_checkImpossibleCheckin = {
     return ['checkImpossibleCheckin', 'impossibleCheckin', 'travelSpeed'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkImpossibleCheckin
 export const _ref_checkImpossibleCheckin = _det358_checkImpossibleCheckin;
-// pattern-ref: impossibleCheckin
 export const _ref_impossibleCheckin = _det358_checkImpossibleCheckin;
-// pattern-ref: travelSpeed
 export const _ref_travelSpeed = _det358_checkImpossibleCheckin;
 
-// ═══ Detector #360 [6] Location history consistency ═══
-// severity: medium
 export const locationHistory_360 = 'locationHistory';
 export const locationConsistency_360 = 'locationConsistency';
 export const gpsHistory_360 = 'gpsHistory';
@@ -524,15 +490,10 @@ export const _det360_locationHistory = {
     return ['locationHistory', 'locationConsistency', 'gpsHistory'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: locationHistory
 export const _ref_locationHistory = _det360_locationHistory;
-// pattern-ref: locationConsistency
 export const _ref_locationConsistency = _det360_locationHistory;
-// pattern-ref: gpsHistory
 export const _ref_gpsHistory = _det360_locationHistory;
 
-// ═══ Detector #362 [6] High-risk area flagging ═══
-// severity: medium
 export const highRiskArea_362 = 'highRiskArea';
 export const dangerousArea_362 = 'dangerousArea';
 export const crimeHotspot_362 = 'crimeHotspot';
@@ -547,15 +508,10 @@ export const _det362_highRiskArea = {
     return ['highRiskArea', 'dangerousArea', 'crimeHotspot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: highRiskArea
 export const _ref_highRiskArea = _det362_highRiskArea;
-// pattern-ref: dangerousArea
 export const _ref_dangerousArea = _det362_highRiskArea;
-// pattern-ref: crimeHotspot
 export const _ref_crimeHotspot = _det362_highRiskArea;
 
-// ═══ Detector #366 [6] Recurring location with different matches ═══
-// severity: medium
 export const recurringLocation_366 = 'recurringLocation';
 export const sameLocationDifferentDates_366 = 'sameLocationDifferentDates';
 export const _det366_recurringLocation = {
@@ -569,13 +525,9 @@ export const _det366_recurringLocation = {
     return ['recurringLocation', 'sameLocationDifferentDates'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: recurringLocation
 export const _ref_recurringLocation = _det366_recurringLocation;
-// pattern-ref: sameLocationDifferentDates
 export const _ref_sameLocationDifferentDates = _det366_recurringLocation;
 
-// ═══ Detector #367 [6] Meeting location changed last minute ═══
-// severity: high
 export const lastMinuteChange_367 = 'lastMinuteChange';
 export const locationChanged_367 = 'locationChanged';
 export const suddenLocationChange_367 = 'suddenLocationChange';
@@ -590,15 +542,10 @@ export const _det367_lastMinuteChange = {
     return ['lastMinuteChange', 'locationChanged', 'suddenLocationChange'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lastMinuteChange
 export const _ref_lastMinuteChange = _det367_lastMinuteChange;
-// pattern-ref: locationChanged
 export const _ref_locationChanged = _det367_lastMinuteChange;
-// pattern-ref: suddenLocationChange
 export const _ref_suddenLocationChange = _det367_lastMinuteChange;
 
-// ═══ Detector #369 [6] Speed of location change post-date ═══
-// severity: medium
 export const postDateSpeed_369 = 'postDateSpeed';
 export const rapidLocationChange_369 = 'rapidLocationChange';
 export const _det369_postDateSpeed = {
@@ -612,13 +559,9 @@ export const _det369_postDateSpeed = {
     return ['postDateSpeed', 'rapidLocationChange'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postDateSpeed
 export const _ref_postDateSpeed = _det369_postDateSpeed;
-// pattern-ref: rapidLocationChange
 export const _ref_rapidLocationChange = _det369_postDateSpeed;
 
-// ═══ Detector #371 [6] Border crossing detection ═══
-// severity: medium
 export const borderCrossing_371 = 'borderCrossing';
 export const countryBoundary_371 = 'countryBoundary';
 export const _det371_borderCrossing = {
@@ -632,13 +575,9 @@ export const _det371_borderCrossing = {
     return ['borderCrossing', 'countryBoundary'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: borderCrossing
 export const _ref_borderCrossing = _det371_borderCrossing;
-// pattern-ref: countryBoundary
 export const _ref_countryBoundary = _det371_borderCrossing;
 
-// ═══ Detector #617 [6] Fuzzy/approximate distance display ═══
-// severity: high
 export const fuzzyDistance_617 = 'fuzzyDistance';
 export const approximateDistance_617 = 'approximateDistance';
 export const distanceBucket_617 = 'distanceBucket';
@@ -653,15 +592,10 @@ export const _det617_fuzzyDistance = {
     return ['fuzzyDistance', 'approximateDistance', 'distanceBucket'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fuzzyDistance
 export const _ref_fuzzyDistance = _det617_fuzzyDistance;
-// pattern-ref: approximateDistance
 export const _ref_approximateDistance = _det617_fuzzyDistance;
-// pattern-ref: distanceBucket
 export const _ref_distanceBucket = _det617_fuzzyDistance;
 
-// ═══ Detector #417 [9] User never checks in detection ═══
-// severity: medium
 export const neverChecksIn_417 = 'neverChecksIn';
 export const skipCheckIn_417 = 'skipCheckIn';
 export const ignoredCheckIn_417 = 'ignoredCheckIn';
@@ -676,15 +610,10 @@ export const _det417_neverChecksIn = {
     return ['neverChecksIn', 'skipCheckIn', 'ignoredCheckIn'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: neverChecksIn
 export const _ref_neverChecksIn = _det417_neverChecksIn;
-// pattern-ref: skipCheckIn
 export const _ref_skipCheckIn = _det417_neverChecksIn;
-// pattern-ref: ignoredCheckIn
 export const _ref_ignoredCheckIn = _det417_neverChecksIn;
 
-// ═══ Detector #418 [9] Speed dating fraud ═══
-// severity: medium
 export const speedDatingFraud_418 = 'speedDatingFraud';
 export const eventFraud_418 = 'eventFraud';
 export const _det418_speedDatingFraud = {
@@ -698,13 +627,9 @@ export const _det418_speedDatingFraud = {
     return ['speedDatingFraud', 'eventFraud'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: speedDatingFraud
 export const _ref_speedDatingFraud = _det418_speedDatingFraud;
-// pattern-ref: eventFraud
 export const _ref_eventFraud = _det418_speedDatingFraud;
 
-// ═══ Detector #652 [9] Post-date Bluetooth scan prompt ═══
-// severity: medium
 export const postDateScan_652 = 'postDateScan';
 export const bluetoothScan_652 = 'bluetoothScan';
 export const trackerScan_652 = 'trackerScan';
@@ -719,15 +644,10 @@ export const _det652_postDateScan = {
     return ['postDateScan', 'bluetoothScan', 'trackerScan'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postDateScan
 export const _ref_postDateScan = _det652_postDateScan;
-// pattern-ref: bluetoothScan
 export const _ref_bluetoothScan = _det652_postDateScan;
-// pattern-ref: trackerScan
 export const _ref_trackerScan = _det652_postDateScan;
 
-// ═══ Detector #653 [9] OS-level tracker alert integration ═══
-// severity: medium
 export const unknownTrackerAlert_653 = 'unknownTrackerAlert';
 export const trackerNotification_653 = 'trackerNotification';
 export const _det653_unknownTrackerAlert = {
@@ -741,13 +661,9 @@ export const _det653_unknownTrackerAlert = {
     return ['unknownTrackerAlert', 'trackerNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: unknownTrackerAlert
 export const _ref_unknownTrackerAlert = _det653_unknownTrackerAlert;
-// pattern-ref: trackerNotification
 export const _ref_trackerNotification = _det653_unknownTrackerAlert;
 
-// ═══ Detector #753 [9] Do not get in their car prompt ═══
-// severity: medium
 export const dontGetInCar_753 = 'dontGetInCar';
 export const ownTransportation_753 = 'ownTransportation';
 export const carSafety_753 = 'carSafety';
@@ -762,15 +678,10 @@ export const _det753_dontGetInCar = {
     return ['dontGetInCar', 'ownTransportation', 'carSafety'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: dontGetInCar
 export const _ref_dontGetInCar = _det753_dontGetInCar;
-// pattern-ref: ownTransportation
 export const _ref_ownTransportation = _det753_dontGetInCar;
-// pattern-ref: carSafety
 export const _ref_carSafety = _det753_dontGetInCar;
 
-// ═══ Detector #909 [9] Drugging report category ═══
-// severity: medium
 export const druggingReport_909 = 'druggingReport';
 export const drinkSpiked_909 = 'drinkSpiked';
 export const druggedReport_909 = 'druggedReport';
@@ -785,15 +696,10 @@ export const _det909_druggingReport = {
     return ['druggingReport', 'drinkSpiked', 'druggedReport'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: druggingReport
 export const _ref_druggingReport = _det909_druggingReport;
-// pattern-ref: drinkSpiked
 export const _ref_drinkSpiked = _det909_druggingReport;
-// pattern-ref: druggedReport
 export const _ref_druggedReport = _det909_druggingReport;
 
-// ═══ Detector #913 [9] Mandatory conversation minimum ═══
-// severity: medium
 export const conversationMinimum_913 = 'conversationMinimum';
 export const chatBeforeMeet_913 = 'chatBeforeMeet';
 export const minimumMessages_913 = 'minimumMessages';
@@ -808,15 +714,10 @@ export const _det913_conversationMinimum = {
     return ['conversationMinimum', 'chatBeforeMeet', 'minimumMessages'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMinimum
 export const _ref_conversationMinimum = _det913_conversationMinimum;
-// pattern-ref: chatBeforeMeet
 export const _ref_chatBeforeMeet = _det913_conversationMinimum;
-// pattern-ref: minimumMessages
 export const _ref_minimumMessages = _det913_conversationMinimum;
 
-// ═══ Detector #914 [9] Match velocity throttling ═══
-// severity: medium
 export const matchThrottle_914 = 'matchThrottle';
 export const matchVelocity_914 = 'matchVelocity';
 export const slowDating_914 = 'slowDating';
@@ -831,15 +732,10 @@ export const _det914_matchThrottle = {
     return ['matchThrottle', 'matchVelocity', 'slowDating'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: matchThrottle
 export const _ref_matchThrottle = _det914_matchThrottle;
-// pattern-ref: matchVelocity
 export const _ref_matchVelocity = _det914_matchThrottle;
-// pattern-ref: slowDating
 export const _ref_slowDating = _det914_matchThrottle;
 
-// ═══ Detector #915 [9] Are you ready to meet checklist ═══
-// severity: medium
 export const readyToMeet_915 = 'readyToMeet';
 export const safetyChecklist_915 = 'safetyChecklist';
 export const meetupChecklist_915 = 'meetupChecklist';
@@ -854,16 +750,10 @@ export const _det915_readyToMeet = {
     return ['readyToMeet', 'safetyChecklist', 'meetupChecklist'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: readyToMeet
 export const _ref_readyToMeet = _det915_readyToMeet;
-// pattern-ref: safetyChecklist
 export const _ref_safetyChecklist = _det915_readyToMeet;
-// pattern-ref: meetupChecklist
 export const _ref_meetupChecklist = _det915_readyToMeet;
 
-// ════════════════════════════════════════════════════
-// Detector #874 [§6.1] Robbery lure pattern detection
-// ════════════════════════════════════════════════════
 export const robberyLure_874_key = 'robberyLure';
 export const lurePattern_874_key = 'lurePattern';
 export const meetupRobbery_874_key = 'meetupRobbery';
@@ -907,9 +797,6 @@ export const _d874_impl = {
   meetupRobbery: meetupRobberyCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #752 [§9] Ride-share integration
-// ════════════════════════════════════════════════════
 export const rideShare_752_key = 'rideShare';
 export const uberIntegration_752_key = 'uberIntegration';
 export const lyftIntegration_752_key = 'lyftIntegration';

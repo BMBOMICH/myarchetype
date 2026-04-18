@@ -107,7 +107,6 @@ export function detectFinancialSextortionEscalation(
     };
   }
 
-  // Track stage progression
   const stages = {
     exchange: false,
     threat: false,
@@ -123,17 +122,14 @@ export function detectFinancialSextortionEscalation(
   for (const msg of suspectMsgs) {
     const text = msg.text;
 
-    // Check intimate exchange references
     if (INTIMATE_EXCHANGE_PATTERNS.some((p) => p.test(text))) {
       stages.exchange = true;
     }
 
-    // Check threats
     if (THREAT_PATTERNS.some((p) => p.test(text))) {
       stages.threat = true;
     }
 
-    // Check financial demands
     if (FINANCIAL_DEMAND_PATTERNS.some((p) => p.test(text))) {
       stages.demand = true;
       demandCount++;
@@ -141,7 +137,6 @@ export function detectFinancialSextortionEscalation(
       if (!firstDemandTime) firstDemandTime = msg.timestamp;
       lastDemandTime = msg.timestamp;
 
-      // Extract amount
       const amountMatch = text.match(/(\$|€|£)\s*[\d,]+(\.\d{2})?/);
       if (amountMatch) {
         demandAmount = amountMatch[0];
@@ -153,13 +148,11 @@ export function detectFinancialSextortionEscalation(
       }
     }
 
-    // Check escalation
     if (ESCALATION_PATTERNS.some((p) => p.test(text))) {
       stages.escalation = true;
     }
   }
 
-  // Calculate escalation rate (demands per hour)
   let escalationRate = 0;
   if (firstDemandTime && lastDemandTime && demandCount > 1) {
     const hoursBetween = Math.max(
@@ -169,7 +162,6 @@ export function detectFinancialSextortionEscalation(
     escalationRate = demandCount / hoursBetween;
   }
 
-  // Determine current stage
   let stage: SextortionEscalationResult['stage'] = 'none';
   const activeStages = Object.values(stages).filter(Boolean).length;
 
@@ -183,12 +175,10 @@ export function detectFinancialSextortionEscalation(
     stage = 'exchange';
   }
 
-  // Calculate confidence
   let confidence = activeStages * 0.25;
   if (stages.threat && stages.demand) confidence = Math.max(confidence, 0.85);
   if (stages.escalation) confidence = Math.max(confidence, 0.95);
 
-  // Determine action
   let action: SextortionEscalationResult['action'] = 'none';
   const detected = activeStages >= 2 && (stages.threat || stages.demand);
 

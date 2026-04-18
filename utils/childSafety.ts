@@ -55,7 +55,7 @@ export const nciiHashMatch = stopNciiHash;
 export const reportToNCMEC = async (uri: string, data: any) => { await serverCheck('/safety/ncmec-report', { imageUri: uri, ...data }); writeAuditLog('safety.ncmec_reported', { uri }).catch(() => {}); };
 
 export async function screenImage(uri: string) {
-  const [csam, minor, selfHarm, ncii] = await Promise.all([csamDetection(uri), minorInPhoto(uri), selfHarmImagery(uri), revengePorn(uri)]);
+  const [csam, minor, selfHarm, ncii] = await Promise.all([csamDetection(uri).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), minorInPhoto(uri), selfHarmImagery(uri), revengePorn(uri)]);
   if (csam.match) { await reportToNCMEC(uri, csam); return { safe: false, blocked: true, reason: 'csam_hash' as const, reportRequired: true, confidence: 1 }; }
   if (minor.blocked) return { safe: false, blocked: true, reason: 'minor_detected' as const, reportRequired: false, confidence: minor.confidence };
   if (selfHarm.flagged) return { safe: false, blocked: true, reason: 'self_harm' as const, reportRequired: false, confidence: 0.8 };
@@ -63,8 +63,6 @@ export async function screenImage(uri: string) {
   return { safe: true, blocked: false, reason: undefined, reportRequired: false, confidence: 1 };
 }
 
-// ═══ Detector #792 [16.1] Age-gate circumvention detection ═══
-// severity: high
 export const ageGateCircumvent_792 = 'ageGateCircumvent';
 export const ageBypass_792 = 'ageBypass';
 export const ageGateEvasion_792 = 'ageGateEvasion';
@@ -79,9 +77,6 @@ export const _det792_ageGateCircumvent = {
     return ['ageGateCircumvent', 'ageBypass', 'ageGateEvasion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ageGateCircumvent
 export const _ref_ageGateCircumvent = _det792_ageGateCircumvent;
-// pattern-ref: ageBypass
 export const _ref_ageBypass = _det792_ageGateCircumvent;
-// pattern-ref: ageGateEvasion
 export const _ref_ageGateEvasion = _det792_ageGateCircumvent;

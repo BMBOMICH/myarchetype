@@ -3,7 +3,6 @@ import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, update
 import { auth, db } from '../firebaseConfig';
 import { checkIcebreakerAnswer, detectEmojiCodedLanguage, detectEmojiSpam } from './moderation';
 
-// ─── Secure random ────────────────────────────────────────
 function secureRandInt(max: number): number {
   const bytes = Crypto.getRandomBytes(4);
   const val = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;
@@ -19,9 +18,6 @@ function secureShuffle<T>(array: T[]): T[] {
   return shuffled;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Question Banks
-// ═══════════════════════════════════════════════════════════
 
 export const WOULD_YOU_RATHER_QUESTIONS: WouldYouRatherQuestion[] = [
   { a: 'Travel to the past', b: 'Travel to the future' },
@@ -125,9 +121,6 @@ export const RAPID_FIRE_QUESTIONS: string[] = [
   'Three words your friends would use to describe you?',
 ];
 
-// ═══════════════════════════════════════════════════════════
-// Question types
-// ═══════════════════════════════════════════════════════════
 
 export interface WouldYouRatherQuestion { a: string; b: string; }
 export interface ThisOrThatQuestion     { a: string; b: string; }
@@ -136,9 +129,6 @@ export interface RapidFireQuestion      { question: string; }
 
 type GameQuestion = WouldYouRatherQuestion | ThisOrThatQuestion | CompatibilityQuestion | RapidFireQuestion;
 
-// ═══════════════════════════════════════════════════════════
-// Game types
-// ═══════════════════════════════════════════════════════════
 
 export interface TwoTruthsGame {
   id: string; creatorId: string; matchId: string; statements: string[];
@@ -170,7 +160,6 @@ export interface RapidFireRound {
   createdAt: string; answeredAt: string | null; moderated: boolean;
 }
 
-// ─── Firestore error shape ────────────────────────────────
 interface FirestoreError { message: string; }
 function getErrorMessage(e: unknown): string {
   return typeof e === 'object' && e !== null && 'message' in e
@@ -178,9 +167,6 @@ function getErrorMessage(e: unknown): string {
     : 'Unknown error';
 }
 
-// ═══════════════════════════════════════════════════════════
-// Answer moderation
-// ═══════════════════════════════════════════════════════════
 
 function moderateGameAnswer(answer: string): { safe: boolean; reason?: string } {
   if (!answer?.trim()) return { safe: true };
@@ -202,9 +188,6 @@ function moderateStatements(statements: string[]): { safe: boolean; reason?: str
   return { safe: true };
 }
 
-// ═══════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════
 
 type StandardGameType = 'would_you_rather' | 'this_or_that' | 'compatibility';
 
@@ -248,9 +231,6 @@ function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], t
   return { matchCount, matchPercentage, compatibilityScore, highlights };
 }
 
-// ═══════════════════════════════════════════════════════════
-// Game lifecycle
-// ═══════════════════════════════════════════════════════════
 
 export async function startGame(chatId: string, matchId: string, gameType: StandardGameType): Promise<{ success: boolean; gameId?: string; error?: string }> {
   const user = auth.currentUser;
@@ -405,7 +385,7 @@ export async function getTwoTruthsForChat(myId: string, matchId: string): Promis
     const games: TwoTruthsGame[] = [];
     const q1 = query(collection(db, 'twoTruthsGames'), where('creatorId', '==', myId), where('matchId', '==', matchId), orderBy('createdAt', 'desc'), limit(10));
     const q2 = query(collection(db, 'twoTruthsGames'), where('creatorId', '==', matchId), where('matchId', '==', myId), orderBy('createdAt', 'desc'), limit(10));
-    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    const [snap1, snap2] = await Promise.all([getDocs(q1).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), getDocs(q2)]);
     snap1.forEach(d => games.push(d.data() as TwoTruthsGame));
     snap2.forEach(d => games.push(d.data() as TwoTruthsGame));
     return games.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

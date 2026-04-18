@@ -1,6 +1,3 @@
-// Covers: [35] #761 Honor-based violence (CRITICAL), #762 Forced marriage (CRITICAL),
-// #763 Caste-based discrimination, #764 Interfaith exploitation,
-// #644 Niche community-specific moderation
 
 export interface CulturalSafetyResult {
   detected: boolean;
@@ -73,7 +70,6 @@ export function analyze(message: string): CulturalSafetyResult {
     [INTERFAITH_EXPLOITATION, 'interfaith_exploitation', 'medium'],
   ];
 
-  // ─── [35] #764 Interfaith exploitation pattern ────────────────
 export interface InterfaithExploitationResult {
   detected: boolean;
   confidence: number;
@@ -90,7 +86,6 @@ const INTERFAITH_EXPLOITATION_PATTERNS: Array<{
   weight: number;
   description: string;
 }> = [
-  // Conversion coercion
   {
     p: /you\s+(must|have\s+to|need\s+to|will)\s+convert\s+(to|before\s+we|if\s+you\s+want\s+to)/i,
     type: 'conversion_coercion',
@@ -115,7 +110,6 @@ const INTERFAITH_EXPLOITATION_PATTERNS: Array<{
     weight: 0.85,
     description: 'Using divine authority to demand conversion',
   },
-  // Damnation threats
   {
     p: /you('ll|\s+will)\s+(go\s+to\s+hell|burn|be\s+damned|face\s+punishment)\s+(because|for|if)\s+(you('re|\s+are)\s+)?(not\s+(muslim|christian|jewish|hindu|buddhist)|your\s+religion)/i,
     type: 'damnation_threat',
@@ -134,7 +128,6 @@ const INTERFAITH_EXPLOITATION_PATTERNS: Array<{
     weight: 0.8,
     description: 'Divine punishment threat targeting religion',
   },
-  // Love jihad / religious honeytrap narratives
   {
     p: /love\s+jihad/i,
     type: 'religious_honeytrap_narrative',
@@ -147,7 +140,6 @@ const INTERFAITH_EXPLOITATION_PATTERNS: Array<{
     weight: 0.95,
     description: 'Targeting people of specific faith to convert via relationship',
   },
-  // Financial exploitation through religious manipulation
   {
     p: /\b(donate|give|tithe|offering|zakat|charity)\s+(to\s+)?(me|my\s+(church|mosque|temple|ministry))\s+(and\s+god\s+will|as\s+proof\s+of\s+your\s+faith)/i,
     type: 'religious_financial_exploitation',
@@ -160,14 +152,12 @@ const INTERFAITH_EXPLOITATION_PATTERNS: Array<{
     weight: 0.9,
     description: 'Fabricating divine revelation to extract money',
   },
-  // Isolation through religious framework
   {
     p: /your\s+(family|friends?|community)\s+(are\s+)?(not\s+true\s+believers?|infidels?|sinners?|corrupt|spiritually\s+blind)\s+(and\s+you\s+should|so\s+you\s+need\s+to)\s+(leave|avoid|cut\s+off|distance)/i,
     type: 'religious_isolation',
     weight: 0.85,
     description: 'Using religious framing to isolate from support network',
   },
-  // Forced religious practices
   {
     p: /you\s+(must|have\s+to|will|need\s+to)\s+(pray|fast|wear|observe|follow)\s+(this|my\s+)?(religion'?s?\s+)?(rules?|practices?|dress\s+code|hijab|cross|kippah)\s+(or\s+(i|our\s+relationship)|if\s+you\s+want)/i,
     type: 'forced_religious_practice',
@@ -196,7 +186,6 @@ export function detectInterfaithExploitation(
     }
   }
 
-  // Context multipliers
   if (context?.combinedWithFinancialRequest && types.length > 0) {
     totalWeight += 0.4;
     indicators.push('combined_with_financial_request');
@@ -270,8 +259,6 @@ export const faithExploit = detectInterfaithExploitation;
   return { detected: false, severity: 'none', action: 'none' };
 }
 
-// ═══ Detector #764 [35] Interfaith exploitation pattern ═══
-// severity: medium
 export const interfaithExploitation_764 = 'interfaithExploitation';
 export const religiousExploitation_764 = 'religiousExploitation';
 export const faithExploit_764 = 'faithExploit';
@@ -286,9 +273,6 @@ export const _det764_interfaithExploitation = {
     return ['interfaithExploitation', 'religiousExploitation', 'faithExploit'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: interfaithExploitation
 export const _ref_interfaithExploitation = _det764_interfaithExploitation;
-// pattern-ref: religiousExploitation
 export const _ref_religiousExploitation = _det764_interfaithExploitation;
-// pattern-ref: faithExploit
 export const _ref_faithExploit = _det764_interfaithExploitation;

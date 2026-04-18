@@ -1,17 +1,4 @@
-// utils/locationSafetyDetectors.ts
-// #361 locationRevoked | stoppedSharing | gpsDisabled
-// #365 isolatedLocation | remoteArea | noNearbyServices
-// #368 geofenceEscape | leftSafeZone
-// #370 reportCluster | locationReportCluster
-// #373 meetingLocationSafety | venueSafetyScore
-// #616 triangulationPrevention | distanceAttack | trilateration
-// #617 fuzzyDistance | approximateDistance | distanceBucket
-// #863 repeatEscalation | multipleReportsEscalate
-// #876 lgbtqRobbery | gayBashing | targetedAttack
-// #877 lureLocationCluster | repeatDangerousLocation
-// #875 baitSwitchMeetup | meetupLocationChange
 
-// ━━━ Shared Utility ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function haversineMeters(
   lat1: number, lng1: number,
@@ -28,7 +15,6 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ━━━ #361: Location Sharing Revoked ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export interface LocationSharingStatus {
   userId: string;

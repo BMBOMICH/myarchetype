@@ -16,9 +16,6 @@ export interface MatchNote {
   lastUpdated: string;
 }
 
-// ═════════════════════════════════════════════════════════
-// #68: Match notes with moderation
-// ═════════════════════════════════════════════════════════
 
 export async function getMatchNote(matchId: string): Promise<string> {
   const user = auth.currentUser;
@@ -42,7 +39,6 @@ export async function saveMatchNote(
   const user = auth.currentUser;
   if (!user || !matchId) return { success: false, error: 'Not authenticated' };
 
-  // #68: Moderate match note content
   if (note.trim().length > 0) {
     const moderation = checkMatchNotes(note);
     if (!moderation.safe) {
@@ -50,7 +46,6 @@ export async function saveMatchNote(
     }
   }
 
-  // Length limit
   if (note.length > 500) {
     return {
       success: false,
@@ -99,8 +94,6 @@ export async function getAllMatchNotes(): Promise<Map<string, string>> {
   if (!user) return new Map();
 
   try {
-    // Notes are keyed by userId_matchId so we'd need a collection query
-    // For now return empty map — implement with collection query if needed
     return new Map();
   } catch (error) {
     logger.error('[matchNotes] getAllMatchNotes error:', error);

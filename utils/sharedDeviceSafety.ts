@@ -1,9 +1,6 @@
-// [4.5] Shared Device Safety | [10.2] Systematic Failure | [10.3] Safety Weaponization
-// [14.2] Fake Dating App | [14.3] Cross-Platform Banned Intel | [14.4] Cheater Tool Defense
 
 import { writeAuditLog } from './logger';
 
-// ─── [4.5] Shared Device Safety ─────────────────────────
 export function browserDataAutoClear(): { sessionOnly: boolean; clearOnExit: boolean; instructions: string } {
   return { sessionOnly: true, clearOnExit: true, instructions: 'Use private/incognito mode on shared devices. Data cleared on session end.' };
 }
@@ -16,7 +13,6 @@ export function guestModeSupport(): { enabled: boolean; restrictions: string[]; 
 export const guestMode = guestModeSupport;
 export const sharedDeviceMode = guestModeSupport;
 
-// ─── [10.2] Systematic Failure / Litigation ──────────────
 export function safetyIncidentPattern(incidents: Array<{ type: string; timestamp: number; resolved: boolean }>): { systemic: boolean; patternType?: string; unresolved: number } {
   const unresolved = incidents.filter(i => !i.resolved).length;
   const typeGroups: Record<string, number> = {};
@@ -53,7 +49,6 @@ export function safetyKpiDashboard(metrics: { reportResponseTimeAvgHours: number
 export const safetyMetrics = safetyKpiDashboard;
 export const platformSafetyKpi = safetyKpiDashboard;
 
-// ─── [10.3] Safety Documentation ─────────────────────────
 export function safetyDocumentationAccuracy(claimed: Record<string, boolean>, actual: Record<string, boolean>): { accurate: boolean; discrepancies: string[] } {
   const discrepancies = Object.entries(claimed).filter(([k, v]) => actual[k] !== v).map(([k]) => k);
   return { accurate: discrepancies.length === 0, discrepancies };
@@ -61,7 +56,6 @@ export function safetyDocumentationAccuracy(claimed: Record<string, boolean>, ac
 export const docAccuracy = safetyDocumentationAccuracy;
 export const safetyTransparency = safetyDocumentationAccuracy;
 
-// ─── [14.2] Fake Dating App / Malware ────────────────────
 const KNOWN_FAKE_PACKAGES = new Set(['com.myarchetype.fake','com.dating.hack','com.tinder.mod','com.bumble.cracked']);
 export function fakeAppDetect(packageName: string, signature: string, expectedSignature: string): { isFake: boolean; reason?: string } {
   if (KNOWN_FAKE_PACKAGES.has(packageName)) return { isFake: true, reason: 'known_fake_package' };
@@ -108,7 +102,6 @@ export function appStoreFakeReview(reviews: Array<{ text: string; rating: number
 export const fakeReviewDetect = appStoreFakeReview;
 export const reviewManipulation = appStoreFakeReview;
 
-// ─── [14.3] Cross-Platform Banned Intel ──────────────────
 export function crossPlatformBanShare(bannedUser: { faceEmbeddingHash: string; phoneHash: string; emailHash: string }): { sharePayload: typeof bannedUser & { sharedAt: string } } {
   return { sharePayload: { ...bannedUser, sharedAt: new Date().toISOString() } };
 }
@@ -132,7 +125,6 @@ export function registryOfBannedUsers(userId: string, reason?: string): { isBann
 export const bannedUserRegistry = registryOfBannedUsers;
 export const globalBanRegistry = registryOfBannedUsers;
 
-// ─── [14.4] Cheater Tool Defense ─────────────────────────
 const swipeTimestamps: Record<string, number[]> = {};
 export function cheaterToolDetect(userId: string): { detected: boolean; swipeRate: number; reason?: string } {
   const now = Date.now();
@@ -146,24 +138,20 @@ export function cheaterToolDetect(userId: string): { detected: boolean; swipeRat
 export const swipeToolDetect = cheaterToolDetect;
 export const autoSwipeDetect = cheaterToolDetect;
 
-// ─── #626 Coordinated mass-swipe campaigns ────────────────
 export interface MassSwipeCampaignResult{detected:boolean;campaignType:string[];affectedUsers:string[];riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'none'|'alert'|'throttle'|'suspend';}
 const massSwipeTracker=new Map<string,{swipes:Array<{targetId:string;timestamp:number;liked:boolean}>;ipHash?:string}>();
 export function detectCoordinatedMassSwipe(events:Array<{userId:string;targetId:string;timestamp:number;liked:boolean;ipHash?:string}>):MassSwipeCampaignResult{
   const byUser=new Map<string,{swipes:Array<{targetId:string;timestamp:number;liked:boolean}>;ipHash?:string}>();
   for(const e of events){const u=byUser.get(e.userId)??{swipes:[],ipHash:e.ipHash};u.swipes.push({targetId:e.targetId,timestamp:e.timestamp,liked:e.liked});byUser.set(e.userId,u);}
   const campaignTypes:string[]=[],affected:string[]=[];
-  // Detect uniform like campaigns (all users liking same targets)
   const targetCounts=new Map<string,Set<string>>();
   for(const[uid,data]of byUser){for(const s of data.swipes.filter(x=>x.liked)){const ts=targetCounts.get(s.targetId)??new Set();ts.add(uid);targetCounts.set(s.targetId,ts);}}
   const coordinatedTargets=[...targetCounts.entries()].filter(([,users])=>users.size>=5);
   if(coordinatedTargets.length>0){campaignTypes.push('coordinated_like_bombing');coordinatedTargets.forEach(([t,users])=>{affected.push(t);users.forEach(u=>affected.push(u));});}
-  // Detect superhuman swipe rates from same IP
   const byIp=new Map<string,{count:number;users:Set<string>}>();
   for(const[uid,data]of byUser){if(!data.ipHash)continue;const ip=byIp.get(data.ipHash)??{count:0,users:new Set()};ip.count+=data.swipes.length;ip.users.add(uid);byIp.set(data.ipHash,ip);}
   const suspectIps=[...byIp.entries()].filter(([,v])=>v.users.size>=3&&v.count>=100);
   if(suspectIps.length>0){campaignTypes.push('ip_cluster_swipe_farm');suspectIps.forEach(([,v])=>v.users.forEach(u=>affected.push(u)));}
-  // Detect dislike bombing
   const dislikeTargets=new Map<string,number>();
   for(const[,data]of byUser){for(const s of data.swipes.filter(x=>!x.liked)){dislikeTargets.set(s.targetId,(dislikeTargets.get(s.targetId)??0)+1);}}
   const bombedTargets=[...dislikeTargets.entries()].filter(([,c])=>c>=10);
@@ -174,7 +162,6 @@ export function detectCoordinatedMassSwipe(events:Array<{userId:string;targetId:
   return{detected:campaignTypes.length>0,campaignType:campaignTypes,affectedUsers:uniqueAffected.slice(0,50),riskLevel:rl,action};}
 export const massSwipeCampaign=detectCoordinatedMassSwipe;export const coordinatedSwipe=detectCoordinatedMassSwipe;export const swipeCampaign=detectCoordinatedMassSwipe;
 
-// ─── #436 False positive rate tracking ───────────────────
 export interface FalsePositiveTrackingResult{falsePositiveRate:number;falseNegativeRate:number;precision:number;recall:number;f1Score:number;grade:'A'|'B'|'C'|'D'|'F';}
 export function trackFalsePositiveRate(results:Array<{predicted:boolean;actual:boolean}>):FalsePositiveTrackingResult{
   let tp=0,fp=0,tn=0,fn=0;
@@ -184,7 +171,6 @@ export function trackFalsePositiveRate(results:Array<{predicted:boolean;actual:b
   return{falsePositiveRate:Math.round(fpr*1000)/1000,falseNegativeRate:Math.round(fnr*1000)/1000,precision:Math.round(precision*1000)/1000,recall:Math.round(recall*1000)/1000,f1Score:Math.round(f1*1000)/1000,grade};}
 export const falsePositiveRate=trackFalsePositiveRate;export const fpTracking=trackFalsePositiveRate;
 
-// ─── #520 Detector efficacy metrics ──────────────────────
 export interface DetectorEfficacyResult{detectorId:string;precision:number;recall:number;f1:number;latencyMs:number;grade:'A'|'B'|'C'|'D'|'F';recommendation:string;}
 export function measureDetectorEfficacy(detectorId:string,metrics:{tp:number;fp:number;fn:number;tn:number;avgLatencyMs:number}):DetectorEfficacyResult{
   const precision=metrics.tp+metrics.fp>0?metrics.tp/(metrics.tp+metrics.fp):0;const recall=metrics.tp+metrics.fn>0?metrics.tp/(metrics.tp+metrics.fn):0;const f1=precision+recall>0?2*precision*recall/(precision+recall):0;
@@ -192,9 +178,6 @@ export function measureDetectorEfficacy(detectorId:string,metrics:{tp:number;fp:
   return{detectorId,precision:Math.round(precision*1000)/1000,recall:Math.round(recall*1000)/1000,f1:Math.round(f1*1000)/1000,latencyMs:metrics.avgLatencyMs,grade,recommendation:grade==='A'?'Detector performing well.':grade==='B'?'Minor tuning recommended.':grade==='C'?'Review training data and thresholds.':grade==='D'?'Significant improvement needed.':'Detector below acceptable threshold. Retrain or replace.'};}
 export const detectorEfficacy=measureDetectorEfficacy;export const efficacyMetrics=measureDetectorEfficacy;
 
-// ════════════════════════════════════════════════════
-// Detector #802 [§4.5] Auto-logout on shared device
-// ════════════════════════════════════════════════════
 export const autoLogout_802_key = 'autoLogout';
 export const sharedDeviceLogout_802_key = 'sharedDeviceLogout';
 

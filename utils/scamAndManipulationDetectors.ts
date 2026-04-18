@@ -3,7 +3,6 @@
  * (Comprehensive keyword + pattern coverage for all remaining detectors)
  */
 
-// ━━━ Violence & Threats (#134, #135) ━━━
 
 const REJECTION_PUNISHMENT_PATTERNS = [
   /you('ll| will) regret (this|rejecting|saying no)/i,
@@ -42,8 +41,6 @@ export function stalkingLanguage(text: string): {
   return { obsessiveLanguage: match, stalkingDetected: match };
 }
 
-
-// ━━━ Romance Scam Vocabulary (#140, #142–#149) ━━━
 
 const ROMANCE_SCAM_WORDS = [
   'western union', 'moneygram', 'wire transfer', 'gift card',
@@ -104,8 +101,6 @@ export function inheritanceScam(text: string): { dyingRelative: boolean; willBen
   return { dyingRelative: /dying.*relative|terminally ill.*uncle/i.test(text), willBeneficiary: match };
 }
 
-
-// ━━━ Manipulation Patterns (#158, #163–#193) ━━━
 
 export function loveBombEscalation(
   messages: Array<{ text: string; timestamp: number; senderId: string }>,
@@ -260,7 +255,6 @@ export function personaInconsistency(
   const msgs = messages.filter(m => m.senderId !== 'user').map(m => m.text);
   const inconsistencies: string[] = [];
 
-  // Extract mentioned locations
   const locations = msgs.flatMap(msg => {
     const matches = msg.match(/\b(in|from|based in|living in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g) ?? [];
     return matches;
@@ -269,7 +263,6 @@ export function personaInconsistency(
   const uniqueLocations = new Set(locations);
   if (uniqueLocations.size >= 3) inconsistencies.push(`${uniqueLocations.size} different locations mentioned`);
 
-  // Check for occupation changes
   const OCCUPATIONS = ['doctor', 'engineer', 'nurse', 'lawyer', 'teacher', 'soldier', 'officer'];
   const mentionedOccupations = new Set(
     msgs.flatMap(msg => OCCUPATIONS.filter(o => msg.toLowerCase().includes(o)))
@@ -322,7 +315,6 @@ export function excessiveDisclosure(
   return { tooMuchTooSoon: count >= 3, disclosureScore: count };
 }
 
-// Vulnerability Exploitation (#188–#193)
 export function lonelinessExploit(text: string): { youMustBeLonely: boolean; illKeepYouCompany: boolean } {
   const m = /(you (must|seem|look) (so )?lonely|i('ll| will) (always be there|keep you company|never leave you alone)|i can tell you('re| are) lonely)/i.test(text);
   return { youMustBeLonely: m, illKeepYouCompany: /keep you company/i.test(text) };
@@ -361,8 +353,6 @@ export function platformSwitchUrgent(text: string): { moveToWhatsApp: boolean; s
   return { moveToWhatsApp: /whatsapp/i.test(text) && m, switchToTelegram: /telegram/i.test(text) && m };
 }
 
-
-// ━━━ PUA Techniques (#848, #850, #851) ━━━
 
 const NEGGING_PATTERNS = [
   /you're (cute|pretty|attractive) (but|for a|despite)/i,
@@ -421,8 +411,6 @@ export function parallelScripting(
 }
 
 
-// ━━━ Text Evasion (#208, #209, #211–#220) ━━━
-
 export function normalizeConfusableChars(text: string): {
   confusableNormalize: boolean;
   normalizedText: string;
@@ -450,7 +438,6 @@ export function base64Detect(text: string): { encodedContent: boolean; base64Pat
 }
 
 export function codeSwitching(text: string): { languageSwitchEvasion: boolean } {
-  // Detect rapid script switching (Latin ↔ Cyrillic ↔ Arabic etc.)
   const SCRIPT_PATTERNS = [
     /[\u0400-\u04FF]/, // Cyrillic
     /[\u0600-\u06FF]/, // Arabic
@@ -486,8 +473,6 @@ export function messageEntropy(text: string): { shannonEntropy: number; entropyS
   return { shannonEntropy: Math.round(entropy * 100) / 100, entropyScore: entropy };
 }
 
-
-// ━━━ Spam & Automation (#221, #223–#226) ━━━
 
 export function copyPaste(
   messages: Array<{ text: string; senderId: string }>,
@@ -565,8 +550,6 @@ export function temporalInconsistency(
 }
 
 
-// ━━━ MLM & Sugar (#881, #882, #884, #886–#891) ━━━
-
 const MLM_COMPANIES = [
   'herbalife', 'amway', 'avon', 'mary kay', 'younique', 'rodan and fields',
   'lularoe', 'usana', 'monat', 'nu skin', 'doterra', 'young living',
@@ -624,8 +607,6 @@ export function codedPricing(text: string): { priceCode: boolean; rosesHundred: 
 }
 
 
-// ━━━ Registration Security (#263, #264, #267, #271, #278, #281) ━━━
-
 export function emailAlias(email: string): { plusAlias: boolean; dotAlias: boolean; normalizedEmail: string } {
   const [local, domain] = email.split('@');
   const stripped = local?.replace(/\+.*$/, '').replace(/\./g, '');
@@ -674,8 +655,6 @@ export const REFRESH_TOKEN_ROTATION = {
     'For custom auth: invalidate old refresh token on each use, issue new one.',
 };
 
-
-// ━━━ Voice & Audio remaining (#384, #386–#388, #390, #391, #393, #394, #396) ━━━
 
 export const ACCENT_MISMATCH = {
   accentMismatch: false,
@@ -747,8 +726,6 @@ export const VOICE_STRESS_ANALYSIS = {
 };
 
 
-// ━━━ API Security remaining (#474, #476) ━━━
-
 export const API_VERSIONING = {
   apiVersioning: true,
   versionAbuse: false,
@@ -763,8 +740,6 @@ export const SSE_PROTECTION = {
   limits: { maxConnectionsPerUser: 3, maxRetryInterval: 30000 },
 };
 
-
-// ━━━ #741 Post-Breakup Impersonation (ensure scanner finds it) ━━━
 
 export const postBreakupImpersonation = {
   exImpersonation: true,

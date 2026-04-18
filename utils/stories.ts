@@ -1,4 +1,3 @@
-// utils/stories.ts
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { uploadToCloudinary } from './cloudinaryUpload';
@@ -25,7 +24,7 @@ function computeExpiry(from = new Date()) { return new Date(from.getTime() + STO
 async function getMatchedUserIds(userId: string): Promise<Set<string>> {
   const col = collection(db, 'likes');
   const [fromSnap, toSnap] = await Promise.all([
-    getDocs(query(col, where('fromUserId', '==', userId), where('status', '==', 'matched'))),
+    getDocs(query(col, where('fromUserId', '==', userId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), where('status', '==', 'matched'))),
     getDocs(query(col, where('toUserId', '==', userId), where('status', '==', 'matched'))),
   ]);
   const ids = new Set<string>();

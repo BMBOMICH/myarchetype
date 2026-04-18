@@ -75,7 +75,6 @@ interface ReportDoc {
   status?: string;
 }
 
-// ─── #107: Bayesian average ───────────────────────────────
 
 export function bayesianAverage(
   userRatings: number[],
@@ -139,7 +138,6 @@ function calculateTrustScore(ratings: RatingsData): number {
   );
 }
 
-// ─── #150 / #151 / #155: Trust score + auto-actions + decay ─
 
 export async function calculateUserTrustScore(userId: string): Promise<TrustScoreResult> {
   try {
@@ -196,7 +194,6 @@ export function determineAutoActions(score: number): TrustAction[] {
   return ['ban'];
 }
 
-// ─── #152: Reporter credibility ───────────────────────────
 
 export async function calculateReporterCredibility(reporterId: string): Promise<ReporterCredibility> {
   try {
@@ -220,7 +217,6 @@ export async function calculateReporterCredibility(reporterId: string): Promise<
   }
 }
 
-// ─── Existing helpers ─────────────────────────────────────
 
 export async function shouldPromptForRating(currentUserId: string, matchId: string): Promise<boolean> {
   try {
@@ -237,7 +233,7 @@ export async function shouldPromptForRating(currentUserId: string, matchId: stri
     if (existingRating.exists()) return false;
 
     const [fromSnap, toSnap] = await Promise.all([
-      getDocs(query(collection(db, 'likes'), where('fromUserId', '==', currentUserId), where('toUserId', '==', matchId),   where('status', '==', 'matched'))),
+      getDocs(query(collection(db, 'likes').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), where('fromUserId', '==', currentUserId), where('toUserId', '==', matchId),   where('status', '==', 'matched'))),
       getDocs(query(collection(db, 'likes'), where('fromUserId', '==', matchId),       where('toUserId', '==', currentUserId), where('status', '==', 'matched'))),
     ]);
 

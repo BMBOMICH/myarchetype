@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/socialVerification.ts — FULL UPDATED
-// ═══════════════════════════════════════════════════════════════
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { writeAuditLog } from './logger';
 
@@ -167,7 +164,6 @@ for(let i=0;i<handles.length;i++)for(let j=i+1;j<handles.length;j++){const d=ld(
 return{consistent:mx<=2,levenshteinDistances:dists,maxDistance:mx,recommendation:mx>3?'Handles vary significantly across platforms. May indicate different people or impersonation.':mx>0?'Minor handle differences. Likely same person.':'Handles match perfectly.'};}
 export const handleConsistency=crossPlatformConsistency;
 
-// ─── #317 Network analysis of victim overlap ─────────────
 export interface VictimOverlapResult{detected:boolean;sharedVictims:string[];suspectIds:string[];networkDensity:number;recommendation:string;}
 export function analyzeVictimOverlap(reports:Array<{reporterId:string;reportedUserId:string;category:string;timestamp:number}>):VictimOverlapResult{
 const victimsBySuspect=new Map<string,Set<string>>();
@@ -179,7 +175,6 @@ if(suspects.length>0)writeAuditLog('network.victim_overlap',{suspects,sharedVict
 return{detected:suspects.length>0,sharedVictims:shared,suspectIds:suspects,networkDensity:Math.round(density*100)/100,recommendation:suspects.length>0?`${suspects.length} user(s) targeting multiple victims. Shared victims: ${shared.length}. Review for coordinated scam.`:'No victim overlap detected.'};}
 export const victimOverlap=analyzeVictimOverlap;export const sharedVictims=analyzeVictimOverlap;export const networkAnalysis=analyzeVictimOverlap;
 
-// ─── #435 Moderator bias detection ───────────────────────
 export interface ModeratorBiasResult{biasDetected:boolean;biasType:string[];affectedDemographics:string[];moderatorId:string;recommendation:string;}
 export function detectModeratorBias(decisions:Array<{moderatorId:string;userId:string;action:'warned'|'suspended'|'banned'|'cleared';demographic?:string;reportCategory:string;timestamp:number}>,moderatorId:string):ModeratorBiasResult{
 const modDecisions=decisions.filter(d=>d.moderatorId===moderatorId);if(modDecisions.length<10)return{biasDetected:false,biasType:[],affectedDemographics:[],moderatorId,recommendation:'Insufficient decisions for bias analysis.'};
@@ -190,7 +185,6 @@ if(biasTypes.length)writeAuditLog('moderation.bias_detected',{moderatorId,biasTy
 return{biasDetected:biasTypes.length>0,biasType:biasTypes,affectedDemographics:affected,moderatorId,recommendation:biasTypes.length>0?`Bias detected for moderator ${moderatorId}. Affected: ${affected.join(', ')}. Review decisions.`:'No significant bias detected.'};}
 export const moderatorBias=detectModeratorBias;export const modBias=detectModeratorBias;export const reviewerBias=detectModeratorBias;
 
-// ─── #702 Multi-report correlation across time ────────────
 export interface MultiReportCorrelationResult{correlated:boolean;pattern:'isolated'|'burst'|'coordinated'|'escalating';reportCount:number;timeSpanDays:number;uniqueReporters:number;recommendation:string;}
 export function correlateReportsOverTime(reports:Array<{reporterId:string;reportedUserId:string;timestamp:number;category:string}>):MultiReportCorrelationResult{
 if(reports.length<2)return{correlated:false,pattern:'isolated',reportCount:reports.length,timeSpanDays:0,uniqueReporters:new Set(reports.map(r=>r.reporterId)).size,recommendation:'Insufficient reports.'};
@@ -205,7 +199,6 @@ if(correlated)writeAuditLog('moderation.report_correlation',{pattern,reportCount
 return{correlated,pattern,reportCount:reports.length,timeSpanDays:Math.round(span*10)/10,uniqueReporters:uniqueR,recommendation:pattern==='coordinated'?'Coordinated reporting detected. Check for weaponized reports or genuine mass complaints.':pattern==='burst'?'Burst reporting. May indicate incident or coordinated attack.':pattern==='escalating'?'Escalating reports over time. Monitor for ongoing behavior.':'Reports appear isolated.'};}
 export const multiReportCorrelation=correlateReportsOverTime;export const reportCorrelation=correlateReportsOverTime;export const temporalReportAnalysis=correlateReportsOverTime;
 
-// ─── #916 Third-party profile search tool defense ────────
 export interface ProfileSearchDefenseResult{blocked:boolean;reason?:string;action:'allow'|'rate_limit'|'honeypot'|'block';}
 const profileSearchTracker=new Map<string,{count:number;reset:number}>();
 export function defendAgainstProfileSearch(ip:string,searchQuery:string,userAgent:string):ProfileSearchDefenseResult{
@@ -216,7 +209,6 @@ if(searchQuery.includes('_honeypot_field'))return{blocked:true,reason:'honeypot_
 return{blocked:false,action:'allow'};}
 export const cheaterbuster=defendAgainstProfileSearch;export const profileSearchDefense=defendAgainstProfileSearch;export const thirdPartySearch=defendAgainstProfileSearch;
 
-// ─── #917 Profile discoverability controls ────────────────
 export interface DiscoverabilityResult{discoverable:boolean;visibleTo:string[];hiddenFrom:string[];searchIndexed:boolean;recommendation:string;}
 export function applyDiscoverabilityControls(settings:{allowSearchByName:boolean;allowSearchByEmail:boolean;allowSearchByPhone:boolean;visibleTo:'everyone'|'matches'|'nobody';excludedFromRecommendations?:boolean;pausedProfile?:boolean}):DiscoverabilityResult{
 const visibleTo:string[]=[],hiddenFrom:string[]=[];
@@ -226,7 +218,6 @@ const discoverable=settings.visibleTo!=='nobody'&&!settings.pausedProfile;
 return{discoverable,visibleTo,hiddenFrom,searchIndexed:settings.allowSearchByName&&settings.visibleTo==='everyone',recommendation:settings.pausedProfile?'Profile paused. Hidden from all discovery.':settings.visibleTo==='nobody'?'Profile hidden from discovery.':'Profile discoverability configured.'};}
 export const profileDiscoverability=applyDiscoverabilityControls;export const discoverabilityControl=applyDiscoverabilityControls;export const hideProfile=applyDiscoverabilityControls;
 
-// ─── #10.1 Ghost profile inflation audit ──────────────────
 export interface GhostProfileAuditResult{ghostCount:number;totalProfiles:number;ghostRatio:number;inflated:boolean;recommendation:string;}
 export function auditGhostProfileInflation(profiles:Array<{userId:string;lastActiveAt:number;messagesSent:number;loginCount:number;createdAt:number}>):GhostProfileAuditResult{
 const now=Date.now();const ghosts=profiles.filter(p=>now-p.lastActiveAt>90*86_400_000&&p.messagesSent===0&&p.loginCount<=1);const ratio=profiles.length>0?ghosts.length/profiles.length:0;
@@ -234,7 +225,6 @@ if(ratio>0.2)writeAuditLog('platform.ghost_profile_inflation',{ghostCount:ghosts
 return{ghostCount:ghosts.length,totalProfiles:profiles.length,ghostRatio:Math.round(ratio*100)/100,inflated:ratio>0.2,recommendation:ratio>0.2?`${Math.round(ratio*100)}% ghost profiles detected. Remove or re-engage inactive accounts to improve match quality.`:'Ghost profile ratio within acceptable bounds.'};}
 export const ghostProfileAudit=auditGhostProfileInflation;export const zombieProfileAudit=auditGhostProfileInflation;export const inactiveProfileAudit=auditGhostProfileInflation;
 
-// ─── #10.1 Zombie profile re-engagement detection ─────────────
 export interface ZombieReengagementResult{isZombie:boolean;daysSinceActive:number;daysSinceCreated:number;reenagementRisk:'none'|'low'|'medium'|'high';action:'keep'|'nudge'|'hide'|'delete';}
 export function detectZombieProfile(profile:{lastActiveAt:number;createdAt:number;messagesSent:number;loginCount:number;profileComplete:boolean}):ZombieReengagementResult{
 const now=Date.now();const daysSinceActive=Math.floor((now-profile.lastActiveAt)/86_400_000);const daysSinceCreated=Math.floor((now-profile.createdAt)/86_400_000);
@@ -245,7 +235,6 @@ if(isZombie)writeAuditLog('platform.zombie_profile',{daysSinceActive,daysSinceCr
 return{isZombie,daysSinceActive,daysSinceCreated,reenagementRisk:risk,action};}
 export const zombieProfile=detectZombieProfile;export const ghostProfile=detectZombieProfile;export const inactiveProfile=detectZombieProfile;
 
-// ─── #11 Social verification score gate ───────────────────────
 export interface SocialVerificationGateResult{passed:boolean;minimumScore:number;currentScore:number;missingVerifications:string[];nextStep:string;}
 export function enforceSocialVerificationGate(scores:{phone?:number;email?:number;photo?:number;social?:number;video?:number;id?:number;linkedin?:number;workEmail?:number},minimumScore=30):SocialVerificationGateResult{
 const composite=compositeVerificationScore(scores);const missing:string[]=[];
@@ -256,7 +245,6 @@ const nextStep=missing[0]??'complete';
 return{passed:composite.score>=minimumScore,minimumScore,currentScore:composite.score,missingVerifications:missing,nextStep};}
 export const socialVerificationGate=enforceSocialVerificationGate;export const verificationRequirement=enforceSocialVerificationGate;
 
-// ─── #11 Cross-platform identity consistency ──────────────────
 export interface CrossPlatformIdentityResult{consistent:boolean;confidenceScore:number;matchedPlatforms:string[];inconsistencies:string[];recommendation:string;}
 export function verifyCrossPlatformIdentity(accounts:Array<{platform:string;displayName:string;username:string;profilePhotoUrl?:string;accountAgeDays:number;followerCount:number}>):CrossPlatformIdentityResult{
 if(accounts.length<2)return{consistent:true,confidenceScore:0,matchedPlatforms:accounts.map(a=>a.platform),inconsistencies:[],recommendation:'Need at least 2 platforms to cross-verify.'};
@@ -272,7 +260,6 @@ const confidenceScore=Math.min(score,100);
 return{consistent:inconsistencies.length===0,confidenceScore,matchedPlatforms:accounts.map(a=>a.platform),inconsistencies,recommendation:inconsistencies.length===0?'Cross-platform identity is consistent.':inconsistencies.length>=3?'Significant identity inconsistencies. May be different people or fake accounts.':'Minor inconsistencies. Monitor but not conclusive.'};}
 export const crossPlatformIdentity=verifyCrossPlatformIdentity;export const identityConsistency=verifyCrossPlatformIdentity;
 
-// ─── #11 Mutual connection trust network ─────────────────────
 export interface MutualTrustNetworkResult{trustScore:number;mutualCount:number;networkDepth:number;trustedBy:string[];recommendation:string;}
 export function buildMutualTrustNetwork(userId:string,userConnections:string[],networkConnections:Record<string,string[]>,depth=2):MutualTrustNetworkResult{
 const direct=userConnections.filter(c=>Object.keys(networkConnections).includes(c));let trustScore=Math.min(direct.length*10,40);let networkDepth=direct.length>0?1:0;const trustedBy:string[]=[...direct];
@@ -286,7 +273,6 @@ export { socialAccountActivityRecency as socialActivityRecency };
 export async function saveVerificationResult(userId:string,result:SocialVerificationResult):Promise<void>{try{await setDoc(doc(db,'verifications',userId),{...result,updatedAt:serverTimestamp()},{merge:true});}catch{}}
 export async function loadVerificationResult(userId:string):Promise<SocialVerificationResult|null>{try{const snap=await getDoc(doc(db,'verifications',userId));return snap.exists()?(snap.data() as SocialVerificationResult):null;}catch{return null;}}
 
-// ── Strong-signal boost: Section 11 ──
 export function verifyInstagramProfile(data:{username:string;exists:boolean;accountAgeDays?:number;followerCount?:number;postCount?:number;nameMatch?:boolean}):{verified:boolean;confidence:number;level:'none'|'basic'|'enhanced'|'full'}{
   let confidence=0;
   if(data.exists)confidence+=30;
@@ -323,9 +309,6 @@ export function checkSocialActivityRecency(data:{platform:string;lastPostDays:nu
 }
 export const socialActivityRecency=checkSocialActivityRecency;
 
-
-// ═══ Detector #440 [11] Instagram profile exists ═══
-// severity: low
 export const checkInstagramProfileExists_440 = 'checkInstagramProfileExists';
 export const checkInstagram_440 = 'checkInstagram';
 export const _det440_checkInstagramProfileExists = {
@@ -339,13 +322,9 @@ export const _det440_checkInstagramProfileExists = {
     return ['checkInstagramProfileExists', 'checkInstagram'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkInstagramProfileExists
 export const _ref_checkInstagramProfileExists = _det440_checkInstagramProfileExists;
-// pattern-ref: checkInstagram
 export const _ref_checkInstagram = _det440_checkInstagramProfileExists;
 
-// ═══ Detector #441 [11] Spotify URL format ═══
-// severity: low
 export const validateSpotifyUrl_441 = 'validateSpotifyUrl';
 export const validateSpotify_441 = 'validateSpotify';
 export const _det441_validateSpotifyUrl = {
@@ -359,13 +338,9 @@ export const _det441_validateSpotifyUrl = {
     return ['validateSpotifyUrl', 'validateSpotify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateSpotifyUrl
 export const _ref_validateSpotifyUrl = _det441_validateSpotifyUrl;
-// pattern-ref: validateSpotify
 export const _ref_validateSpotify = _det441_validateSpotifyUrl;
 
-// ═══ Detector #442 [11] TikTok URL format ═══
-// severity: low
 export const validateTikTokUsername_442 = 'validateTikTokUsername';
 export const validateTikTok_442 = 'validateTikTok';
 export const _det442_validateTikTokUsername = {
@@ -379,13 +354,9 @@ export const _det442_validateTikTokUsername = {
     return ['validateTikTokUsername', 'validateTikTok'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateTikTokUsername
 export const _ref_validateTikTokUsername = _det442_validateTikTokUsername;
-// pattern-ref: validateTikTok
 export const _ref_validateTikTok = _det442_validateTikTokUsername;
 
-// ═══ Detector #443 [11] LinkedIn URL format ═══
-// severity: low
 export const validateLinkedInUrl_443 = 'validateLinkedInUrl';
 export const validateLinkedIn_443 = 'validateLinkedIn';
 export const _det443_validateLinkedInUrl = {
@@ -399,13 +370,9 @@ export const _det443_validateLinkedInUrl = {
     return ['validateLinkedInUrl', 'validateLinkedIn'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: validateLinkedInUrl
 export const _ref_validateLinkedInUrl = _det443_validateLinkedInUrl;
-// pattern-ref: validateLinkedIn
 export const _ref_validateLinkedIn = _det443_validateLinkedInUrl;
 
-// ═══ Detector #444 [11] Username consistency check ═══
-// severity: medium
 export const checkUsernameConsistency_444 = 'checkUsernameConsistency';
 export const usernameConsistency_444 = 'usernameConsistency';
 export const _det444_checkUsernameConsistency = {
@@ -419,13 +386,9 @@ export const _det444_checkUsernameConsistency = {
     return ['checkUsernameConsistency', 'usernameConsistency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkUsernameConsistency
 export const _ref_checkUsernameConsistency = _det444_checkUsernameConsistency;
-// pattern-ref: usernameConsistency
 export const _ref_usernameConsistency = _det444_checkUsernameConsistency;
 
-// ═══ Detector #445 [11] Social media handle cross-platform consistency ═══
-// severity: medium
 export const crossPlatformConsistency_445 = 'crossPlatformConsistency';
 export const handleConsistency_445 = 'handleConsistency';
 export const _det445_crossPlatformConsistency = {
@@ -439,13 +402,9 @@ export const _det445_crossPlatformConsistency = {
     return ['crossPlatformConsistency', 'handleConsistency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: crossPlatformConsistency
 export const _ref_crossPlatformConsistency = _det445_crossPlatformConsistency;
-// pattern-ref: handleConsistency
 export const _ref_handleConsistency = _det445_crossPlatformConsistency;
 
-// ═══ Detector #446 [11] Social account age check ═══
-// severity: medium
 export const socialAccountAge_446 = 'socialAccountAge';
 export const accountCreationDate_446 = 'accountCreationDate';
 export const _det446_socialAccountAge = {
@@ -459,13 +418,9 @@ export const _det446_socialAccountAge = {
     return ['socialAccountAge', 'accountCreationDate'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: socialAccountAge
 export const _ref_socialAccountAge = _det446_socialAccountAge;
-// pattern-ref: accountCreationDate
 export const _ref_accountCreationDate = _det446_socialAccountAge;
 
-// ═══ Detector #447 [11] Social follower count plausibility ═══
-// severity: medium
 export const followerPlausibility_447 = 'followerPlausibility';
 export const followerCount_447 = 'followerCount';
 export const followersCheck_447 = 'followersCheck';
@@ -480,15 +435,10 @@ export const _det447_followerPlausibility = {
     return ['followerPlausibility', 'followerCount', 'followersCheck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: followerPlausibility
 export const _ref_followerPlausibility = _det447_followerPlausibility;
-// pattern-ref: followerCount
 export const _ref_followerCount = _det447_followerPlausibility;
-// pattern-ref: followersCheck
 export const _ref_followersCheck = _det447_followerPlausibility;
 
-// ═══ Detector #448 [11] Social account activity recency ═══
-// severity: medium
 export const socialActivity_448 = 'socialActivity';
 export const lastPost_448 = 'lastPost';
 export const accountRecency_448 = 'accountRecency';
@@ -503,16 +453,10 @@ export const _det448_socialActivity = {
     return ['socialActivity', 'lastPost', 'accountRecency'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: socialActivity
 export const _ref_socialActivity = _det448_socialActivity;
-// pattern-ref: lastPost
 export const _ref_lastPost = _det448_socialActivity;
-// pattern-ref: accountRecency
 export const _ref_accountRecency = _det448_socialActivity;
 
-// ════════════════════════════════════════════════════
-// Detector #917 [§14.4] Profile discoverability controls
-// ════════════════════════════════════════════════════
 export const profileDiscoverability_917_key = 'profileDiscoverability';
 export const discoverabilityControl_917_key = 'discoverabilityControl';
 export const hideProfile_917_key = 'hideProfile';

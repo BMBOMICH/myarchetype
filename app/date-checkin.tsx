@@ -53,9 +53,6 @@ export interface CheckinEvent {
   note?: string;
 }
 
-// ═════════════════════════════════════════════════════════
-// #145: Start check-in with reminder scheduling
-// ═════════════════════════════════════════════════════════
 
 export async function startDateCheckin(
   matchId: string,
@@ -101,11 +98,8 @@ export async function startDateCheckin(
 
     await setDoc(doc(db, 'dateCheckins', checkinId), checkin);
 
-    // #145: Schedule check-in reminder
     await scheduleCheckinReminder(checkinId, matchName, checkinIntervalMinutes);
 
-    // #146: Schedule missed check-in alert
-    // If user doesn't check in within interval + 15 min grace period
     await scheduleMissedCheckinAlert(
       checkinId,
       matchName,
@@ -113,7 +107,6 @@ export async function startDateCheckin(
       emergencyContact
     );
 
-    // #149: Share location with emergency contact
     if (emergencyContact) {
       await shareLocationWithContact(
         emergencyContact,
@@ -132,15 +125,12 @@ export async function startDateCheckin(
     });
 
     return { success: true, checkinId };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[dateCheckin] startDateCheckin error:', error);
     return { success: false, error: error.message };
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// #145: Schedule check-in reminder notification
-// ═════════════════════════════════════════════════════════
 
 async function scheduleCheckinReminder(
   checkinId: string,
@@ -162,9 +152,6 @@ async function scheduleCheckinReminder(
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// #146: Schedule missed check-in alert to trusted contact
-// ═════════════════════════════════════════════════════════
 
 async function scheduleMissedCheckinAlert(
   checkinId: string,
@@ -175,8 +162,6 @@ async function scheduleMissedCheckinAlert(
   if (!emergencyContact) return;
 
   try {
-    // Schedule a local notification that fires if user hasn't checked in
-    // The app should check checkin status when this fires
     await Notifications.scheduleNotificationAsync({
       content: {
         title: '⚠️ Missed Check-in Alert',
@@ -197,9 +182,6 @@ async function scheduleMissedCheckinAlert(
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// #149: Share location with trusted contact
-// ═════════════════════════════════════════════════════════
 
 async function shareLocationWithContact(
   contact: { name: string; phone: string },
@@ -232,9 +214,6 @@ async function shareLocationWithContact(
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// Perform check-in
-// ═════════════════════════════════════════════════════════
 
 export async function performCheckin(
   checkinId: string,
@@ -282,7 +261,6 @@ export async function performCheckin(
         checkin.checkinInterval
       );
 
-      // #146: Re-schedule missed alert for next interval
       await scheduleMissedCheckinAlert(
         checkinId,
         checkin.matchName,
@@ -313,7 +291,6 @@ export async function performCheckin(
         checkinId,
       });
     } else if (status === 'sos') {
-      // #144: Emergency SOS
       updateData.status = 'emergency';
       await triggerSOSAlert(checkin);
     }
@@ -321,21 +298,17 @@ export async function performCheckin(
     await updateDoc(checkinRef, updateData);
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[dateCheckin] performCheckin error:', error);
     return { success: false, error: error.message };
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// #144: SOS alert
-// ═════════════════════════════════════════════════════════
 
 async function triggerSOSAlert(checkin: DateCheckin): Promise<void> {
   const user = auth.currentUser;
 
   try {
-    // #169: Audit log
     await writeAuditLog('safety.sos_triggered', {
       checkinId: checkin.id,
       location: checkin.location,
@@ -343,10 +316,8 @@ async function triggerSOSAlert(checkin: DateCheckin): Promise<void> {
       triggeredAt: new Date().toISOString(),
     });
 
-    // Call emergency services
     await Linking.openURL('tel:112');
 
-    // Send SMS to emergency contact
     if (checkin.emergencyContact) {
       const mapsLink =
         checkin.latitude && checkin.longitude
@@ -370,10 +341,6 @@ async function triggerSOSAlert(checkin: DateCheckin): Promise<void> {
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// #146: Handle missed check-in
-// Call this from notification handler when missed_checkin fires
-// ═════════════════════════════════════════════════════════
 
 export async function handleMissedCheckin(checkinId: string): Promise<void> {
   try {
@@ -387,14 +354,12 @@ export async function handleMissedCheckin(checkinId: string): Promise<void> {
     if (checkin.status !== 'active') return;
     if (checkin.missedCheckinAlertSent) return;
 
-    // Mark as missed
     await updateDoc(checkinRef, {
       status: 'missed',
       missedCheckinAlertSent: true,
       missedAt: new Date().toISOString(),
     });
 
-    // #146: Alert trusted contact
     if (checkin.emergencyContact) {
       const mapsLink =
         checkin.latitude && checkin.longitude
@@ -414,7 +379,6 @@ export async function handleMissedCheckin(checkinId: string): Promise<void> {
       await Linking.openURL(smsUrl);
     }
 
-    // Log missed check-in
     await writeAuditLog('safety.content_flagged', {
       type: 'missed_date_checkin',
       checkinId,
@@ -425,9 +389,6 @@ export async function handleMissedCheckin(checkinId: string): Promise<void> {
   }
 }
 
-// ═════════════════════════════════════════════════════════
-// Getters + helpers
-// ═════════════════════════════════════════════════════════
 
 export async function getActiveCheckin(): Promise<DateCheckin | null> {
   const user = auth.currentUser;

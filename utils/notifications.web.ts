@@ -1,19 +1,15 @@
 import type * as Notifications from 'expo-notifications';
 import { logger } from './logger';
 
-// ─── Types ────────────────────────────────────────────────
 export type NotificationType = 'match' | 'message' | 'like' | 'rating_prompt';
 
-// ─── Dummy subscription ───────────────────────────────────
 const DUMMY_SUBSCRIPTION: Notifications.EventSubscription = {
   remove: () => {},
 };
 
-// ─── VAPID public key ─────────────────────────────────────
 const VAPID_PUBLIC_KEY =
   'BMothFbf8iMeqOrdqMI2OmY4qWNn1sEvKaXr7MnrYqIW_dAFhxu6tm9XH0m9iF9aKzznDBEdgvO-IhuKGr1N7C0';
 
-// ─── Helper ───────────────────────────────────────────────
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
@@ -27,33 +23,27 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-// ─── Register for web push notifications ─────────────────
 export async function registerForPushNotifications(): Promise<string | null> {
   try {
-    // Check browser support
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       logger.log('[Web Notifications] Not supported in this browser');
       return null;
     }
 
-    // Check/request permission
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       logger.log('[Web Notifications] Permission denied');
       return null;
     }
 
-    // Register service worker
     const registration = await navigator.serviceWorker.register(
       '/service-worker.js'
     );
     await navigator.serviceWorker.ready;
     logger.log('[Web Notifications] Service worker ready');
 
-    // Check for existing subscription first
     let subscription = await registration.pushManager.getSubscription();
 
-    // Create new subscription if none exists
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -63,7 +53,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
     const token = JSON.stringify(subscription);
 
-    // Save to Firebase
     const { auth, db } = await import('../firebaseConfig');
     const { doc, updateDoc } = await import('firebase/firestore');
     const user = auth.currentUser;
@@ -82,7 +71,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-// ─── Local notification ───────────────────────────────────
 export async function sendLocalNotification(
   title: string,
   body: string,
@@ -101,7 +89,6 @@ export async function sendLocalNotification(
   }
 }
 
-// ─── Send push (handled server-side for web) ──────────────
 export async function sendPushNotification(
   _token: string,
   _title: string,
@@ -112,7 +99,6 @@ export async function sendPushNotification(
   return true;
 }
 
-// ─── Notification helpers ─────────────────────────────────
 export async function notifyNewMatch(
   _recipientToken: string,
   _matcherName: string
@@ -131,7 +117,6 @@ export async function notifyRatingPrompt(
   _matchName: string
 ): Promise<void> {}
 
-// ─── Event listeners (no-op on web) ──────────────────────
 export function addNotificationReceivedListener(
   _callback: (notification: Notifications.Notification) => void
 ): Notifications.EventSubscription {
@@ -144,7 +129,6 @@ export function addNotificationResponseListener(
   return DUMMY_SUBSCRIPTION;
 }
 
-// ─── Badge / clear (no-op on web) ────────────────────────
 export async function getBadgeCount(): Promise<number> {
   return 0;
 }

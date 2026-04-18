@@ -1,13 +1,24 @@
+import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, Image,
-  RefreshControl, StyleSheet, Text, TextInput,
-  TouchableOpacity, View,
+  ActivityIndicator, Alert,
+  RefreshControl, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import TurboImage from 'react-native-turbo-image';
+import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../../firebaseConfig';
 import { logger } from '../../utils/logger';
+
+const scheduleIdleTask = (cb: () => void): (() => void) => {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback(cb);
+    return () => cancelIdleCallback(id);
+  }
+  const id = setTimeout(cb, 100);
+  return () => clearTimeout(id);
+};
 
 interface User {
   uid: string; name: string; email: string; age: number; gender: string;
@@ -47,18 +58,24 @@ export default function AdminUsersScreen() {
       const list: User[] = snapshot.docs.map((d) => {
         const data = d.data();
         return {
-          uid: d.id, name: String(data.name ?? 'Unknown'), email: String(data.email ?? ''),
-          age: Number(data.age ?? 0), gender: String(data.gender ?? ''),
-          photos:         data.photos         as string[]      ?? [],
-          selfieVerified: data.selfieVerified  as boolean       ?? false,
-          isBanned:       data.isBanned        as boolean       ?? false,
-          isAdmin:        data.isAdmin         as boolean       ?? false,
-          warnings:       data.warnings        as number        ?? 0,
-          createdAt: String(data.createdAt ?? ''),
+          uid:            d.id,
+          name:           String(data.name      ?? 'Unknown'),
+          email:          String(data.email     ?? ''),
+          age:            Number(data.age       ?? 0),
+          gender:         String(data.gender    ?? ''),
+          photos:         data.photos           as string[] ?? [],
+          selfieVerified: data.selfieVerified   as boolean  ?? false,
+          isBanned:       data.isBanned         as boolean  ?? false,
+          isAdmin:        data.isAdmin          as boolean  ?? false,
+          warnings:       data.warnings         as number   ?? 0,
+          createdAt:      String(data.createdAt ?? ''),
         };
       });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setUsers(list);
+
+      scheduleIdleTask(() => {
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setUsers(list);
+      });
     } catch (error) {
       logger.error('[AdminUsers] loadUsers error:', error);
     } finally {
@@ -70,17 +87,21 @@ export default function AdminUsersScreen() {
   useEffect(() => { if (isAdmin) void loadUsers(); }, [isAdmin, loadUsers]);
 
   useEffect(() => {
-    let result = [...users];
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
-    }
-    switch (filter) {
-      case 'verified':   result = result.filter(u => u.selfieVerified);  break;
-      case 'unverified': result = result.filter(u => !u.selfieVerified); break;
-      case 'banned':     result = result.filter(u => u.isBanned);        break;
-    }
-    setFiltered(result);
+    return scheduleIdleTask(() => {
+      let result = [...users];
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(
+          u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
+        );
+      }
+      switch (filter) {
+        case 'verified':   result = result.filter(u => u.selfieVerified);  break;
+        case 'unverified': result = result.filter(u => !u.selfieVerified); break;
+        case 'banned':     result = result.filter(u => u.isBanned);        break;
+      }
+      setFiltered(result);
+    });
   }, [users, searchQuery, filter]);
 
   const handleRefresh = useCallback(() => { setRefreshing(true); void loadUsers(); }, [loadUsers]);
@@ -119,10 +140,11 @@ export default function AdminUsersScreen() {
         Alert.alert('Error', 'Error verifying user');
       }
     };
-    Alert.alert('Verify User', `Manually verify ${user.name}?\nThis gives them a verified badge without selfie verification.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Verify', onPress: onConfirm },
-    ]);
+    Alert.alert(
+      'Verify User',
+      `Manually verify ${user.name}?\nThis gives them a verified badge without selfie verification.`,
+      [{ text: 'Cancel', style: 'cancel' }, { text: 'Verify', onPress: onConfirm }],
+    );
   }, [loadUsers]);
 
   const handleMakeAdmin = useCallback((user: User) => {
@@ -137,50 +159,75 @@ export default function AdminUsersScreen() {
         Alert.alert('Error', 'Error updating user');
       }
     };
-    Alert.alert(label, user.isAdmin ? `Remove admin from ${user.name}?` : `Make ${user.name} an admin?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: label, onPress: onConfirm },
-    ]);
+    Alert.alert(
+      label,
+      user.isAdmin ? `Remove admin from ${user.name}?` : `Make ${user.name} an admin?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: label, onPress: onConfirm },
+      ],
+    );
   }, [loadUsers]);
 
-  const renderItem = useCallback(({ item }: { item: User }) => (
-    <View style={[s.userCard, item.isBanned && s.userCardBanned]}
-      accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}>
-      <View style={s.userHeader}>
+  const renderItem = useCallback(({ item }: LegendListRenderItemProps<User>) => (
+    <View
+      style={[styles.userCard, item.isBanned && styles.userCardBanned]}
+      accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}
+    >
+      <View style={styles.userHeader}>
         {item.photos && item.photos.length > 0 ? (
-          <Image source={{ uri: item.photos[0] }} style={s.userPhoto} accessibilityLabel={`Photo of ${item.name}`} />
+          <TurboImage
+            source={{ uri: item.photos[0]! }}
+            style={styles.userPhoto}
+            cachePolicy="dataCache"
+            accessibilityLabel={`Photo of ${item.name}`}
+          />
         ) : (
-          <View style={s.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
-            <Text style={s.userPhotoText}>?</Text>
+          <View style={styles.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
+            <Text style={styles.userPhotoText}>?</Text>
           </View>
         )}
-        <View style={s.userInfo}>
-          <View style={s.userNameRow}>
-            <Text style={s.userName}>{item.name}</Text>
-            {item.selfieVerified && <Text style={s.verifiedBadge} accessibilityLabel="Verified">✓</Text>}
-            {item.isAdmin  && <Text style={s.adminBadge}>Admin</Text>}
-            {item.isBanned && <Text style={s.bannedBadge}>Banned</Text>}
+        <View style={styles.userInfo}>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName}>{item.name}</Text>
+            {item.selfieVerified && (
+              <Text style={styles.verifiedBadge} accessibilityLabel="Verified">✓</Text>
+            )}
+            {item.isAdmin && <Text style={styles.adminBadge}>Admin</Text>}
+            {item.isBanned && <Text style={styles.bannedBadge}>Banned</Text>}
           </View>
-          <Text style={s.userEmail}>{item.email}</Text>
-          <Text style={s.userDetails}>
+          <Text style={styles.userEmail}>{item.email}</Text>
+          <Text style={styles.userDetails}>
             {item.age} y/o {item.gender}{item.warnings ? ` • ${item.warnings} warnings` : ''}
           </Text>
         </View>
       </View>
-      <View style={s.userActions}>
+      <View style={styles.userActions}>
         {!item.selfieVerified && (
-          <TouchableOpacity style={s.verifyButton} onPress={() => handleVerify(item)}
-            accessibilityLabel={`Verify ${item.name}`} accessibilityRole="button">
-            <Text style={s.verifyButtonText}>Verify</Text>
+          <TouchableOpacity
+            style={styles.verifyButton}
+            onPress={() = accessibilityLabel="button"> handleVerify(item)}
+            accessibilityLabel={`Verify ${item.name}`}
+            accessibilityRole="button"
+          >
+            <Text style={styles.verifyButtonText}>Verify</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={item.isBanned ? s.unbanButton : s.banButton} onPress={() => handleBan(item)}
-          accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`} accessibilityRole="button">
-          <Text style={s.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
+        <TouchableOpacity
+          style={item.isBanned ? styles.unbanButton : styles.banButton}
+          onPress={() = accessibilityLabel="button"> handleBan(item)}
+          accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`}
+          accessibilityRole="button"
+        >
+          <Text style={styles.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.adminButton} onPress={() => handleMakeAdmin(item)}
-          accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`} accessibilityRole="button">
-          <Text style={s.adminButtonText}>{item.isAdmin ? 'Remove Admin' : 'Make Admin'}</Text>
+        <TouchableOpacity
+          style={styles.adminButton}
+          onPress={() = accessibilityLabel="button"> handleMakeAdmin(item)}
+          accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`}
+          accessibilityRole="button"
+        >
+          <Text style={styles.adminButtonText}>{item.isAdmin ? 'Remove Admin' : 'Make Admin'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -191,58 +238,82 @@ export default function AdminUsersScreen() {
 
   if (!isAdmin || loading) {
     return (
-      <View style={s.loadingContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#53a8b6" />
-        <Text style={s.loadingText}>{!isAdmin ? 'Verifying admin access...' : 'Loading users...'}</Text>
+        <Text style={styles.loadingText}>
+          {!isAdmin ? 'Verifying admin access...' : 'Loading users...'}
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={s.container}>
-      <Text style={s.title} accessibilityRole="header">Manage Users</Text>
-      <Text style={s.subtitle}>{users.length} total users</Text>
+    <View style={styles.container}>
+      <Text style={styles.title} accessibilityRole="header">Manage Users</Text>
+      <Text style={styles.subtitle}>{users.length} total users</Text>
       <TextInput
-        style={s.searchInput} placeholder="Search by name or email..."
-        placeholderTextColor="#666" value={searchQuery} onChangeText={setSearchQuery}
-        accessibilityLabel="Search users" autoCapitalize="none" autoCorrect={false}
+        style={styles.searchInput}
+        placeholder="Search by name or email..."
+        placeholderTextColor="#666"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        accessibilityLabel="Search users"
+        autoCapitalize="none"
+        autoCorrect={false}
       />
-      <View style={s.filterTabs} accessibilityRole="tablist">
+      <View style={styles.filterTabs} accessibilityRole="tablist">
         {(['all', 'verified', 'unverified', 'banned'] as const).map((f) => (
-          <TouchableOpacity key={f} style={[s.filterTab, filter === f && s.filterTabActive]}
-            onPress={handleFilter(f)} accessibilityLabel={`Filter by ${f}`}
-            accessibilityRole="tab" accessibilityState={{ selected: filter === f }}>
-            <Text style={[s.filterTabText, filter === f && s.filterTabTextActive]}>
+          <TouchableOpacity
+            key={f}
+            style={[styles.filterTab, filter === f && styles.filterTabActive]}
+            onPress={handleFilter(f)}
+            accessibilityLabel={`Filter by ${f}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: filter === f }}
+          >
+            <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={s.resultsCount} accessibilityLiveRegion="polite">
+      <Text style={styles.resultsCount} accessibilityLiveRegion="polite">
         Showing {filteredUsers.length} of {users.length} users
       </Text>
-      <FlatList
+      <LegendList
         data={filteredUsers}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#53a8b6" />}
-        ListEmptyComponent={<View style={s.emptyContainer}><Text style={s.emptyText}>No users found</Text></View>}
+        estimatedItemSize={140}
+        recycleItems={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#53a8b6"
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No users found</Text>
+          </View>
+        }
       />
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  container:            { flex: 1, backgroundColor: '#1a1a2e', padding: 20, paddingTop: 60 },
-  loadingContainer:     { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-  loadingText:          { color: '#aaa', marginTop: 15, fontSize: 16 },
-  title:                { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 5, textAlign: 'center' },
-  subtitle:             { fontSize: 14, color: '#888', marginBottom: 20, textAlign: 'center' },
+const styles = StyleSheet.create((theme) => ({
+  container:            { flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: 60 },
+  loadingContainer:     { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
+  loadingText:          { color: theme.colors.textSecondary, marginTop: 15, fontSize: 16 },
+  title:                { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 5, textAlign: 'center' },
+  subtitle:             { fontSize: 14, color: theme.colors.textSecondary, marginBottom: 20, textAlign: 'center' },
   searchInput:          { backgroundColor: '#16213e', color: '#fff', padding: 15, borderRadius: 10, fontSize: 16, marginBottom: 15 },
   filterTabs:           { flexDirection: 'row', marginBottom: 15, backgroundColor: '#16213e', borderRadius: 10, padding: 5 },
   filterTab:            { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
   filterTabActive:      { backgroundColor: '#53a8b6' },
-  filterTabText:        { color: '#888', fontSize: 12, fontWeight: '600' },
+  filterTabText:        { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
   filterTabTextActive:  { color: '#fff' },
   resultsCount:         { color: '#666', fontSize: 12, marginBottom: 15 },
   emptyContainer:       { padding: 40, alignItems: 'center' },
@@ -255,11 +326,11 @@ const s = StyleSheet.create({
   userPhotoText:        { fontSize: 20, color: '#666' },
   userInfo:             { flex: 1 },
   userNameRow:          { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  userName:             { fontSize: 16, fontWeight: 'bold', color: '#eee' },
+  userName:             { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
   verifiedBadge:        { fontSize: 14, color: '#3498db' },
   adminBadge:           { backgroundColor: '#9b59b6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10, color: '#fff', overflow: 'hidden' },
   bannedBadge:          { backgroundColor: '#e74c3c', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10, color: '#fff', overflow: 'hidden' },
-  userEmail:            { fontSize: 12, color: '#888', marginTop: 2 },
+  userEmail:            { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 },
   userDetails:          { fontSize: 11, color: '#666', marginTop: 2 },
   userActions:          { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   verifyButton:         { backgroundColor: '#3498db', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15 },
@@ -269,4 +340,4 @@ const s = StyleSheet.create({
   banButtonText:        { color: '#fff', fontSize: 12, fontWeight: '600' },
   adminButton:          { backgroundColor: '#0f3460', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15 },
   adminButtonText:      { color: '#9b59b6', fontSize: 12, fontWeight: '600' },
-});
+}));

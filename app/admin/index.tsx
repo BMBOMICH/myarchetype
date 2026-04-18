@@ -1,7 +1,10 @@
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../../firebaseConfig';
 import { logger } from '../../utils/logger';
 
@@ -12,11 +15,21 @@ interface Stats {
 const EMPTY_STATS: Stats = { totalUsers: 0, verifiedUsers: 0, totalMatches: 0, pendingReports: 0, totalReports: 0, activeToday: 0 };
 interface Section { key: string; render: () => React.ReactElement }
 
+const scheduleIdleTask = (cb: () => void): (() => void) => {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback(cb);
+    return () => cancelIdleCallback(id);
+  }
+  const id = setTimeout(cb, 100);
+  return () => clearTimeout(id);
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats]     = useState<Stats>(EMPTY_STATS);
+  const isMounted             = useRef(true);
 
   const load = useCallback(async () => {
     try {
@@ -26,6 +39,7 @@ export default function AdminDashboard() {
       if (!userDoc.exists() || !(userDoc.data().isAdmin as boolean | undefined)) {
         logger.log('[Admin] Not an admin'); router.replace('/home'); return;
       }
+      if (!isMounted.current) return;
       setIsAdmin(true);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const usersSnap = await getDocs(collection(db, 'users'));
@@ -40,11 +54,12 @@ export default function AdminDashboard() {
         }
       });
       const [matchesSnap, reportsSnap] = await Promise.all([
-        getDocs(query(collection(db, 'likes'), where('status', '==', 'matched'))),
+        getDocs(query(collection(db, 'likes').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), where('status', '==', 'matched'))),
         getDocs(collection(db, 'reports')),
       ]);
       let pendingReports = 0;
       reportsSnap.forEach((d) => { if (d.data().status === 'pending') pendingReports++; });
+      if (!isMounted.current) return;
       setStats({
         totalUsers: usersSnap.size, verifiedUsers, activeToday,
         totalMatches: Math.floor(matchesSnap.size / 2),
@@ -53,18 +68,23 @@ export default function AdminDashboard() {
     } catch (error) {
       logger.error('[Admin] load error:', error);
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [router]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    isMounted.current = true;
+    return scheduleIdleTask(() => { void load(); }, []);
+  }, [load]);
 
-  const handleBack    = useCallback(() => router.back(), [router]);
-  const handleReports = useCallback(() => router.push('/admin/reports'), [router]);
-  const handleUsers   = useCallback(() => router.push('/admin/users'), [router]);
-  const handleStats   = useCallback(() => router.push('/admin/stats'), [router]);
+  useEffect(() => () => { isMounted.current = false; }, []);
 
-  const renderSection = useCallback(({ item }: { item: Section }) => item.render(), []);
+  const handleBack    = useCallback(() => router.back(),                    [router]);
+  const handleReports = useCallback(() => router.push('/admin/reports'),    [router]);
+  const handleUsers   = useCallback(() => router.push('/admin/users'),      [router]);
+  const handleStats   = useCallback(() => router.push('/admin/stats'),      [router]);
+
+  const renderSection = useCallback(({ item }: LegendListRenderItemProps<Section>) => item.render(), []);
   const keyExtractor  = useCallback((item: Section) => item.key, []);
 
   if (loading) {
@@ -114,10 +134,8 @@ export default function AdminDashboard() {
           <Text style={s.sectionTitle} accessibilityRole="header">Quick Actions</Text>
           {actions.map((item) => (
             <TouchableOpacity key={item.key} style={[s.actionButton, item.alert && s.actionButtonAlert]}
-              onPress={item.onPress}
-              accessibilityLabel={`${item.title}: ${item.subtitle}`}
-              accessibilityRole="button"
-              accessibilityHint={`Navigate to ${item.title}`}>
+              onPress={item.onPress} accessibilityLabel={`${item.title}: ${item.subtitle}`}
+              accessibilityRole="button" accessibilityHint={`Navigate to ${item.title}`}>
               <Text style={s.actionIcon} accessibilityElementsHidden>{item.icon}</Text>
               <View style={s.actionContent}>
                 <Text style={s.actionTitle}>{item.title}</Text>
@@ -138,36 +156,34 @@ export default function AdminDashboard() {
   return (
     <View style={s.container}>
       <Text style={s.title} accessibilityRole="header">👮 Admin Dashboard</Text>
-      <FlatList
-        data={sections}
-        keyExtractor={keyExtractor}
-        renderItem={renderSection}
-        contentContainerStyle={s.content}
+      <LegendList
+        data={sections} keyExtractor={keyExtractor} renderItem={renderSection}
+        contentContainerStyle={s.content} estimatedItemSize={300} recycleItems={false}
       />
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  center:            { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  container:         { flex: 1, backgroundColor: '#1a1a2e' },
+const s = StyleSheet.create((theme) => ({
+  center:            { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  container:         { flex: 1, backgroundColor: theme.colors.background },
   content:           { padding: 20, paddingBottom: 40 },
-  loadingText:       { color: '#aaa', marginTop: 15, fontSize: 16 },
-  errorText:         { color: '#d9534f', fontSize: 18 },
-  title:             { fontSize: 28, fontWeight: 'bold', color: '#eee', textAlign: 'center', marginTop: 20, paddingHorizontal: 20 },
+  loadingText:       { color: theme.colors.textSecondary, marginTop: 15, fontSize: 16 },
+  errorText:         { color: theme.colors.error, fontSize: 18 },
+  title:             { fontSize: 28, fontWeight: 'bold', color: theme.colors.text, textAlign: 'center', marginTop: 20, paddingHorizontal: 20 },
   statsGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30 },
   statCard:          { backgroundColor: '#16213e', borderRadius: 15, padding: 20, width: '48%', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
   statCardAlert:     { borderColor: '#d9534f', borderWidth: 2 },
   statNumber:        { fontSize: 32, fontWeight: 'bold', marginBottom: 5 },
-  statLabel:         { fontSize: 12, color: '#888', textAlign: 'center' },
+  statLabel:         { fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center' },
   sectionTitle:      { fontSize: 18, fontWeight: 'bold', color: '#53a8b6', marginBottom: 15 },
   actionButton:      { backgroundColor: '#16213e', borderRadius: 15, padding: 20, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
   actionButtonAlert: { borderColor: '#d9534f', borderWidth: 2 },
   actionIcon:        { fontSize: 30, marginRight: 15 },
   actionContent:     { flex: 1 },
-  actionTitle:       { fontSize: 16, fontWeight: '600', color: '#eee', marginBottom: 4 },
-  actionSubtitle:    { fontSize: 12, color: '#888' },
+  actionTitle:       { fontSize: 16, fontWeight: '600', color: theme.colors.text, marginBottom: 4 },
+  actionSubtitle:    { fontSize: 12, color: theme.colors.textSecondary },
   actionArrow:       { fontSize: 20, color: '#53a8b6' },
   backButton:        { marginTop: 20, paddingVertical: 15, alignItems: 'center' },
   backButtonText:    { color: '#53a8b6', fontSize: 16 },
-});
+}));

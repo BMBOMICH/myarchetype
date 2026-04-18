@@ -61,13 +61,13 @@ async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyProfile 
   try {
     const headers = { Authorization: `Bearer ${accessToken}` };
     const [profileRes, artistsRes, tracksRes] = await Promise.all([
-      fetch('https://api.spotify.com/v1/me', { headers }),
+      fetch('https://api.spotify.com/v1/me', { headers }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
       fetch('https://api.spotify.com/v1/me/top/artists?limit=10&time_range=medium_term', { headers }),
       fetch('https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=medium_term', { headers }),
     ]);
     if (!profileRes.ok) { logger.error('[Spotify] Profile fetch failed:', profileRes.status); return null; }
     const [profile, artistsData, tracksData] = await Promise.all([
-      profileRes.json() as Promise<SpotifyProfileApiResponse>,
+      profileRes.json().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) as Promise<SpotifyProfileApiResponse>,
       artistsRes.ok ? artistsRes.json() as Promise<SpotifyTopArtistsResponse> : Promise.resolve({ items: [] }),
       tracksRes.ok ? tracksRes.json() as Promise<SpotifyTopTracksResponse> : Promise.resolve({ items: [] }),
     ]);

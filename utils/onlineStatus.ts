@@ -2,7 +2,6 @@ import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { logger } from './logger';
 
-// ─── Firestore timestamp shape ────────────────────────────
 interface FirestoreTimestamp {
   toDate: () => Date;
 }

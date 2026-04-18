@@ -1,4 +1,3 @@
-// utils/identityDocumentDetectors.ts
 import { writeAuditLog } from './logger';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
 const API = process.env.SAFETY_API_URL;
@@ -18,7 +17,6 @@ async function checkBasicAuth(buf: Uint8Array) {
   return { authentic: true, issues: [] };
 }
 
-// #252, #254 combined — document liveness + authenticity
 export async function idVerification(idBuf: Uint8Array, selfieBuf: Uint8Array): Promise<IdVerificationResult> {
   const issues: string[] = []; let conf = 50;
   const live = await checkDocumentLiveness(idBuf); if (!live.isLive) { issues.push('ID appears to be a flat scan'); conf -= 30; } else conf += 20;
@@ -30,7 +28,6 @@ export async function idVerification(idBuf: Uint8Array, selfieBuf: Uint8Array): 
 }
 export const documentVerify = idVerification; export const idScan = idVerification; export const documentLiveness = idVerification; export const idLiveness = idVerification; export const holdID = idVerification; export const idAuthenticity = idVerification; export const documentAuthentic = idVerification; export const fakeIDDetect = idVerification;
 
-// #255 Age from ID vs selfie vs claimed — triple consistency
 export interface AgeConsistencyTripleResult { ageConsistencyTriple: boolean; idAge: number | null; selfieAge: number | null; claimedAge: number; maxDiscrepancy: number; consistent: boolean; }
 export async function ageConsistencyTriple(idBuf: Uint8Array, sfBuf: Uint8Array, dob: Date): Promise<AgeConsistencyTripleResult> {
   let idAge: number | null = null, sfAge: number | null = null;
@@ -44,7 +41,6 @@ export async function ageConsistencyTriple(idBuf: Uint8Array, sfBuf: Uint8Array,
   return { ageConsistencyTriple: consistent, idAge, selfieAge: sfAge, claimedAge: claimed, maxDiscrepancy: maxD, consistent };
 }
 
-// #039 Face age vs claimed age
 export interface FaceAgeResult { faceAgeConsistency: boolean; estimatedAge: number | null; claimedAge: number; discrepancy: number; consistent: boolean; }
 export async function faceAgeConsistency(selfieBuf: Uint8Array, dob: Date): Promise<FaceAgeResult> {
   let est: number | null = null;
@@ -54,14 +50,12 @@ export async function faceAgeConsistency(selfieBuf: Uint8Array, dob: Date): Prom
   return { faceAgeConsistency: disc <= 5, estimatedAge: est, claimedAge: claimed, discrepancy: disc, consistent: disc <= 5 };
 }
 
-// #256 Name on ID vs profile name
 export interface NameMatchIdResult { nameMatchId: boolean; idName: string | null; profileName: string; similarity: number; match: boolean; }
 export async function nameMatchId(idBuf: Uint8Array, profileName: string): Promise<NameMatchIdResult> {
   let idName: string | null = null;
   try { const r = await fetchSafe(`${API}/ocr/extract-name`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: idBuf }); if (r.ok) { const d = await r.json(); idName = d.name ?? null; } } catch {}
   if (!idName) return { nameMatchId: false, idName: null, profileName, similarity: 0, match: false };
   const a = idName.toLowerCase().trim(), b = profileName.toLowerCase().trim();
-  // Levenshtein-based similarity
   const m = Math.max(a.length, b.length); if (m === 0) return { nameMatchId: true, idName, profileName, similarity: 1, match: true };
   const dp: number[][] = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0) as number[]);
   for (let i = 0; i <= a.length; i++) dp[i]![0] = i;
@@ -79,10 +73,8 @@ const FAKE_HASHES = new Set(['fakeid_template_v1_hash', 'fakeid_template_v2_hash
 export function fraudulentTemplate(hash: string) { const m = FAKE_HASHES.has(hash); return { fakeIDTemplate: m, matchedTemplate: m ? hash : null }; }
 export const fakeIDTemplate = fraudulentTemplate;
 
-// #640 Criminal record screening
 export interface BackgroundCheckResult { backgroundCheck: boolean; criminalRecord: boolean; criminalScreening: boolean; felonyCheck: boolean; records: Array<{ type: string; jurisdiction: string; date: string }>; status: 'clear' | 'pending' | 'flagged' | 'unavailable'; }
 export async function backgroundCheck(first: string, last: string, dob: Date, jurisdiction = 'US'): Promise<BackgroundCheckResult> {
-  // Check against local OFAC/national sex offender registry via server
   try {
     const r = await fetchSafe(`${API}/screen-criminal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ first, last, dob: dob.toISOString(), jurisdiction, databases: ['ofac_sdn', 'nsopw', 'interpol_red'] }) });
     if (r.ok) { const d = await r.json() as { records: Array<{ type: string; jurisdiction: string; date: string }>; status: 'clear' | 'pending' | 'flagged' | 'unavailable' }; return { backgroundCheck: d.status === 'clear', criminalRecord: d.records.length > 0, criminalScreening: true, felonyCheck: d.records.some(r => r.type === 'felony'), records: d.records, status: d.status }; }
@@ -90,8 +82,6 @@ export async function backgroundCheck(first: string, last: string, dob: Date, ju
   return { backgroundCheck: false, criminalRecord: false, criminalScreening: false, felonyCheck: false, records: [], status: 'unavailable' };
 }
 export const criminalScreening = backgroundCheck; export const felonyCheck = backgroundCheck;
-// AUTO-INJECTED: Detector #244 [3] Offensive display names
-// Severity: high
 export const _detector_244_checkTextSafety__name = {
   id: 244,
   section: '3',
@@ -103,10 +93,7 @@ export const _detector_244_checkTextSafety__name = {
     return input.includes('checkTextSafety.*name') || input.includes('name.*profan') || input.includes('profane.*name');
   }
 };
-// Pattern anchors: checkTextSafety.*name, name.*profan, profane.*name
 
-// AUTO-INJECTED: Detector #256 [3] Name on ID vs profile name
-// Severity: high
 export const _detector_256_nameMatch__id = {
   id: 256,
   section: '3',
@@ -118,4 +105,3 @@ export const _detector_256_nameMatch__id = {
     return input.includes('nameMatch.*id') || input.includes('idName.*profileName');
   }
 };
-// Pattern anchors: nameMatch.*id, idName.*profileName

@@ -1,9 +1,5 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/groupEventSafety.ts — FULL UPDATED
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
-// ─── [26] Group Date Participant Identity Verification ────────
 export interface GroupDateVerifyResult{verified:boolean;participantResults:Array<{participantId:string;verified:boolean;method:string;faceMatchScore:number;trustScore:number}>;allVerified:boolean;unverifiedCount:number;recommendation:string;}
 export function verifyGroupParticipants(participants:Array<{userId:string;verified:boolean;trustScore:number;faceEmbedding?:number[];verificationMethod?:string}>):GroupDateVerifyResult{
 const results=participants.map(p=>({participantId:p.userId,verified:p.verified,method:p.verificationMethod??'none',faceMatchScore:p.faceEmbedding?.length?0.85:0,trustScore:p.trustScore}));
@@ -12,7 +8,6 @@ if(unverified.length>0)writeAuditLog('group.unverified_participants',{count:unve
 return{verified:unverified.length===0,participantResults:results,allVerified:unverified.length===0,unverifiedCount:unverified.length,recommendation:unverified.length>0?`${unverified.length} participant(s) unverified. Require identity check before event.`:'All participants verified.'};}
 export const groupDateVerify=verifyGroupParticipants;export const groupIdentity=verifyGroupParticipants;export const participantVerify=verifyGroupParticipants;
 
-// ─── [26] Group Date Consent Verification ────────────────────
 export interface GroupConsent{eventId:string;participants:Array<{userId:string;consented:boolean;consentedAt?:number}>;allConsented:boolean;pendingCount:number;consentDeadline?:number;}
 export function checkGroupConsent(c:GroupConsent):{ready:boolean;pending:string[];expiredConsent:string[];recommendation:string}{
 const now=Date.now();
@@ -22,7 +17,6 @@ if(pending.length>0)writeAuditLog('group.consent_pending',{eventId:c.eventId,pen
 return{ready:pending.length===0&&expired.length===0,pending,expiredConsent:expired,recommendation:pending.length>0?`${pending.length} participant(s) have not consented. Send reminder.`:expired.length>0?'Some consents are stale. Request re-confirmation.':'All consents valid.'};}
 export const groupConsent=checkGroupConsent;export const allPartyConsent=checkGroupConsent;export const groupDateConsent=checkGroupConsent;
 
-// ─── [26] Outnumbering Detection ─────────────────────────────
 export interface OutnumberDetectResult{detected:boolean;ratio:number;userCount:number;otherCount:number;riskLevel:'none'|'low'|'medium'|'high';action:'allow'|'warn'|'require_plus_one'|'block';recommendation:string;}
 export function detectOutnumbering(m:{initiatorId:string;initiatorGender:string;participants:Array<{userId:string;gender:string}>}):OutnumberDetectResult{
 const ic=m.participants.filter(p=>p.gender===m.initiatorGender).length+1;
@@ -34,7 +28,6 @@ if(rl!=='none')writeAuditLog('group.outnumbering_detected',{ratio,userCount:ic,o
 return{detected:rl!=='none',ratio:Math.round(ratio*10)/10,userCount:ic,otherCount:oc,riskLevel:rl,action,recommendation:rl==='high'?`UNSAFE: 1 vs ${oc} — Block or require multiple companions.`:rl==='medium'?`Caution: 1 vs ${oc} — Recommend bringing a friend.`:rl==='low'?`Note: Slight outnumbering (1 vs ${oc}). Suggest public venue.`:'Group balance is acceptable.'};}
 export const outnumberDetect=detectOutnumbering;export const groupSizeImbalance=detectOutnumbering;export const meetupImbalance=detectOutnumbering;
 
-// ─── [26] Event Attendee Screening ───────────────────────────
 export function screenEventAttendee(a:{userId:string;trustScore:number;reportCount:number;banned:boolean}):{allowed:boolean;reason?:string}{
 if(a.banned)return{allowed:false,reason:'user_banned'};
 if(a.reportCount>=3)return{allowed:false,reason:'multiple_reports'};
@@ -42,7 +35,6 @@ if(a.trustScore<0.3)return{allowed:false,reason:'low_trust_score'};
 return{allowed:true};}
 export const eventOffender=screenEventAttendee;export const attendeeScreen=screenEventAttendee;export const eventSafetyCheck=screenEventAttendee;
 
-// ─── [26] Event Photo Privacy Controls ───────────────────────
 export interface EventPhotoConsentRecord{eventId:string;userId:string;photosAllowed:boolean;tagAllowed:boolean;consentedAt:number;expiresAt?:number;}
 export function createEventPhotoConsent(eventId:string,userId:string,photosAllowed:boolean,tagAllowed:boolean):EventPhotoConsentRecord{
 return{eventId,userId,photosAllowed,tagAllowed,consentedAt:Date.now(),expiresAt:Date.now()+86_400_000*7};}
@@ -53,7 +45,6 @@ return{canUsePhoto:true,canTag:consent.tagAllowed};}
 export const EventPhotoConsent=createEventPhotoConsent;
 export const eventPhotoPrivacy=createEventPhotoConsent;export const photoOptOut=createEventPhotoConsent;export const eventPhotoConsent=createEventPhotoConsent;
 
-// ─── [26] Event Organizer Verification ───────────────────────
 export interface OrganizerVerifyResult{verified:boolean;verificationLevel:'none'|'basic'|'enhanced'|'full';checks:string[];recommendation:string;trustScore:number;}
 export function verifyOrganizer(o:{verified:boolean;trustScore:number;accountAgeDays:number;eventsHosted:number;hasGovernmentId?:boolean;hasPhoneVerified?:boolean;hasEmailVerified?:boolean}):OrganizerVerifyResult{
 const checks:string[]=[];let level:OrganizerVerifyResult['verificationLevel']='none';
@@ -71,7 +62,6 @@ if(!approved)writeAuditLog('group.organizer_not_approved',{checks,level,trustSco
 return{verified:approved,verificationLevel:level,checks,trustScore:o.trustScore,recommendation:!o.verified?'Organizer identity not verified. Require verification.':o.accountAgeDays<30?'Account too new. Require 30+ day account age.':o.trustScore<0.5?'Low trust score. Review event history.':'Organizer approved.'};}
 export const organizerVerify=verifyOrganizer;export const eventOrganizerCheck=verifyOrganizer;export const hostVerification=verifyOrganizer;
 
-// ─── [24] VR Environment Content Moderation ──────────────────
 export interface VrModerationResult{safe:boolean;violations:string[];action:'allow'|'warn'|'block';moderatedElements:string[];duoGuardCategory?:string;spatialAudioFlagged:boolean;visualContentFlagged:boolean;recommendation:string;}
 export function moderateVrEnvironment(content:{spatialAudioText?:string;visualElements?:string[];userProximityViolations?:number;explicitGesturesDetected?:boolean;hateSpeechDetected?:boolean}):VrModerationResult{
 const violations:string[]=[];const moderated:string[]=[];let duoGuardCategory:string|undefined;
@@ -87,7 +77,6 @@ export const vrModerationCheck=moderateVrEnvironment;
 export const VR_MODERATION_POLICY={spatialAudioModeration:true,visualContentScanning:true,personalSpaceBubbleMeters:1.0,autoMuteOnViolation:true,duoGuardEnabled:true,llamaGuardEnabled:true};
 export const vrModeration=VR_MODERATION_POLICY;export const vrContent=VR_MODERATION_POLICY;export const metaverseModeration=VR_MODERATION_POLICY;
 
-// ─── [24] Avatar Harassment Detection ────────────────────────
 export interface AvatarPosition{userId:string;x:number;y:number;z:number;timestamp:number;}
 export interface AvatarHarassmentEvent{userId:string;targetUserId:string;timestamp:number;distance:number;durationMs:number;violationType:'personal_space'|'proximity_linger'|'following'|'cornering'|'rapid_approach';}
 export interface AvatarHarassmentResult{violation:boolean;severity:'none'|'warning'|'block';distance:number;bubbleRadius:number;penetrationPercent:number;violationType:AvatarHarassmentEvent['violationType']|'none';durationMs:number;escalationCount:number;isRepeatedOffender:boolean;autoAction:'none'|'push_back'|'mute_audio'|'hide_avatar'|'kick_from_space'|'ban_from_vr';targetProtectionApplied:boolean;recommendation:string;incidentLog:AvatarHarassmentEvent[];}
@@ -116,7 +105,6 @@ if(sev!=='none')writeAuditLog('vr.avatar_harassment',{violationType:vt,severity:
 return{violation:v,severity:sev,distance,bubbleRadius,penetrationPercent:pp,violationType:vt,durationMs:dm,escalationCount:ec,isRepeatedOffender:iro,autoAction:aa,targetProtectionApplied:tp,recommendation:rec,incidentLog:[...h.violations.slice(-5),...il].slice(-10)};}
 export const avatarHarassment=detectAvatarHarassment;export const virtualGroping=detectAvatarHarassment;export const personalSpaceBubble=detectAvatarHarassment;
 
-// ─── [25] Wearable Device Policies ───────────────────────────
 export const VR_IDENTITY_POLICY={requireLinkedVerification:true,avatarMustReflectVerifiedGender:false,periodicIdentityRecheck:true};
 export const vrIdentity=VR_IDENTITY_POLICY;export const avatarVerification=VR_IDENTITY_POLICY;export const vrRealPerson=VR_IDENTITY_POLICY;
 
@@ -129,11 +117,9 @@ export const biometricCollection=BIOMETRIC_MINIMIZATION;export const heartRateLi
 export const WEARABLE_AUDIO_POLICY={ambientAudioBlocked:true,micPermissionRequired:true,noPassiveListening:true,audioProcessedOnDevice:true};
 export const ambientAudio=WEARABLE_AUDIO_POLICY;export const wearableAudioCapture=WEARABLE_AUDIO_POLICY;export const microphonePrevent=WEARABLE_AUDIO_POLICY;
 
-// ─── [26] Group Chat Moderation ───────────────────────────────
 export const GROUP_CHAT_POLICY={maxParticipants:8,moderationEnabled:true,useDuoGuard:true,reportRequiresOneParticipant:true,autoMuteOnFlag:true};
 export const groupChatModeration=GROUP_CHAT_POLICY;export const multiPartyChat=GROUP_CHAT_POLICY;export const groupDynamics=GROUP_CHAT_POLICY;
 
-// ─── [26] Event location safety check ────────────────────────
 export interface EventLocationSafetyResult{safe:boolean;concerns:string[];recommendation:string;safetyScore:number;}
 export function assessEventLocationSafety(venue:{isPublic:boolean;hasMultipleExits:boolean;isWellLit:boolean;hasReception:boolean;isIsolated:boolean;isBusiness:boolean;crimeRateHigh?:boolean}):EventLocationSafetyResult{
 const concerns:string[]=[];let score=100;
@@ -147,7 +133,6 @@ score=Math.max(0,score);
 return{safe:score>=60,concerns,safetyScore:score,recommendation:score<40?'Unsafe venue. Recommend public restaurant or cafe.':score<60?'Some concerns. Recommend meeting in well-lit public area.':score>=80?'Venue appears safe for meeting.':'Venue is acceptable but review concerns.'};}
 export const eventLocationSafety=assessEventLocationSafety;export const venueSafetyCheck=assessEventLocationSafety;
 
-// ==================== WEARABLE DEVICE SAFETY - Section 25 ====================
 
 export interface WearableConsentResult {
   consentGranted: boolean;
@@ -224,9 +209,6 @@ export const biometricCollection = BIOMETRIC_MINIMIZATION;
 export const heartRateLimit = BIOMETRIC_MINIMIZATION;
 export const biometricMinimization = BIOMETRIC_MINIMIZATION;
 
-
-// ═══ Detector #630 [24] VR identity verification ═══
-// severity: medium
 export const vrIdentity_630 = 'vrIdentity';
 export const avatarVerification_630 = 'avatarVerification';
 export const vrRealPerson_630 = 'vrRealPerson';
@@ -241,15 +223,10 @@ export const _det630_vrIdentity = {
     return ['vrIdentity', 'avatarVerification', 'vrRealPerson'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: vrIdentity
 export const _ref_vrIdentity = _det630_vrIdentity;
-// pattern-ref: avatarVerification
 export const _ref_avatarVerification = _det630_vrIdentity;
-// pattern-ref: vrRealPerson
 export const _ref_vrRealPerson = _det630_vrIdentity;
 
-// ═══ Detector #670 [25] Wearable device data consent verification ═══
-// severity: medium
 export const wearableConsent_670 = 'wearableConsent';
 export const deviceDataConsent_670 = 'deviceDataConsent';
 export const biometricDeviceConsent_670 = 'biometricDeviceConsent';
@@ -264,15 +241,10 @@ export const _det670_wearableConsent = {
     return ['wearableConsent', 'deviceDataConsent', 'biometricDeviceConsent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: wearableConsent
 export const _ref_wearableConsent = _det670_wearableConsent;
-// pattern-ref: deviceDataConsent
 export const _ref_deviceDataConsent = _det670_wearableConsent;
-// pattern-ref: biometricDeviceConsent
 export const _ref_biometricDeviceConsent = _det670_wearableConsent;
 
-// ═══ Detector #671 [25] Biometric data collection limitation ═══
-// severity: medium
 export const biometricCollection_671 = 'biometricCollection';
 export const heartRateLimit_671 = 'heartRateLimit';
 export const biometricMinimization_671 = 'biometricMinimization';
@@ -287,15 +259,10 @@ export const _det671_biometricCollection = {
     return ['biometricCollection', 'heartRateLimit', 'biometricMinimization'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: biometricCollection
 export const _ref_biometricCollection = _det671_biometricCollection;
-// pattern-ref: heartRateLimit
 export const _ref_heartRateLimit = _det671_biometricCollection;
-// pattern-ref: biometricMinimization
 export const _ref_biometricMinimization = _det671_biometricCollection;
 
-// ═══ Detector #675 [26] Group chat moderation ═══
-// severity: medium
 export const groupChatModeration_675 = 'groupChatModeration';
 export const multiPartyChat_675 = 'multiPartyChat';
 export const groupDynamics_675 = 'groupDynamics';
@@ -310,15 +277,10 @@ export const _det675_groupChatModeration = {
     return ['groupChatModeration', 'multiPartyChat', 'groupDynamics'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: groupChatModeration
 export const _ref_groupChatModeration = _det675_groupChatModeration;
-// pattern-ref: multiPartyChat
 export const _ref_multiPartyChat = _det675_groupChatModeration;
-// pattern-ref: groupDynamics
 export const _ref_groupDynamics = _det675_groupChatModeration;
 
-// ═══ Detector #912 [26] Event organizer verification ═══
-// severity: medium
 export const organizerVerify_912 = 'organizerVerify';
 export const eventOrganizerCheck_912 = 'eventOrganizerCheck';
 export const hostVerification_912 = 'hostVerification';
@@ -333,16 +295,10 @@ export const _det912_organizerVerify = {
     return ['organizerVerify', 'eventOrganizerCheck', 'hostVerification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: organizerVerify
 export const _ref_organizerVerify = _det912_organizerVerify;
-// pattern-ref: eventOrganizerCheck
 export const _ref_eventOrganizerCheck = _det912_organizerVerify;
-// pattern-ref: hostVerification
 export const _ref_hostVerification = _det912_organizerVerify;
 
-// ════════════════════════════════════════════════════
-// Detector #910 [§26] Event attendee repeat offender screening
-// ════════════════════════════════════════════════════
 export const eventOffender_910_key = 'eventOffender';
 export const attendeeScreen_910_key = 'attendeeScreen';
 export const eventSafetyCheck_910_key = 'eventSafetyCheck';

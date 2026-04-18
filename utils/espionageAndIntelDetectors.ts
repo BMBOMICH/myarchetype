@@ -31,8 +31,6 @@ export function detectElicitation(messages: Array<{ text: string; senderId: stri
 }
 export const elicitationDetect = detectElicitation;
 
-// ═══ Detector #824 [5.10] State-sponsored honeytrap pattern ═══
-// severity: high
 export const honeytrapPattern_824 = 'honeytrapPattern';
 export const stateSponsored_824 = 'stateSponsored';
 export const espionagePattern_824 = 'espionagePattern';
@@ -47,9 +45,6 @@ export const _det824_honeytrapPattern = {
     return ['honeytrapPattern', 'stateSponsored', 'espionagePattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: honeytrapPattern
 export const _ref_honeytrapPattern = _det824_honeytrapPattern;
-// pattern-ref: stateSponsored
 export const _ref_stateSponsored = _det824_honeytrapPattern;
-// pattern-ref: espionagePattern
 export const _ref_espionagePattern = _det824_honeytrapPattern;

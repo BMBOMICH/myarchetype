@@ -58,7 +58,6 @@ export async function exitRelationshipMode(): Promise<{ success: boolean }> {
       try {
         await updateDoc(doc(db, 'users', relationship.partnerId), { relationshipStatus: deleteField(), isVisible: true });
       } catch {
-        // Partner may have already exited — safe to ignore
       }
     }
     return { success: true };

@@ -1,8 +1,6 @@
-// utils/criticalSafetyDetectors.ts
 import { createHash } from 'crypto';
 import { addDoc, collection, doc, getDoc, getDocs, getFirestore, setDoc } from 'firebase/firestore';
 
-// ─── #784 Child photo predator attraction risk ─────────────────
 export interface PredatorAttractionRiskResult {
   childPhotoRiskScore: number;
   riskFactors: string[];
@@ -51,7 +49,6 @@ export async function predatorAttractionRisk(
   return { childPhotoRiskScore: s, riskFactors: rf, recommendation, monitoringEnabled: me };
 }
 
-// ─── AI NCII hash sharing ──────────────────────────────────────
 export interface AiNciiHashSharingResult {
   pdqHash: string;
   sha256Hash: string;
@@ -123,7 +120,6 @@ async function computePdq(buf: Buffer): Promise<string> {
       }
     } catch { /* fallback below */ }
   }
-  // Fallback: local MD5-based approximation (not cryptographically equivalent to PDQ)
   return `dhash_${createHash('md5').update(buf).digest('hex')}`;
 }
 
@@ -178,7 +174,6 @@ function hamming(a: string, b: string): number {
   return d;
 }
 
-// ─── Sextortion victim support ────────────────────────────────
 export interface SextortionVictimSupportResult {
   shouldRoute: boolean;
   urgency: 'immediate' | 'high' | 'standard' | 'none';
@@ -270,7 +265,6 @@ export const sextortionSupport = sextortionVictimSupport;
 export function victimRouting(m: string, l?: string, a?: number) { return sextortionVictimSupport(m, l, a); }
 export function crisisRouting(m: string, l?: string, a?: number) { return sextortionVictimSupport(m, l, a); }
 
-// ─── #836 Off-platform sextortion continuation ────────────────
 export interface OffPlatformSextortionResult {
   offPlatformSextortion: boolean;
   sextortionWarning: string;
@@ -310,7 +304,6 @@ export function offPlatformSextortion(
   };
 }
 
-// ─── #325 Blackmail escalation trajectory ─────────────────────
 export interface BlackmailEscalationResult {
   detected: boolean;
   threatTrajectory: string[];
@@ -367,7 +360,6 @@ export function blackmailEscalation(
   return { detected: d, threatTrajectory: tt, currentStage: ms, escalationVelocity: ev, action };
 }
 
-// ─── Single parent safety ──────────────────────────────────────
 export interface SingleParentSafetyPromptResult {
   title: string;
   body: string;

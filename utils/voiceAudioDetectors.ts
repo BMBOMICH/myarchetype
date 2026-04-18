@@ -1,28 +1,23 @@
-// file: utils/voiceAudioDetectors.ts
 import { writeAuditLog } from './logger';
 
 const fetchSafe=async(u:string,o:RequestInit,t=8000):Promise<Response>=>{const c=new AbortController();const id=setTimeout(()=>c.abort(),t);try{return await fetch(u,{...o,signal:c.signal});}finally{clearTimeout(id);}};
 
 const API=process.env['EXPO_PUBLIC_API_URL']??process.env['SAFETY_API_URL']??'';
 
-// #600 voiceDeepfake — Resemble Detect + ASVspoof + WeDefense
 export interface RealtimeVoiceDeepfakeResult{liveVoiceDeepfake:boolean;confidence:number;analysisMethod:string;signals:string[];}
 export async function realtimeVoiceDeepfake(buf:ArrayBuffer):Promise<RealtimeVoiceDeepfakeResult>{
   const k=process.env['RESEMBLE_API_KEY'];
   if(!k){
-    // Fallback: WeDefense open-source
     try{const r=await fetchSafe(`${API}/audio/deepfake-detect`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:buf});if(r.ok){const d=await r.json() as{is_synthetic?:boolean;confidence?:number;signals?:string[]};return{liveVoiceDeepfake:d.is_synthetic??false,confidence:d.confidence??0,analysisMethod:'wedefense_fallback',signals:d.signals??[]};}}catch{}
     return{liveVoiceDeepfake:false,confidence:0,analysisMethod:'missing_key',signals:[]};
   }
   try{
-    // Primary: Resemble Detect (free non-commercial, up to 2min)
     const r=await fetchSafe('https://api.resembleai.com/v2/detect',{method:'POST',headers:{Authorization:`Bearer ${k}`,'Content-Type':'audio/wav'},body:buf});
     if(!r.ok)throw new Error('API error');
     const d=await r.json() as{is_deepfake?:boolean;confidence?:number;signals?:string[]};
     if(d.is_deepfake)await writeAuditLog('safety.voice_deepfake_detected',{confidence:d.confidence}).catch(()=>{});
     return{liveVoiceDeepfake:d.is_deepfake??false,confidence:d.confidence??0,analysisMethod:'resemble_detect',signals:d.signals??[]};
   }catch{
-    // Fallback: ASVspoof baselines via server
     try{const r=await fetchSafe(`${API}/audio/asvspoof`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:buf});if(r.ok){const d=await r.json() as{is_spoof?:boolean;confidence?:number};return{liveVoiceDeepfake:d.is_spoof??false,confidence:d.confidence??0,analysisMethod:'asvspoof_fallback',signals:[]};}}catch{}
     return{liveVoiceDeepfake:false,confidence:0,analysisMethod:'unavailable',signals:[]};
   }
@@ -34,7 +29,6 @@ export const syntheticVoice=realtimeVoiceDeepfake;
 export const aiVoice=realtimeVoiceDeepfake;
 export const detectVoiceDeepfake=realtimeVoiceDeepfake;
 
-// #601 voiceHarassment — Whisper → DuoGuard/Llama Guard
 export interface VoiceHarassmentResult{flagged:boolean;categories:string[];transcript?:string;severity:'none'|'low'|'medium'|'high'|'critical';action:'allow'|'warn'|'block'|'escalate';}
 export async function voiceHarassment(audioUri:string):Promise<VoiceHarassmentResult>{
   try{
@@ -51,7 +45,6 @@ export const audioHarassment=voiceHarassment;
 export const verbalAbuse=voiceHarassment;
 export const moderateVoiceNote=voiceHarassment;
 
-// #602 voiceCloning — pyannote.audio speaker verification
 export interface VoiceCloningResult{match:boolean;confidence:number;likelyCloned:boolean;method:string;}
 export async function voiceCloning(audioUri:string,enrollmentAudioUri:string):Promise<VoiceCloningResult>{
   try{
@@ -65,7 +58,6 @@ export const voiceSpoofing=voiceCloning;
 export const speakerVerify=voiceCloning;
 export const verifySpeakerIdentity=voiceCloning;
 
-// #603 audioSteganography — StegExpose + zsteg server-side
 export interface AudioStegoResult{detected:boolean;method?:string;confidence:number;payload?:string;}
 export async function audioSteganography(audioUri:string):Promise<AudioStegoResult>{
   try{
@@ -80,7 +72,6 @@ export const hiddenAudioData=audioSteganography;
 export const stegoAudio=audioSteganography;
 export const detectAudioSteganography=audioSteganography;
 
-// #604 voiceCallModeration — real-time Whisper streaming + keyword check
 export interface LiveAudioResult{flagged:boolean;reason?:string;transcript?:string;action:'allow'|'warn'|'terminate';}
 export async function voiceCallModeration(audioChunk:ArrayBuffer):Promise<LiveAudioResult>{
   try{
@@ -95,7 +86,6 @@ export const liveCallSafety=voiceCallModeration;
 export const realtimeAudio=voiceCallModeration;
 export const moderateLiveAudio=voiceCallModeration;
 
-// #605 voiceGenderEstimation — librosa pitch analysis
 export interface VoicePitchResult{estimatedPitch:number;gender?:'male'|'female'|'ambiguous';confidence:number;consistent:boolean;}
 export async function voiceGenderEstimation(audioUri:string,profileGender?:string):Promise<VoicePitchResult>{
   try{
@@ -108,7 +98,6 @@ export async function voiceGenderEstimation(audioUri:string,profileGender?:strin
 export const pitchAnalysis=voiceGenderEstimation;
 export const analyzeVoicePitch=voiceGenderEstimation;
 
-// #380 / #606 voiceNoteTranscript — Whisper (MIT)
 export interface TranscriptResult{transcript:string;language:string;confidence:number;durationSeconds:number;}
 export async function voiceNoteTranscript(audioUri:string):Promise<TranscriptResult>{
   try{
@@ -123,7 +112,6 @@ export const voiceCaption=voiceNoteTranscript;
 export const transcribeVoiceNote=voiceNoteTranscript;
 export const transcribeAudio=voiceNoteTranscript;
 
-// #607 ambientSoundLeak — background noise analysis
 export interface AmbientSoundResult{riskyEnvironment:boolean;indicators:string[];environmentType?:string;riskLevel:'none'|'low'|'medium'|'high';}
 export async function ambientSoundLeak(audioUri:string):Promise<AmbientSoundResult>{
   try{
@@ -136,7 +124,6 @@ export async function ambientSoundLeak(audioUri:string):Promise<AmbientSoundResu
 export const backgroundNoiseAnalysis=ambientSoundLeak;
 export const analyzeAmbientSound=ambientSoundLeak;
 
-// Audio fingerprinting — chromaprint/acoustid for duplicate/spam detection
 export async function fingerprintAudio(audioUri:string):Promise<string|null>{
   try{
     const r=await fetchSafe(`${API}/safety/audio-fingerprint`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioUri,tool:'chromaprint'})});
@@ -146,7 +133,6 @@ export async function fingerprintAudio(audioUri:string):Promise<string|null>{
   }catch{return null;}
 }
 
-// Audio spam detection using fingerprint comparison
 export async function audioSpamDetect(audioUri:string):Promise<{isSpam:boolean;matchCount:number;fingerprint:string|null}>{
   const fingerprint=await fingerprintAudio(audioUri);
   if(!fingerprint)return{isSpam:false,matchCount:0,fingerprint:null};
@@ -158,7 +144,6 @@ export async function audioSpamDetect(audioUri:string):Promise<{isSpam:boolean;m
   }catch{return{isSpam:false,matchCount:0,fingerprint};}
 }
 
-// DTMF / tone detection
 export function dtmfDetect(d:string):{toneDetect:boolean;touchtone:boolean;callCenterIndicator:boolean;signals:string[]}{
   const h=/dtmf|dial\s*tone|touch\s*tone|key\s*press|button.*press|automated\s*menu|press\s*\d/i.test(d);
   const cc=/call\s*center|customer\s*service|press\s*1\s*for|your\s*call\s*is\s*important/i.test(d);
@@ -169,7 +154,6 @@ export function dtmfDetect(d:string):{toneDetect:boolean;touchtone:boolean;callC
 }
 export const toneDetect=dtmfDetect;
 
-// Keyword spotting — fraud/scam/emergency keywords
 const CK=['bank account','social security','credit card','password','verification code','wire transfer','bitcoin','gift card','send money','western union','pay now','urgent','irs','arrest','warrant','suspend','romance','love you','soulmate','investment opportunity','crypto','forex','trading','inheritance','prince','lottery','won','prize','claim','verify now','act now','limited time'];
 export function keywordSpotting(t:string):{callKeyword:boolean;voiceKeyword:string[];riskLevel:'none'|'low'|'medium'|'high';categories:string[]}{
   const l=t.toLowerCase();
@@ -183,7 +167,6 @@ export function keywordSpotting(t:string):{callKeyword:boolean;voiceKeyword:stri
 export const callKeyword=keywordSpotting;
 export const voiceKeyword=keywordSpotting;
 
-// Voice stress analysis — coercion detection
 export interface VoiceStressResult{stressDetected:boolean;stressScore:number;indicators:string[];possibleCoercion:boolean;riskLevel:'none'|'low'|'medium'|'high';}
 export async function voiceStressAnalysis(url:string):Promise<VoiceStressResult>{
   try{
@@ -197,7 +180,6 @@ export async function voiceStressAnalysis(url:string):Promise<VoiceStressResult>
 }
 export const stressAnalysis=voiceStressAnalysis;
 
-// Coached response detection
 export interface CoachedResponseResult{coachedResponse:boolean;promptedAnswer:boolean;feedResponse:boolean;indicators:string[];confidence:number;}
 export function coachedResponse(a:{hasBackgroundVoices:boolean;unusualPausePattern:boolean;averagePauseLengthMs:number;whisperingDetected:boolean;consistentResponseLatency:boolean}):CoachedResponseResult{
   const i:string[]=[];
@@ -212,7 +194,6 @@ export function coachedResponse(a:{hasBackgroundVoices:boolean;unusualPausePatte
 export const promptedAnswer=coachedResponse;
 export const feedResponse=coachedResponse;
 
-// Room acoustics consistency
 export interface RoomAcousticsResult{consistent:boolean;reverbProfile:string;anomalies:string[];likelySpliced:boolean;}
 export async function roomAcousticsConsistency(audioUri:string):Promise<RoomAcousticsResult>{
   try{
@@ -225,7 +206,6 @@ export async function roomAcousticsConsistency(audioUri:string):Promise<RoomAcou
 export const reverbProfile=roomAcousticsConsistency;
 export const acousticsCheck=roomAcousticsConsistency;
 
-// Script reading detection — prosody + pause pattern
 export interface ScriptReadingResult{detected:boolean;confidence:number;indicators:string[];}
 export async function scriptReadingDetect(audioUri:string):Promise<ScriptReadingResult>{
   try{
@@ -238,7 +218,6 @@ export async function scriptReadingDetect(audioUri:string):Promise<ScriptReading
 export const prosodyCheck=scriptReadingDetect;
 export const readingDetect=scriptReadingDetect;
 
-// Voice note policy
 export const VOICE_NOTE_POLICY={
   maxDurationSeconds:120,
   requireConsentToReceive:true,
@@ -250,11 +229,10 @@ export const VOICE_NOTE_POLICY={
   requireLivenessForProfile:true,
 };
 
-// Comprehensive voice safety scan
 export interface VoiceSafetyScanResult{deepfakeDetected:boolean;multipleVoices:boolean;keywordsFound:string[];coachedResponse:boolean;stressDetected:boolean;harassmentDetected:boolean;scriptReading:boolean;overallRisk:'none'|'low'|'medium'|'high'|'critical';recommendedAction:string;categories:string[];}
 export async function scanVoiceForSafety(url:string,buf?:ArrayBuffer):Promise<VoiceSafetyScanResult>{
   const[df,sp,tr,st,har,sc]=await Promise.all([
-    buf?realtimeVoiceDeepfake(buf):Promise.resolve({liveVoiceDeepfake:false,confidence:0,analysisMethod:'skipped',signals:[]}),
+    buf?realtimeVoiceDeepfake(buf).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }):Promise.resolve({liveVoiceDeepfake:false,confidence:0,analysisMethod:'skipped',signals:[]}),
     fetchSafe(`${API}/audio/diarize`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioUrl:url})}).then(r=>r.ok?r.json() as Promise<{segments?:Array<{speaker:string;startSec:number;endSec:number}>}>:{segments:[]}).catch(()=>({segments:[]})),
     voiceNoteTranscript(url),
     voiceStressAnalysis(url),
@@ -282,8 +260,6 @@ export async function scanVoiceForSafety(url:string,buf?:ArrayBuffer):Promise<Vo
   };
 }
 
-// ═══ Detector #380 [7] NSFW speech in voice intros (audio section) ═══
-// severity: high
 export const checkNsfwSpeechVoice_380 = 'checkNsfwSpeechVoice';
 export const nsfw_speech_voice_380 = 'nsfw_speech_voice';
 export const _det380_checkNsfwSpeechVoice = {
@@ -297,13 +273,9 @@ export const _det380_checkNsfwSpeechVoice = {
     return ['checkNsfwSpeechVoice', 'nsfw_speech_voice'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkNsfwSpeechVoice
 export const _ref_checkNsfwSpeechVoice = _det380_checkNsfwSpeechVoice;
-// pattern-ref: nsfw_speech_voice
 export const _ref_nsfw_speech_voice = _det380_checkNsfwSpeechVoice;
 
-// ═══ Detector #387 [7] Emotional authenticity scoring ═══
-// severity: low
 export const emotionalAuthenticity_387 = 'emotionalAuthenticity';
 export const emotionAnalysis_387 = 'emotionAnalysis';
 export const sentimentVoice_387 = 'sentimentVoice';
@@ -318,15 +290,10 @@ export const _det387_emotionalAuthenticity = {
     return ['emotionalAuthenticity', 'emotionAnalysis', 'sentimentVoice'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emotionalAuthenticity
 export const _ref_emotionalAuthenticity = _det387_emotionalAuthenticity;
-// pattern-ref: emotionAnalysis
 export const _ref_emotionAnalysis = _det387_emotionalAuthenticity;
-// pattern-ref: sentimentVoice
 export const _ref_sentimentVoice = _det387_emotionalAuthenticity;
 
-// ═══ Detector #392 [7] DTMF tone detection (call center) ═══
-// severity: medium
 export const dtmfDetect_392 = 'dtmfDetect';
 export const toneDetect_392 = 'toneDetect';
 export const touchtone_392 = 'touchtone';
@@ -341,15 +308,10 @@ export const _det392_dtmfDetect = {
     return ['dtmfDetect', 'toneDetect', 'touchtone'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: dtmfDetect
 export const _ref_dtmfDetect = _det392_dtmfDetect;
-// pattern-ref: toneDetect
 export const _ref_toneDetect = _det392_dtmfDetect;
-// pattern-ref: touchtone
 export const _ref_touchtone = _det392_dtmfDetect;
 
-// ═══ Detector #394 [7] Echo / delay pattern detection ═══
-// severity: low
 export const echoDetect_394 = 'echoDetect';
 export const delayPattern_394 = 'delayPattern';
 export const latencyAnomaly_394 = 'latencyAnomaly';
@@ -364,9 +326,6 @@ export const _det394_echoDetect = {
     return ['echoDetect', 'delayPattern', 'latencyAnomaly'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: echoDetect
 export const _ref_echoDetect = _det394_echoDetect;
-// pattern-ref: delayPattern
 export const _ref_delayPattern = _det394_echoDetect;
-// pattern-ref: latencyAnomaly
 export const _ref_latencyAnomaly = _det394_echoDetect;

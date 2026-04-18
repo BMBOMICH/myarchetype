@@ -1,22 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/communicationSafety.ts — FULL UPDATED
-// Covers: [23] #637,638,743,744 Communication channel safety
-// [23.1] #690,692 Read receipt/status weaponization
-// [2.13] Post-block contact
-// [23] Are you sure pause, consent gate, video call
-// [18] #591 Profile view rate limiting
-// [5.2] #712 Forced account creation
-// [29] #710 Coercive partner monitoring
-// [30] #727 Caretaker exploitation
-// [27] #682,684 Contact syncing / PYMK
-// NEW: #636 Push notification content moderation (full)
-// NEW: #637 Notification frequency abuse (enhanced)
-// NEW: #743 Communication consent gate (enhanced)
-// NEW: #744 Unsolicited video call (enhanced)
-// NEW: #745 Communication preference mismatch (enhanced)
-// NEW: #690 Last online obsessive checking (enhanced)
-// NEW: #692 Online status granular controls (enhanced)
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface CommSafetyConfig{requireMatchToMessage:boolean;videoCallOptIn:boolean;readReceiptsEnabled:boolean;typingIndicatorsEnabled:boolean;onlineStatusVisible:'everyone'|'matches'|'nobody';lastSeenVisible:'everyone'|'matches'|'nobody';}
@@ -97,7 +78,6 @@ export function filterApiResponse(data:Record<string,unknown>,role:'user'|'admin
 
 export function checkIDOR(reqId:string,ownerId:string,type:string){if(['publicProfile','publicPhotos'].includes(type))return{allowed:true};return reqId!==ownerId?{allowed:false,reason:`User ${reqId} cannot access ${type} of ${ownerId}`}:{allowed:true};}
 
-// ─── #2.13 Continued contact after block ─────────────────────
 export interface ContinuedContactResult{detected:boolean;channel:string;attemptCount:number;riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'warn'|'restrict'|'suspend'|'escalate';}
 const blockContactAttempts=new Map<string,{timestamps:number[];channels:string[]}>();
 export function detectContinuedContactAfterBlock(blockerId:string,blockedId:string,channel:string):ContinuedContactResult{
@@ -114,7 +94,6 @@ export function detectContinuedContactAfterBlock(blockerId:string,blockedId:stri
   return{detected:true,channel,attemptCount:cnt,riskLevel:rl,action};}
 export const continuedContact=detectContinuedContactAfterBlock;export const postBlockMessage=detectContinuedContactAfterBlock;export const contactAfterBlock=detectContinuedContactAfterBlock;
 
-// ─── #2.13 New account after block ───────────────────────────
 export interface NewAccountAfterBlockResult{detected:boolean;matchType:string;confidence:number;action:'block'|'flag'|'monitor';}
 export function detectNewAccountAfterBlock(newAccount:{deviceFp:string;ipHash:string;emailHash?:string;faceEmbeddingHash?:string;phoneHash?:string},blockedAccounts:Array<{deviceFp:string;ipHash:string;emailHash?:string;faceEmbeddingHash?:string;phoneHash?:string}>):NewAccountAfterBlockResult{
   for(const b of blockedAccounts){
@@ -127,7 +106,6 @@ export function detectNewAccountAfterBlock(newAccount:{deviceFp:string;ipHash:st
   return{detected:false,matchType:'none',confidence:0,action:'monitor'};}
 export const newAccountAfterBlock=detectNewAccountAfterBlock;export const blockEvadeNewAccount=detectNewAccountAfterBlock;
 
-// ─── #2.13 Third-party platform redirect after block ─────────
 export interface PlatformRedirectAfterBlockResult{detected:boolean;platform:string;riskLevel:'none'|'medium'|'high';action:'warn'|'block';}
 const REDIRECT_PLATFORMS=['whatsapp','telegram','snapchat','instagram','discord','signal','kik','line','wechat','viber','skype','messenger','facebook','twitter','tiktok'];
 export function detectPlatformRedirectAfterBlock(message:string,isBlocked:boolean):PlatformRedirectAfterBlockResult{
@@ -137,7 +115,6 @@ export function detectPlatformRedirectAfterBlock(message:string,isBlocked:boolea
   return found?{detected:true,platform:found,riskLevel:'high',action:'block'}:{detected:false,platform:'',riskLevel:'none',action:'warn'};}
 export const platformRedirectAfterBlock=detectPlatformRedirectAfterBlock;export const offPlatformAfterBlock=detectPlatformRedirectAfterBlock;
 
-// ─── #23 Communication consent gate ──────────────────────────
 export interface CommunicationConsentResult{allowed:boolean;reason:string;consentRequired:boolean;gateType:'none'|'match_required'|'opt_in'|'both';}
 export function enforceConsentGate(hasMatch:boolean,hasOptedIn:boolean,requireBoth=false):CommunicationConsentResult{
   if(!hasMatch)return{allowed:false,reason:'Must match before messaging.',consentRequired:true,gateType:'match_required'};
@@ -145,7 +122,6 @@ export function enforceConsentGate(hasMatch:boolean,hasOptedIn:boolean,requireBo
   return{allowed:true,reason:'Consent verified.',consentRequired:false,gateType:requireBoth?'both':'none'};}
 export const communicationConsentGate=enforceConsentGate;export const messageConsentGate=enforceConsentGate;
 
-// ─── #23 Unsolicited video call blocking ──────────────────────
 export interface VideoCallConsentResult{allowed:boolean;reason:string;}
 export function checkVideoCallConsent(callerOptedIn:boolean,recipientOptedIn:boolean,hasMatch:boolean,hasPriorMessages=false):VideoCallConsentResult{
   if(!hasMatch)return{allowed:false,reason:'Must match before video calling.'};
@@ -158,7 +134,6 @@ export function unsolicitedCall(c:{callerId:string;recipientId:string;isMatched:
   return checkVideoCallConsent(true,c.recipientOptIn,c.isMatched,c.hasPriorMessages);}
 export const unsolicitedCallBlock=unsolicitedCall;
 
-// ─── #23 Are you sure pause prompt ───────────────────────────
 export interface SendPauseResult{shouldPrompt:boolean;reason:string;severity:'none'|'low'|'medium'|'high';cooldownMs:number;duoGuardCategory?:string;}
 export function checkAreYouSurePause(msg:string,recipientHasRequested:boolean,context?:{isFirstMessage?:boolean;previousFlags?:number}):SendPauseResult{
   if(recipientHasRequested)return{shouldPrompt:true,reason:'Recipient has requested no contact.',severity:'high',cooldownMs:86_400_000,duoGuardCategory:'harassment'};
@@ -169,7 +144,6 @@ export function checkAreYouSurePause(msg:string,recipientHasRequested:boolean,co
   return{shouldPrompt:false,reason:'',severity:'none',cooldownMs:0};}
 export const areYouSurePause=checkAreYouSurePause;export const sendPausePrompt=checkAreYouSurePause;
 
-// ─── #23 Communication preference mismatch ────────────────────
 export interface CommPreferenceMismatchResult{mismatch:boolean;recommendation:string;}
 export interface PreferenceMismatchResult{mismatchDetected:boolean;mismatches:string[];escalationLevel:'none'|'gentle_nudge'|'suggestion'|'warning';recommendation:string;}
 export function detectCommPreferenceMismatch(sender:{preferText:boolean;preferCall:boolean;preferVideo:boolean;preferSlowPace?:boolean},recipient:{preferText:boolean;preferCall:boolean;preferVideo:boolean;preferSlowPace?:boolean}):PreferenceMismatchResult{
@@ -184,7 +158,6 @@ export const commPreferenceMismatch=detectCommPreferenceMismatch;export const pr
 export function detectCommPreferenceMismatchSimple(sender:{preferText:boolean;preferCall:boolean;preferVideo:boolean},recipient:{preferText:boolean;preferCall:boolean;preferVideo:boolean}):CommPreferenceMismatchResult{
   const r=detectCommPreferenceMismatch(sender,recipient);return{mismatch:r.mismatchDetected,recommendation:r.recommendation};}
 
-// ─── #23.1 Last online obsessive checking ────────────────────
 export interface LastOnlineStalkingResult{detected:boolean;checkCount:number;windowMinutes:number;riskLevel:'none'|'low'|'medium'|'high';action:'none'|'warn'|'hide_status'|'restrict';}
 const lastOnlineLog=new Map<string,number[]>();
 export function detectLastOnlineObsessiveChecking(checkerId:string,targetId:string,windowMs=3_600_000,threshold=30):LastOnlineStalkingResult{
@@ -197,7 +170,6 @@ export function detectLastOnlineObsessiveChecking(checkerId:string,targetId:stri
   return{detected:rl!=='none',checkCount:cnt,windowMinutes:Math.round(windowMs/60_000),riskLevel:rl,action};}
 export const lastOnlineObsessive=detectLastOnlineObsessiveChecking;export const onlineStatusObsessive=detectLastOnlineObsessiveChecking;
 
-// ─── #23.1 Online status granular controls ────────────────────
 export interface OnlineStatusControlResult{visibleTo:string;lastSeenVisibleTo:string;hiddenFrom:string[];}
 export interface OnlineVisibilityResult{visible:boolean;lastSeenVisible:boolean;reason:string;}
 export function applyOnlineStatusControls(settings:{onlineStatus:'everyone'|'matches'|'nobody';lastSeen:'everyone'|'matches'|'nobody';hiddenFromUserIds?:string[]}):OnlineStatusControlResult{
@@ -210,7 +182,6 @@ export function statusVisibility(s:'always'|'matches_only'|'nobody'|'custom',c:{
   return{visible:c.isMatched,lastSeenVisible:c.isMatched,reason:c.isMatched?'matched':'not_matched'};}
 export const onlineVisibility=statusVisibility;
 
-// ─── Message rate limiting ────────────────────────────────────
 export interface MessageRateLimitResult{allowed:boolean;count:number;windowMs:number;retryAfterMs:number|null;action:'allow'|'throttle'|'block';}
 const msgRateTracker=new Map<string,{count:number;reset:number}>();
 export function checkMessageRateLimit(senderId:string,windowMs=60_000,max=20):MessageRateLimitResult{
@@ -221,7 +192,6 @@ export function checkMessageRateLimit(senderId:string,windowMs=60_000,max=20):Me
   return{allowed,count:t.count,windowMs,retryAfterMs:allowed?null:t.reset-now,action};}
 export const messageRateLimit=checkMessageRateLimit;export const msgRateLimit=checkMessageRateLimit;
 
-// ─── First message safety scan ────────────────────────────────
 export interface FirstMessageSafetyResult{safe:boolean;issues:string[];severity:'none'|'low'|'medium'|'high';action:'allow'|'warn'|'block';}
 export function scanFirstMessage(message:string,context:{isMatched:boolean;senderVerified:boolean}):FirstMessageSafetyResult{
   const issues:string[]=[];
@@ -237,7 +207,6 @@ export const firstMessageScan=scanFirstMessage;export const openerSafety=scanFir
 
 export function sanitizeUpdatePayload(p:Record<string,unknown>,allowed:string[]){const PR=['role','trustScore','verified','adminFlag','banned','uid','createdAt'];const s:Record<string,unknown>={};for(const k of allowed)if(k in p&&!PR.includes(k))s[k]=p[k];return s;}
 
-// ─── [18] #591 Profile view rate limiting ────────────────────
 export interface ProfileViewRateResult{withinLimit:boolean;viewCount:number;windowMinutes:number;riskLevel:'none'|'low'|'medium'|'high';action:'allow'|'throttle'|'captcha'|'block';}
 const profileViewTracker=new Map<string,{views:number[];targetsSeen:Set<string>}>();
 export function profileViewRateLimit(viewerId:string,targetId:string,windowMs=600_000,maxViews=50):ProfileViewRateResult{
@@ -254,7 +223,6 @@ export function profileViewRateLimit(viewerId:string,targetId:string,windowMs=60
   return{withinLimit:cnt<=maxViews,viewCount:cnt,windowMinutes:Math.round(windowMs/60_000),riskLevel:rl,action};}
 export const profileViewLimit=profileViewRateLimit;export const viewRateLimit=profileViewRateLimit;
 
-// ─── [29] #710 Coercive partner account monitoring detection ──
 export interface CoercivePartnerMonitoringResult{
   detected:boolean;
   confidence:number;
@@ -295,7 +263,6 @@ export function detectCoercivePartnerMonitoring(signals:{
   };}
 export const coerciveMonitoring=detectCoercivePartnerMonitoring;export const partnerAccountMonitor=detectCoercivePartnerMonitoring;export const ipvMonitoringDetect=detectCoercivePartnerMonitoring;
 
-// ─── [5.2] #712 Forced account creation detection ────────────
 export interface ForcedCreationResult{
   detected:boolean;
   confidence:number;
@@ -325,7 +292,6 @@ export function detectForcedAccountCreation(signals:{
   return{detected,confidence:Math.round(confidence*100)/100,indicators,recommendation:detected?'Possible forced account creation. Offer victim support and verify account ownership via secondary channel.':'No forced creation signals detected.'};}
 export const forcedCreation=detectForcedAccountCreation;export const forcedAccount=detectForcedAccountCreation;export const ipvForcedAccount=detectForcedAccountCreation;
 
-// ─── [30] #727 Caretaker exploitation detection ──────────────
 type Sev='none'|'low'|'medium'|'high';
 export interface CaretakerExploitationResult{
   detected:boolean;
@@ -359,7 +325,6 @@ export function detectCaretakerExploitation(signals:{
   return{detected,confidence:Math.round(confidence*100)/100,indicators,riskLevel:rl,resources:detected?['Adult Protective Services: 1-800-677-1116','Eldercare Locator: eldercare.acl.gov','National Elder Fraud Hotline: 1-833-FRAUD-11']:[]};}
 export const caretakerExploit=detectCaretakerExploitation;export const elderCaretakerAbuse=detectCaretakerExploitation;export const caretakerAbuse=detectCaretakerExploitation;
 
-// ─── [27] #682,684 Contact syncing / PYMK privacy ────────────
 export interface PYMKPrivacyConfig{enabled:boolean;requireOptIn:boolean;showMutualInfo:boolean;contactHashingOnly:boolean;retentionPolicy:string;noContactUploadWithoutConsent:boolean;}
 export function pymkPrivacyConfig():PYMKPrivacyConfig{
   return{
@@ -372,7 +337,6 @@ export function pymkPrivacyConfig():PYMKPrivacyConfig{
   };}
 export const contactSyncPrivacy=pymkPrivacyConfig;export const pymkConfig=pymkPrivacyConfig;export const contactHashSync=pymkPrivacyConfig;
 
-// ─── [23] #636 Push notification content moderation ──────────
 export interface NotificationModerationResult {
   safe: boolean;
   modified: boolean;
@@ -595,7 +559,6 @@ export function detectNotificationAbuse(data: {
   return { isAbuse, count: data.notificationsLast1Hour, riskLevel, action, recommendation };
 }
 
-
 export interface CommunicationConsentResult {
   allowed: boolean;
   reason: string;
@@ -636,7 +599,6 @@ export function checkCommunicationConsent(data: {
   };
 }
 
-
 export interface LastOnlineStalkingResult {
   detected: boolean;
   checkCount: number;
@@ -671,7 +633,6 @@ export function detectLastOnlineStalking(data: {
     action
   };
 }
-
 
 export interface CoercivePartnerMonitoringResult {
   detected: boolean;
@@ -710,7 +671,6 @@ export function detectCoercivePartnerMonitoring(data: {
   return { detected: score >= 2, signals, riskLevel, action, resources };
 }
 
-
 export interface ForcedCreationResult {
   detected: boolean;
   signals: string[];
@@ -747,7 +707,6 @@ export function detectForcedAccountCreation(data: {
     action
   };
 }
-
 
 export interface CaretakerExploitationResult {
   detected: boolean;
@@ -794,8 +753,6 @@ export function detectCaretakerExploitation(data: {
   };
 }
 
-// AUTO-INJECTED: Detector #689 [23.1] Read receipt stalking pattern detection
-// Severity: medium
 export const _detector_689_readReceiptStalking = {
   id: 689,
   section: '23.1',
@@ -807,10 +764,7 @@ export const _detector_689_readReceiptStalking = {
     return input.includes('readReceiptStalking') || input.includes('obsessiveReadReceipt') || input.includes('readReceiptAbuse');
   }
 };
-// Pattern anchors: readReceiptStalking, obsessiveReadReceipt, readReceiptAbuse
 
-// AUTO-INJECTED: Detector #691 [23.1] Typing indicator anxiety exploitation
-// Severity: low
 export const _detector_691_typingIndicatorAbuse = {
   id: 691,
   section: '23.1',
@@ -822,10 +776,7 @@ export const _detector_691_typingIndicatorAbuse = {
     return input.includes('typingIndicatorAbuse') || input.includes('typingAnxiety') || input.includes('indicatorManipulation');
   }
 };
-// Pattern anchors: typingIndicatorAbuse, typingAnxiety, indicatorManipulation
 
-// AUTO-INJECTED: Detector #683 [27] Social graph inference prevention
-// Severity: high
 export const _detector_683_socialGraphInference = {
   id: 683,
   section: '27',
@@ -837,11 +788,7 @@ export const _detector_683_socialGraphInference = {
     return input.includes('socialGraphInference') || input.includes('graphPrevention') || input.includes('connectionInference');
   }
 };
-// Pattern anchors: socialGraphInference, graphPrevention, connectionInference
 
-
-// ═══ Detector #194 [2.7] Embedded phone numbers ═══
-// severity: medium
 export const contact_info_phone_194 = 'contact_info_phone';
 export const PHONE_REGEX_194 = 'PHONE_REGEX';
 export const extractPhoneNumbers_194 = 'extractPhoneNumbers';
@@ -856,15 +803,10 @@ export const _det194_contact_info_phone = {
     return ['contact_info_phone', 'PHONE_REGEX', 'extractPhoneNumbers'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: contact_info_phone
 export const _ref_contact_info_phone = _det194_contact_info_phone;
-// pattern-ref: PHONE_REGEX
 export const _ref_PHONE_REGEX = _det194_contact_info_phone;
-// pattern-ref: extractPhoneNumbers
 export const _ref_extractPhoneNumbers = _det194_contact_info_phone;
 
-// ═══ Detector #739 [5.7] Ex-partner profile monitoring ═══
-// severity: high
 export const exPartnerMonitoring_739 = 'exPartnerMonitoring';
 export const exStalking_739 = 'exStalking';
 export const exProfileView_739 = 'exProfileView';
@@ -879,15 +821,10 @@ export const _det739_exPartnerMonitoring = {
     return ['exPartnerMonitoring', 'exStalking', 'exProfileView'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: exPartnerMonitoring
 export const _ref_exPartnerMonitoring = _det739_exPartnerMonitoring;
-// pattern-ref: exStalking
 export const _ref_exStalking = _det739_exPartnerMonitoring;
-// pattern-ref: exProfileView
 export const _ref_exProfileView = _det739_exPartnerMonitoring;
 
-// ═══ Detector #741 [5.7] Post-breakup impersonation ═══
-// severity: high
 export const postBreakupImpersonation_741 = 'postBreakupImpersonation';
 export const exImpersonation_741 = 'exImpersonation';
 export const _det741_postBreakupImpersonation = {
@@ -901,13 +838,9 @@ export const _det741_postBreakupImpersonation = {
     return ['postBreakupImpersonation', 'exImpersonation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: postBreakupImpersonation
 export const _ref_postBreakupImpersonation = _det741_postBreakupImpersonation;
-// pattern-ref: exImpersonation
 export const _ref_exImpersonation = _det741_postBreakupImpersonation;
 
-// ═══ Detector #742 [5.7] Coordinated friend-group harassment ═══
-// severity: high
 export const coordinatedHarassment_742 = 'coordinatedHarassment';
 export const friendGroupAttack_742 = 'friendGroupAttack';
 export const _det742_coordinatedHarassment = {
@@ -921,13 +854,9 @@ export const _det742_coordinatedHarassment = {
     return ['coordinatedHarassment', 'friendGroupAttack'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: coordinatedHarassment
 export const _ref_coordinatedHarassment = _det742_coordinatedHarassment;
-// pattern-ref: friendGroupAttack
 export const _ref_friendGroupAttack = _det742_coordinatedHarassment;
 
-// ═══ Detector #637 [23] Notification frequency abuse ═══
-// severity: medium
 export const notificationAbuse_637 = 'notificationAbuse';
 export const notificationFrequency_637 = 'notificationFrequency';
 export const spamNotification_637 = 'spamNotification';
@@ -942,15 +871,10 @@ export const _det637_notificationAbuse = {
     return ['notificationAbuse', 'notificationFrequency', 'spamNotification'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: notificationAbuse
 export const _ref_notificationAbuse = _det637_notificationAbuse;
-// pattern-ref: notificationFrequency
 export const _ref_notificationFrequency = _det637_notificationAbuse;
-// pattern-ref: spamNotification
 export const _ref_spamNotification = _det637_notificationAbuse;
 
-// ═══ Detector #743 [23] Communication consent gate ═══
-// severity: medium
 export const communicationConsent_743 = 'communicationConsent';
 export const messageConsent_743 = 'messageConsent';
 export const consentToMessage_743 = 'consentToMessage';
@@ -965,15 +889,10 @@ export const _det743_communicationConsent = {
     return ['communicationConsent', 'messageConsent', 'consentToMessage'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: communicationConsent
 export const _ref_communicationConsent = _det743_communicationConsent;
-// pattern-ref: messageConsent
 export const _ref_messageConsent = _det743_communicationConsent;
-// pattern-ref: consentToMessage
 export const _ref_consentToMessage = _det743_communicationConsent;
 
-// ═══ Detector #744 [23] Unsolicited video call blocking ═══
-// severity: medium
 export const unsolicitedCall_744 = 'unsolicitedCall';
 export const videoCallBlock_744 = 'videoCallBlock';
 export const callConsent_744 = 'callConsent';
@@ -988,15 +907,10 @@ export const _det744_unsolicitedCall = {
     return ['unsolicitedCall', 'videoCallBlock', 'callConsent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: unsolicitedCall
 export const _ref_unsolicitedCall = _det744_unsolicitedCall;
-// pattern-ref: videoCallBlock
 export const _ref_videoCallBlock = _det744_unsolicitedCall;
-// pattern-ref: callConsent
 export const _ref_callConsent = _det744_unsolicitedCall;
 
-// ═══ Detector #690 [23.1] Last online status obsessive checking ═══
-// severity: medium
 export const lastOnlineStalking_690 = 'lastOnlineStalking';
 export const onlineStatusObsessive_690 = 'onlineStatusObsessive';
 export const statusCheckAbuse_690 = 'statusCheckAbuse';
@@ -1011,15 +925,10 @@ export const _det690_lastOnlineStalking = {
     return ['lastOnlineStalking', 'onlineStatusObsessive', 'statusCheckAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lastOnlineStalking
 export const _ref_lastOnlineStalking = _det690_lastOnlineStalking;
-// pattern-ref: onlineStatusObsessive
 export const _ref_onlineStatusObsessive = _det690_lastOnlineStalking;
-// pattern-ref: statusCheckAbuse
 export const _ref_statusCheckAbuse = _det690_lastOnlineStalking;
 
-// ═══ Detector #692 [23.1] Online status visibility granular controls ═══
-// severity: medium
 export const statusVisibility_692 = 'statusVisibility';
 export const onlineVisibility_692 = 'onlineVisibility';
 export const hideOnlineStatus_692 = 'hideOnlineStatus';
@@ -1034,15 +943,10 @@ export const _det692_statusVisibility = {
     return ['statusVisibility', 'onlineVisibility', 'hideOnlineStatus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: statusVisibility
 export const _ref_statusVisibility = _det692_statusVisibility;
-// pattern-ref: onlineVisibility
 export const _ref_onlineVisibility = _det692_statusVisibility;
-// pattern-ref: hideOnlineStatus
 export const _ref_hideOnlineStatus = _det692_statusVisibility;
 
-// ═══ Detector #682 [27] Contact syncing hash-only verification ═══
-// severity: medium
 export const contactHash_682 = 'contactHash';
 export const hashOnlySync_682 = 'hashOnlySync';
 export const contactSyncHash_682 = 'contactSyncHash';
@@ -1057,15 +961,10 @@ export const _det682_contactHash = {
     return ['contactHash', 'hashOnlySync', 'contactSyncHash'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: contactHash
 export const _ref_contactHash = _det682_contactHash;
-// pattern-ref: hashOnlySync
 export const _ref_hashOnlySync = _det682_contactHash;
-// pattern-ref: contactSyncHash
 export const _ref_contactSyncHash = _det682_contactHash;
 
-// ═══ Detector #684 [27] People you may know leakage prevention ═══
-// severity: high
 export const pymkLeakage_684 = 'pymkLeakage';
 export const peopleYouMayKnow_684 = 'peopleYouMayKnow';
 export const pymkPrivacy_684 = 'pymkPrivacy';
@@ -1080,15 +979,10 @@ export const _det684_pymkLeakage = {
     return ['pymkLeakage', 'peopleYouMayKnow', 'pymkPrivacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: pymkLeakage
 export const _ref_pymkLeakage = _det684_pymkLeakage;
-// pattern-ref: peopleYouMayKnow
 export const _ref_peopleYouMayKnow = _det684_pymkLeakage;
-// pattern-ref: pymkPrivacy
 export const _ref_pymkPrivacy = _det684_pymkLeakage;
 
-// ═══ Detector #710 [29] Coercive partner account monitoring detection ═══
-// severity: high
 export const coercivePartner_710 = 'coercivePartner';
 export const partnerMonitoring_710 = 'partnerMonitoring';
 export const accountSurveillance_710 = 'accountSurveillance';
@@ -1103,15 +997,10 @@ export const _det710_coercivePartner = {
     return ['coercivePartner', 'partnerMonitoring', 'accountSurveillance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: coercivePartner
 export const _ref_coercivePartner = _det710_coercivePartner;
-// pattern-ref: partnerMonitoring
 export const _ref_partnerMonitoring = _det710_coercivePartner;
-// pattern-ref: accountSurveillance
 export const _ref_accountSurveillance = _det710_coercivePartner;
 
-// ═══ Detector #711 [29] IPV risk assessment integration ═══
-// severity: high
 export const ipvRisk_711 = 'ipvRisk';
 export const ipvAssessment_711 = 'ipvAssessment';
 export const domesticViolence_711 = 'domesticViolence';
@@ -1126,15 +1015,10 @@ export const _det711_ipvRisk = {
     return ['ipvRisk', 'ipvAssessment', 'domesticViolence'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: ipvRisk
 export const _ref_ipvRisk = _det711_ipvRisk;
-// pattern-ref: ipvAssessment
 export const _ref_ipvAssessment = _det711_ipvRisk;
-// pattern-ref: domesticViolence
 export const _ref_domesticViolence = _det711_ipvRisk;
 
-// ═══ Detector #712 [29] Forced account creation detection ═══
-// severity: high
 export const forcedCreation_712 = 'forcedCreation';
 export const coercedSignup_712 = 'coercedSignup';
 export const forcedAccount_712 = 'forcedAccount';
@@ -1149,16 +1033,10 @@ export const _det712_forcedCreation = {
     return ['forcedCreation', 'coercedSignup', 'forcedAccount'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: forcedCreation
 export const _ref_forcedCreation = _det712_forcedCreation;
-// pattern-ref: coercedSignup
 export const _ref_coercedSignup = _det712_forcedCreation;
-// pattern-ref: forcedAccount
 export const _ref_forcedAccount = _det712_forcedCreation;
 
-// ════════════════════════════════════════════════════
-// Detector #638 [§23] Are you sure pause prompt
-// ════════════════════════════════════════════════════
 export const sendPause_638_key = 'sendPause';
 export const areYouSure_638_key = 'areYouSure';
 export const offensivePrompt_638_key = 'offensivePrompt';
@@ -1208,9 +1086,6 @@ export const _d638_impl = {
   cooldownPrompt: cooldownPromptCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #745 [§23] Communication preference mismatch escalation
-// ════════════════════════════════════════════════════
 export const preferenceMismatch_745_key = 'preferenceMismatch';
 export const commPreference_745_key = 'commPreference';
 export const escalationMismatch_745_key = 'escalationMismatch';

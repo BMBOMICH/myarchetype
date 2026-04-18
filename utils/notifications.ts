@@ -1,4 +1,3 @@
-// utils/notifications.ts
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
@@ -41,7 +40,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
     if (Platform.OS === 'android') {
       await Promise.all([
-        Notifications.setNotificationChannelAsync('default',  { name: 'Default',      importance: Notifications.AndroidImportance.MAX,     vibrationPattern: [0,250,250,250], lightColor: '#53a8b6' }),
+        Notifications.setNotificationChannelAsync('default',  { name: 'Default',      importance: Notifications.AndroidImportance.MAX,     vibrationPattern: [0,250,250,250], lightColor: '#53a8b6' }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
         Notifications.setNotificationChannelAsync('matches',  { name: 'New Matches',  importance: Notifications.AndroidImportance.HIGH,    vibrationPattern: [0,500,250,500], lightColor: '#5cb85c' }),
         Notifications.setNotificationChannelAsync('messages', { name: 'Messages',     importance: Notifications.AndroidImportance.HIGH,    vibrationPattern: [0,250],         lightColor: '#53a8b6' }),
         Notifications.setNotificationChannelAsync('likes',    { name: 'Likes',        importance: Notifications.AndroidImportance.DEFAULT,                                    lightColor: '#e67e22' }),

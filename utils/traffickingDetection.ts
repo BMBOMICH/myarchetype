@@ -11,20 +11,16 @@ const TRAFFIC_PATTERNS = {
   exploitation_language: [/make me (do things|work|see clients|see men|see people)/i, /boss won't let me/i, /have to (earn|make|bring in|work off)/i, /quota/i, /they (sell|sold|pimp)/i],
 };
 
-// ─── #768 Scam Compound Operating Pattern ───
 export interface CompoundPatternResult { detected: boolean; confidence: number; patterns: string[]; shiftDetected: boolean; ipClustered: boolean; compoundOp: boolean; }
 
 export function scamCompoundPattern(sessions: Array<{ accountId: string; ip: string; timestamp: number; messagesSent: number }>): CompoundPatternResult {
   const patterns: string[] = []; let shiftDetected = false, ipClustered = false, compoundOp = false;
-  // Shift: activity in 3+ distinct 8-hour windows
   const hours = sessions.map(s => new Date(s.timestamp).getUTCHours());
   const windows = new Set(hours.map(h => Math.floor(h / 8)));
   if (windows.size >= 3 && sessions.length >= 20) { shiftDetected = true; patterns.push('3-shift_pattern'); }
-  // IP clustering: 3+ accounts from same /24
   const subnets = new Map<string, Set<string>>();
   sessions.forEach(s => { const net = s.ip.split('.').slice(0, 3).join('.'); if (!subnets.has(net)) subnets.set(net, new Set()); subnets.get(net)!.add(s.accountId); });
   for (const [, accts] of subnets) { if (accts.size >= 3) { ipClustered = true; patterns.push('ip_cluster_3plus'); break; } }
-  // Compound: uniform message volume across accounts
   const vols: Record<string, number> = {};
   sessions.forEach(s => { vols[s.accountId] = (vols[s.accountId] || 0) + s.messagesSent; });
   const vals = Object.values(vols);
@@ -36,7 +32,6 @@ export function scamCompoundPattern(sessions: Array<{ accountId: string; ip: str
 export const shiftPattern = scamCompoundPattern;
 export const compoundOperation = scamCompoundPattern;
 
-// ─── #770 Scam Script Template Matching ───
 const KNOWN_SCRIPTS: Array<{ name: string; phrases: RegExp[] }> = [
   { name: 'romance_military', phrases: [/deployed overseas/i, /can't access.*bank/i, /need.*release.*funds/i, /love you.*soon/i, /video.*not allowed/i] },
   { name: 'crypto_pig_butchering', phrases: [/guaranteed returns/i, /crypto.*opportunity/i, /let me teach you/i, /download.*exchange/i, /show you.*trade/i] },
@@ -62,7 +57,6 @@ export function scamTemplate(messages: string[]): ScriptMatchResult {
 export const playbookMatch = scamTemplate;
 export const knownScript = scamTemplate;
 
-// ─── Core Trafficking Detection ───
 export function detectTraffickingAndRefer(msgs: Array<{ text: string; timestamp: number; senderId: string }>, victimId: string, country = 'US'): TraffickingReferralResult {
   const ind: string[] = [];
   for (const m of msgs.filter(x => x.senderId === victimId).sort((a, b) => a.timestamp - b.timestamp)) {
@@ -102,8 +96,6 @@ export function humanTrafficking(text: string) { const r = quickTraffickingCheck
 export const traffickingIndicator = humanTrafficking;
 export const laborTrafficking = humanTrafficking;
 
-// ═══ Detector #769 [5.6] Trafficking victim referral pathway ═══
-// severity: critical
 export const traffickingReferral_769 = 'traffickingReferral';
 export const victimPathway_769 = 'victimPathway';
 export const polarisTipline_769 = 'polarisTipline';
@@ -118,9 +110,6 @@ export const _det769_traffickingReferral = {
     return ['traffickingReferral', 'victimPathway', 'polarisTipline'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: traffickingReferral
 export const _ref_traffickingReferral = _det769_traffickingReferral;
-// pattern-ref: victimPathway
 export const _ref_victimPathway = _det769_traffickingReferral;
-// pattern-ref: polarisTipline
 export const _ref_polarisTipline = _det769_traffickingReferral;

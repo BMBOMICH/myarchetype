@@ -1,0 +1,652 @@
+{
+  "timestamp": "2026-04-14T16:10:59.049Z",
+  "projectRoot": "C:\\Users\\Elxan\\Desktop\\MyArchetype",
+  "summary": {
+    "errors": 1,
+    "warnings": 18,
+    "info": 1
+  },
+  "configFiles": [
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\package.json",
+      "exists": true,
+      "implemented": [
+        "@legendapp/list (^3.0.0-beta.44)",
+        "@legendapp/state (^3.0.0)",
+        "react-native-mmkv (^4.3.1)",
+        "react-native-nitro-modules (^0.35.4)",
+        "react-native-turbo-image (^1.24.1)",
+        "react-native-unistyles (^3.2.3)",
+        "react-native-reanimated (^4.2.1)",
+        "react-native-worklets (^0.7.2)",
+        "react-native-gesture-handler (~2.30.0)",
+        "react-native-screens (~4.23.0)",
+        "react-native-safe-area-context (~5.6.2)",
+        "@tanstack/react-query (^5.99.0)",
+        "@chenglou/pretext (^0.0.5)",
+        "expo-router (~55.0.12)",
+        "expo-font (~55.0.6)",
+        "expo-splash-screen (~55.0.17)",
+        "expo-build-properties (~55.0.13)",
+        "babel-plugin-transform-remove-console (^6.9.4)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\ios\\Podfile",
+      "exists": false,
+      "implemented": [],
+      "missing": [],
+      "forbidden": [],
+      "findings": [],
+      "skipReason": "ios/Podfile not found — run 'npx expo prebuild'"
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\android\\gradle.properties",
+      "exists": true,
+      "implemented": [
+        "newArchEnabled not overridden (correct)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\app.json",
+      "exists": true,
+      "implemented": [
+        "React Compiler enabled",
+        "expo-build-properties plugin",
+        "ProGuard enabled",
+        "Resource shrinking enabled",
+        "expo-font config plugin",
+        "Async Routes (bundle splitting)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\babel.config.js",
+      "exists": true,
+      "implemented": [
+        "babel-preset-expo",
+        "transform-remove-console",
+        "Scoped to production",
+        "Excludes \"error\" and \"warn\"",
+        "Reanimated plugin NOT manually added (correct)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\metro.config.js",
+      "exists": true,
+      "implemented": [
+        "getDefaultConfig from expo/metro-config",
+        "inlineRequires: true",
+        "unstable_enablePackageExports: true"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\app\\_layout.tsx",
+      "exists": true,
+      "implemented": [
+        "react-native-gesture-handler is first import",
+        "enableScreens(true)",
+        "Unistyles config imported",
+        "GestureHandlerRootView present",
+        "GestureHandlerRootView has flex:1",
+        "QueryClientProvider present",
+        "QueryClient at module level",
+        "refetchOnWindowFocus: false",
+        "Global staleTime on QueryClient",
+        "SplashScreen.preventAutoHideAsync()",
+        "SplashScreen.hideAsync()"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\src\\store\\appStore.ts",
+      "exists": true,
+      "implemented": [
+        "observable()",
+        "syncObservable()",
+        "MMKV persistence plugin",
+        "No deprecated .use() calls"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\src\\services\\storage.ts",
+      "exists": true,
+      "implemented": [
+        "createMMKV() — v4 API",
+        "No new MMKV() calls (correct)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\src\\styles\\unistyles.ts",
+      "exists": true,
+      "implemented": [
+        "StyleSheet.configure()",
+        "Light + dark themes",
+        "UnistylesThemes augmentation",
+        "StyleSheet from react-native-unistyles (correct)"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\src\\hooks\\useData.ts",
+      "exists": true,
+      "implemented": [
+        "useQuery",
+        "Centralized queryKeys",
+        "staleTime configured",
+        "gcTime configured"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    },
+    {
+      "file": "C:\\Users\\Elxan\\Desktop\\MyArchetype\\assets\\fonts",
+      "exists": true,
+      "implemented": [
+        "3 font file(s): Inter-Bold.ttf, Inter-Medium.ttf, Inter-Regular.ttf"
+      ],
+      "missing": [],
+      "forbidden": [],
+      "findings": []
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "app\\admin\\index.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\admin\\reports.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\admin\\stats.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\admin\\users.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\blocked-users.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\chat.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "8/9 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles",
+        "maintainScrollAtEnd — correct chat scroll",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\compatibility-quiz.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\daily-question.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\date-safety.tsx",
+      "issues": [
+        {
+          "severity": "error",
+          "file": "app\\date-safety.tsx",
+          "message": "ScrollView wrapping a list — inner list cannot virtualize. One of the worst RN performance mistakes.",
+          "fix": "Remove ScrollView. Use LegendList's ListHeaderComponent / ListFooterComponent instead."
+        }
+      ],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\date-spot-reviews.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "1/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\dating-stats.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\dating-stats.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 5
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\deal-breakers.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\deal-breakers.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 5
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\edit-profile.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "3/4 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles"
+      ]
+    },
+    {
+      "file": "app\\home.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\home.tsx",
+          "message": "4 inline style objects — each creates a new object every render",
+          "fix": "Extract to StyleSheet.create((theme) => ({...}))"
+        }
+      ],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "7/10 useEffect(s) have cleanup",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\icebreaker-game.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\index.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\index.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 10
+        }
+      ],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\interests.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\login.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "8/12 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\matches.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\matches.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 15
+        }
+      ],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "2/3 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\my-matches.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\my-matches.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 15
+        }
+      ],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "2/2 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\personality-quiz.tsx",
+      "issues": [
+        {
+          "severity": "info",
+          "file": "app\\personality-quiz.tsx",
+          "message": "Heavy computation (sort/filter/reduce/JSON) inside a useEffect body — may cause jank during transitions",
+          "fix": "Use requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', () => { heavyWork(); })"
+        },
+        {
+          "severity": "warning",
+          "file": "app\\personality-quiz.tsx",
+          "message": "File renders a list (data array .map() rendering) without LegendList — no virtualization, all items render at once",
+          "fix": "import { LegendList } from \"@legendapp/list\" with recycleItems={true}"
+        }
+      ],
+      "goodPatterns": [
+        "5/9 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles"
+      ]
+    },
+    {
+      "file": "app\\post-date-rating.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\profile-preview.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\profile-preview.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 10
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\profile-setup.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "4/7 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\profile-views.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\referral-leaderboard.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\referral-leaderboard.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 8
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\referral.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\referral.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 19
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\relationship-mode.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\second-look.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\second-look.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 10
+        }
+      ],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\selfie-verification.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\selfie-verification.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 8
+        }
+      ],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\settings.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\settings.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 22
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\shared-playlist.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\shared-playlist.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 7
+        }
+      ],
+      "goodPatterns": [
+        "2/2 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\signup.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "8/13 useEffect(s) have cleanup",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles",
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "app\\smart-photos.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\smart-photos.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 7
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\stories.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\stories.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 15
+        }
+      ],
+      "goodPatterns": [
+        "2/4 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)",
+        "useSharedValue — UI thread animation",
+        "useAnimatedStyle — bridge-free styles"
+      ]
+    },
+    {
+      "file": "app\\super-likes.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "app\\super-likes.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 11
+        }
+      ],
+      "goodPatterns": [
+        "@chenglou/pretext: correct prepare() + layout() API",
+        "1/1 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\video-profile-recorder.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "1/2 useEffect(s) have cleanup"
+      ]
+    },
+    {
+      "file": "app\\voice-intro-recorder.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "2/3 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)"
+      ]
+    },
+    {
+      "file": "app\\_layout.tsx",
+      "issues": [],
+      "goodPatterns": [
+        "requestIdleCallback — modern idle deferral"
+      ]
+    },
+    {
+      "file": "components\\ProfileStrengthBar.tsx",
+      "issues": [
+        {
+          "severity": "warning",
+          "file": "components\\ProfileStrengthBar.tsx",
+          "message": "InteractionManager deprecated since RN 0.82 — behavior changed to match setImmediate",
+          "fix": "Replace with requestIdleCallback(() => { heavyWork(); }) or navigation.addListener('transitionEnd', ...)",
+          "line": 4
+        }
+      ],
+      "goodPatterns": [
+        "1/1 useEffect(s) have cleanup",
+        "observer() wrapping component (correct)"
+      ]
+    }
+  ]
+}

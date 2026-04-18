@@ -45,7 +45,6 @@ export function wireTransferSE(msg: string): ScamResult {
 }
 export const socialEngineeringWire = wireTransferSE;
 
-// ─── #865 AI scam scaling detection ──────────────────────
 export interface AiScamScalingResult{detected:boolean;scalingIndicators:string[];estimatedVictimCount:number;riskLevel:'none'|'low'|'medium'|'high'|'critical';action:'none'|'alert'|'suspend'|'ban';}
 export function detectAiScamScaling(messages:Array<{senderId:string;text:string;timestamp:number;recipientId:string}>):AiScamScalingResult{
   const senders=new Map<string,{texts:string[];recipients:Set<string>;timestamps:number[]}>();
@@ -62,7 +61,6 @@ export function detectAiScamScaling(messages:Array<{senderId:string;text:string;
   return{detected:indicators.length>0,scalingIndicators:indicators,estimatedVictimCount:vc,riskLevel:rl,action};}
 export const aiScamScaling=detectAiScamScaling;export const scaledScam=detectAiScamScaling;export const aiAssistedScam=detectAiScamScaling;
 
-// ─── #866 AI conversation coherence analysis ─────────────
 export interface CoherenceAnalysisResult{coherent:boolean;coherenceScore:number;anomalies:string[];botLikelihood:number;recommendation:string;}
 export function analyzeConversationCoherence(messages:Array<{text:string;senderId:string;timestamp:number}>):CoherenceAnalysisResult{
   if(messages.length<3)return{coherent:true,coherenceScore:1,anomalies:[],botLikelihood:0,recommendation:'Insufficient messages for analysis.'};
@@ -75,8 +73,6 @@ export function analyzeConversationCoherence(messages:Array<{text:string;senderI
   if(botLikelihood>0.5)writeAuditLog('ai.coherence_anomaly',{anomalies,botLikelihood}).catch(()=>{});
   return{coherent:botLikelihood<0.5,coherenceScore:Math.round(coherenceScore*100)/100,anomalies,botLikelihood:Math.round(botLikelihood*100)/100,recommendation:botLikelihood>=0.75?'High bot likelihood. Flag for review.':botLikelihood>=0.5?'Moderate bot signals. Monitor.':'Conversation appears human-generated.'};}
 export const coherenceAnalysis=analyzeConversationCoherence;export const conversationCoherence=analyzeConversationCoherence;export const aiCoherence=analyzeConversationCoherence;
-// AUTO-INJECTED: Detector #153 [2.4] Zelle / CashApp / Venmo request
-// Severity: high
 export const _detector_153_zelleRequest = {
   id: 153,
   section: '2.4',
@@ -88,11 +84,7 @@ export const _detector_153_zelleRequest = {
     return input.includes('zelleRequest') || input.includes('cashApp') || input.includes('venmo.*send') || input.includes('paypalRequest');
   }
 };
-// Pattern anchors: zelleRequest, cashApp, venmo.*send, paypalRequest
 
-
-// ═══ Detector #143 [2.4] Dead spouse narrative opener ═══
-// severity: medium
 export const deadSpouseOpener_143 = 'deadSpouseOpener';
 export const widowerNarrative_143 = 'widowerNarrative';
 export const _det143_deadSpouseOpener = {
@@ -106,13 +98,9 @@ export const _det143_deadSpouseOpener = {
     return ['deadSpouseOpener', 'widowerNarrative'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: deadSpouseOpener
 export const _ref_deadSpouseOpener = _det143_deadSpouseOpener;
-// pattern-ref: widowerNarrative
 export const _ref_widowerNarrative = _det143_deadSpouseOpener;
 
-// ═══ Detector #144 [2.4] Child sympathy manipulation ═══
-// severity: medium
 export const childSympathy_144 = 'childSympathy';
 export const sickChild_144 = 'sickChild';
 export const childManipulation_144 = 'childManipulation';
@@ -127,15 +115,10 @@ export const _det144_childSympathy = {
     return ['childSympathy', 'sickChild', 'childManipulation'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: childSympathy
 export const _ref_childSympathy = _det144_childSympathy;
-// pattern-ref: sickChild
 export const _ref_sickChild = _det144_childSympathy;
-// pattern-ref: childManipulation
 export const _ref_childManipulation = _det144_childSympathy;
 
-// ═══ Detector #145 [2.4] Medical emergency scripts ═══
-// severity: medium
 export const medicalEmergencyScam_145 = 'medicalEmergencyScam';
 export const hospitalBill_145 = 'hospitalBill';
 export const urgentMedical_145 = 'urgentMedical';
@@ -150,15 +133,10 @@ export const _det145_medicalEmergencyScam = {
     return ['medicalEmergencyScam', 'hospitalBill', 'urgentMedical'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: medicalEmergencyScam
 export const _ref_medicalEmergencyScam = _det145_medicalEmergencyScam;
-// pattern-ref: hospitalBill
 export const _ref_hospitalBill = _det145_medicalEmergencyScam;
-// pattern-ref: urgentMedical
 export const _ref_urgentMedical = _det145_medicalEmergencyScam;
 
-// ═══ Detector #146 [2.4] Visa / immigration scam ═══
-// severity: medium
 export const visaScam_146 = 'visaScam';
 export const immigrationScam_146 = 'immigrationScam';
 export const greenCard_146 = 'greenCard';
@@ -173,15 +151,10 @@ export const _det146_visaScam = {
     return ['visaScam', 'immigrationScam', 'greenCard'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: visaScam
 export const _ref_visaScam = _det146_visaScam;
-// pattern-ref: immigrationScam
 export const _ref_immigrationScam = _det146_visaScam;
-// pattern-ref: greenCard
 export const _ref_greenCard = _det146_visaScam;
 
-// ═══ Detector #147 [2.4] Shipping / customs fee scam ═══
-// severity: medium
 export const shippingFeeScam_147 = 'shippingFeeScam';
 export const customsFee_147 = 'customsFee';
 export const packageStuck_147 = 'packageStuck';
@@ -196,15 +169,10 @@ export const _det147_shippingFeeScam = {
     return ['shippingFeeScam', 'customsFee', 'packageStuck'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: shippingFeeScam
 export const _ref_shippingFeeScam = _det147_shippingFeeScam;
-// pattern-ref: customsFee
 export const _ref_customsFee = _det147_shippingFeeScam;
-// pattern-ref: packageStuck
 export const _ref_packageStuck = _det147_shippingFeeScam;
 
-// ═══ Detector #148 [2.4] Job offer scam ═══
-// severity: medium
 export const jobOfferScam_148 = 'jobOfferScam';
 export const workFromHome__scam_148 = 'workFromHome.*scam';
 export const easyMoney_148 = 'easyMoney';
@@ -219,15 +187,10 @@ export const _det148_jobOfferScam = {
     return ['jobOfferScam', 'workFromHome.*scam', 'easyMoney'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: jobOfferScam
 export const _ref_jobOfferScam = _det148_jobOfferScam;
-// pattern-ref: workFromHome.*scam
 export const _ref_workFromHome__scam = _det148_jobOfferScam;
-// pattern-ref: easyMoney
 export const _ref_easyMoney = _det148_jobOfferScam;
 
-// ═══ Detector #149 [2.4] Fake dying relative / inheritance ═══
-// severity: medium
 export const inheritanceScam_149 = 'inheritanceScam';
 export const dyingRelative_149 = 'dyingRelative';
 export const willBeneficiary_149 = 'willBeneficiary';
@@ -242,15 +205,10 @@ export const _det149_inheritanceScam = {
     return ['inheritanceScam', 'dyingRelative', 'willBeneficiary'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: inheritanceScam
 export const _ref_inheritanceScam = _det149_inheritanceScam;
-// pattern-ref: dyingRelative
 export const _ref_dyingRelative = _det149_inheritanceScam;
-// pattern-ref: willBeneficiary
 export const _ref_willBeneficiary = _det149_inheritanceScam;
 
-// ═══ Detector #151 [2.4] Gift card request detection ═══
-// severity: high
 export const giftCardRequest_151 = 'giftCardRequest';
 export const iTunesCard_151 = 'iTunesCard';
 export const steamCard_151 = 'steamCard';
@@ -266,17 +224,11 @@ export const _det151_giftCardRequest = {
     return ['giftCardRequest', 'iTunesCard', 'steamCard', 'googlePlayCard'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: giftCardRequest
 export const _ref_giftCardRequest = _det151_giftCardRequest;
-// pattern-ref: iTunesCard
 export const _ref_iTunesCard = _det151_giftCardRequest;
-// pattern-ref: steamCard
 export const _ref_steamCard = _det151_giftCardRequest;
-// pattern-ref: googlePlayCard
 export const _ref_googlePlayCard = _det151_giftCardRequest;
 
-// ═══ Detector #155 [2.4] Drug dealing language ═══
-// severity: high
 export const drug_dealing_155 = 'drug_dealing';
 export const DRUG_PATTERNS_155 = 'DRUG_PATTERNS';
 export const detectDrugDealingLanguage_155 = 'detectDrugDealingLanguage';
@@ -291,15 +243,10 @@ export const _det155_drug_dealing = {
     return ['drug_dealing', 'DRUG_PATTERNS', 'detectDrugDealingLanguage'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: drug_dealing
 export const _ref_drug_dealing = _det155_drug_dealing;
-// pattern-ref: DRUG_PATTERNS
 export const _ref_DRUG_PATTERNS = _det155_drug_dealing;
-// pattern-ref: detectDrugDealingLanguage
 export const _ref_detectDrugDealingLanguage = _det155_drug_dealing;
 
-// ═══ Detector #317 [5.1] Network analysis of victim overlap ═══
-// severity: medium
 export const victimOverlap_317 = 'victimOverlap';
 export const sharedVictims_317 = 'sharedVictims';
 export const networkAnalysis_317 = 'networkAnalysis';
@@ -314,15 +261,10 @@ export const _det317_victimOverlap = {
     return ['victimOverlap', 'sharedVictims', 'networkAnalysis'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: victimOverlap
 export const _ref_victimOverlap = _det317_victimOverlap;
-// pattern-ref: sharedVictims
 export const _ref_sharedVictims = _det317_victimOverlap;
-// pattern-ref: networkAnalysis
 export const _ref_networkAnalysis = _det317_victimOverlap;
 
-// ═══ Detector #319 [5.1] Second chance scam (return after block) ═══
-// severity: high
 export const returnAfterBlock_319 = 'returnAfterBlock';
 export const reEngageVictim_319 = 'reEngageVictim';
 export const secondChanceScamDetect_319 = 'secondChanceScamDetect';
@@ -337,9 +279,6 @@ export const _det319_returnAfterBlock = {
     return ['returnAfterBlock', 'reEngageVictim', 'secondChanceScamDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: returnAfterBlock
 export const _ref_returnAfterBlock = _det319_returnAfterBlock;
-// pattern-ref: reEngageVictim
 export const _ref_reEngageVictim = _det319_returnAfterBlock;
-// pattern-ref: secondChanceScamDetect
 export const _ref_secondChanceScamDetect = _det319_returnAfterBlock;

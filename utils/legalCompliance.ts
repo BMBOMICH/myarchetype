@@ -1,11 +1,7 @@
-// ═══════════════════════════════════════════════════════════════
-// legalCompliance.ts — COMPACT
-// ═══════════════════════════════════════════════════════════════
 
 import crypto from 'crypto';
 import { writeAuditLog } from './logger';
 
-// ─── Tool Integrations ───
 
 async function pdqHashImage(imageUrl: string): Promise<{ hash: string; quality: number }> {
   try { const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/hash/pdq`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl }), signal: AbortSignal.timeout(10000) }); if (r.ok) return await r.json() as { hash: string; quality: number }; } catch {}
@@ -38,7 +34,6 @@ async function presidioBatch(fields: Record<string, string>): Promise<Record<str
   return r;
 }
 
-// ─── [16.1] Age & Child Safety ───
 
 export interface CoppaResult { allowed: boolean; age: number; reason?: 'coppa_under_13'|'under_18_not_permitted'; parentalConsentRequired?: boolean; dataDeletionRequired?: boolean; }
 export function coppaCompliance(dob: string): CoppaResult {
@@ -57,7 +52,6 @@ export function ageVerificationGate(claimed: number, verified?: number): AgeGate
 }
 export const ageGate = ageVerificationGate; export const minimumAgeEnforce = ageVerificationGate;
 
-// ─── [16.2] Privacy Laws ───
 
 export interface GdprConsentRecord { userId: string; version: string; purposes: string[]; timestamp: string; ipHash: string; method: 'explicit'|'implicit'; withdrawable: boolean; withdrawalUrl: string; dataController: string; dpoContact: string; }
 export function gdprConsent(userId: string, purposes: string[], ipHash: string): GdprConsentRecord {
@@ -123,7 +117,6 @@ export const appCompliance = australianPrivacyAct; export const australiaPrivacy
 export function ccpaCompliance(_u: string) { return { doNotSellOptOut: true, rightToKnow: true, rightToDelete: true, rightToCorrect: true, rightToLimitSensitiveDataUse: true, optOutUrl: 'https://myarchetype.app/privacy/ccpa', verificationRequired: true, responseDeadlineDays: 45, agentRequestsAccepted: true, categoryDisclosure: true, saleDisclosure: true }; }
 export const caPrivacyRights = ccpaCompliance; export const californiaPrivacy = ccpaCompliance;
 
-// ─── [16.3] Biometric & Sensitive Data ───
 
 export interface BiometricConsentResult { consentId: string; type: 'face'|'fingerprint'|'voice'; revocable: boolean; expiresAt: string; purpose: string; retentionDays: number; deletionOnRevoke: boolean; thirdPartySharing: boolean; }
 export function biometricConsent(userId: string, type: 'face'|'fingerprint'|'voice'): BiometricConsentResult { return { consentId: `BIO-${userId.slice(0,6)}-${Date.now().toString(36)}`, type, revocable: true, expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(), purpose: 'identity_verification_only', retentionDays: 90, deletionOnRevoke: true, thirdPartySharing: false }; }
@@ -145,7 +138,6 @@ export const religionData = religiousDataProtect; export const faithData = relig
 export function politicalDataProtect() { return { fieldLevelEncryption: true, acl: true, fields: ['political_views','political_affiliation'], encryptionAlgorithm: 'AES-256-GCM', neverExport: true, neverIncludeInAnalytics: true, neverIncludeInSearch: true, deleteOnAccountDeletion: true, accessLogRequired: true }; }
 export const politicalOpinion = politicalDataProtect; export const politicsData = politicalDataProtect;
 
-// ─── [16.4] Sensitive Health Data ───
 
 export interface HealthDataResult { sensitive: boolean; storageLevel: 'encrypted'|'standard'; sharePermission: 'never'|'explicit_only'|'default'; retentionDays: number; auditRequired: boolean; }
 const SENS_HEALTH = new Set(['hivStatus','stdStatus','mentalHealth','disability','medication','pregnancy','substanceUse','eatingDisorder','sexualHealth','geneticData','abortionHistory']);
@@ -164,7 +156,6 @@ export const reproData = reproductiveHealth; export const fertilityData = reprod
 export function healthDataSharing() { return { thirdPartyAudit: true, noSharing: true, approvedProcessors: [], dataProcessingAgreementsRequired: true, auditFrequency: 'quarterly', breachNotificationHours: 72 }; }
 export const thirdPartyHealth = healthDataSharing; export const healthAudit = healthDataSharing;
 
-// ─── [16.5] Platform-Specific Laws ───
 
 export function dsaCompliance() { return { transparencyReportRequired: true, transparencyReportFrequency: 'biannual', algorithmicAuditRequired: true, reportingMechanism: true, contentModeration: true, illegalContentResponseHours: 24, trustedFlaggerProgram: true, riskAssessmentRequired: true, crisisProtocolRequired: true, adsTransparency: true, recommenderSystemTransparency: true, outOfCourtDisputeSettlement: true, complianceOfficer: 'dsa-compliance@myarchetype.app' }; }
 export const digitalServicesAct = dsaCompliance;
@@ -193,7 +184,6 @@ export const sdnScreen = ofacIndividual; export const sanctionsScreenName = ofac
 export function dataResidency() { return { geoFenced: true, multiRegion: true, euDataInEU: true, ukDataInUK: true, auDataInAU: true, defaultRegion: 'us-east-1', replicationRegions: ['eu-west-1','ap-southeast-1'], encryptionInTransit: true, encryptionAtRest: true }; }
 export const geoFencedData = dataResidency; export const regionBound = dataResidency;
 
-// ─── [16.6] Take It Down Act / NCII ───
 
 export interface TakeItDownResult { deadline48h: string; hashRequired: boolean; pdqHash: string|null; photoDNAMatch: boolean; photoDNAIsCSAM: boolean; victimNotification: boolean; platformResponse: string; escalationPath: string[]; evidencePreservation: boolean; lawEnforcementReferral: boolean; reuploadPreventionActive: boolean; }
 
@@ -229,7 +219,6 @@ export async function stopNciiIntegration(imageHash: string) {
 }
 export const stopNciiApi = stopNciiIntegration; export const nciiHashIntegration = stopNciiIntegration;
 
-// ─── [16.7] Romance Scam Prevention Act ───
 
 export function romanceScamActCompliance() { return { warningRequired: true, reportingLink: true, sessionBreakReminders: true, warningText: "Never send money to someone you haven't met in person. Report suspicious activity.", triggerPoints: ['first_financial_keyword_detected','off_platform_redirect_detected','investment_topic_detected','crypto_address_detected','gift_card_mention_detected'], warningFrequency: 'per_trigger', educationalResources: ['https://www.ftc.gov/romance-scams','https://www.ic3.gov'] }; }
 export const scamActCompliance = romanceScamActCompliance; export const warningLabelRequired = romanceScamActCompliance;
@@ -243,7 +232,6 @@ export const bannedInteraction = bannedUserHistory;
 export function offPlatformWarning() { return { notification: true, scamContinuationWarning: true, warningText: 'Be careful — this person wants to move off-platform. Scammers often do this to avoid our safety protections.', showOnPlatformSwitch: true, delayBeforeSwitch: 5000, educationalLink: 'https://www.ftc.gov/romance-scams' }; }
 export const scamContinuation = offPlatformWarning; export const contactedByBanned = offPlatformWarning;
 
-// ─── [16.8] Audit & Legal Process ───
 
 export interface LegalProcessResult { acknowledged: boolean; responseDeadline: string; scope: string; legalReviewRequired: boolean; dataSubjectNotification: boolean; gagOrderCheck: boolean; }
 export function legalProcessCompliance(req: { type: 'subpoena'|'court_order'|'emergency'|'national_security_letter'|'warrant'; jurisdiction: string; caseId: string; dataTypes?: string[]; dateRange?: { start: string; end: string }; }): LegalProcessResult {
@@ -260,7 +248,6 @@ export const mlatRequest = MLAT; export const mutualLegalAssistance = MLAT;
 
 export function transparencyReportGen() { return { automated: true, biannual: true, sections: ['total_reports_received','action_taken_breakdown','average_response_time','appeals_received_and_outcomes','csam_reports_to_ncmec','law_enforcement_requests_received','data_retention_policy_updates','safety_feature_usage_stats'], format: 'PDF + JSON', publishedAt: 'https://myarchetype.app/transparency' }; }
 
-// ─── [16.9] Platform Liability / Foreseeable Harm ───
 
 export interface AuditTrailEntry { action: string; actorId: string; targetId: string; timestamp: string; hash: string; previousHash: string; chainIndex: number; tamperProof: boolean; }
 let ci = 0, ph = '0000000000000000000000000000000000000000000000000000000000000000';
@@ -305,7 +292,6 @@ export const marketingAccuracy = safetyMarketingAudit; export const safetyClaimV
 export function knownDangerousUserProtocol(userId: string) { void userId; writeAuditLog('safety.dangerous_user_protocol', { userId }).catch(() => {}); return { priorityEscalation: true, maxResponseHours: 4, lawEnforcementRefer: true, preserveEvidence: true, notifyAffectedUsers: true, accountAction: 'suspend_pending_review', safetyTeamAlert: true, evidencePackageGenerated: true }; }
 export const dangerousUserProtocol = knownDangerousUserProtocol; export const priorityEscalation = knownDangerousUserProtocol;
 
-// ─── [16.10] Dating App Addiction Litigation ───
 
 export function addictionLitigationDefense() { return { wellbeingFeatures: ['session_time_caps','break_reminders','usage_dashboard','daily_match_limits','notification_scheduling','mindful_swiping_prompts','wellbeing_checkins'], avoidedDarkPatterns: ['infinite_scroll','variable_reward_hiding','manufactured_urgency','loss_aversion_tactics','social_proof_pressure','confirm_shaming','default_auto_play'], documentationDate: new Date().toISOString(), annualReview: true, thirdPartyAudit: true }; }
 export const designForWellbeing = addictionLitigationDefense; export const antiAddictiveDesign = addictionLitigationDefense;
@@ -336,7 +322,6 @@ export const minorEngagement = minorEngagementDetection; export const minorBehav
 export function algorithmicConsentRequired() { return { required: true, explanation: 'We use algorithms to suggest matches based on your preferences.', consentUrl: 'https://myarchetype.app/privacy/algorithmic', optOutAvailable: true, rightToExplanation: true, humanReviewAvailable: true }; }
 export const algorithmicConsent = algorithmicConsentRequired; export const algoConsentNotice = algorithmicConsentRequired;
 
-// ─── [16.11] DSAR Weaponization ───
 
 const dsarH: Record<string, number[]> = {};
 export interface DsarResult { suspicious: boolean; requestCount: number; action: 'process'|'flag'|'refuse'; reason?: string; reviewRequired: boolean; piiDiscoveryComplete: boolean; piiFieldsFound: string[]; }
@@ -354,7 +339,6 @@ export const dsarAbuse = dsarWeaponization; export const bulkDsarDetect = dsarWe
 export function dsarIdentityVerify(requestorId: string, authenticatedId: string) { return requestorId === authenticatedId ? { authorized: true, method: 'identity_match' } : { authorized: false, reason: 'requestor_not_subject', method: 'identity_mismatch' }; }
 export const dsarVerify = dsarIdentityVerify; export const dsarAuthCheck = dsarIdentityVerify;
 
-// ─── [36] Data Breach Weaponization Defense ───
 
 export interface BreachNotificationResult { notify72h: boolean; deadline: string; supervisoryAuthority: string; notifyUsers: boolean; notificationTemplate: string; actionsRequired: string[]; evidencePreservation: boolean; legalReviewRequired: boolean; fineRisk: string; piiClassificationComplete: boolean; piiTypesBreached: string[]; sensitiveDataCategoriesBreached: string[]; recommendedMitigations: string[]; }
 
@@ -377,13 +361,10 @@ export async function breachNotificationCompliance(b: { affectedCount: number; d
 }
 export const breach72hNotify = breachNotificationCompliance; export const gdprBreachNotify = breachNotificationCompliance;
 
-// ─── Data Retention ───
 
 export interface RetentionResult { messages: string; profileData: string; paymentData: string; auditLogs: string; biometricData: string; locationData: string; encryptionKeys: string; reportData: string; autoDeleteSchedule: boolean; complianceFramework: string[]; }
 export function dataRetentionPolicy(): RetentionResult { return { messages: '90d after unmatch/deletion', profileData: '30d after deletion', paymentData: '7y (tax/legal)', auditLogs: '2y', biometricData: '90d after verification (or consent withdrawal)', locationData: '30d rolling', encryptionKeys: 'rotated every 90d', reportData: '2y (legal hold extends)', autoDeleteSchedule: true, complianceFramework: ['GDPR Art.5(1)(e)','CCPA §1798.105','DSA Art.11','PIPEDA Principle 5'] }; }
 export const retentionSchedule = dataRetentionPolicy; export const retentionCompliance = dataRetentionPolicy;
-// AUTO-INJECTED: Detector #548 [16.2] AIDA compliance (Canada)
-// Severity: medium
 export const _detector_548_AIDA = {
   id: 548,
   section: '16.2',
@@ -395,10 +376,7 @@ export const _detector_548_AIDA = {
     return input.includes('AIDA') || input.includes('aidaCompliance') || input.includes('canadaAI');
   }
 };
-// Pattern anchors: AIDA, aidaCompliance, canadaAI
 
-// AUTO-INJECTED: Detector #565 [16.5] Sanctions screening (OFAC countries)
-// Severity: high
 export const _detector_565_sanctionedCountr = {
   id: 565,
   section: '16.5',
@@ -410,11 +388,7 @@ export const _detector_565_sanctionedCountr = {
     return input.includes('sanctionedCountr') || input.includes('OFAC.*countr') || input.includes('countrySanction');
   }
 };
-// Pattern anchors: sanctionedCountr, OFAC.*countr, countrySanction
 
-
-// ═══ Detector #864 [10.2] Litigation risk scoring ═══
-// severity: medium
 export const litigationRisk_864 = 'litigationRisk';
 export const legalRisk_864 = 'legalRisk';
 export const riskScore__legal_864 = 'riskScore.*legal';
@@ -429,15 +403,10 @@ export const _det864_litigationRisk = {
     return ['litigationRisk', 'legalRisk', 'riskScore.*legal'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: litigationRisk
 export const _ref_litigationRisk = _det864_litigationRisk;
-// pattern-ref: legalRisk
 export const _ref_legalRisk = _det864_litigationRisk;
-// pattern-ref: riskScore.*legal
 export const _ref_riskScore__legal = _det864_litigationRisk;
 
-// ═══ Detector #575 [16.8] Law enforcement subpoena process ═══
-// severity: high
 export const subpoenaProcess_575 = 'subpoenaProcess';
 export const lawEnforcement__request_575 = 'lawEnforcement.*request';
 export const legalRequest_575 = 'legalRequest';
@@ -452,16 +421,10 @@ export const _det575_subpoenaProcess = {
     return ['subpoenaProcess', 'lawEnforcement.*request', 'legalRequest'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: subpoenaProcess
 export const _ref_subpoenaProcess = _det575_subpoenaProcess;
-// pattern-ref: lawEnforcement.*request
 export const _ref_lawEnforcement__request = _det575_subpoenaProcess;
-// pattern-ref: legalRequest
 export const _ref_legalRequest = _det575_subpoenaProcess;
 
-// ════════════════════════════════════════════════════
-// Detector #543 [§16.2] LGPD compliance (Brazil)
-// ════════════════════════════════════════════════════
 export const LGPD_543_key = 'LGPD';
 export const lgpdCompliance_543_key = 'lgpdCompliance';
 export const brazilPrivacy_543_key = 'brazilPrivacy';

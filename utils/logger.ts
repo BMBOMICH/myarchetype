@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// logger.ts — COMPACT
-// ═══════════════════════════════════════════════════════════════
 
 import * as Crypto from 'expo-crypto';
 import { addDoc, collection, FieldValue, serverTimestamp } from 'firebase/firestore';
@@ -16,7 +13,7 @@ export interface AuditLogEntry { action: AuditActionType; userId?: string|null; 
 export interface ConsentRecord { userId: string; consentType: string; granted: boolean; version?: string; timestamp: FieldValue; ipAddress?: string; }
 export interface DMCANotice { reporterEmail: string; contentUrl: string; copyrightOwner: string; workDescription: string; goodFaithStatement: boolean; accuracyStatement: boolean; }
 
-export const logger = { log: (...a: unknown[]) => { if (isDev) console.log('[App]', ...a); }, error: (...a: unknown[]) => { if (isDev) console.error('[App]', ...a); }, warn: (...a: unknown[]) => { if (isDev) console.warn('[App]', ...a); }, info: (...a: unknown[]) => { if (isDev) console.info('[App]', ...a); }, security: (...a: unknown[]) => { console.warn('[SECURITY]', new Date().toISOString(), ...a); } };
+if (__DEV__) export const logger = { log: (...a: unknown[]) => { if (isDev) console.log('[App]', ...a); }, error: (...a: unknown[]) => { if (isDev) console.error('[App]', ...a); }, warn: (...a: unknown[]) => { if (isDev) console.warn('[App]', ...a); }, info: (...a: unknown[]) => { if (isDev) console.info('[App]', ...a); }, security: (...a: unknown[]) => { console.warn('[SECURITY]', new Date().toISOString(), ...a); } };
 
 function secureId(p: string): string { const h = Array.from(Crypto.getRandomBytes(4)).map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase(); return `${p}-${Date.now()}-${h}`; }
 

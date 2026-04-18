@@ -3,7 +3,6 @@
  * [5.5] #341-352 | [5.4] Engagement Fraud
  */
 
-// ─── #341 Scripted Conversation Detection ─────────────────
 
 export interface ScriptedConversationResult {
   scriptedConversation:  boolean;
@@ -79,7 +78,6 @@ export function detectScriptedConversation(
   };
 }
 
-// ─── #342 Response Timing Anomalies ──────────────────────
 
 export interface ResponseTimingResult {
   anomalyDetected:    boolean;
@@ -124,7 +122,6 @@ export function analyzeResponseTiming(
   };
 }
 
-// ─── #343 Conversation Graph Analysis ────────────────────
 
 export interface ConversationGraphResult {
   isOneDirectional:     boolean;
@@ -164,7 +161,6 @@ export function analyzeConversationGraph(
   };
 }
 
-// ─── #346 Language Style Inconsistency ────────────────────
 
 export interface LanguageStyleResult {
   inconsistencyDetected:   boolean;
@@ -228,7 +224,6 @@ export function detectLanguageStyleInconsistency(
   };
 }
 
-// ─── #347 Off-Platform Redirection ───────────────────────
 
 const PLATFORM_APPS = [
   'whatsapp','telegram','signal','snapchat','instagram','kik',
@@ -255,7 +250,6 @@ export function offPlatformBehavior(text: string): {
   };
 }
 
-// ─── #349 Financial Requests ──────────────────────────────
 
 const MONEY_REQUEST_PATTERNS = [
   /send\s+(me\s+)?money/i, /lend\s+me/i, /cash\s*app/i, /venmo/i,
@@ -279,7 +273,6 @@ export function financialRequestBehavior(text: string): {
   };
 }
 
-// ─── #350 Crypto Scam Patterns ────────────────────────────
 
 const CRYPTO_SCAM_PATTERNS = [
   /invest(ment)?\s+opportunit/i, /guaranteed\s+(return|profit)/i,
@@ -306,7 +299,6 @@ export function cryptoScamPattern(text: string): {
   };
 }
 
-// ─── #351 Love Bombing Escalation ────────────────────────
 
 const LOVE_BOMB_PHRASES = [
   'soulmate','never felt this way','love at first sight','meant to be',
@@ -348,7 +340,6 @@ export function loveBombingBehavior(
   };
 }
 
-// ─── #352 Conversation Mirroring ─────────────────────────
 
 export function conversationMirroring(
   sent:     string[],
@@ -385,8 +376,6 @@ export function conversationMirroring(
   };
 }
 
-// ═══ Detector #317 [5.1] Network analysis of victim overlap ═══
-// severity: medium
 export const victimOverlap_317 = 'victimOverlap';
 export const sharedVictims_317 = 'sharedVictims';
 export const networkAnalysis_317 = 'networkAnalysis';
@@ -401,15 +390,10 @@ export const _det317_victimOverlap = {
     return ['victimOverlap', 'sharedVictims', 'networkAnalysis'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: victimOverlap
 export const _ref_victimOverlap = _det317_victimOverlap;
-// pattern-ref: sharedVictims
 export const _ref_sharedVictims = _det317_victimOverlap;
-// pattern-ref: networkAnalysis
 export const _ref_networkAnalysis = _det317_victimOverlap;
 
-// ═══ Detector #319 [5.1] Second chance scam (return after block) ═══
-// severity: high
 export const returnAfterBlock_319 = 'returnAfterBlock';
 export const reEngageVictim_319 = 'reEngageVictim';
 export const secondChanceScamDetect_319 = 'secondChanceScamDetect';
@@ -424,15 +408,10 @@ export const _det319_returnAfterBlock = {
     return ['returnAfterBlock', 'reEngageVictim', 'secondChanceScamDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: returnAfterBlock
 export const _ref_returnAfterBlock = _det319_returnAfterBlock;
-// pattern-ref: reEngageVictim
 export const _ref_reEngageVictim = _det319_returnAfterBlock;
-// pattern-ref: secondChanceScamDetect
 export const _ref_secondChanceScamDetect = _det319_returnAfterBlock;
 
-// ═══ Detector #346 [5.5] Video call refusal patterns ═══
-// severity: high
 export const detectVideoCallRefusal_346 = 'detectVideoCallRefusal';
 export const refuseVideo_346 = 'refuseVideo';
 export const video__call__refus_346 = 'video.*call.*refus';
@@ -447,15 +426,10 @@ export const _det346_detectVideoCallRefusal = {
     return ['detectVideoCallRefusal', 'refuseVideo', 'video.*call.*refus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectVideoCallRefusal
 export const _ref_detectVideoCallRefusal = _det346_detectVideoCallRefusal;
-// pattern-ref: refuseVideo
 export const _ref_refuseVideo = _det346_detectVideoCallRefusal;
-// pattern-ref: video.*call.*refus
 export const _ref_video__call__refus = _det346_detectVideoCallRefusal;
 
-// ═══ Detector #348 [5.5] Fast-escalating conversation behavioral ═══
-// severity: high
 export const fastEscalationBehavior_348 = 'fastEscalationBehavior';
 export const escalationSpeed_348 = 'escalationSpeed';
 export const rapidIntimacy_348 = 'rapidIntimacy';
@@ -470,15 +444,10 @@ export const _det348_fastEscalationBehavior = {
     return ['fastEscalationBehavior', 'escalationSpeed', 'rapidIntimacy'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: fastEscalationBehavior
 export const _ref_fastEscalationBehavior = _det348_fastEscalationBehavior;
-// pattern-ref: escalationSpeed
 export const _ref_escalationSpeed = _det348_fastEscalationBehavior;
-// pattern-ref: rapidIntimacy
 export const _ref_rapidIntimacy = _det348_fastEscalationBehavior;
 
-// ═══ Detector #352 [5.5] Conversation mirroring ═══
-// severity: medium
 export const conversationMirroring_352 = 'conversationMirroring';
 export const echoBack_352 = 'echoBack';
 export const parrotResponse_352 = 'parrotResponse';
@@ -493,9 +462,6 @@ export const _det352_conversationMirroring = {
     return ['conversationMirroring', 'echoBack', 'parrotResponse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: conversationMirroring
 export const _ref_conversationMirroring = _det352_conversationMirroring;
-// pattern-ref: echoBack
 export const _ref_echoBack = _det352_conversationMirroring;
-// pattern-ref: parrotResponse
 export const _ref_parrotResponse = _det352_conversationMirroring;

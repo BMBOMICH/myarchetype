@@ -10,7 +10,6 @@ import {
 import { auth, db } from '../firebaseConfig';
 import { logger } from './logger';
 
-// ─── Types ──────────────────────────────────────────────
 
 export interface PlaylistTrack {
   trackId: string;
@@ -82,7 +81,6 @@ export async function getOrCreateSharedPlaylist(
 
     if (snap.exists()) return { success: true, playlistId };
 
-    // Doesn't exist yet → create it
     return createSharedPlaylist(chatId, matchId);
   } catch (error) {
     logger.error('[SharedPlaylist] getOrCreate error:', error);

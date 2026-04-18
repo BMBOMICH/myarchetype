@@ -1,4 +1,3 @@
-// file: utils/voiceIntro.ts
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 import { auth, db } from '../firebaseConfig';
@@ -77,7 +76,6 @@ export async function detectVoiceCloneHeuristic(audioUri:string):Promise<{likely
       const silentRatio=rms.filter(r=>r<0.0001).length/rms.length;
       if(silentRatio>0.4)signals.push('Unusual silence patterns');
       if(silentRatio<0.01)signals.push('No natural breath pauses detected');
-      // Spectral flatness heuristic — TTS tends to be spectrally flat
       const vals=nonSilent.length>0?nonSilent:[rms[0]??0];
       const geoMean=Math.exp(vals.reduce((s,v)=>s+Math.log(Math.max(v,1e-10)),0)/vals.length);
       const ariMean=vals.reduce((a,b)=>a+b,0)/vals.length;
@@ -104,8 +102,6 @@ export async function detectPreRecordedAudio(audioUri:string):Promise<{likelyPre
   return{likelyPreRecorded:signals.length>=1,signals};
 }
 
-// #380 — Core NSFW speech detection
-// Server: Whisper (MIT) transcription → DuoGuard sexual_content category → Llama Guard 4 S1/S2
 export async function transcribeAndModerateAudio(audioUrl:string):Promise<NsfwSpeechResult>{
   try{
     const res=await fetch(`${SERVER_URL}/transcribeAndModerate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioUrl,model:'whisper-large-v3',guardrail:'duoguard',categories:['sexual_content','violence','hate','self_harm','scam']})});
@@ -114,16 +110,11 @@ export async function transcribeAndModerateAudio(audioUrl:string):Promise<NsfwSp
     if(!data.safe)return{safe:false,transcription:data.transcription,reason:data.reason??'Audio contains inappropriate content.',flaggedCategories:data.flaggedCategories};
     const transcription=data.transcription??'';
     if(transcription){
-      // Layer 1: general text safety
       const textCheck=checkTextSafety(transcription,'general');
       if(!textCheck.safe)return{safe:false,transcription,reason:textCheck.reason,flaggedCategories:textCheck.flaggedCategories};
-      // Layer 2: NSFW speech patterns
       for(const pattern of NSFW_SPEECH_PATTERNS){if(pattern.test(transcription))return{safe:false,transcription,reason:'Voice intro contains sexually explicit content.',flaggedCategories:['nsfw_speech','sexual_content']};}
-      // Layer 3: threat patterns
       for(const pattern of THREAT_PATTERNS){if(pattern.test(transcription))return{safe:false,transcription,reason:'Voice intro contains threatening content.',flaggedCategories:['threats','violence']};}
-      // Layer 4: scam patterns
       for(const pattern of SCAM_PATTERNS){if(pattern.test(transcription))return{safe:false,transcription,reason:'Voice intro contains suspicious solicitation.',flaggedCategories:['scam','solicitation']};}
-      // Layer 5: contact info
       if(PHONE_RE.test(transcription))return{safe:false,transcription,reason:'Voice intro may not contain phone numbers.',flaggedCategories:['contact_info_phone']};
       if(EMAIL_RE.test(transcription))return{safe:false,transcription,reason:'Voice intro may not contain email addresses.',flaggedCategories:['contact_info_email']};
     }
@@ -131,7 +122,6 @@ export async function transcribeAndModerateAudio(audioUrl:string):Promise<NsfwSp
   }catch{return{safe:true};}
 }
 
-// #380 — all required export names
 export const checkNsfwSpeech=transcribeAndModerateAudio;
 export const checkNsfwSpeechVoice=transcribeAndModerateAudio;
 export const nsfw_speech_voice=transcribeAndModerateAudio;
@@ -158,7 +148,7 @@ export const E2EEAudio=encryptVoiceForRecipient;
 
 export async function analyzeVoiceIntro(audioUri:string,audioUrl:string,profileGender?:string):Promise<VoiceAnalysisResult>{
   const issues:string[]=[],warnings:string[]=[];
-  const[cloneCheck,preCheck,transcript]=await Promise.all([detectVoiceCloneHeuristic(audioUri),detectPreRecordedAudio(audioUri),transcribeAndModerateAudio(audioUrl)]);
+  const[cloneCheck,preCheck,transcript]=await Promise.all([detectVoiceCloneHeuristic(audioUri).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),detectPreRecordedAudio(audioUri),transcribeAndModerateAudio(audioUrl)]);
   if(cloneCheck.likelyCloned)warnings.push('Voice may be AI-generated. Human voice required.');
   if(preCheck.likelyPreRecorded)warnings.push('Audio may be pre-recorded. Record your voice live.');
   if(!transcript.safe)issues.push(transcript.reason??'Audio contains inappropriate content.');

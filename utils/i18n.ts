@@ -1,10 +1,7 @@
-// Multi-language support for MyArchetype
-// Priority: Azerbaijani, Turkish, English
 
 export type Language = 'az' | 'tr' | 'en' | 'ru' | 'es' | 'fr' | 'de' | 'ar' | 'pt' | 'zh';
 
 export interface Translations {
-  // Common
   appName:             string;
   loading:             string;
   save:                string;
@@ -21,7 +18,6 @@ export interface Translations {
   no:                  string;
   ok:                  string;
 
-  // Auth
   login:                  string;
   signup:                 string;
   logout:                 string;

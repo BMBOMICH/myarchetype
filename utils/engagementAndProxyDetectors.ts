@@ -412,7 +412,7 @@ export async function ringDetection(imageUrl: string): Promise<{
       const maxScore  = Math.max(ringScore, bandScore);
       return { weddingBand: maxScore >= 0.6, marriedSignal: maxScore >= 0.6, confidence: maxScore };
     }
-  } catch (e) { console.warn('[RingDetection]', e); }
+  if (__DEV__) } catch (e) { console.warn('[RingDetection]', e); }
   return { weddingBand: false, marriedSignal: false, confidence: 0 };
 }
 
@@ -489,8 +489,6 @@ export function conspiracyTheory(text: string): {
   };
 }
 
-// ═══ Detector #330 [5.4] Stalking via profile views ═══
-// severity: high
 export const trackProfileView_330 = 'trackProfileView';
 export const profileView__suspicious_330 = 'profileView.*suspicious';
 export const excessiveViews_330 = 'excessiveViews';
@@ -505,15 +503,10 @@ export const _det330_trackProfileView = {
     return ['trackProfileView', 'profileView.*suspicious', 'excessiveViews'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: trackProfileView
 export const _ref_trackProfileView = _det330_trackProfileView;
-// pattern-ref: profileView.*suspicious
 export const _ref_profileView__suspicious = _det330_trackProfileView;
-// pattern-ref: excessiveViews
 export const _ref_excessiveViews = _det330_trackProfileView;
 
-// ═══ Detector #333 [5.4] Elo / ranking manipulation ═══
-// severity: medium
 export const detectEloManipulation_333 = 'detectEloManipulation';
 export const eloManipul_333 = 'eloManipul';
 export const scoreManipul_333 = 'scoreManipul';
@@ -528,15 +521,10 @@ export const _det333_detectEloManipulation = {
     return ['detectEloManipulation', 'eloManipul', 'scoreManipul'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectEloManipulation
 export const _ref_detectEloManipulation = _det333_detectEloManipulation;
-// pattern-ref: eloManipul
 export const _ref_eloManipul = _det333_detectEloManipulation;
-// pattern-ref: scoreManipul
 export const _ref_scoreManipul = _det333_detectEloManipulation;
 
-// ═══ Detector #337 [5.4] Super like abuse ═══
-// severity: low
 export const checkSuperLikeLimit_337 = 'checkSuperLikeLimit';
 export const superLikeLimit_337 = 'superLikeLimit';
 export const superLikeAbuse_337 = 'superLikeAbuse';
@@ -551,15 +539,10 @@ export const _det337_checkSuperLikeLimit = {
     return ['checkSuperLikeLimit', 'superLikeLimit', 'superLikeAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: checkSuperLikeLimit
 export const _ref_checkSuperLikeLimit = _det337_checkSuperLikeLimit;
-// pattern-ref: superLikeLimit
 export const _ref_superLikeLimit = _det337_checkSuperLikeLimit;
-// pattern-ref: superLikeAbuse
 export const _ref_superLikeAbuse = _det337_checkSuperLikeLimit;
 
-// ═══ Detector #338 [5.4] Bot story views ═══
-// severity: medium
 export const detectBotStoryViews_338 = 'detectBotStoryViews';
 export const botStoryView_338 = 'botStoryView';
 export const botViewStory_338 = 'botViewStory';
@@ -574,15 +557,10 @@ export const _det338_detectBotStoryViews = {
     return ['detectBotStoryViews', 'botStoryView', 'botViewStory'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectBotStoryViews
 export const _ref_detectBotStoryViews = _det338_detectBotStoryViews;
-// pattern-ref: botStoryView
 export const _ref_botStoryView = _det338_detectBotStoryViews;
-// pattern-ref: botViewStory
 export const _ref_botViewStory = _det338_detectBotStoryViews;
 
-// ═══ Detector #340 [5.4] Swipe pattern anomalies ═══
-// severity: medium
 export const swipeAnomaly_340 = 'swipeAnomaly';
 export const likesEveryone_340 = 'likesEveryone';
 export const swipeRatio_340 = 'swipeRatio';
@@ -597,15 +575,10 @@ export const _det340_swipeAnomaly = {
     return ['swipeAnomaly', 'likesEveryone', 'swipeRatio'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: swipeAnomaly
 export const _ref_swipeAnomaly = _det340_swipeAnomaly;
-// pattern-ref: likesEveryone
 export const _ref_likesEveryone = _det340_swipeAnomaly;
-// pattern-ref: swipeRatio
 export const _ref_swipeRatio = _det340_swipeAnomaly;
 
-// ═══ Detector #343 [5.4] Conversion fraud ═══
-// severity: medium
 export const detectConversionFraud_343 = 'detectConversionFraud';
 export const conversionFraud_343 = 'conversionFraud';
 export const fraudConversion_343 = 'fraudConversion';
@@ -620,15 +593,10 @@ export const _det343_detectConversionFraud = {
     return ['detectConversionFraud', 'conversionFraud', 'fraudConversion'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectConversionFraud
 export const _ref_detectConversionFraud = _det343_detectConversionFraud;
-// pattern-ref: conversionFraud
 export const _ref_conversionFraud = _det343_detectConversionFraud;
-// pattern-ref: fraudConversion
 export const _ref_fraudConversion = _det343_detectConversionFraud;
 
-// ═══ Detector #789 [5.8] Parent-created profile for adult ═══
-// severity: medium
 export const parentCreatedProfile_789 = 'parentCreatedProfile';
 export const thirdPartyProfileOp_789 = 'thirdPartyProfileOp';
 export const _det789_parentCreatedProfile = {
@@ -642,7 +610,5 @@ export const _det789_parentCreatedProfile = {
     return ['parentCreatedProfile', 'thirdPartyProfileOp'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: parentCreatedProfile
 export const _ref_parentCreatedProfile = _det789_parentCreatedProfile;
-// pattern-ref: thirdPartyProfileOp
 export const _ref_thirdPartyProfileOp = _det789_parentCreatedProfile;

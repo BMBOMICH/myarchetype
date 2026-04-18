@@ -1,6 +1,5 @@
 import { writeAuditLog } from './logger';
 
-// ─── Report Safety ───
 export function anonymousReportSafety(r: { reporterId?: string; deviceFingerprint?: string; ipHash?: string }) { const { reporterId: _r, deviceFingerprint: _d, ipHash: _i, ...s } = r; return { strippedReport: s, tokenId: Math.random().toString(36).slice(2) + Date.now().toString(36) }; }
 export const safeAnonymousReport = anonymousReportSafety; export const whistleblowerProtect = anonymousReportSafety;
 
@@ -11,7 +10,6 @@ export const stripReportMeta = reportMetadataStrip; export const reportAnonymize
 export function scoreReportCredibility(r: { hasEvidence: boolean; reporterHistory: number; targetReportCount: number; specificDetails: boolean; timelyReport: boolean }) { let s = 0; if (r.hasEvidence) s += 35; if (r.specificDetails) s += 25; if (r.timelyReport) s += 15; if (r.reporterHistory >= 3) s += 15; if (r.targetReportCount >= 3) s += 10; const w = s >= 70 ? 'high' : s >= 40 ? 'medium' : 'low'; if (s >= 50) writeAuditLog('safety.high_credibility_report', { score: s, weight: w }).catch(() => {}); return { score: s, credible: s >= 50, weight: w }; }
 export const reportCredibility = scoreReportCredibility; export const credibilityScore = scoreReportCredibility;
 
-// ─── API Response Sanitization ───
 const PII = new Set(['password', 'ssn', 'creditCard', 'bankAccount', 'driverLicense', 'passportNumber', 'privateKey', 'secretKey', 'apiKey', 'accessToken', 'refreshToken', 'biometricTemplate', 'securityAnswer']);
 export function apiResponseSanitize(res: Record<string, unknown>) { return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, PII.has(k) ? '[REDACTED]' : v])); }
 export const sanitizeApiResponse = apiResponseSanitize; export const piiScrubResponse = apiResponseSanitize;
@@ -19,20 +17,16 @@ export const sanitizeApiResponse = apiResponseSanitize; export const piiScrubRes
 export function apiFieldProjection<T extends Record<string, unknown>>(obj: T, allowed: (keyof T)[]) { return Object.fromEntries(Object.entries(obj).filter(([k]) => allowed.includes(k as keyof T))) as Partial<T>; }
 export const fieldProjection = apiFieldProjection; export const responseFieldLimit = apiFieldProjection;
 
-// ─── Export Limits ───
 const exp: Record<string, { c: number; w: number }> = {};
 export function bulkDataExportLimit(uid: string, max = 3) { const n = Date.now(), e = exp[uid]; if (!e || n - e.w > 3_600_000) { exp[uid] = { c: 1, w: n }; return { allowed: true, remaining: max - 1 }; } e.c++; return { allowed: e.c <= max, remaining: Math.max(0, max - e.c) }; }
 export const exportRateLimit = bulkDataExportLimit; export const dataExportThrottle = bulkDataExportLimit;
 
-// ─── GraphQL Field Masking ───
 export function graphqlFieldMasking(res: Record<string, unknown>, role: 'user' | 'admin' | 'moderator') { const A = new Set(['email', 'phone', 'ipAddress', 'deviceFingerprint', 'internalScore', 'trustScore', 'reportCount', 'safetyFlags']); if (role === 'admin') return res; return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, A.has(k) ? undefined : v])); }
 export const fieldMasking = graphqlFieldMasking; export const sensitiveFieldMask = graphqlFieldMasking;
 
-// ─── API Versioning ───
 export function apiVersionDeprecation(v: string, dep: string[]) { if (!dep.includes(v)) return { deprecated: false }; return { deprecated: true, message: `API version ${v} deprecated. Migrate to /v2/`, sunsetDate: '2025-12-31' }; }
 export const versionDeprecate = apiVersionDeprecation; export const endpointDeprecation = apiVersionDeprecation;
 
-// ─── Injection Prevention ───
 const SQL = [/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE)\b)/i, /('|--|;|\/\*|\*\/)/];
 export function sqlInjectionPrevention(i: string) { return { safe: !SQL.some(p => p.test(i)), sanitized: i.replace(/['";\-\-\/\*]/g, '') }; }
 export const sqlInjection = sqlInjectionPrevention; export const injectionDetect = sqlInjectionPrevention;
@@ -41,7 +35,6 @@ const XSS = [/<script\b/i, /javascript:/i, /on\w+\s*=/i, /<iframe/i, /eval\s*\(/
 export function xssPrevention(i: string) { return { safe: !XSS.some(p => p.test(i)), sanitized: i.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;') }; }
 export const xssDetect = xssPrevention; export const scriptInjection = xssPrevention;
 
-// ─── CSP & Headers ───
 export function cspViolationReport(v: { documentUri: string; violatedDirective: string; blockedUri: string }) { const H = ['script-src', 'object-src', 'base-uri']; const sev = H.some(d => v.violatedDirective.includes(d)) ? 'high' : 'medium'; return { severity: sev, shouldAlert: sev === 'high' }; }
 export const cspViolation = cspViolationReport; export const contentSecurityPolicy = cspViolationReport;
 
@@ -51,7 +44,6 @@ export const depVulnCheck = dependencyVulnerability; export const packageAudit =
 export function securityHeadersCheck(h: Record<string, string>) { const R = ['strict-transport-security', 'x-content-type-options', 'x-frame-options', 'content-security-policy', 'referrer-policy', 'permissions-policy']; const l = Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), v])); const m = R.filter(x => !l[x]), p = R.filter(x => !!l[x]); return { score: Math.round((p.length / R.length) * 100), missing: m, passed: p }; }
 export const headerAudit = securityHeadersCheck; export const httpSecurityHeaders = securityHeadersCheck;
 
-// ─── #654 PII Detection in Text ───
 const PII_PATTERNS: Array<{ type: string; pattern: RegExp }> = [
   { type: 'ssn', pattern: /\b\d{3}-\d{2}-\d{4}\b/ },
   { type: 'credit_card', pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/ },
@@ -76,7 +68,6 @@ export function detectPIIInText(text: string): { found: boolean; types: string[]
 }
 export const piiDetect = detectPIIInText; export const textPII = detectPIIInText;
 
-// ─── Log Redaction ───
 export function redactLogs(entry: Record<string, unknown>): Record<string, unknown> {
   const SENSITIVE_KEYS = new Set(['password', 'token', 'secret', 'apiKey', 'authorization', 'cookie', 'session', 'creditCard', 'ssn', 'phone', 'email', 'ip', 'location', 'lat', 'lng', 'biometric', 'health']);
   return Object.fromEntries(Object.entries(entry).map(([k, v]) => {
@@ -89,7 +80,6 @@ export function redactLogs(entry: Record<string, unknown>): Record<string, unkno
 }
 export const logRedaction = redactLogs; export const sanitizeLog = redactLogs;
 
-// ─── Error Message Sanitization ───
 export function sanitizeErrorMessage(error: Error, isProduction: boolean): { message: string; stack?: string; details?: string } {
   if (!isProduction) return { message: error.message, stack: error.stack, details: error.cause?.toString() };
   const safeMessages: Record<string, string> = { 'ECONNREFUSED': 'Service temporarily unavailable', 'ENOTFOUND': 'Service temporarily unavailable', 'ETIMEDOUT': 'Request timed out', 'ENOENT': 'Resource not found', 'UNAUTHORIZED': 'Authentication required', 'FORBIDDEN': 'Access denied', 'ValidationError': 'Invalid input provided' };
@@ -98,7 +88,6 @@ export function sanitizeErrorMessage(error: Error, isProduction: boolean): { mes
 }
 export const errorSanitize = sanitizeErrorMessage; export const productionError = sanitizeErrorMessage;
 
-// ─── Data Classification ───
 export type DataClassification = 'public' | 'internal' | 'confidential' | 'restricted';
 const FIELD_CLASSIFICATION: Record<string, DataClassification> = {
   name: 'public', bio: 'public', age: 'public', photos: 'public', interests: 'public',
@@ -121,7 +110,6 @@ export function enforceDataAccess(fields: string[], userClearance: DataClassific
 }
 export const dataAccessControl = enforceDataAccess; export const fieldAccessEnforce = enforceDataAccess;
 
-// ─── Egress Monitoring ───
 export function egressMonitor(response: { statusCode: number; body: Record<string, unknown>; endpoint: string; role: string }): { blocked: boolean; reason?: string } {
   if (response.role !== 'admin') {
     const bodyStr = JSON.stringify(response.body);
@@ -133,7 +121,6 @@ export function egressMonitor(response: { statusCode: number; body: Record<strin
 }
 export const egressFilter = egressMonitor; export const responseMonitor = egressMonitor;
 
-// ─── Sensitive Field Encryption Config ───
 export const SENSITIVE_FIELD_ENCRYPTION = {
   algorithm: 'AES-256-GCM' as const,
   fields: ['sexualOrientation', 'politicalViews', 'religion', 'healthData', 'biometricTemplate', 'location', 'dateOfBirth', 'sexualPreferences', 'kinkPreferences', 'stiStatus'],
@@ -144,7 +131,6 @@ export const SENSITIVE_FIELD_ENCRYPTION = {
 };
 export const fieldEncryption = SENSITIVE_FIELD_ENCRYPTION; export const encryptionConfig = SENSITIVE_FIELD_ENCRYPTION;
 
-// ─── NoSQL Injection Prevention ───
 const NOSQL_PATTERNS = [/\$where/i, /\$regex/i, /\$gt/i, /\$lt/i, /\$ne/i, /\$or/i, /\$and/i, /\$not/i, /\$expr/i, /\$lookup/i];
 export function noSQLInjectionPrevention(input: unknown): { safe: boolean; sanitized: unknown } {
   if (typeof input === 'string') {
@@ -161,7 +147,6 @@ export function noSQLInjectionPrevention(input: unknown): { safe: boolean; sanit
 }
 export const noSQLInjection = noSQLInjectionPrevention; export const mongoInjection = noSQLInjectionPrevention;
 
-// ─── Path Traversal Prevention ───
 const PATH_TRAVERSAL = [/\.\./, /\.\.\\/, /%2e%2e/i, /%252e/i, /\.\.%2f/i, /%2f\.\./i];
 export function pathTraversalPrevention(input: string): { safe: boolean; sanitized: string } {
   const safe = !PATH_TRAVERSAL.some(p => p.test(input));
@@ -169,7 +154,6 @@ export function pathTraversalPrevention(input: string): { safe: boolean; sanitiz
 }
 export const pathTraversal = pathTraversalPrevention; export const directoryTraversal = pathTraversalPrevention;
 
-// ─── Command Injection Prevention ───
 const CMD_PATTERNS = [/;\s*(rm|cat|ls|wget|curl|bash|sh|python|perl|nc|ncat|netcat)\b/i, /\|\s*(rm|cat|ls|wget|curl|bash|sh)\b/i, /`[^`]*`/, /\$\([^)]*\)/, /&&\s*(rm|cat|ls|wget|curl)\b/i];
 export function commandInjectionPrevention(input: string): { safe: boolean; sanitized: string } {
   const safe = !CMD_PATTERNS.some(p => p.test(input));
@@ -177,7 +161,6 @@ export function commandInjectionPrevention(input: string): { safe: boolean; sani
 }
 export const commandInjection = commandInjectionPrevention; export const cmdInjection = commandInjectionPrevention;
 
-// ─── #501 Data Loss Prevention ────────────────────────────
 export interface DlpResult{violation:boolean;type:string[];severity:'none'|'low'|'medium'|'high'|'critical';blockedContent:string[];recommendation:string;}
 const DLP_PATTERNS=[
   {type:'ssn',pattern:/\b\d{3}-\d{2}-\d{4}\b/g,severity:'critical' as const},

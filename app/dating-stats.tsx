@@ -1,6 +1,9 @@
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, InteractionManager, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 import { calculateDatingStats, DatingStats, getConversationRateLevel, getMatchRateLevel } from '../utils/datingStats';
 import { logger } from '../utils/logger';
 
@@ -10,20 +13,32 @@ export default function DatingStatsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats]     = useState<DatingStats | null>(null);
+  const isMounted             = useRef(true);
 
   const loadStats = useCallback(async () => {
     try {
-      setStats(await calculateDatingStats());
+      const result = await calculateDatingStats();
+      if (!isMounted.current) return;
+      setStats(result);
     } catch (error) {
       logger.error('[Stats] Load error:', error);
-      Alert.alert('Error', 'Failed to calculate stats.');
+      if (!isMounted.current) return;
       setStats(null);
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => {
+    isMounted.current = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadStats();
+    }, []);
+    return () => {
+      isMounted.current = false;
+      task.cancel();
+    };
+  }, [loadStats]);
 
   const handleBack = useCallback(() => router.back(), [router]);
 
@@ -51,10 +66,10 @@ export default function DatingStatsScreen() {
         render: () => (
           <View style={styles.overviewGrid}>
             {[
-              { n: stats.totalMatches,       l: 'Total Matches', c: '#53a8b6' },
-              { n: `${stats.matchRate}%`,    l: 'Match Rate',    c: matchRateInfo.color },
-              { n: stats.profileViews,       l: 'Profile Views', c: '#53a8b6' },
-              { n: stats.trustScore,         l: 'Trust Score',   c: '#53a8b6' },
+              { n: stats.totalMatches,    l: 'Total Matches', c: '#53a8b6' },
+              { n: `${stats.matchRate}%`, l: 'Match Rate',    c: matchRateInfo.color },
+              { n: stats.profileViews,    l: 'Profile Views', c: '#53a8b6' },
+              { n: stats.trustScore,      l: 'Trust Score',   c: '#53a8b6' },
             ].map((item) => (
               <View key={item.l} style={styles.overviewCard} accessibilityLabel={`${item.l}: ${item.n}`}>
                 <Text style={[styles.overviewNumber, { color: item.c }]}>{item.n}</Text>
@@ -205,7 +220,7 @@ export default function DatingStatsScreen() {
     ];
   }, [stats, handleBack]);
 
-  const renderSection = useCallback(({ item }: { item: Section }) => item.render(), []);
+  const renderSection = useCallback(({ item }: LegendListRenderItemProps<Section>) => item.render(), []);
   const keyExtractor  = useCallback((item: Section) => item.key, []);
 
   if (loading) {
@@ -229,51 +244,53 @@ export default function DatingStatsScreen() {
   }
 
   return (
-    <FlatList
+    <LegendList
       data={sections}
       keyExtractor={keyExtractor}
       renderItem={renderSection}
       contentContainerStyle={styles.content}
       style={styles.flatList}
+      estimatedItemSize={300}
+      recycleItems={false}
     />
   );
 }
 
-const styles = StyleSheet.create({
-  flatList:      { flex: 1, backgroundColor: '#1a1a2e' },
-  container:     { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-  content:       { padding: 20, paddingBottom: 40 },
-  loadingText:   { color: '#aaa', fontSize: 16, marginTop: 15, textAlign: 'center' },
-  errorText:     { color: '#d9534f', fontSize: 16, textAlign: 'center', marginTop: 50 },
-  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, marginBottom: 20 },
-  headerSpacer:  { width: 60 },
-  backButton:    { color: '#53a8b6', fontSize: 16 },
-  title:         { fontSize: 20, fontWeight: 'bold', color: '#eee' },
-  overviewGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 25 },
-  overviewCard:  { flex: 1, minWidth: '45%', backgroundColor: '#16213e', borderRadius: 15, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
+const styles = StyleSheet.create((theme) => ({
+  flatList:       { flex: 1, backgroundColor: theme.colors.background },
+  container:      { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
+  content:        { padding: 20, paddingBottom: 40 },
+  loadingText:    { color: theme.colors.textSecondary, fontSize: 16, marginTop: 15, textAlign: 'center' },
+  errorText:      { color: theme.colors.error, fontSize: 16, textAlign: 'center', marginTop: 50 },
+  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, marginBottom: 20 },
+  headerSpacer:   { width: 60 },
+  backButton:     { color: '#53a8b6', fontSize: 16 },
+  title:          { fontSize: 20, fontWeight: 'bold', color: theme.colors.text },
+  overviewGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 25 },
+  overviewCard:   { flex: 1, minWidth: '45%', backgroundColor: '#16213e', borderRadius: 15, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
   overviewNumber: { fontSize: 32, fontWeight: 'bold', marginBottom: 5 },
-  overviewLabel: { fontSize: 13, color: '#888', textAlign: 'center' },
-  section:       { marginBottom: 25 },
-  sectionTitle:  { fontSize: 18, fontWeight: 'bold', color: '#53a8b6', marginBottom: 15 },
-  ratingCard:    { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, marginBottom: 15 },
-  ratingHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  ratingLabel:   { fontSize: 16, fontWeight: '600', color: '#eee' },
-  ratingBadge:   { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12 },
-  ratingBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  progressBar:   { height: 10, backgroundColor: '#0f3460', borderRadius: 5, overflow: 'hidden', marginBottom: 12 },
-  progressFill:  { height: '100%', borderRadius: 5 },
-  ratingMessage: { color: '#aaa', fontSize: 14, lineHeight: 20 },
-  statsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statItem:      { flex: 1, minWidth: '45%', backgroundColor: '#16213e', borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
-  statNumber:    { fontSize: 24, fontWeight: 'bold', color: '#eee', marginBottom: 5 },
-  statLabel:     { fontSize: 12, color: '#888', textAlign: 'center' },
-  infoCard:      { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 1, borderColor: '#0f3460' },
-  infoRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
-  infoLabel:     { fontSize: 15, color: '#aaa' },
-  infoValue:     { fontSize: 16, fontWeight: 'bold', color: '#eee' },
-  goldText:      { color: '#f1c40f' },
-  greenText:     { color: '#5cb85c' },
-  tipsCard:      { backgroundColor: 'rgba(83,168,182,0.1)', borderRadius: 15, padding: 20, borderWidth: 1, borderColor: 'rgba(83,168,182,0.3)' },
-  tipsTitle:     { fontSize: 16, fontWeight: 'bold', color: '#53a8b6', marginBottom: 12 },
-  tipText:       { color: '#aaa', fontSize: 14, lineHeight: 22 },
-});
+  overviewLabel:  { fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center' },
+  section:        { marginBottom: 25 },
+  sectionTitle:   { fontSize: 18, fontWeight: 'bold', color: '#53a8b6', marginBottom: 15 },
+  ratingCard:     { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 2, marginBottom: 15 },
+  ratingHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  ratingLabel:    { fontSize: 16, fontWeight: '600', color: theme.colors.text },
+  ratingBadge:    { paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12 },
+  ratingBadgeText:{ color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  progressBar:    { height: 10, backgroundColor: '#0f3460', borderRadius: 5, overflow: 'hidden', marginBottom: 12 },
+  progressFill:   { height: '100%', borderRadius: 5 },
+  ratingMessage:  { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  statsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  statItem:       { flex: 1, minWidth: '45%', backgroundColor: '#16213e', borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#0f3460' },
+  statNumber:     { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 5 },
+  statLabel:      { fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center' },
+  infoCard:       { backgroundColor: '#16213e', borderRadius: 15, padding: 20, borderWidth: 1, borderColor: '#0f3460' },
+  infoRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
+  infoLabel:      { fontSize: 15, color: theme.colors.textSecondary },
+  infoValue:      { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
+  goldText:       { color: '#f1c40f' },
+  greenText:      { color: '#5cb85c' },
+  tipsCard:       { backgroundColor: 'rgba(83,168,182,0.1)', borderRadius: 15, padding: 20, borderWidth: 1, borderColor: 'rgba(83,168,182,0.3)' },
+  tipsTitle:      { fontSize: 16, fontWeight: 'bold', color: '#53a8b6', marginBottom: 12 },
+  tipText:        { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 22 },
+}));

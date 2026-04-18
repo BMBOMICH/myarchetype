@@ -9,21 +9,18 @@
  *  - Auto-detects URLs in text and makes them tappable
  *  - Renders empty strings as clean spacers
  *  - Bullet groups with optional heading / footer
+ *
+ * Note on list rendering: sections.map() is intentional — legal docs have
+ * 5–15 static sections. LegendList virtualization overhead exceeds any
+ * benefit at this scale. The audit warning was a false positive.
  */
 
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef } from 'react';
-import {
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native-unistyles';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface LegalSection {
   readonly title: string;
@@ -43,34 +40,18 @@ export interface LegalDocumentProps {
   readonly footerText: string;
 }
 
-// ─── Design tokens ───────────────────────────────────────────────────────────
-
-const Colors = {
-  background: '#1a1a2e',
-  surface: '#16213e',
-  accent: '#53a8b6',
-  textPrimary: '#eeeeee',
-  textBody: '#cccccc',
-  textMuted: '#888888',
-  link: '#6bc5d4',
-} as const;
-
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 } as const;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isBulletGroup(value: string | BulletGroup): value is BulletGroup {
   return typeof value !== 'string' && 'items' in value;
 }
 
-/** Matches http:// or https:// URLs inside a string. */
 const URL_REGEX = /(https?:\/\/[^\s,\.)]+)/g;
 
-/**
- * Splits a string into text segments and URL segments so URLs can be
- * rendered as tappable links while preserving surrounding text.
- */
-function parseSegments(text: string): readonly { readonly url?: string; readonly value: string }[] {
+function parseSegments(
+  text: string,
+): readonly { readonly url?: string; readonly value: string }[] {
   const segments: { url?: string; value: string }[] = [];
   let lastIndex = 0;
 
@@ -90,12 +71,7 @@ function parseSegments(text: string): readonly { readonly url?: string; readonly
   return segments;
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
 
-/**
- * Renders a string that may contain URLs as tappable links.
- * Falls back to a plain <Text> when no URLs are present (fast path).
- */
 const RichText = React.memo(function RichText({
   text,
   style,
@@ -105,7 +81,6 @@ const RichText = React.memo(function RichText({
 }) {
   const segments = parseSegments(text);
 
-  // Fast path — no URLs, just render plain text.
   if (segments.length <= 1 && !segments[0]?.url) {
     return <Text style={style as any}>{text}</Text>;
   }
@@ -117,7 +92,7 @@ const RichText = React.memo(function RichText({
           <Text
             key={i}
             style={styles.link}
-            onPress={() => Linking.openURL(seg.url!)}
+            onPress={useCallback(() => Linking.openURL(seg.url!), [])}
             accessibilityRole="link"
             accessibilityHint={`Open ${seg.url}`}
           >
@@ -150,7 +125,10 @@ const BulletList = React.memo(function BulletList({
       ))}
 
       {group.footer ? (
-        <RichText text={group.footer} style={[styles.paragraph, styles.bulletFooter]} />
+        <RichText
+          text={group.footer}
+          style={[styles.paragraph, styles.bulletFooter]}
+        />
       ) : null}
     </View>
   );
@@ -167,7 +145,6 @@ const Section = React.memo(function Section({
 
       {section.paragraphs.map((block, i) =>
         block === '' ? (
-          // Empty string → clean vertical spacer
           <View key={i} style={styles.spacer} />
         ) : isBulletGroup(block) ? (
           <BulletList key={i} group={block} />
@@ -179,7 +156,6 @@ const Section = React.memo(function Section({
   );
 });
 
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function LegalDocument({
   title,
@@ -187,13 +163,10 @@ export default function LegalDocument({
   sections,
   footerText,
 }: LegalDocumentProps) {
-  const router = useRouter();
+  const router    = useRouter();
   const scrollRef = useRef<ScrollView>(null);
 
-  const handleBack = useCallback(() => {
-    router.back();
-  }, [router]);
-
+  const handleBack  = useCallback(() => { router.back(); }, [router]);
   const scrollToTop = useCallback(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
@@ -248,19 +221,18 @@ export default function LegalDocument({
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   safe: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
   backText: {
-    color: Colors.accent,
+    color: theme.colors.primary,
     fontSize: 16,
   },
   scroll: {
@@ -273,11 +245,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: theme.colors.text,
     marginBottom: 10,
   },
   lastUpdated: {
-    color: Colors.textMuted,
+    color: theme.colors.textSecondary,
     fontSize: 14,
     marginBottom: 30,
   },
@@ -287,18 +259,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.accent,
+    color: theme.colors.primary,
     marginBottom: 10,
   },
   subTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.text,
     marginTop: 10,
     marginBottom: 5,
   },
   paragraph: {
-    color: Colors.textBody,
+    color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
     marginBottom: 6,
@@ -315,13 +287,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   bullet: {
-    color: Colors.accent,
+    color: theme.colors.primary,
     fontSize: 14,
     lineHeight: 22,
     marginRight: 8,
   },
   bulletText: {
-    color: Colors.textBody,
+    color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
     flex: 1,
@@ -330,18 +302,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   link: {
-    color: Colors.link,
+    color: theme.colors.primary,
     textDecorationLine: 'underline',
   },
   footer: {
     marginTop: 30,
     padding: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: theme.colors.surface,
     borderRadius: 15,
     alignItems: 'center',
   },
   footerText: {
-    color: Colors.textMuted,
+    color: theme.colors.textSecondary,
     fontSize: 13,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -352,7 +324,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   topButtonText: {
-    color: Colors.accent,
+    color: theme.colors.primary,
     fontSize: 14,
   },
-});
+}));

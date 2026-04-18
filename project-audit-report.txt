@@ -1,25 +1,25 @@
 ╔═══════════════════════════════════════════════════════════════╗
-║            ULTIMATE PROJECT AUDIT REPORT  v6.4               ║
+║            ULTIMATE PROJECT AUDIT REPORT  v6.5               ║
 ╚═══════════════════════════════════════════════════════════════╝
-  Generated:                       2026-04-13T09:24:28.444Z
+  Generated:                       2026-04-14T16:50:26.293Z
   Platform:                        win32
   Node:                            v20.20.2
-  Duration:                        11.79s
+  Duration:                        11.65s
 ═════════════════════════════════════════════════════════════════
   HEALTH SCORE
 ═════════════════════════════════════════════════════════════════
-  ⭐ OVERALL              [[32m██████████[0m░░░░░░░░░░] 52/100
+  ⭐ OVERALL              [[32m███████████[0m░░░░░░░░░] 55/100
 
-  security               [[32m███████████[0m░░░░░░░░░] 55/100
+  security               [[32m████████████[0m░░░░░░░░] 61/100
   typeSafety             [[32m██████████████████[0m░░] 90/100
   errorHandling          [[32m███████████[0m░░░░░░░░░] 57/100
   codeQuality            [[32m█████████████[0m░░░░░░░] 65/100
   dependencies           [[32m[0m░░░░░░░░░░░░░░░░░░░░] 0/100
   architecture           [[32m██████████████[0m░░░░░░] 70/100
   reactPatterns          [[32m[0m░░░░░░░░░░░░░░░░░░░░] 0/100
-  accessibility          [[32m████████████████[0m░░░░] 80/100
-  performance            [[32m██████████████[0m░░░░░░] 70/100
-  documentation          [[32m████████████████[0m░░░░] 80/100
+  accessibility          [[32m████████████████████[0m] 100/100
+  performance            [[32m████████████████[0m░░░░] 80/100
+  documentation          [[32m██████████████████[0m░░] 90/100
   testing                [[32m[0m░░░░░░░░░░░░░░░░░░░░] 1/100
   observability          [[32m█████████████[0m░░░░░░░] 65/100
 ═════════════════════════════════════════════════════════════════
@@ -31,30 +31,30 @@
   Package Manager:                 npm
   Type:                            commonjs
   Monorepo:                        No
-  ⚠️  Missing npm scripts: build
 
   EAS Profiles:                    development, preview, production
 ═════════════════════════════════════════════════════════════════
   2. PACKAGES
 ═════════════════════════════════════════════════════════════════
-  Total:                           67
-  Production:                      46
+  Total:                           73
+  Production:                      52
   Dev:                             21
-  Actually Imported:               38
-  ⚠️  Possibly unused: @shopify/flash-list, expo-asset, expo-constants, expo-font, expo-symbols (+7)
+  Actually Imported:               44
+  ⚠️  Possibly unused: expo-asset, expo-build-properties, expo-constants, expo-font, expo-image (+7)
   ⚠️  Undeclared imports: firebase-functions, firebase-admin, web-push, express, cors
   ⚠️  108 package version conflict(s)
 ═════════════════════════════════════════════════════════════════
   3. SECURITY
 ═════════════════════════════════════════════════════════════════
-  Total Issues:                    29
+  Total Issues:                    28
   Critical:                        0
   High:                            0
-  Medium:                          15
-  Low:                             14
+  Medium:                          13
+  Low:                             15
 
   ✅ .env in .gitignore
   ✅ node_modules in .gitignore
+  🔴 .env committed to git: .env.example
   🔴 Secrets found in git history
   🔴 Real secrets in .env: Google API Key
 ═════════════════════════════════════════════════════════════════
@@ -63,136 +63,132 @@
   Total Defined:                   74
   Secrets:                         40
   Empty Values:                    29
+  🔴 Tracked by git: .env.example
 ═════════════════════════════════════════════════════════════════
   5. CODE & ARCHITECTURE
 ═════════════════════════════════════════════════════════════════
-  Lines of Code:                   87,242
-  Source Files:                    250
-  Empty Files:                     0
-  Long Files (>300):               82
+  Lines of Code:                   85,487
+  Source Files:                    244
+  Empty Files:                     1
+  Long Files (>300):               83
   God Files (>500):                48
        → utils\missingDetectors.ts
        → utils\missingDetectors2.ts
-       → utils\remainingDetectors.ts
+       → scripts\audit-detectors.js
 
-  Components:                      55
-  Custom Hooks:                    1
-  Hooks No Cleanup:                1
-  Untyped Props:                   36
+  Components:                      54
+  Custom Hooks:                    2
+  Hooks No Cleanup:                0
+  Untyped Props:                   17
   map() No key:                    2
-  ScrollView Abuse:                23
+  ScrollView Abuse:                18
 
   Route Type:                      file-based
-  Total Routes:                    44
+  Total Routes:                    43
   Dynamic Routes:                  0
   ✅ 404/not-found page
 
   Circular Deps:                   1
   Avg Imports/File:                1.5
   ⚠️  Cycle: app\date-spot-reviews.tsx → utils\dateSpotReviews.ts → utils\dateSpotReviews.ts
-  Dead Exports:                    4754
+  Dead Exports:                    4734
   Identical Files:                 0
   Complexity Issues:               12
 ═════════════════════════════════════════════════════════════════
   6. REACT PATTERN ISSUES
 ═════════════════════════════════════════════════════════════════
-  Total Issues:                    1551
-    inline-arrow-props:            261
-    missing-dep-array:             131
-    hook-in-conditional:           342
-    object-literal-prop:           699
-    scrollview-list:               16
-    setstate-after-unmount:        70
-    hook-in-loop:                  5
-    flatlist-no-key-extractor:     3
-    stale-closure:                 24
+  Total Issues:                    1387
+    missing-dep-array:             153
+    hook-in-conditional:           442
+    object-literal-prop:           588
+    stale-closure:                 83
+    setstate-after-unmount:        44
+    scrollview-list:               12
+    inline-arrow-props:            56
+    hook-in-loop:                  9
 
-  ⚠️  app\+not-found.tsx:11 - Inline arrow function as prop "onPress" - use useCallback
-       │ <TouchableOpacity style={s.button} onPress={() => router.replace('/home')} accessibilityLabel="Go to home screen" accessibilityRole="button">
-  ⚠️  app\achievements.tsx:38 - useEffect possibly missing dependency array
-       │ useEffect(() => { void loadAchievements(); }, [loadAchievements]);
-  ⚠️  app\achievements.tsx:27 - Hook "useEffect)" possibly inside conditional
-       │ if (user) {
-  ⚠️  app\achievements.tsx:29 - Hook "useEffect)" possibly inside conditional
-       │ if (snap.exists()) setProgress(getAchievementProgress(snap.data()));
-  ⚠️  app\achievements.tsx:63 - Prop "style" receives new object/array each render - causes unnecessary re-renders
-       │ style={[s.achievementCard, isLocked ? s.achievementLocked : s.achievementUnlocked]}
-  ⚠️  app\achievements.tsx:102 - Prop "style" receives new object/array each render - causes unnecessary re-renders
-       │ <Text style={[s.progressNumber, { color: item.c }]}>{item.n}</Text>
-  ⚠️  app\achievements.tsx:109 - Prop "style" receives new object/array each render - causes unnecessary re-renders
-       │ <View style={[s.progressBar, { width: `${pct}%` }]} />
-  ⚠️  app\achievements.tsx:116 - Prop "style" receives new object/array each render - causes unnecessary re-renders
-       │ style={[s.categoryChip, !selectedCategory && s.categoryChipActive]}
-  ⚠️  app\achievements.tsx:119 - Prop "accessibilityState" receives new object/array each render - causes unnecessary re-renders
-       │ accessibilityState={{ selected: !selectedCategory }}>
-  ⚠️  app\achievements.tsx:120 - Prop "style" receives new object/array each render - causes unnecessary re-renders
-       │ <Text style={[s.categoryChipText, !selectedCategory && s.categoryChipTextActive]}>All</Text>
+  ⚠️  app\admin\index.tsx:75 - useEffect possibly missing dependency array
+       │ useEffect(() => {
+  ⚠️  app\admin\index.tsx:80 - useEffect possibly missing dependency array
+       │ useEffect(() => () => { isMounted.current = false; }, []);
+  ⚠️  app\admin\index.tsx:19 - Hook "useRouter)" possibly inside conditional
+       │ if (typeof requestIdleCallback === 'function') {
+  ⚠️  app\admin\index.tsx:62 - Hook "useEffect)" possibly inside conditional
+       │ if (!isMounted.current) return;
+  ⚠️  app\admin\index.tsx:71 - Hook "useEffect)" possibly inside conditional
+       │ if (isMounted.current) setLoading(false);
+  ⚠️  app\admin\index.tsx:121 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <View key={item.l} style={[s.statCard, item.alert && s.statCardAlert]}
+  ⚠️  app\admin\index.tsx:123 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <Text style={[s.statNumber, { color: item.c }]}>{item.n}</Text>
+  ⚠️  app\admin\index.tsx:136 - Prop "style" receives new object/array each render - causes unnecessary re-renders
+       │ <TouchableOpacity key={item.key} style={[s.actionButton, item.alert && s.actionButtonAlert]}
+  ⚠️  app\admin\index.tsx:75 - useEffect with [] may capture stale values (stale closure)
+       │ useEffect(() => {
+  ⚠️  app\admin\index.tsx:80 - useEffect with [] may capture stale values (stale closure)
+       │ useEffect(() => () => { isMounted.current = false; }, []);
 ═════════════════════════════════════════════════════════════════
   7. TYPE SAFETY
 ═════════════════════════════════════════════════════════════════
-  TS Coverage:                     87%
+  TS Coverage:                     90%
   Strict Mode:                     YES ✅
-  "any" Usage:                     24
-       app\chat.tsx:58  →  gifSearchQuery: string; gifResults: any[]; loadingGifs: boolean;
-       app\chat.tsx:68  →  showNearby: boolean; nearbyPlaces: any[]; loadingNearby: boolean;
-       app\chat.tsx:84  →  | { type: 'SET_GIF_RESULTS'; payload: any[] }
-       app\chat.tsx:110  →  | { type: 'SET_NEARBY'; payload: any[] }
-       app\chat.tsx:710  →  const sendGif = useCallback(async (gif: any) => {
+  "any" Usage:                     16
+       app\date-checkin.tsx:247  →  const updateData: Partial<DateCheckin> & { [key: string]: any } = {
+       app\index.tsx:137  →  const listRef        = useRef<any>(null);
+       scripts\fix-all.js:133  →  // 5. catch (e: any) → catch (e: unknown)
+       scripts\fix-all.js:143  →  if (count) changes.push(`catch (e: any) → catch (e: unknown): ${count}`);
+       utils\apiSecurity.ts:2  →  export function sanitizeApiResponse(data: any, allowedFields: string[]): any {
   Suppressions:                    0
-  Non-null (!):                    13
+  Non-null (!):                    0
   Runtime Validation:              zod
-  ⚠️  13 risky non-null assertion(s):
-       app\chat.tsx:397  →  senderId: user!.uid, timestamp: serverTimestamp(), read: false, version: enc.version,
-       app\matches.tsx:527  →  {u.photos!.map((_, i) => <PhotoDot key={i} active={photoIdx === i} />)}
-       app\profile-preview.tsx:176  →  {userData.photos!.map((_, index) => (
 ═════════════════════════════════════════════════════════════════
   8. TESTING
 ═════════════════════════════════════════════════════════════════
   Test Files:                      1
-  Source Files:                    250
+  Source Files:                    244
   Testing Score:                   1/100
   Empty Tests:                     0
   No Assertions:                   0
   ✅ Jest configured
   ❌ Vitest configured
+  ❌ Detox e2e configured
+  ✅ MSW mock configured
 ═════════════════════════════════════════════════════════════════
   9. ERROR HANDLING
 ═════════════════════════════════════════════════════════════════
-  try/catch blocks:                674
+  try/catch blocks:                685
   Empty catches:                   0
   Error Boundaries:                16
   Sentry calls:                    5
   Async no try:                    11
-  Promise.all no err:              1
+  Promise.all no err:              0
 ═════════════════════════════════════════════════════════════════
   10. PERFORMANCE
 ═════════════════════════════════════════════════════════════════
-  Async Anti-patterns:             41
-  ⚠️  app\admin\index.tsx:42 - Promise.all without error handling
-       │ const [matchesSnap, reportsSnap] = await Promise.all([
-  ⚠️  app\matches.tsx:264 - Promise.all without error handling
-       │ const [likesSnap, snap] = await Promise.all([
-  ⚠️  app\matches.tsx:322 - Promise.all without error handling
+  Async Anti-patterns:             2
+  ⚠️  app\selfie-verification.tsx:313 - Promise.all without error handling
+       │ Promise.all([preloadSafetyModel(), loadFaceVerification()]).then(([nsfw, face]) => {
+  ⚠️  utils\notifications.ts:42 - Promise.all without error handling
        │ await Promise.all([
-  ⚠️  app\matches.tsx:387 - Promise.all without error handling
-       │ await Promise.all([
-  ⚠️  app\my-matches.tsx:180 - Promise.all without error handling
-       │ const [snap1, snap2] = await Promise.all([
   Memory Leak Risks:               14
-  ⚠️  app\chat.tsx:324 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
-  ⚠️  app\home.tsx:539 - 5 addEventListener vs 2 removeEventListener - possible event listener leak
-  ⚠️  app\index.tsx:138 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
-  ⚠️  app\login.tsx:567 - 2 addEventListener vs 0 removeEventListener - possible event listener leak
-  ⚠️  app\personality-quiz.tsx:1121 - 2 addEventListener vs 1 removeEventListener - possible event listener leak
-  ❌ FlashList
+  ⚠️  app\chat.tsx:550 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\home.tsx:1154 - 5 addEventListener vs 2 removeEventListener - possible event listener leak
+  ⚠️  app\index.tsx:148 - 1 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\login.tsx:774 - 2 addEventListener vs 0 removeEventListener - possible event listener leak
+  ⚠️  app\personality-quiz.tsx:251 - 2 addEventListener vs 1 removeEventListener - possible event listener leak
+  ⚠️  Heavy import: moment → use dayjs or date-fns
+  ⚠️  Heavy import: lodash → use lodash-es or native methods
+  ✅ LegendList
+  ✅ FlashList
   ✅ useMemo/React.memo
   ✅ Optimized image component
+  ✅ InteractionManager used
 ═════════════════════════════════════════════════════════════════
   11. NETWORK
 ═════════════════════════════════════════════════════════════════
-  fetch() calls:                   130
-  axios calls:                     2
-  Library:                         SWR
+  fetch() calls:                   143
+  axios calls:                     7
+  Library:                         React Query
   ⚠️  3 hardcoded URL(s):
        server\src\index.ts:15  →  http://localhost:8081
        server\src\index.ts:15  →  http://localhost:19006
@@ -210,11 +206,10 @@
   DB Schema:                       No
   ❌ DB Indexes
 
-  ❌ google-services.json
+  ✅ google-services.json
   ❌ GoogleService-Info.plist
   ✅ firestore.rules
   ❌ App Check enabled
-  ⚠️  Missing android/app/google-services.json
   ⚠️  Missing ios/GoogleService-Info.plist
 
   ✅ Push permission requested
@@ -228,42 +223,43 @@
   ❌ Podfile exists
   ❌ iOS Privacy Manifest
   ⚠️  Declared but unused perms: INTERNET
-  ⚠️  Used but not declared: CAMERA, ACCESS_FINE_LOCATION
+
+  Native Setup:                    
+  ✅ enableScreens() called
+  ✅ GestureHandlerRootView wrapping root
+  ✅ SplashScreen.preventAutoHideAsync() called
+  ✅ SafeAreaProvider present
+  ✅ InteractionManager used
+  ✅ Haptic feedback
 ═════════════════════════════════════════════════════════════════
   14. ACCESSIBILITY
 ═════════════════════════════════════════════════════════════════
-  Score                  [[32m████████████████[0m░░░░] 80/100
-  Labels:                          489
-  Roles:                           362
+  Score                  [[32m████████████████████[0m] 100/100
+  Labels:                          686
+  Roles:                           401
   Hints:                           28
-  ⚠️  app\chat.tsx:771 - <Pressable> missing accessibilityLabel
-       │ <Pressable
-  ⚠️  app\chat.tsx:797 - <Pressable> missing accessibilityLabel
-       │ <Pressable onPress={() => setCore({ type: 'SET_PREVIEW', payload: item.mediaUrl ?? null })}>
-  ⚠️  app\chat.tsx:803 - <Pressable> missing accessibilityLabel
-       │ <Pressable onPress={() => setCore({ type: 'SET_PREVIEW', payload: item.mediaUrl ?? null })}>
-  ⚠️  app\chat.tsx:894 - <Pressable> missing accessibilityLabel
-       │ <Pressable style={styles.menuOverlay} onPress={() => setCore({ type: 'SET_MENU', payload: false })}>
-  ⚠️  app\chat.tsx:896 - <Pressable> missing accessibilityLabel
-       │ <Pressable style={styles.menuItem} onPress={() => { setCore({ type: 'SET_MENU', payload: false }); setCore({ type: 'SET_NOTE', payload: true }); }}>
+  ✅ Reduced motion support
+  ✅ Dynamic type support
 ═════════════════════════════════════════════════════════════════
   15. ASSETS & BUNDLE
 ═════════════════════════════════════════════════════════════════
-  Source Size:                     4.6 MB
+  Source Size:                     4.4 MB
   Image Assets:                    541.1 KB
   Image Count:                     8
-  Font Files:                      0
+  Font Files:                      3
   Tree Shaking:                    CJS ❌
+  Inline Requires:                 ✅ Default in Expo 55+
   ⚠️  Large asset: assets\images\icon.png (384.3 KB)
+  ❌ Blurhash placeholders
 ═════════════════════════════════════════════════════════════════
   16. i18n
 ═════════════════════════════════════════════════════════════════
   Library:                         none
   Locale Files:                    0
-  Hardcoded Strings:               750
-       app\+not-found.tsx:9  →  <Text style={s.title} accessibilityRole="header">Page Not Found</Text>
-       app\+not-found.tsx:10  →  <Text style={s.subtitle}>This screen doesn't exist.</Text>
-       app\+not-found.tsx:12  →  <Text style={s.buttonText}>Go Home</Text>
+  Hardcoded Strings:               714
+       app\+not-found.tsx:10  →  <Text style={s.title} accessibilityRole="header">Page Not Found</Text>
+       app\+not-found.tsx:11  →  <Text style={s.subtitle}>This screen doesn't exist.</Text>
+       app\+not-found.tsx:13  →  <Text style={s.buttonText}>Go Home</Text>
   ✅ RTL support
 ═════════════════════════════════════════════════════════════════
   17. PRIVACY & COMPLIANCE
@@ -275,6 +271,8 @@
   ❌ iOS Privacy Manifest
   ✅ GDPR
   ✅ COPPA
+  ✅ Certificate Pinning
+  ✅ Screenshot Prevention
 ═════════════════════════════════════════════════════════════════
   18. OBSERVABILITY
 ═════════════════════════════════════════════════════════════════
@@ -284,144 +282,173 @@
   ❌ Analytics
   ❌ Flipper
   ✅ ErrorBoundary + Sentry
+  ✅ InteractionManager tracked
 ═════════════════════════════════════════════════════════════════
   19. CODE QUALITY
 ═════════════════════════════════════════════════════════════════
-  Comment Ratio:                   7%
-  console.log total:               240
-  TODO/FIXME:                      0
+  Comment Ratio:                   1%
+  console.log total:               241
+  TODO/FIXME:                      16
   ✅ ESLint
   ❌ Prettier
   ✅ Husky git hooks
-  Unguarded console:               203
+  Unguarded console:               142
   ✅ Console stripped in Babel
-       analyze-stack.js:93  →  console.log('\n🔍 COMPLETE PROJECT DEPENDENCY INVENTORY');
-       analyze-stack.js:94  →  console.log('═'.repeat(60));
-       analyze-stack.js:95  →  console.log(`📦 Declared in package.json: ${Object.keys(declaredDeps).length}`);
-  Unused Styles:                   1636/2626 (62%)
+       scripts\audit-detectors.js:82  →  console.warn(`⚠️  Unknown flag ignored: ${arg}`);
+       scripts\audit-detectors.js:89  →  console.log(`
+       scripts\audit-detectors.js:1306  →  console.warn(`⚠️  Skipped ${dupeIds.size} duplicate detector IDs (keeping first occurrence): ${[...dupeIds].join(', ')}`);
+  Unused Styles:                   401/566 (71%)
 ═════════════════════════════════════════════════════════════════
-  20. DOCUMENTATION
+  20. STATE MANAGEMENT
 ═════════════════════════════════════════════════════════════════
-  Score                  [[32m████████████████[0m░░░░] 80/100
+  Legend State:                    ✅ imported
+  MMKV:                            ✅ imported
+  MMKV Syntax:                     ✅ createMMKV()
+  Redux:                           not used
+  Zustand:                         not used
+  Context count:                   3
+
+  ✅ LegendList installed
+  ✅ LegendList imported
+  ✅ recycleItems={true} set
+  ✅ LegendState installed
+  ✅ LegendState imported
+  ✅ observer() used
+  ✅ syncObservable (MMKV persist)
+═════════════════════════════════════════════════════════════════
+  21. LIST RENDERING
+═════════════════════════════════════════════════════════════════
+  ✅ LegendList used
+  ❌ FlashList used
+  FlatList usages:                 1
+  recycleItems set:                ✅ yes
+  maintainScrollAtEnd:             ✅ yes
+═════════════════════════════════════════════════════════════════
+  22. IMAGE OPTIMIZATION
+═════════════════════════════════════════════════════════════════
+  Score                  [[32m████████████████████[0m] 100/100
+  ✅ TurboImage
+  ✅ expo-image
+  ❌ FastImage
+  ✅ Cache policy configured
+  ✅ Blurhash placeholders
+  ✅ WebP assets
+═════════════════════════════════════════════════════════════════
+  23. BUILD CONFIG
+═════════════════════════════════════════════════════════════════
+  ✅ metro.config.js exists
+  ✅ Custom resolver
+  ✅ babel.config.js exists
+  ✅ Console stripped in production
+  ❌ Reanimated Babel plugin
+  ❌ React Compiler enabled
+  ❌ Typed Routes enabled
+  EAS Profiles:                    development, preview, production
+═════════════════════════════════════════════════════════════════
+  24. DOCUMENTATION
+═════════════════════════════════════════════════════════════════
+  Score                  [[32m██████████████████[0m░░] 90/100
   ✅ README.md
   ✅ LICENSE
   ✅ CHANGELOG.md
   ❌ CONTRIBUTING.md
-  JSDoc blocks:                    7
+  JSDoc blocks:                    11
 ═════════════════════════════════════════════════════════════════
-  21. GIT
+  25. GIT
 ═════════════════════════════════════════════════════════════════
   Branch:                          main
-  Total Commits:                   47
-  Last Commit:                     chore: stop tracking .env.example
-  Uncommitted:                     213
+  Total Commits:                   48
+  Last Commit:                     feat: add safety detectors and scanner v6.4
+  Uncommitted:                     219
   Hooks:                           husky
-  Conventional:                    1/47 commits
+  Conventional:                    2/48 commits
 ═════════════════════════════════════════════════════════════════
-  22. CI/CD
+  26. CI/CD
 ═════════════════════════════════════════════════════════════════
   ✅ CI Pipeline detected
   ✅ CI Caching configured
 ═════════════════════════════════════════════════════════════════
-  23. SEO / WEB
+  27. TOOL RECOMMENDATIONS
 ═════════════════════════════════════════════════════════════════
-  ℹ️  No web/SEO issues detected
-═════════════════════════════════════════════════════════════════
-  24. TOOL RECOMMENDATIONS
-═════════════════════════════════════════════════════════════════
-  Missing/Misconfigured Tools:     0 high, 3 medium, 1 low
-
-  🟡 [MEDIUM] @shopify/flash-list
-       Why: FlashList is installed but never imported anywhere in your source code.
-       Where: Replace FlatList usages with FlashList. Search for <FlatList and replace.
-       Install: already installed
-       Usage: import {FlashList} from "@shopify/flash-list";
-
-  🟡 [MEDIUM] @tanstack/react-query
-       Why: You have 130 fetch() calls managed with useState+useEffect. This pattern causes race conditions, memory leaks, and duplicate requests.
-       Where: Replace all fetch+useState+useEffect patterns. Especially for Firebase reads, API calls, any server data.
-       Install: npm install @tanstack/react-query
-       Usage: const {data,isLoading,error}=useQuery({queryKey:["key"],queryFn:fetchFn,staleTime:1000*60*5});
+  Missing/Misconfigured:           0 high, 1 medium, 1 low
 
   🟡 [MEDIUM] React Compiler (reactCompiler: true)
-       Why: Without React Compiler you must manually add useMemo/useCallback everywhere. The compiler adds them automatically where safe.
-       Where: app.json experiments section. Affects all components automatically - no code changes needed.
+       Status: not-configured
+       Why: You have 702 manual memoization calls. React Compiler adds useMemo/useCallback automatically everywhere it is safe. No code changes needed.
+       Where: app.json experiments section. Affects every component in the entire app automatically.
        Install: no install needed on SDK 54+ - one line in app.json
        Usage: {"expo":{"experiments":{"reactCompiler":true}}}
 
   🔵 [LOW] prettier
-       Why: No code formatter. Code style is inconsistent across files.
-       Where: Root of project. Add format script to package.json.
+       Status: missing
+       Why: No code formatter. Code style is inconsistent across 250 files.
+       Where: Root of project. Add to package.json scripts.
        Install: npm install --save-dev prettier
        Usage: echo {}>.prettierrc && npx prettier --write "**/*.{ts,tsx}"
 
 ═════════════════════════════════════════════════════════════════
-  25. FILE COMPACTNESS
+  28. FILE COMPACTNESS
 ═════════════════════════════════════════════════════════════════
-  Files With Issues:               12
-  Least compact files:
-       → metro.config.js
-       → fix-moderation.js
-       → utils\heightEstimation.ts
-       → utils\storage.ts
-       → web-push\lib\index.js
-
-  ⚠️  metro.config.js (15 lines)
-       │ 27% blank lines (4/15) - remove excess whitespace
-       │ 27% comment lines (4/15) - remove comments, code should be self-explanatory
-  ⚠️  fix-moderation.js (73 lines)
-       │ 26% comment lines (19/73) - remove comments, code should be self-explanatory
-  ⚠️  utils\heightEstimation.ts (164 lines)
-       │ 29% comment lines (47/164) - remove comments, code should be self-explanatory
-  ⚠️  utils\storage.ts (16 lines)
-       │ 63% comment lines (10/16) - remove comments, code should be self-explanatory
+  Files With Issues:               11
   ⚠️  web-push\lib\index.js (29 lines)
        │ 86% comment lines (25/29) - remove comments, code should be self-explanatory
+  ⚠️  web-push\src\index.ts (31 lines)
+       │ 77% comment lines (24/31) - remove comments, code should be self-explanatory
+  ⚠️  metro.config.js (19 lines)
+       │ 21% blank lines (4/19) - remove excess whitespace
+  ⚠️  server\src\index.ts (385 lines)
+       │ 22% blank lines (85/385) - remove excess whitespace
+  ⚠️  utils\childSafety.ts (82 lines)
+       │ 23% blank lines (19/82) - remove excess whitespace
+  ⚠️  utils\LanguageContext.tsx (54 lines)
+       │ 20% blank lines (11/54) - remove excess whitespace
+  ⚠️  utils\legalCompliance.ts (469 lines)
+       │ 21% blank lines (99/469) - remove excess whitespace
+  ⚠️  utils\logger.ts (47 lines)
+       │ 34% blank lines (16/47) - remove excess whitespace
+  ⚠️  utils\physicalDateDetectors.ts (37 lines)
+       │ 30% blank lines (11/37) - remove excess whitespace
+  ⚠️  utils\storage.native.ts (33 lines)
+       │ 21% blank lines (7/33) - remove excess whitespace
 ═════════════════════════════════════════════════════════════════
-  26. COMMENTS
+  29. COMMENTS
 ═════════════════════════════════════════════════════════════════
-  Total Comment Lines:             5786
-  Comment Ratio:                   7%
-  Inline Comments:                 5660
-  Block Comments:                  31
-  JSDoc Blocks:                    95
-  Files With Many Comments:        58
-  ⚠️  Remove comments. Compact code is self-documenting. Comments add noise and go stale.
-  Files to clean up:
-  ⚠️  utils\infrastructureSecurity.ts (173 comments)
-       │ // file: utils/infrastructureSecurity.ts
-       │ // ─── [13.1] API Data Exposure ─────────────────────────────
-  ⚠️  utils\deviceIntegrity.ts (158 comments)
-       │ // file: utils/deviceIntegrity.ts
-       │ // ─── [14.1] Network/Graph Analysis ───────────────────────
-  ⚠️  utils\manipulationDetection.ts (120 comments)
-       │ // ═══════════════════════════════════════════════════════════════
-       │ // manipulationDetection.ts — FULL REWRITE
-  ⚠️  utils\financialFraud.ts (113 comments)
-       │ // ═══════════════════════════════════════════════════════════════
-       │ // utils/financialFraud.ts — FULL UPDATED
-  ⚠️  utils\conversationAnalysis.ts (100 comments)
-       │ // file: utils/conversationAnalysis.ts
-       │ // [2.12] AI Emotional Manipulation patterns
+  Total Comment Lines:             642
+  Inline Comments:                 520
+  Block Comments:                  28
+  JSDoc Blocks:                    94
+  Files With Many Comments:        8
+  ⚠️  Remove comments. Compact code is self-documenting.
+  ⚠️  scripts\audit-stack.ts (77 comments)
+       │ // scripts/audit-stack.ts
+       │ // Run with: npx ts-node --project scripts/tsconfig.json scripts/audit-stack.ts
+  ⚠️  app\personality-quiz.tsx (25 comments)
+       │ /**
+       │ /* ═══ CONSTANTS ═══ */
+  ⚠️  utils\i18n.ts (25 comments)
+       │ /** Full sentence including CTA — used as accessibility label */
+       │ /** Question only, without CTA — used in split footer link */
+  ⚠️  web-push\lib\index.js (18 comments)
+       │ /**
+       │ // Start writing functions
+  ⚠️  scripts\fix-all.js (17 comments)
+       │ // scripts/fix-all.js
+       │ // ─── Config ───────────────────────────────────────────────────────────────────
 ═════════════════════════════════════════════════════════════════
   RECOMMENDATIONS
 ═════════════════════════════════════════════════════════════════
+  🔴 [P1] env committed to git - run: git rm --cached .env
   🔴 [P1] Secrets in git history - rotate all affected credentials
   🔴 [P1] Real credentials in .env - rotate immediately
-  📘 [P2] Reduce "any" usage (24 found)
   🔄 [P2] Fix 1 circular dependency cycle(s)
-  ⚛️ [P2] Fix 1551 React pattern issue(s)
+  ⚛️ [P2] Fix 1387 React pattern issue(s)
   🧠 [P2] 14 memory leak risk(s) - check event listener cleanup
   ✨ [P3] Add Prettier
-  🧹 [P3] 1 useEffect(s) without cleanup
-  📦 [P3] 108 version conflict(s) - run: npm dedupe
-  🗑️ [P3] 4754 potentially dead exports
-  📐 [P3] 12 files need compacting - remove blank lines and whitespace
-  💬 [P3] 5786 comment lines found - remove comments, write self-documenting code
-  🔧 [P3] Consider: @shopify/flash-list - FlashList is installed but never imported anywhere in your source code
-  🔧 [P3] Consider: @tanstack/react-query - You have 130 fetch() calls managed with useState+useEffect
-  🔧 [P3] Consider: React Compiler (reactCompiler: true) - Without React Compiler you must manually add useMemo/useCallback everywhere
-  🔧 [P4] Consider: prettier - No code formatter
+  🗑️ [P3] 4734 potentially dead exports
+  📐 [P3] 11 files need compacting
+  ⚡ [P3] Replace: moment→dayjs or date-fns, lodash→lodash-es or native methods
+  🔧 [P3] React Compiler (reactCompiler: true): You have 702 manual memoization calls
+  🔧 [P4] prettier: No code formatter
 ═════════════════════════════════════════════════════════════════
-  Scanner v6.4 | 250 files | 87,242 LOC
+  Scanner v6.5 | 244 files | 85,487 LOC
 ═════════════════════════════════════════════════════════════════

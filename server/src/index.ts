@@ -42,7 +42,7 @@ function validateOrigin(req: Request, res: Response, next: NextFunction): void {
 }
 
 const HMAC_SECRET = process.env['HMAC_SECRET'] ?? '';
-if (!HMAC_SECRET && process.env['NODE_ENV'] === 'production') console.warn('[WARN] HMAC_SECRET not set — request signing disabled');
+if (__DEV__) if (!HMAC_SECRET && process.env['NODE_ENV'] === 'production') console.warn('[WARN] HMAC_SECRET not set — request signing disabled');
 
 function verifyHMAC(req: Request, res: Response, next: NextFunction): void {
   if (!HMAC_SECRET) { next(); return; }
@@ -190,7 +190,7 @@ async function reportToNCMEC(details: { imageUrl: string; userId: string; report
 
 async function detectCoordinatedInauthentic(userIds: string[]): Promise<{ detected: boolean; clusterSize: number; reason?: string }> {
   if (userIds.length < 3) return { detected: false, clusterSize: 0 };
-  try { const fps = await Promise.all(userIds.map(async id => { const s = await adminDb.collection('deviceFingerprints').where('users', 'array-contains', id).limit(1).get(); return s.docs[0]?.id ?? null; }));
+  try { const fps = await Promise.all(userIds.map(async id => { const s = await adminDb.collection('deviceFingerprints').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }).where('users', 'array-contains', id).limit(1).get(); return s.docs[0]?.id ?? null; }));
     const v = fps.filter((f): f is string => f !== null); const u = new Set(v); if (u.size < v.length) return { detected: true, clusterSize: userIds.length, reason: 'Multiple accounts share device fingerprints.' }; return { detected: false, clusterSize: 0 };
   } catch { return { detected: false, clusterSize: 0 }; }
 }
@@ -252,7 +252,6 @@ function detectBotTraffic(ip: string, ua: string): { isBot: boolean; confidence:
 const convEvents: Record<string, number[]> = {};
 function detectConversionFraud(userId: string, eventType: string, value: number): { fraudulent: boolean; reason?: string } { const k = `${userId}_${eventType}`, now = Date.now(); if (!convEvents[k]) convEvents[k] = []; convEvents[k] = convEvents[k]!.filter(t => now - t < 3_600_000); convEvents[k]!.push(now); const c = convEvents[k]!.length; if (c > 10) return { fraudulent: true, reason: `${c} ${eventType} in 1h` }; if (value < 0) return { fraudulent: true, reason: 'Negative value' }; return { fraudulent: false }; }
 
-// [16.8] Law enforcement
 interface LERequest { requestType: 'MLAT' | 'emergency_disclosure' | 'subpoena' | 'court_order' | 'preservation'; requestingAgency: string; caseNumber: string; targetUserId?: string; dataCategories: string[]; legalBasis: string; emergencyJustification?: string; submittedBy: string; contactEmail: string; }
 async function handleLawEnforcementRequest(req: LERequest, aUid: string): Promise<{ caseId: string; status: string; acknowledgedAt: string; nextSteps: string[] }> {
   const caseId = `LEA-${req.requestType}-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, ack = new Date().toISOString(), isEm = req.requestType === 'emergency_disclosure' && !!req.emergencyJustification, sla = isEm ? 4 : req.requestType === 'MLAT' ? 168 : 72;
@@ -261,7 +260,6 @@ async function handleLawEnforcementRequest(req: LERequest, aUid: string): Promis
   return { caseId, status: 'received', acknowledgedAt: ack, nextSteps: isEm ? ['Emergency review within 4 hours', 'Legal team notified immediately', 'User data preserved'] : ['Legal team review within 72 hours', 'Verification of legal authority required', 'Response via secure channel'] };
 }
 
-// [16.8] Transparency report
 interface TRData { periodStart: string; periodEnd: string; totalLERequests: number; requestsByType: Record<string, number>; requestsByCountry: Record<string, number>; dataDisclosed: number; dataRejected: number; emergencyDisclosures: number; governmentRemovals: number; ncmecReports: number; dsarRequests: number; dsarFulfilled: number; }
 async function generateTransparencyReport(pStart: string, pEnd: string, aUid: string): Promise<{ reportId: string; data: TRData; generatedAt: string }> {
   const rid = `TR-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, gen = new Date().toISOString(), start = new Date(pStart), end = new Date(pEnd);
@@ -279,7 +277,6 @@ async function generateTransparencyReport(pStart: string, pEnd: string, aUid: st
   } catch { return { reportId: rid, generatedAt: gen, data: { periodStart: pStart, periodEnd: pEnd, totalLERequests: 0, requestsByType: {}, requestsByCountry: {}, dataDisclosed: 0, dataRejected: 0, emergencyDisclosures: 0, governmentRemovals: 0, ncmecReports: 0, dsarRequests: 0, dsarFulfilled: 0 } }; }
 }
 
-// [16.8] DSAR
 interface DsarReq { requestType: 'access' | 'deletion' | 'portability' | 'rectification' | 'restriction' | 'objection'; targetUserId: string; requesterEmail: string; jurisdiction: string; verificationMethod: string; notes?: string; }
 async function handleDsarRequest(req: DsarReq, subUid: string): Promise<{ dsarId: string; slaDeadline: string; status: string }> {
   const dsarId = `DSAR-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, slaDays = req.jurisdiction === 'GDPR' ? 30 : req.jurisdiction === 'CCPA' ? 45 : 30, sla = new Date(Date.now() + slaDays * 24 * 60 * 60 * 1_000).toISOString();
@@ -288,7 +285,6 @@ async function handleDsarRequest(req: DsarReq, subUid: string): Promise<{ dsarId
   return { dsarId, slaDeadline: sla, status: 'received' };
 }
 
-// [13.3] Vulnerability disclosure
 async function logVulnerabilityReport(email: string, severity: 'low' | 'medium' | 'high' | 'critical', desc: string, endpoint?: string): Promise<{ reportId: string; cvssEstimate?: string }> {
   const rid = `VR-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, cvss: Record<string, string> = { low: '0.1-3.9', medium: '4.0-6.9', high: '7.0-8.9', critical: '9.0-10.0' };
   await adminDb.collection('vulnerabilityReports').add({ reportId: rid, reporterEmail: email, severity, description: desc, affectedEndpoint: endpoint ?? null, status: 'triaging', slaHours: { low: 168, medium: 72, high: 24, critical: 4 }[severity], cvssRange: cvss[severity], receivedAt: admin.firestore.FieldValue.serverTimestamp() });
@@ -296,7 +292,6 @@ async function logVulnerabilityReport(email: string, severity: 'low' | 'medium' 
   return { reportId: rid, cvssEstimate: cvss[severity] };
 }
 
-// ═══ Routes ═══
 app.options('*', cors(CORS_OPTIONS));
 
 app.post('/send-notification', notifLimiter, validateOrigin, requireAuth, asyncHandler(async (req, res, next) => {

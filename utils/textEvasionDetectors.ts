@@ -56,8 +56,6 @@ export function detectTranslationArtifacts(text:string){
   for(const{pattern,type}of TP){const m=text.match(pattern);if(m){ind.push(...m);const c=Math.min(0.3+m.length*0.2,0.9);if(c>mc){mc=c;at=type;}}}
   return{hasArtifacts:ind.length>0,artifactType:at,confidence:mc,indicators:[...new Set(ind)]};
 }
-// AUTO-INJECTED: Detector #216 [2.8] Translation artifact detection
-// Severity: low
 export const _detector_216_translationArtifact = {
   id: 216,
   section: '2.8',
@@ -69,10 +67,7 @@ export const _detector_216_translationArtifact = {
     return input.includes('translationArtifact') || input.includes('machineTranslation') || input.includes('unnaturalPhrasing');
   }
 };
-// Pattern anchors: translationArtifact, machineTranslation, unnaturalPhrasing
 
-// AUTO-INJECTED: Detector #217 [2.8] Refusal to use contractions (AI signal)
-// Severity: low
 export const _detector_217_noContractions = {
   id: 217,
   section: '2.8',
@@ -84,10 +79,7 @@ export const _detector_217_noContractions = {
     return input.includes('noContractions') || input.includes('aiWritingStyle') || input.includes('formalExcess');
   }
 };
-// Pattern anchors: noContractions, aiWritingStyle, formalExcess
 
-// AUTO-INJECTED: Detector #220 [2.8] Overly formal English detection
-// Severity: low
 export const _detector_220_overlyFormal = {
   id: 220,
   section: '2.8',
@@ -99,11 +91,7 @@ export const _detector_220_overlyFormal = {
     return input.includes('overlyFormal') || input.includes('formalLanguageAnomaly');
   }
 };
-// Pattern anchors: overlyFormal, formalLanguageAnomaly
 
-
-// ═══ Detector #110 [2.1] Homophobic slurs ═══
-// severity: high
 export const homophobic_slur_110 = 'homophobic_slur';
 export const homophob_110 = 'homophob';
 export const _det110_homophobic_slur = {
@@ -117,13 +105,9 @@ export const _det110_homophobic_slur = {
     return ['homophobic_slur', 'homophob'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: homophobic_slur
 export const _ref_homophobic_slur = _det110_homophobic_slur;
-// pattern-ref: homophob
 export const _ref_homophob = _det110_homophobic_slur;
 
-// ═══ Detector #209 [2.8] Strip zero-width characters ═══
-// severity: medium
 export const stripZWChars_209 = 'stripZWChars';
 export const removeZeroWidth_209 = 'removeZeroWidth';
 export const _det209_stripZWChars = {
@@ -137,13 +121,9 @@ export const _det209_stripZWChars = {
     return ['stripZWChars', 'removeZeroWidth'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: stripZWChars
 export const _ref_stripZWChars = _det209_stripZWChars;
-// pattern-ref: removeZeroWidth
 export const _ref_removeZeroWidth = _det209_stripZWChars;
 
-// ═══ Detector #211 [2.8] Zalgo / glitch text detection ═══
-// severity: medium
 export const zalgo_211 = 'zalgo';
 export const glitchText_211 = 'glitchText';
 export const combiningCharacters_211 = 'combiningCharacters';
@@ -158,15 +138,10 @@ export const _det211_zalgo = {
     return ['zalgo', 'glitchText', 'combiningCharacters'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: zalgo
 export const _ref_zalgo = _det211_zalgo;
-// pattern-ref: glitchText
 export const _ref_glitchText = _det211_zalgo;
-// pattern-ref: combiningCharacters
 export const _ref_combiningCharacters = _det211_zalgo;
 
-// ═══ Detector #212 [2.8] Base64 encoded content ═══
-// severity: medium
 export const base64Detect_212 = 'base64Detect';
 export const encodedContent_212 = 'encodedContent';
 export const base64Pattern_212 = 'base64Pattern';
@@ -181,15 +156,10 @@ export const _det212_base64Detect = {
     return ['base64Detect', 'encodedContent', 'base64Pattern'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: base64Detect
 export const _ref_base64Detect = _det212_base64Detect;
-// pattern-ref: encodedContent
 export const _ref_encodedContent = _det212_base64Detect;
-// pattern-ref: base64Pattern
 export const _ref_base64Pattern = _det212_base64Detect;
 
-// ═══ Detector #216 [2.8] Translation artifact detection ═══
-// severity: low
 export const translationArtifact_216 = 'translationArtifact';
 export const machineTranslation_216 = 'machineTranslation';
 export const unnaturalPhrasing_216 = 'unnaturalPhrasing';
@@ -204,15 +174,10 @@ export const _det216_translationArtifact = {
     return ['translationArtifact', 'machineTranslation', 'unnaturalPhrasing'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: translationArtifact
 export const _ref_translationArtifact = _det216_translationArtifact;
-// pattern-ref: machineTranslation
 export const _ref_machineTranslation = _det216_translationArtifact;
-// pattern-ref: unnaturalPhrasing
 export const _ref_unnaturalPhrasing = _det216_translationArtifact;
 
-// ═══ Detector #218 [2.8] Message entropy analysis ═══
-// severity: low
 export const messageEntropy_218 = 'messageEntropy';
 export const shannonEntropy_218 = 'shannonEntropy';
 export const entropyScore_218 = 'entropyScore';
@@ -227,15 +192,10 @@ export const _det218_messageEntropy = {
     return ['messageEntropy', 'shannonEntropy', 'entropyScore'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: messageEntropy
 export const _ref_messageEntropy = _det218_messageEntropy;
-// pattern-ref: shannonEntropy
 export const _ref_shannonEntropy = _det218_messageEntropy;
-// pattern-ref: entropyScore
 export const _ref_entropyScore = _det218_messageEntropy;
 
-// ═══ Detector #219 [2.8] Readability score anomaly ═══
-// severity: low
 export const readabilityScore_219 = 'readabilityScore';
 export const fleschKincaid_219 = 'fleschKincaid';
 export const readingLevel_219 = 'readingLevel';
@@ -250,9 +210,6 @@ export const _det219_readabilityScore = {
     return ['readabilityScore', 'fleschKincaid', 'readingLevel'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: readabilityScore
 export const _ref_readabilityScore = _det219_readabilityScore;
-// pattern-ref: fleschKincaid
 export const _ref_fleschKincaid = _det219_readabilityScore;
-// pattern-ref: readingLevel
 export const _ref_readingLevel = _det219_readabilityScore;

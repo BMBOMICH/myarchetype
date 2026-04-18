@@ -1,4 +1,3 @@
-// file: utils/robberyDetection.ts
 export interface BaitAndSwitchReport{reporterId:string;reportedUserId:string;reason:'different_person'|'looked_different'|'catfish'|'not_who_expected';severityOverride?:'robbery'|'assault'|'scam';}
 export function processBaitAndSwitchReport(r:BaitAndSwitchReport,prev:number,vs:'verified'|'unverified'|'failed'):{riskLevel:'low'|'medium'|'high'|'critical';action:string[]}{
 const a:string[]=[];let rl:'low'|'medium'|'high'|'critical'='low';

@@ -92,7 +92,6 @@ export async function checkPasswordBreach(pw: string) {
 }
 export const hibpCheck = checkPasswordBreach; export const passwordBreached = checkPasswordBreach;
 
-// ─── #4.2 Login Security Missing: Account Lockout ───
 const lockouts = new Map<string, { attempts: number; lockedUntil: number }>();
 export function accountLockout(userId: string, loginSuccess: boolean, maxAttempts = 5, lockMinutes = 30): { locked: boolean; attempts: number; remainingAttempts: number; unlockAt?: number } {
   const now = Date.now();
@@ -106,7 +105,6 @@ export function accountLockout(userId: string, loginSuccess: boolean, maxAttempt
 }
 export const loginLockout = accountLockout; export const bruteForceLockout = accountLockout;
 
-// ─── #4.2 Login Security Missing: Suspicious Login Location ───
 export function suspiciousLoginLocation(login: { ipCountry: string; profileCountry: string; ipLat: number; ipLng: number; profileLat: number; profileLng: number; knownCountries: string[] }): { suspicious: boolean; distanceKm: number; newCountry: boolean; action: 'allow' | 'challenge' | 'block' } {
   const newCountry = !login.knownCountries.includes(login.ipCountry) && login.ipCountry !== login.profileCountry;
   const R = 6371;
@@ -118,7 +116,6 @@ export function suspiciousLoginLocation(login: { ipCountry: string; profileCount
 }
 export const loginLocationAnomaly = suspiciousLoginLocation; export const geoAnomaly = suspiciousLoginLocation;
 
-// ─── #4.2 Login Security Missing: Login Notification ───
 export function loginNotification(login: { userId: string; deviceName: string; location: string; ip: string; timestamp: number; isNewDevice: boolean; isNewLocation: boolean }): { shouldNotify: boolean; channels: ('push' | 'email' | 'sms')[]; message: string } {
   const channels: ('push' | 'email' | 'sms')[] = [];
   const shouldNotify = login.isNewDevice || login.isNewLocation;
@@ -130,8 +127,6 @@ export function loginNotification(login: { userId: string; deviceName: string; l
   return { shouldNotify, channels: [...new Set(channels)], message };
 }
 export const newLoginAlert = loginNotification; export const loginAlert = loginNotification;
-// AUTO-INJECTED: Detector #905 [4.4] Proxy account creation detection
-// Severity: medium
 export const _detector_905_proxyAccountCreation = {
   id: 905,
   section: '4.4',
@@ -143,11 +138,7 @@ export const _detector_905_proxyAccountCreation = {
     return input.includes('proxyAccountCreation') || input.includes('accountProxy') || input.includes('thirdPartyCreation');
   }
 };
-// Pattern anchors: proxyAccountCreation, accountProxy, thirdPartyCreation
 
-
-// ═══ Detector #263 [4.1] Email alias abuse detection ═══
-// severity: medium
 export const emailAlias_263 = 'emailAlias';
 export const plusAlias_263 = 'plusAlias';
 export const dotAlias_263 = 'dotAlias';
@@ -163,17 +154,11 @@ export const _det263_emailAlias = {
     return ['emailAlias', 'plusAlias', 'dotAlias', 'gmailDot'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emailAlias
 export const _ref_emailAlias = _det263_emailAlias;
-// pattern-ref: plusAlias
 export const _ref_plusAlias = _det263_emailAlias;
-// pattern-ref: dotAlias
 export const _ref_dotAlias = _det263_emailAlias;
-// pattern-ref: gmailDot
 export const _ref_gmailDot = _det263_emailAlias;
 
-// ═══ Detector #264 [4.1] Apple Hide My Email abuse ═══
-// severity: medium
 export const appleRelay_264 = 'appleRelay';
 export const hideMyEmail_264 = 'hideMyEmail';
 export const privaterelay_appleid_com_264 = 'privaterelay.appleid.com';
@@ -188,15 +173,10 @@ export const _det264_appleRelay = {
     return ['appleRelay', 'hideMyEmail', 'privaterelay.appleid.com'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: appleRelay
 export const _ref_appleRelay = _det264_appleRelay;
-// pattern-ref: hideMyEmail
 export const _ref_hideMyEmail = _det264_appleRelay;
-// pattern-ref: privaterelay.appleid.com
 export const _ref_privaterelay_appleid_com = _det264_appleRelay;
 
-// ═══ Detector #267 [4.1] Phone number recycling detection ═══
-// severity: medium
 export const phoneRecycling_267 = 'phoneRecycling';
 export const numberRecycled_267 = 'numberRecycled';
 export const _det267_phoneRecycling = {
@@ -210,13 +190,9 @@ export const _det267_phoneRecycling = {
     return ['phoneRecycling', 'numberRecycled'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: phoneRecycling
 export const _ref_phoneRecycling = _det267_phoneRecycling;
-// pattern-ref: numberRecycled
 export const _ref_numberRecycled = _det267_phoneRecycling;
 
-// ═══ Detector #284 [4.2] Account enumeration via timing ═══
-// severity: medium
 export const accountEnumeration_284 = 'accountEnumeration';
 export const timingAttack_284 = 'timingAttack';
 export const constantTimeCompare_284 = 'constantTimeCompare';
@@ -231,15 +207,10 @@ export const _det284_accountEnumeration = {
     return ['accountEnumeration', 'timingAttack', 'constantTimeCompare'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountEnumeration
 export const _ref_accountEnumeration = _det284_accountEnumeration;
-// pattern-ref: timingAttack
 export const _ref_timingAttack = _det284_accountEnumeration;
-// pattern-ref: constantTimeCompare
 export const _ref_constantTimeCompare = _det284_accountEnumeration;
 
-// ═══ Detector #285 [4.2] Login from datacenter IP ═══
-// severity: medium
 export const datacenterIP_285 = 'datacenterIP';
 export const hostingProvider_285 = 'hostingProvider';
 export const cloudIP_285 = 'cloudIP';
@@ -254,16 +225,10 @@ export const _det285_datacenterIP = {
     return ['datacenterIP', 'hostingProvider', 'cloudIP'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: datacenterIP
 export const _ref_datacenterIP = _det285_datacenterIP;
-// pattern-ref: hostingProvider
 export const _ref_hostingProvider = _det285_datacenterIP;
-// pattern-ref: cloudIP
 export const _ref_cloudIP = _det285_datacenterIP;
 
-// ════════════════════════════════════════════════════
-// Detector #280 [§4.2] Session token binding
-// ════════════════════════════════════════════════════
 export const sessionBinding_280_key = 'sessionBinding';
 export const tokenBind_280_key = 'tokenBind';
 export const deviceBoundToken_280_key = 'deviceBoundToken';
@@ -307,9 +272,6 @@ export const _d280_impl = {
   deviceBoundToken: deviceBoundTokenCheck,
 };
 
-// ════════════════════════════════════════════════════
-// Detector #310 [§4.3] Biometric bypass detection
-// ════════════════════════════════════════════════════
 export const biometricBypass_310_key = 'biometricBypass';
 export const biometricSpoof_310_key = 'biometricSpoof';
 export const fakeBiometric_310_key = 'fakeBiometric';

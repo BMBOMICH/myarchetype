@@ -82,7 +82,7 @@ export async function checkSexOffenderRegistry(firstName: string, lastName: stri
     const data = await response.json();
     return { match: data.results?.length > 0, results: data.results ?? [] };
   } catch {
-    console.error('NSOPW check failed');
+    if (__DEV__) console.error('NSOPW check failed');
     return { match: false, results: [] };
   }
 }
@@ -106,8 +106,6 @@ export function detectGroomingSequence(messages: Array<{ text: string; timestamp
   if (activeStages >= 3) return { detector: '#322', weight: activeStages * 25, detail: `Grooming sequence: ${activeStages}/4 stages detected (trust:${stages.trustBuilding}, isolate:${stages.isolation}, secret:${stages.secretKeeping}, desensitize:${stages.desensitization})` };
   return null;
 }
-// AUTO-INJECTED: Detector #818 [5.3] Single parent targeting pattern
-// Severity: critical
 export const _detector_818_singleParentTargeting = {
   id: 818,
   section: '5.3',
@@ -119,10 +117,7 @@ export const _detector_818_singleParentTargeting = {
     return input.includes('singleParentTargeting') || input.includes('targetSingleParent');
   }
 };
-// Pattern anchors: singleParentTargeting, targetSingleParent
 
-// AUTO-INJECTED: Detector #819 [5.3] Child access motivation scoring
-// Severity: critical
 export const _detector_819_childAccessMotivation = {
   id: 819,
   section: '5.3',
@@ -134,10 +129,7 @@ export const _detector_819_childAccessMotivation = {
     return input.includes('childAccessMotivation') || input.includes('kidsMention.*early');
   }
 };
-// Pattern anchors: childAccessMotivation, kidsMention.*early
 
-// AUTO-INJECTED: Detector #820 [5.3] Child-related question velocity
-// Severity: critical
 export const _detector_820_childQuestionVelocity = {
   id: 820,
   section: '5.3',
@@ -149,10 +141,7 @@ export const _detector_820_childQuestionVelocity = {
     return input.includes('childQuestionVelocity') || input.includes('kidsQuestionRate');
   }
 };
-// Pattern anchors: childQuestionVelocity, kidsQuestionRate
 
-// AUTO-INJECTED: Detector #821 [5.3] Sex offender behavioral profile matching
-// Severity: critical
 export const _detector_821_sexOffenderProfile = {
   id: 821,
   section: '5.3',
@@ -164,10 +153,7 @@ export const _detector_821_sexOffenderProfile = {
     return input.includes('sexOffenderProfile') || input.includes('behavioralProfileMatch');
   }
 };
-// Pattern anchors: sexOffenderProfile, behavioralProfileMatch
 
-// AUTO-INJECTED: Detector #822 [5.3] Meet the kids velocity detector
-// Severity: critical
 export const _detector_822_meetTheKids = {
   id: 822,
   section: '5.3',
@@ -179,11 +165,7 @@ export const _detector_822_meetTheKids = {
     return input.includes('meetTheKids') || input.includes('kidsIntroduction.*early');
   }
 };
-// Pattern anchors: meetTheKids, kidsIntroduction.*early
 
-
-// ═══ Detector #818 [5.3] Single parent targeting pattern ═══
-// severity: critical
 export const singleParentTargeting_818 = 'singleParentTargeting';
 export const targetSingleParent_818 = 'targetSingleParent';
 export const _det818_singleParentTargeting = {
@@ -197,7 +179,5 @@ export const _det818_singleParentTargeting = {
     return ['singleParentTargeting', 'targetSingleParent'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: singleParentTargeting
 export const _ref_singleParentTargeting = _det818_singleParentTargeting;
-// pattern-ref: targetSingleParent
 export const _ref_targetSingleParent = _det818_singleParentTargeting;

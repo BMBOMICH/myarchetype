@@ -79,7 +79,6 @@ export async function decryptSignalText(payload: SignalPayload, senderId: string
   return utf8Dec(output);
 }
 
-// 🔀 Migration Router
 export async function encryptTextForRecipient(plaintext: string, recipientId: string) {
   const sig = await encryptSignalText(plaintext, recipientId);
   if (sig) return sig;

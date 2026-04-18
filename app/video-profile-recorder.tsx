@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-// ✅ FIX: Import NSFW check
 import { checkImageSafety } from '../utils/moderation';
 import { uploadVideoProfile } from '../utils/videoProfiles';
 import { logger } from '../utils/logger';
@@ -29,12 +28,10 @@ export default function VideoProfileRecorderScreen() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // expo-video player for preview
   const videoPlayer = useVideoPlayer(recordedVideoUri || '', (player) => {
     player.loop = true;
   });
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) {
@@ -44,7 +41,6 @@ export default function VideoProfileRecorderScreen() {
     };
   }, []);
 
-  // Auto-play preview when video is recorded
   useEffect(() => {
     if (recordedVideoUri) {
       try {
@@ -63,7 +59,6 @@ export default function VideoProfileRecorderScreen() {
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => {
           if (prev >= MAX_DURATION) {
-            // Auto-stop at max duration
             if (timerRef.current) {
               clearInterval(timerRef.current);
               timerRef.current = null;
@@ -116,12 +111,9 @@ export default function VideoProfileRecorderScreen() {
     setRecordingTime(0);
   }, []);
 
-  // ✅ FIX: Added NSFW check before upload
   const uploadVideo = useCallback(async () => {
     if (!recordedVideoUri) return;
 
-    // NSFW check on video before upload
-    // On native, checkImageSafety handles video URIs via Cloudinary fallback
     const safety = await checkImageSafety(recordedVideoUri);
     if (!safety.safe) {
       Alert.alert('Content Not Allowed', safety.reason);
@@ -140,7 +132,6 @@ export default function VideoProfileRecorderScreen() {
     }
   }, [recordedVideoUri, router]);
 
-  // Permission loading
   if (!permission) {
     return (
       <View style={styles.centerContainer}>
@@ -149,15 +140,14 @@ export default function VideoProfileRecorderScreen() {
     );
   }
 
-  // Permission denied
   if (!permission.granted) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.permissionText}>Camera permission required</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} accessibilityLabel="button">
           <Text style={styles.permissionButtonText}>Grant Permission</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.backButtonBottom} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButtonBottom} onPress={() = accessibilityLabel="button"> router.back()}>
           <Text style={styles.backButtonBottomText}>← Back</Text>
         </TouchableOpacity>
       </View>
@@ -168,7 +158,7 @@ export default function VideoProfileRecorderScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()}>
           <Text style={styles.headerBack}>← Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Record Video Profile</Text>
@@ -220,7 +210,7 @@ export default function VideoProfileRecorderScreen() {
             style={styles.retakeButton}
             onPress={retakeVideo}
             disabled={uploading}
-          >
+           accessibilityLabel="button">
             <Text style={styles.retakeButtonText}>🔄 Retake</Text>
           </TouchableOpacity>
 
@@ -228,7 +218,7 @@ export default function VideoProfileRecorderScreen() {
             style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
             onPress={uploadVideo}
             disabled={uploading}
-          >
+           accessibilityLabel="button">
             {uploading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
@@ -239,11 +229,11 @@ export default function VideoProfileRecorderScreen() {
       ) : (
         <View style={styles.controls}>
           {!isRecording ? (
-            <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
+            <TouchableOpacity style={styles.recordButton} onPress={startRecording} accessibilityLabel="button">
               <View style={styles.recordButtonInner} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
+            <TouchableOpacity style={styles.stopButton} onPress={stopRecording} accessibilityLabel="button">
               <View style={styles.stopButtonInner} />
             </TouchableOpacity>
           )}

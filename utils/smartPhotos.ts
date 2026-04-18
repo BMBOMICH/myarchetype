@@ -6,13 +6,11 @@ import { scorePhotoQuality } from './faceDetection';
 export interface SmartPhotoResult { recommended: string[]; scores: Record<string, number>; duplicates: string[]; lowQuality: string[]; suggestions: string[]; }
 export interface PhotoValidationResult { valid: boolean; isDuplicate: boolean; qualityScore: number; qualityIssues: string[]; reason?: string; }
 
-// #14: Duplicate check
 export async function checkNewPhotoDuplicate(uri: string, existing: string[]): Promise<{ isDuplicate: boolean; similarity: number; duplicateIndex?: number }> {
   if (!existing.length) return { isDuplicate: false, similarity: 0 };
   return checkDuplicatePhotoSameUser(uri, existing);
 }
 
-// #25: Quality ranking
 export async function rankPhotosByQuality(photos: string[]): Promise<Array<{ uri: string; score: number; issues: string[] }>> {
   const results: Array<{ uri: string; score: number; issues: string[] }> = [];
   for (const uri of photos) {
@@ -35,7 +33,6 @@ export async function rankPhotosByQuality(photos: string[]): Promise<Array<{ uri
   return results.sort((a, b) => b.score - a.score);
 }
 
-// #14 + #25 + #33: Full validation
 export async function validateNewPhoto(newUri: string, existing: string[], cloudinaryData?: { width?: number; height?: number; bytes?: number; format?: string; exifTimestamp?: string }): Promise<PhotoValidationResult> {
   const dup = await checkNewPhotoDuplicate(newUri, existing);
   if (dup.isDuplicate) return { valid: false, isDuplicate: true, qualityScore: 0, qualityIssues: [], reason: 'This photo is too similar to one you already have.' };

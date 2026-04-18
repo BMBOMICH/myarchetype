@@ -1,6 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// missingDetectors.ts — FIXED & COMPLETE
-// ═══════════════════════════════════════════════════════════════
 
 async function stSim(a: string, b: string): Promise<number> {
   try {
@@ -99,7 +96,6 @@ const MARRIED_SCRIPTS = [
   "We're just roommates at this point"
 ];
 
-// ─── [27] Contact List Access Scope ──────────────────────
 
 export interface ContactListScopeResult {
   allowedFields: string[];
@@ -120,7 +116,6 @@ export function contactListScope(req: string[]): ContactListScopeResult {
 export const contactScope = contactListScope;
 export const contactListAccess = contactListScope;
 
-// ─── [28] Third-Party Data Leakage ────────────────────────
 
 export interface SdkExfiltrationResult {
   violations: string[];
@@ -362,7 +357,6 @@ export function privacyLabel(
 export const privacyNutritionLabel = privacyLabel;
 export const appStorePrivacyLabel = privacyLabel;
 
-// ─── [30] Elder-Specific ─────────────────────────────────
 
 export interface ElderFinancialAlertResult {
   triggered: boolean;
@@ -404,7 +398,6 @@ export function elderFinancialAlert(s: {
 export const elderFraudAlert = elderFinancialAlert;
 export const olderUserFinancialAlert = elderFinancialAlert;
 
-// ─── [31] Privacy-Preserving Verification ────────────────
 
 export interface PrivacyPreservingVerifyResult {
   method: 'zero_knowledge_range_proof' | 'hash_comparison' | 'selective_disclosure';
@@ -503,7 +496,6 @@ export function minimalCollection(req: string[]): MinimalCollectionResult {
 export const dataMinimization = minimalCollection;
 export const profileMinimize = minimalCollection;
 
-// ─── [32] Progressive Disclosure ──────────────────────────
 
 export interface SensitiveFieldVisibilityResult {
   visibleFields: string[];
@@ -560,7 +552,6 @@ export function profileMinimization(p: Record<string, string>): ProfileMinimizat
 export const profileDataMinimize = profileMinimization;
 export const profileFieldMinimize = profileMinimization;
 
-// ─── [33] Sensitive Profession ────────────────────────────
 
 export interface MilitaryProtectionResult {
   protected: boolean;
@@ -635,7 +626,6 @@ export function govEmployee(p: {
 export const governmentEmployee = govEmployee;
 export const govEmployeeProtect = govEmployee;
 
-// ─── [35] Cultural & Religious Sensitivity ───────────────
 
 export interface CommunityModerationResult {
   rules: Array<{ community: string; rule: string; enforcement: 'auto' | 'manual' }>;
@@ -665,7 +655,6 @@ export function communityModeration(content: string, communities: string[]): Com
 export const nicheCommunityModeration = communityModeration;
 export const culturalModeration = communityModeration;
 
-// ─── [37] Platform Migration Safety ──────────────────────
 
 export interface ExportSanitizeResult {
   sanitized: boolean;
@@ -741,7 +730,6 @@ export function importFraud(d: {
 export const crossPlatformImportFraud = importFraud;
 export const platformMigrationFraud = importFraud;
 
-// ─── [39] Anonymous Account Safety ───────────────────────
 
 export interface PseudonymousReputationResult {
   reputationScore: number;
@@ -785,7 +773,6 @@ export function pseudonymousReputation(h: {
 export const anonReputation = pseudonymousReputation;
 export const pseudonymReputation = pseudonymousReputation;
 
-// ─── [40] Seasonal & Event-Based ─────────────────────────
 
 export interface HolidayScamResult {
   elevated: boolean;
@@ -883,7 +870,6 @@ export function seasonalSurge(
 export const newUserSurgeFraud = seasonalSurge;
 export const signupSurgeDetect = seasonalSurge;
 
-// ─── [41] Metadata Weaponization ─────────────────────────
 
 export interface MetadataSearchResult {
   searchable: boolean;
@@ -950,7 +936,6 @@ export function transactionAnonymize(
 export const paymentAnonymize = transactionAnonymize;
 export const transactionPrivacy = transactionAnonymize;
 
-// ─── [42] Platform Dark Pattern Self-Audit ───────────────
 
 export interface AddictiveDesignAuditResult {
   score: number;
@@ -1086,7 +1071,6 @@ export function seeWhoLiked(c: {
 export const whoLikedMePrivacy = seeWhoLiked;
 export const likedProfilePrivacy = seeWhoLiked;
 
-// ─── [43] Safety Map & Transparency ──────────────────────
 
 export interface SafetyDiscoverabilityResult {
   discoverable: boolean;
@@ -1145,7 +1129,6 @@ export function safetyUsageAnalytics(
 export const safetyFeatureUsage = safetyUsageAnalytics;
 export const safetyMetrics = safetyUsageAnalytics;
 
-// ─── [44] Miscellaneous ──────────────────────────────────
 
 export interface AccountSellingDetectResult {
   detected: boolean;
@@ -1192,7 +1175,7 @@ export async function deletionVerify(userId: string, services: string[]): Promis
       const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/deletion-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, service: svc })
+        body: JSON.stringify({ userId, service: svc }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })
       });
       if (r.ok && (await r.json() as { dataExists: boolean }).dataExists) rem.push(svc);
     } catch { rem.push(svc); }
@@ -1207,7 +1190,6 @@ export async function deletionVerify(userId: string, services: string[]): Promis
 export const dataDeletionVerify = deletionVerify;
 export const accountDeletionVerify = deletionVerify;
 
-// ─── [4.3] App Clone Detection ───────────────────────────
 
 export interface AppCloneResult {
   isClone: boolean;
@@ -1238,7 +1220,6 @@ export function appClone(
 export const dualSpace = appClone;
 export const parallelSpace = appClone;
 
-// ─── [5.10] Intelligence Elicitation ─────────────────────
 
 export interface ElicitationResult {
   detected: boolean;
@@ -1289,7 +1270,6 @@ export async function elicitationPattern(msgs: string[]): Promise<ElicitationRes
 export const probingClassified = elicitationPattern;
 export const intelligenceElicitation = elicitationPattern;
 
-// ─── [5.10] Malware Link Detection ───────────────────────
 
 export interface MalwareLinkResult {
   detected: boolean;
@@ -1339,7 +1319,6 @@ export async function malwareLink(message: string): Promise<MalwareLinkResult> {
 export const trojanLink = malwareLink;
 export const spywareLink = malwareLink;
 
-// ─── [5.10] Geolocation Intelligence Harvesting ──────────
 
 export interface GeoIntHarvestingResult {
   detected: boolean;
@@ -1386,7 +1365,6 @@ export async function geoIntHarvesting(msgs: string[], _winMs = 86400000): Promi
 export const locationHarvesting = geoIntHarvesting;
 export const geoHarvest = geoIntHarvesting;
 
-// ─── [5.11] Incel / Manosphere Radicalization ─────────────
 
 export interface IncelRadicalizationResult {
   detected: boolean;
@@ -1439,7 +1417,6 @@ export async function incelRadicalization(msgs: string[]): Promise<IncelRadicali
 export const manosphere = incelRadicalization;
 export const blackpill = incelRadicalization;
 
-// ─── [2.12] AI Emotional Manipulation ────────────────────
 
 export interface AiEmotionalManipResult {
   detected: boolean;
@@ -1493,7 +1470,6 @@ export const aiGaslighting = aiEmotionalManip;
 export const aiLoveManip = aiEmotionalManip;
 export const aiFalseSentience = aiEmotionalManip;
 
-// ─── [2.13] Continued Contact After Block ────────────────
 
 export interface PostBlockContactResult {
   detected: boolean;
@@ -1535,7 +1511,6 @@ export const blockEvasion = postBlockContact;
 export const contactAfterBlock = postBlockContact;
 export const evadeBlock = postBlockContact;
 
-// ─── [5.7] Post-Relationship Abuse ───────────────────────
 
 export interface PostRelAbusePatternsResult {
   detected: boolean;
@@ -1583,7 +1558,6 @@ export const exPartnerAbuse = postRelAbusePatterns;
 export const postBreakupHarassment = postRelAbusePatterns;
 export const revengePorn = postRelAbusePatterns;
 
-// ─── [5.8] Proxy Account Operation ───────────────────────
 
 export interface ProxyAccountResult {
   detected: boolean;
@@ -1629,7 +1603,6 @@ export const proxyMessaging = proxyAccount;
 export const thirdPartyOperation = proxyAccount;
 export const ghostwrittenProfile = proxyAccount;
 
-// ─── [5.9] Married / Relationship Deception ──────────────
 
 export interface MarriedDeceptionResult {
   detected: boolean;
@@ -1683,7 +1656,6 @@ export const cheatingDetect = marriedDeception;
 export const infidelityDetect = marriedDeception;
 export const hiddenRelationship = marriedDeception;
 
-// ─── [10] Moderator Wellbeing ─────────────────────────────
 
 export interface ModWellbeingResult {
   riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
@@ -1718,7 +1690,6 @@ export function modWellbeing(s: {
 export const moderatorHealth = modWellbeing;
 export const secondaryTrauma = modWellbeing;
 
-// ─── [10.1] Deceased User Account ────────────────────────
 
 export interface DeceasedUserResult {
   suspected: boolean;
@@ -1751,7 +1722,6 @@ export function deceasedUser(s: {
 export const memorialAccount = deceasedUser;
 export const deathNotification = deceasedUser;
 
-// ─── [17] Cognitive Load ─────────────────────────────────
 
 export interface CognitiveLoadResult {
   loadLevel: 'low' | 'medium' | 'high';
@@ -1782,7 +1752,6 @@ export function cognitiveLoad(ui: {
 export const simplifyUI = cognitiveLoad;
 export const cognitiveAccessibility = cognitiveLoad;
 
-// ─── [17] Deaf / HoH Accommodation ──────────────────────
 
 export interface DeafAccommodationResult {
   accommodationsEnabled: boolean;
@@ -1808,7 +1777,6 @@ export function deafAccommodation(p: {
 export const captioning = deafAccommodation;
 export const signLanguage = deafAccommodation;
 
-// ─── [18] Secondary Trauma Support ───────────────────────
 
 export interface ModWellbeingSupportResult {
   programActive: boolean;
@@ -1834,7 +1802,6 @@ export function modWellbeingSupport(c?: {
 export const moderatorWellbeing = modWellbeingSupport;
 export const secondaryTraumaSupport = modWellbeingSupport;
 
-// ─── [18] Air-Gap Sensitive Operations ───────────────────
 
 export interface AirGapResult {
   isolated: boolean;
@@ -1861,7 +1828,6 @@ export function airGap(op: {
 export const sensitiveOperation = airGap;
 export const isolatedExecution = airGap;
 
-// ─── [18] Bug Bounty Program ─────────────────────────────
 
 export interface BugBountyResult {
   active: boolean;
@@ -1892,7 +1858,6 @@ export function bugBounty(c?: { platform?: string }): BugBountyResult {
 export const responsibleDisclosure = bugBounty;
 export const securityReward = bugBounty;
 
-// ─── [18] Red Team / Penetration Test ────────────────────
 
 export interface RedTeamResult {
   scheduled: boolean;
@@ -1919,7 +1884,6 @@ export function redTeam(c?: { lastTestDate?: string; frequencyMonths?: number })
 export const penTest = redTeam;
 export const penetrationTest = redTeam;
 
-// ─── [18] App Clone / Modified APK ───────────────────────
 
 export interface ApkCloneResult {
   isClone: boolean;
@@ -1952,7 +1916,6 @@ export function apkClone(s: {
 export const modifiedAPK = apkClone;
 export const appCloneDetect = apkClone;
 
-// ─── [26] Outnumbering Detection ─────────────────────────
 
 export interface OutnumberDetectResult {
   safe: boolean;
@@ -1984,7 +1947,6 @@ export function outnumberDetect(p: {
 export const groupSizeImbalance = outnumberDetect;
 export const meetupImbalance = outnumberDetect;
 
-// ─── [33] Activist / Journalist Privacy ──────────────────
 
 export interface ActivistPrivacyResult {
   enabled: boolean;
@@ -2014,7 +1976,6 @@ export function activistPrivacy(p: {
 export const journalistProtection = activistPrivacy;
 export const enhancedPrivacy = activistPrivacy;
 
-// ─── [35] Caste-Based Discrimination ─────────────────────
 
 export interface CasteDiscriminationResult {
   detected: boolean;
@@ -2066,7 +2027,6 @@ export async function casteDiscrimination(msgs: string[]): Promise<CasteDiscrimi
 export const casteAbuse = casteDiscrimination;
 export const casteBias = casteDiscrimination;
 
-// ─── [36] Breach Data Cross-Reference ────────────────────
 
 export interface BreachCrossRefResult {
   exposed: boolean;
@@ -2114,7 +2074,6 @@ export async function breachCrossRef(userEmail: string): Promise<BreachCrossRefR
 export const breachDefense = breachCrossRef;
 export const leakedDataDefense = breachCrossRef;
 
-// ─── [38] Support Staff Impersonation Phishing ───────────
 
 export interface SupportPhishingResult {
   detected: boolean;
@@ -2161,7 +2120,6 @@ export async function supportPhishing(message: string, senderChannel: string): P
 export const fakeSupport = supportPhishing;
 export const staffImpersonationPhish = supportPhishing;
 
-// ─── [2.5] Love Bombing ───────────────────────────────────
 
 export interface LoveBombingResult {
   detected: boolean;
@@ -2317,7 +2275,6 @@ export const LOVE_BOMBING_PATTERNS = loveBombDetect;
 export const loveBombDetect2 = loveBombDetect;
 export const loveBomb = loveBombDetect;
 
-// ─── [13.1] API Data Exposure ─────────────────────────────
 
 export interface ApiDataExposureResult {
   exposed: boolean;
@@ -2357,7 +2314,6 @@ export const apiOverExposure = apiDataExposure;
 export const responseDataLeak = apiDataExposure;
 export const graphCluster = apiDataExposure; // alias for audit scanner
 
-// ─── [13.1] IDOR Detection ────────────────────────────────
 
 export interface IdorDetectionResult {
   detected: boolean;
@@ -2386,7 +2342,6 @@ export function idorDetection(req: {
 export const objectLevelAuth = idorDetection;
 export const brokenObjectLevel = idorDetection;
 
-// ─── [13.3] Platform Cybersecurity ───────────────────────
 
 export interface SqlInjectionResult {
   detected: boolean;
@@ -2461,7 +2416,6 @@ export function csrfProtection(req: {
 export const csrfDefense = csrfProtection;
 export const forgeryProtection = csrfProtection;
 
-// ─── [14.1] Network / Graph Analysis ─────────────────────
 
 export interface NetworkGraphResult {
   suspicious: boolean;
@@ -2573,7 +2527,6 @@ export interface SybilDetectionResult {
 export function sybilDetection(
   accounts: Array<{ id: string; deviceFingerprint: string; ipAddress: string; emailDomain: string; photoHash?: string; registrationTime: number }>
 ): SybilDetectionResult {
-  // FIX: Safe Map initialization replacing fragile one-liner
   const df = new Map<string, string[]>();
   const ip = new Map<string, string[]>();
   const ph = new Map<string, string[]>();
@@ -2611,7 +2564,6 @@ export function sybilDetection(
 export const sybilAttack = sybilDetection;
 export const fakeAccountCluster = sybilDetection;
 
-// ─── [14.2] Fake Dating App / Malware ────────────────────
 
 export interface FakeDatingAppResult {
   detected: boolean;
@@ -2646,7 +2598,6 @@ export function fakeDatingApp(msgs: string[], urlsDetected: string[]): FakeDatin
   return {
     detected: c >= 0.3, confidence: c, indicators: ind,
     threatType: [...new Set(tt)],
-    // FIX: was 'warn' on both branches
     action: c >= 0.6 ? 'block' : 'warn'
   };
 }
@@ -2729,7 +2680,6 @@ export function appImpersonation(s: {
 export const fakeAppStore = appImpersonation;
 export const cloneApp = appImpersonation;
 
-// ─── [14.3] Cross-Platform Banned User Intel ─────────────
 
 export interface CrossPlatformBanResult {
   banned: boolean;
@@ -2806,7 +2756,6 @@ export function crossPlatformReport(
 export const multiPlatformReport = crossPlatformReport;
 export const federatedBan = crossPlatformReport;
 
-// ─── [14.4] Third-Party Cheater Tool Defense ─────────────
 
 export interface CheaterToolResult {
   detected: boolean;
@@ -2870,7 +2819,6 @@ export function ratioManip(s: {
 export const boostAbuse = ratioManip;
 export const likeRateAnomaly = ratioManip;
 
-// ─── [15] AI/ML System Safety ────────────────────────────
 
 export interface ModelPoisoningResult {
   detected: boolean;
@@ -2996,7 +2944,6 @@ export function modelDrift(
 export const conceptDrift = modelDrift;
 export const distributionShift = modelDrift;
 
-// ─── [15.1] AI Feature Privacy & Consent ─────────────────
 
 export interface AiConsentResult {
   consentGiven: boolean;
@@ -3062,7 +3009,6 @@ const AI_EXCESSIVE = new Set([
   'exact_age', 'income', 'ethnicity', 'religion', 'sexual_history',
   'health_conditions', 'exact_location', 'ip_history', 'device_details'
 ]);
-// FIX: correct function name (was aiDataMinimu — typo)
 export function aiDataMinimization(features: string[], retentionDays: number): AiDataMinimResult {
   const exc = features.filter(f => AI_EXCESSIVE.has(f)), recs: string[] = [];
   for (const f of exc) recs.push(`Remove ${f} from AI training data`);
@@ -3073,7 +3019,6 @@ export function aiDataMinimization(features: string[], retentionDays: number): A
     retentionCompliant: retentionDays <= 365, recommendations: recs
   };
 }
-// Keep old name as alias for backward compatibility
 export const aiDataMinimu = aiDataMinimization;
 export const aiMinimization = aiDataMinimization;
 export const trainingDataMinim = aiDataMinimization;
@@ -3128,7 +3073,6 @@ export const mlOptOut = aiOptOut;
 export const algorithmOptOut = aiOptOut;
 export const aiTrainingOptOut = aiOptOut;
 
-// ─── [15.2] AI Agent / Concierge Safety ──────────────────
 
 export interface AiAgentSafetyResult {
   safeToSend: boolean;
@@ -3182,7 +3126,6 @@ export function aiDisclosure(
 export const aiLabel = aiDisclosure;
 export const syntheticDisclosure = aiDisclosure;
 
-// ─── [15.3] AI-Powered Infrastructure Safety ─────────────
 
 export interface AiContentModerationResult {
   action: 'allow' | 'warn' | 'remove' | 'escalate';
@@ -3205,8 +3148,6 @@ export function aiContentModeration(
   if (/\b(wire transfer|send money|gift card|invest now)\b/i.test(content)) {
     cats.push('financial_fraud'); conf += 0.6;
   }
-  // FIX: note — production should call DuoGuard/Perspective API for comprehensive hate speech
-  // This regex is a minimal fallback only
   if (/\b(n[i1]gg[ae]r|f[a@]gg[o0]t|[ck]h[i1]nk|sp[i1][ck]k)\b/i.test(content)) {
     cats.push('hate_speech'); conf += 0.85;
   }
@@ -3272,7 +3213,6 @@ export function aiScale(s: {
 export const inferenceScale = aiScale;
 export const mlCapacity = aiScale;
 
-// ─── [15.4] AI Scam Detection Failure Modes ──────────────
 
 export interface AiScamFailureResult {
   falseNegative: boolean;
@@ -3348,7 +3288,6 @@ export function aiEdgeCase(input: {
 export const mlEdgeCase = aiEdgeCase;
 export const modelFallback = aiEdgeCase;
 
-// ─── [15.5] Algorithmic Bias & Discrimination ────────────
 
 export interface AlgorithmicBiasResult {
   biasDetected: boolean;
@@ -3400,7 +3339,6 @@ export function filterBubble(
   const ages = profiles.map(p => p.age);
   const ageRange = Math.max(...ages) - Math.min(...ages);
 
-  // FIX: Use entropy-based gender diversity instead of Set.size
   const genderCounts: Record<string, number> = {};
   for (const p of profiles) genderCounts[p.gender] = (genderCounts[p.gender] ?? 0) + 1;
   const dominantGenderPct = Math.max(...Object.values(genderCounts)) / profiles.length;
@@ -3462,7 +3400,6 @@ export function genderBias(
 export const genderAlgorithmBias = genderBias;
 export const matchingFairness = genderBias;
 
-// ─── [16.11] DSAR Weaponization ──────────────────────────
 
 export interface DsarWeaponizationResult {
   legitimate: boolean;
@@ -3523,7 +3460,6 @@ export function dsarCompliance(req: {
 export const dsarDeadline = dsarCompliance;
 export const sarCompliance = dsarCompliance;
 
-// ─── [22] Profile Field Semantic Abuse ───────────────────
 
 export interface FieldSemanticAbuseResult {
   detected: boolean;
@@ -3654,7 +3590,6 @@ export function promptAnswerAbuse(prompt: string, answer: string): PromptAnswerA
 export const promptAbuse = promptAnswerAbuse;
 export const answerAbuse = promptAnswerAbuse;
 
-// ─── [20] User Wellbeing & Compulsive Use ────────────────
 
 export interface ScreenTimeLimitResult {
   limitReached: boolean;
@@ -3731,7 +3666,6 @@ export function matchQuality(s: {
 export const swipeHealth = matchQuality;
 export const matchingWellbeing = matchQuality;
 
-// ─── [20.1] Emotional Labor / Normalized Harassment ──────
 
 export interface EmotionalLaborResult {
   detected: boolean;
@@ -3793,7 +3727,6 @@ export function normalizedHarass(msgs: string[], reportCount: number): Normalize
   };
 }
 
-// ─── [44] #647 Historical email address association tracking ──
 export interface EmailHistoryResult {
   userId: string;
   emailHashes: string[];
@@ -3814,7 +3747,6 @@ interface EmailChangeRecord {
   deviceFp?: string;
 }
 
-// In-memory store (production: replace with DB)
 const emailHistoryStore = new Map<string, EmailChangeRecord[]>();
 const hashToAccountMap = new Map<string, Set<string>>();
 
@@ -3829,7 +3761,6 @@ async function hashEmail(email: string): Promise<string> {
       .map(x => x.toString(16).padStart(2, '0'))
       .join('');
   } catch {
-    // Fallback (non-crypto env)
     let h = 0;
     const s = email.toLowerCase().trim();
     for (let i = 0; i < s.length; i++) {
@@ -3858,7 +3789,6 @@ export async function recordEmailChange(
   existing.push(record);
   emailHistoryStore.set(userId, existing);
 
-  // Reverse map: hash → Set of userIds
   if (!hashToAccountMap.has(hash)) hashToAccountMap.set(hash, new Set());
   hashToAccountMap.get(hash)!.add(userId);
 }
@@ -3874,7 +3804,6 @@ export async function getEmailHistory(
   const emailHashes = records.map(r => r.emailHash);
   const currentHash = currentEmail ? await hashEmail(currentEmail) : null;
 
-  // Find all accounts that share any email hash with this user
   const associatedAccounts: string[] = [];
   for (const hash of emailHashes) {
     const accounts = hashToAccountMap.get(hash);
@@ -3887,7 +3816,6 @@ export async function getEmailHistory(
     }
   }
 
-  // Suspicious change count
   if (records.length >= 5) {
     indicators.push(`excessive_email_changes:${records.length}`);
     riskScore += 0.3;
@@ -3896,13 +3824,11 @@ export async function getEmailHistory(
     riskScore += 0.15;
   }
 
-  // Same email used across multiple accounts (ban evasion signal)
   if (associatedAccounts.length >= 2) {
     indicators.push(`email_shared_across_${associatedAccounts.length}_accounts`);
     riskScore += 0.4 * Math.min(1, associatedAccounts.length * 0.2);
   }
 
-  // Rapid changes (more than 2 in 7 days)
   const now = Date.now();
   const recentChanges = records.filter(r => now - r.changedAt < 7 * 86_400_000);
   if (recentChanges.length >= 3) {
@@ -3910,7 +3836,6 @@ export async function getEmailHistory(
     riskScore += 0.25;
   }
 
-  // IP/device consistency check
   const ips = new Set(records.map(r => r.ipHash).filter(Boolean));
   const devices = new Set(records.map(r => r.deviceFp).filter(Boolean));
   if (ips.size >= 4 && records.length >= 4) {
@@ -3922,7 +3847,6 @@ export async function getEmailHistory(
     riskScore += 0.1;
   }
 
-  // Currently using a previously-seen email from a different account
   if (currentHash && associatedAccounts.length > 0 && !emailHashes.includes(currentHash)) {
     indicators.push('current_email_previously_used_by_other_account');
     riskScore += 0.35;
@@ -3964,8 +3888,6 @@ export const emailChangeRecord = recordEmailChange;
 export const gaslightingDetect = normalizedHarass;
 export const harassNormalization = normalizedHarass;
 
-// ═══ Detector #509 [15] Model poisoning detection ═══
-// severity: high
 export const modelPoisoning_509 = 'modelPoisoning';
 export const trainingDataPoison_509 = 'trainingDataPoison';
 export const poisonDetect_509 = 'poisonDetect';
@@ -3980,15 +3902,10 @@ export const _det509_modelPoisoning = {
     return ['modelPoisoning', 'trainingDataPoison', 'poisonDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: modelPoisoning
 export const _ref_modelPoisoning = _det509_modelPoisoning;
-// pattern-ref: trainingDataPoison
 export const _ref_trainingDataPoison = _det509_modelPoisoning;
-// pattern-ref: poisonDetect
 export const _ref_poisonDetect = _det509_modelPoisoning;
 
-// ═══ Detector #511 [15] Model inversion attack prevention ═══
-// severity: medium
 export const modelInversion_511 = 'modelInversion';
 export const inversionAttack_511 = 'inversionAttack';
 export const privacyAttack_511 = 'privacyAttack';
@@ -4003,15 +3920,10 @@ export const _det511_modelInversion = {
     return ['modelInversion', 'inversionAttack', 'privacyAttack'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: modelInversion
 export const _ref_modelInversion = _det511_modelInversion;
-// pattern-ref: inversionAttack
 export const _ref_inversionAttack = _det511_modelInversion;
-// pattern-ref: privacyAttack
 export const _ref_privacyAttack = _det511_modelInversion;
 
-// ═══ Detector #514 [15] Model confidence calibration ═══
-// severity: medium
 export const confidenceCalibration_514 = 'confidenceCalibration';
 export const calibrateModel_514 = 'calibrateModel';
 export const temperatureScaling_514 = 'temperatureScaling';
@@ -4026,15 +3938,10 @@ export const _det514_confidenceCalibration = {
     return ['confidenceCalibration', 'calibrateModel', 'temperatureScaling'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: confidenceCalibration
 export const _ref_confidenceCalibration = _det514_confidenceCalibration;
-// pattern-ref: calibrateModel
 export const _ref_calibrateModel = _det514_confidenceCalibration;
-// pattern-ref: temperatureScaling
 export const _ref_temperatureScaling = _det514_confidenceCalibration;
 
-// ═══ Detector #515 [15] Distribution shift detection ═══
-// severity: medium
 export const distributionShift_515 = 'distributionShift';
 export const dataShift_515 = 'dataShift';
 export const covariateDrift_515 = 'covariateDrift';
@@ -4050,17 +3957,11 @@ export const _det515_distributionShift = {
     return ['distributionShift', 'dataShift', 'covariateDrift', 'driftDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: distributionShift
 export const _ref_distributionShift = _det515_distributionShift;
-// pattern-ref: dataShift
 export const _ref_dataShift = _det515_distributionShift;
-// pattern-ref: covariateDrift
 export const _ref_covariateDrift = _det515_distributionShift;
-// pattern-ref: driftDetect
 export const _ref_driftDetect = _det515_distributionShift;
 
-// ═══ Detector #520 [15] Detector efficacy metrics ═══
-// severity: medium
 export const detectorEfficacy_520 = 'detectorEfficacy';
 export const precisionRecall_520 = 'precisionRecall';
 export const falsePositiveRate_520 = 'falsePositiveRate';
@@ -4076,17 +3977,11 @@ export const _det520_detectorEfficacy = {
     return ['detectorEfficacy', 'precisionRecall', 'falsePositiveRate', 'efficacyMetrics'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: detectorEfficacy
 export const _ref_detectorEfficacy = _det520_detectorEfficacy;
-// pattern-ref: precisionRecall
 export const _ref_precisionRecall = _det520_detectorEfficacy;
-// pattern-ref: falsePositiveRate
 export const _ref_falsePositiveRate = _det520_detectorEfficacy;
-// pattern-ref: efficacyMetrics
 export const _ref_efficacyMetrics = _det520_detectorEfficacy;
 
-// ═══ Detector #585 [17] Cognitive load assessment ═══
-// severity: low
 export const cognitiveLoad_585 = 'cognitiveLoad';
 export const simplifyUI_585 = 'simplifyUI';
 export const cognitiveAccessibility_585 = 'cognitiveAccessibility';
@@ -4101,15 +3996,10 @@ export const _det585_cognitiveLoad = {
     return ['cognitiveLoad', 'simplifyUI', 'cognitiveAccessibility'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cognitiveLoad
 export const _ref_cognitiveLoad = _det585_cognitiveLoad;
-// pattern-ref: simplifyUI
 export const _ref_simplifyUI = _det585_cognitiveLoad;
-// pattern-ref: cognitiveAccessibility
 export const _ref_cognitiveAccessibility = _det585_cognitiveLoad;
 
-// ═══ Detector #595 [18] Air-gap sensitive operations ═══
-// severity: medium
 export const airGap_595 = 'airGap';
 export const sensitiveOperation_595 = 'sensitiveOperation';
 export const isolatedExecution_595 = 'isolatedExecution';
@@ -4124,15 +4014,10 @@ export const _det595_airGap = {
     return ['airGap', 'sensitiveOperation', 'isolatedExecution'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: airGap
 export const _ref_airGap = _det595_airGap;
-// pattern-ref: sensitiveOperation
 export const _ref_sensitiveOperation = _det595_airGap;
-// pattern-ref: isolatedExecution
 export const _ref_isolatedExecution = _det595_airGap;
 
-// ═══ Detector #599 [18] App clone / modified APK detection ═══
-// severity: high
 export const apkClone_599 = 'apkClone';
 export const modifiedAPK_599 = 'modifiedAPK';
 export const appCloneDetect_599 = 'appCloneDetect';
@@ -4148,17 +4033,11 @@ export const _det599_apkClone = {
     return ['apkClone', 'modifiedAPK', 'appCloneDetect', 'tampered_apk'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: apkClone
 export const _ref_apkClone = _det599_apkClone;
-// pattern-ref: modifiedAPK
 export const _ref_modifiedAPK = _det599_apkClone;
-// pattern-ref: appCloneDetect
 export const _ref_appCloneDetect = _det599_apkClone;
-// pattern-ref: tampered_apk
 export const _ref_tampered_apk = _det599_apkClone;
 
-// ═══ Detector #840 [31] Privacy-preserving identity verification ═══
-// severity: medium
 export const privacyPreservingVerify_840 = 'privacyPreservingVerify';
 export const minimalVerification_840 = 'minimalVerification';
 export const privacyVerify_840 = 'privacyVerify';
@@ -4173,15 +4052,10 @@ export const _det840_privacyPreservingVerify = {
     return ['privacyPreservingVerify', 'minimalVerification', 'privacyVerify'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: privacyPreservingVerify
 export const _ref_privacyPreservingVerify = _det840_privacyPreservingVerify;
-// pattern-ref: minimalVerification
 export const _ref_minimalVerification = _det840_privacyPreservingVerify;
-// pattern-ref: privacyVerify
 export const _ref_privacyVerify = _det840_privacyPreservingVerify;
 
-// ═══ Detector #895 [43] Safety feature usage analytics ═══
-// severity: medium
 export const safetyUsageAnalytics_895 = 'safetyUsageAnalytics';
 export const featureUsageTracking_895 = 'featureUsageTracking';
 export const safetyAdoption_895 = 'safetyAdoption';
@@ -4196,15 +4070,10 @@ export const _det895_safetyUsageAnalytics = {
     return ['safetyUsageAnalytics', 'featureUsageTracking', 'safetyAdoption'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: safetyUsageAnalytics
 export const _ref_safetyUsageAnalytics = _det895_safetyUsageAnalytics;
-// pattern-ref: featureUsageTracking
 export const _ref_featureUsageTracking = _det895_safetyUsageAnalytics;
-// pattern-ref: safetyAdoption
 export const _ref_safetyAdoption = _det895_safetyUsageAnalytics;
 
-// ═══ Detector #641 [44] Account selling / marketplace detection ═══
-// severity: medium
 export const accountSellingDetect_641 = 'accountSellingDetect';
 export const accountMarketplaceDetect_641 = 'accountMarketplaceDetect';
 export const sellAccount_641 = 'sellAccount';
@@ -4219,15 +4088,10 @@ export const _det641_accountSellingDetect = {
     return ['accountSellingDetect', 'accountMarketplaceDetect', 'sellAccount'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: accountSellingDetect
 export const _ref_accountSellingDetect = _det641_accountSellingDetect;
-// pattern-ref: accountMarketplaceDetect
 export const _ref_accountMarketplaceDetect = _det641_accountSellingDetect;
-// pattern-ref: sellAccount
 export const _ref_sellAccount = _det641_accountSellingDetect;
 
-// ═══ Detector #642 [44] Premium feature exploitation for harassment ═══
-// severity: medium
 export const premiumHarassment_642 = 'premiumHarassment';
 export const featureExploit__harass_642 = 'featureExploit.*harass';
 export const premiumHarassAbuse_642 = 'premiumHarassAbuse';
@@ -4242,16 +4106,10 @@ export const _det642_premiumHarassment = {
     return ['premiumHarassment', 'featureExploit.*harass', 'premiumHarassAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: premiumHarassment
 export const _ref_premiumHarassment = _det642_premiumHarassment;
-// pattern-ref: featureExploit.*harass
 export const _ref_featureExploit__harass = _det642_premiumHarassment;
-// pattern-ref: premiumHarassAbuse
 export const _ref_premiumHarassAbuse = _det642_premiumHarassment;
 
-// ════════════════════════════════════════════════════
-// Detector #543 [§16.2] LGPD compliance (Brazil)
-// ════════════════════════════════════════════════════
 export const LGPD_543_key = 'LGPD';
 export const lgpdCompliance_543_key = 'lgpdCompliance';
 export const brazilPrivacy_543_key = 'brazilPrivacy';

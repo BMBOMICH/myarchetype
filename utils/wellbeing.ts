@@ -1,13 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// utils/wellbeing.ts — FULL UPDATED
-// Covers: [20] #606,608,609,735,736,737,898
-// [20.1] #897 Emotional fatigue
-// [42] #668 Dark pattern self-audit
-// [43] #669,894,895 Safety feature discoverability/analytics
-// [16.5] UK Online Safety Act (duty of care)
-// [23] #638 Are you sure pause prompt (alias)
-// [23.1] #692 Online status visibility
-// ═══════════════════════════════════════════════════════════════
 import { writeAuditLog } from './logger';
 
 export interface WellbeingNudge{type:'time_limit'|'rejection_pause'|'compulsive_check'|'take_break';message:string;actionable:boolean;}
@@ -32,7 +22,6 @@ export function auditPaywalledFeatures(premiumOnlyFeatures:string[]):{violations
   const violations=premiumOnlyFeatures.filter(f=>MUST_BE_FREE.includes(f as any));
   return{violations};}
 
-// ─── #606 Compulsive usage / doom-swiping detection ──────────
 export interface DoomSwipeResult{detected:boolean;swipeCount:number;sessionMinutes:number;swipesPerMinute:number;riskLevel:'none'|'low'|'medium'|'high';recommendation:string;}
 export function detectDoomSwiping(swipeTimestamps:number[],sessionStartMs:number):DoomSwipeResult{
   const now=Date.now(),sessionMinutes=(now-sessionStartMs)/60_000,swipesPerMinute=sessionMinutes>0?swipeTimestamps.length/sessionMinutes:0;
@@ -42,13 +31,11 @@ export function detectDoomSwiping(swipeTimestamps:number[],sessionStartMs:number
   return{detected,swipeCount:swipeTimestamps.length,sessionMinutes:Math.round(sessionMinutes*10)/10,swipesPerMinute:Math.round(swipesPerMinute*10)/10,riskLevel:rl,recommendation:rl==='high'?'Taking a break may help. Rapid swiping rarely leads to meaningful connections.':rl==='medium'?'Slow down and read profiles more carefully.':rl==='low'?'Consider spending more time on each profile.':'Swiping pace is healthy.'};}
 export const compulsiveUsage=detectDoomSwiping;export const doomSwiping=detectDoomSwiping;
 
-// ─── [20] CompulsiveUsageResult interface ─────────────────────
 export interface CompulsiveUsageResult{detected:boolean;sessionsToday:number;totalSwipesToday:number;averageSessionLength:number;riskLevel:'none'|'low'|'medium'|'high';}
 export function buildCompulsiveUsageResult(sessionsToday:number,totalSwipesToday:number,averageSessionLength:number,swipeTimestamps:number[],sessionStartMs:number):CompulsiveUsageResult{
   const r=detectDoomSwiping(swipeTimestamps,sessionStartMs);
   return{detected:r.detected,sessionsToday,totalSwipesToday,averageSessionLength,riskLevel:r.riskLevel};}
 
-// ─── #608 Rejection sensitivity overload detection ────────────
 export interface RejectionSensitivityResult{overloaded:boolean;rejectionRate:number;recentRejections:number;recommendation:string;suggestBreak:boolean;}
 export function detectRejectionSensitivityOverload(stats:{likesGiven:number;matchesReceived:number;unmatchedRecently:number;sessionCount7d:number}):RejectionSensitivityResult{
   const matchRate=stats.likesGiven>0?stats.matchesReceived/stats.likesGiven:0;const rejectionRate=1-matchRate;const overloaded=rejectionRate>=0.98&&stats.likesGiven>=50||stats.unmatchedRecently>=5;
@@ -56,14 +43,12 @@ export function detectRejectionSensitivityOverload(stats:{likesGiven:number;matc
   return{overloaded,rejectionRate:Math.round(rejectionRate*100)/100,recentRejections:stats.unmatchedRecently,suggestBreak:overloaded,recommendation:overloaded?'It looks like you might be experiencing some rejection fatigue. Consider taking a break or refreshing your profile.':rejectionRate>=0.9?'Your match rate is lower than average. A profile refresh might help.':'Match rate is within normal range.'};}
 export const rejectionSensitivity=detectRejectionSensitivityOverload;export const rejectionOverload=detectRejectionSensitivityOverload;
 
-// ─── #608 RejectionOverloadResult ─────────────────────────────
 export interface RejectionOverloadResult{detected:boolean;rejectionRate:number;consecutiveRejections:number;riskLevel:'none'|'low'|'medium'|'high';recommendation:string;suggestBreak:boolean;}
 export function buildRejectionOverloadResult(stats:{likesGiven:number;matchesReceived:number;unmatchedRecently:number;consecutiveRejections:number;sessionCount7d:number}):RejectionOverloadResult{
   const r=detectRejectionSensitivityOverload(stats);
   const rl:RejectionOverloadResult['riskLevel']=stats.consecutiveRejections>=20?'high':stats.consecutiveRejections>=10?'medium':stats.consecutiveRejections>=5?'low':'none';
   return{detected:r.overloaded,rejectionRate:r.rejectionRate,consecutiveRejections:stats.consecutiveRejections,riskLevel:rl,recommendation:r.recommendation,suggestBreak:r.suggestBreak};}
 
-// ─── #609 Self-esteem impact monitoring ───────────────────────
 export interface SelfEsteemImpactResult{impactScore:number;trend:'improving'|'stable'|'declining';signals:string[];recommendation:string;}
 export function monitorSelfEsteemImpact(metrics:{recentMatchRate:number;baselineMatchRate:number;negativeMessagesReceived:number;profileEditsLast7d:number;sessionFrequencyChange:number;appOpenAfterRejection:boolean}):SelfEsteemImpactResult{
   const signals:string[]=[];let score=50;
@@ -80,7 +65,6 @@ export function monitorSelfEsteemImpact(metrics:{recentMatchRate:number;baseline
   return{impactScore:score,trend,signals,recommendation:trend==='declining'?'We\'ve noticed some patterns that may be affecting your wellbeing. Consider taking a break or adjusting your approach.':trend==='stable'?'Your app use seems balanced.':'Your experience appears positive. Keep going!'};}
 export const selfEsteemMonitor=monitorSelfEsteemImpact;export const selfEsteemImpact=monitorSelfEsteemImpact;
 
-// ─── #735 Algorithmic engagement vs wellbeing tradeoff ────────
 export interface EngagementVsWellbeingResult{balanceScore:number;engagementOverridden:boolean;recommendation:string;adjustments:string[];}
 export function balanceEngagementVsWellbeing(metrics:{engagementScore:number;wellbeingScore:number;userReportedSatisfaction?:number;sessionTimeMinutes:number;returnRate7d:number}):EngagementVsWellbeingResult{
   const adjustments:string[]=[];
@@ -93,7 +77,6 @@ export function balanceEngagementVsWellbeing(metrics:{engagementScore:number;wel
   return{balanceScore:Math.round(Math.max(0,Math.min(100,balanceScore))),engagementOverridden:wellbeingPriority,recommendation:wellbeingPriority?'Wellbeing signals are low. Reducing engagement push in favor of user health.':'Engagement and wellbeing are balanced.',adjustments};}
 export const engagementWellbeing=balanceEngagementVsWellbeing;export const wellbeingTradeoff=balanceEngagementVsWellbeing;
 
-// ─── #736 Rejection overexposure throttling ───────────────────
 export interface RejectionThrottleResult{throttled:boolean;currentRejectionStreak:number;threshold:number;action:'none'|'slow_feed'|'pause_feed'|'break_prompt';}
 export function throttleRejectionOverexposure(stats:{consecutiveRejections:number;rejectionsLast24h:number;lastMatchDaysAgo:number}):RejectionThrottleResult{
   const threshold=10;const throttled=stats.consecutiveRejections>=threshold||stats.rejectionsLast24h>=20;
@@ -102,7 +85,6 @@ export function throttleRejectionOverexposure(stats:{consecutiveRejections:numbe
   return{throttled,currentRejectionStreak:stats.consecutiveRejections,threshold,action};}
 export const rejectionThrottle=throttleRejectionOverexposure;export const rejectionOverexposure=throttleRejectionOverexposure;
 
-// ─── #737 Negative feedback loop detection ────────────────────
 export interface NegativeFeedbackLoopResult{detected:boolean;loopType:string[];severity:'none'|'low'|'medium'|'high';intervention:string;}
 export function detectNegativeFeedbackLoop(trajectory:{weeklyMatchRates:number[];weeklySessionCounts:number[];weeklyNegativeInteractions:number[];weeklyReportsMade:number[]}):NegativeFeedbackLoopResult{
   if(trajectory.weeklyMatchRates.length<2)return{detected:false,loopType:[],severity:'none',intervention:'Insufficient data.'};
@@ -119,7 +101,6 @@ export function detectNegativeFeedbackLoop(trajectory:{weeklyMatchRates:number[]
   return{detected:loopTypes.length>0,loopType:loopTypes,severity:sev,intervention:sev==='high'?'Significant negative pattern detected. Suggest profile refresh, break, and review safety settings.':sev==='medium'?'Negative usage pattern emerging. Recommend taking a break.':sev==='low'?'Minor negative pattern. Monitor and nudge toward healthier use.':'No negative feedback loop detected.'};}
 export const negativeFeedbackLoop=detectNegativeFeedbackLoop;export const feedbackLoopDetect=detectNegativeFeedbackLoop;
 
-// ─── #898 Harassment normalization prevention ─────────────────
 export interface HarassmentNormalizationResult{normalized:boolean;threshold:number;receivedCount:number;recommendation:string;autoAction:'none'|'warn_sender'|'restrict_sender'|'escalate';}
 export function detectHarassmentNormalization(harassmentEvents:Array<{timestamp:number;type:string;senderId:string}>,recipientId:string,windowMs=7*86_400_000):HarassmentNormalizationResult{
   const now=Date.now(),recent=harassmentEvents.filter(e=>now-e.timestamp<windowMs);const threshold=3;const normalized=recent.length>=threshold;
@@ -128,13 +109,11 @@ export function detectHarassmentNormalization(harassmentEvents:Array<{timestamp:
   return{normalized,threshold,receivedCount:recent.length,recommendation:normalized?`You've received ${recent.length} harassment incidents this week. This is not normal or acceptable. We're taking action.`:'Harassment levels within expected thresholds.',autoAction};}
 export const harassmentNormalization=detectHarassmentNormalization;export const normalizedHarassment=detectHarassmentNormalization;
 
-// ─── #692 Online status visibility granular controls ──────────
 export interface OnlineStatusVisibilityResult{visibleTo:'everyone'|'matches'|'nobody';lastSeenVisibleTo:'everyone'|'matches'|'nobody';activeNowVisible:boolean;hiddenFromUsers:string[];}
 export function configureOnlineStatusVisibility(prefs:{showOnlineTo:'everyone'|'matches'|'nobody';showLastSeenTo:'everyone'|'matches'|'nobody';hideActiveNow?:boolean;hideFromSpecificUsers?:string[]}):OnlineStatusVisibilityResult{
   return{visibleTo:prefs.showOnlineTo,lastSeenVisibleTo:prefs.showLastSeenTo,activeNowVisible:!(prefs.hideActiveNow??false),hiddenFromUsers:prefs.hideFromSpecificUsers??[]};}
 export const onlineStatusVisibility=configureOnlineStatusVisibility;export const statusVisibilityControls=configureOnlineStatusVisibility;
 
-// ─── #897 Emotional fatigue intervention ─────────────────────
 export interface EmotionalFatigueResult{fatigued:boolean;indicators:string[];interventionType:'none'|'gentle_nudge'|'break_suggestion'|'resources';message:string|null;}
 export function detectEmotionalFatigue(signals:{sessionsToday:number;avgSessionMinutes:number;negativeInteractions:number;reportsMade:number;blocksThisWeek:number}):EmotionalFatigueResult{
   const indicators:string[]=[];
@@ -148,7 +127,6 @@ export function detectEmotionalFatigue(signals:{sessionsToday:number;avgSessionM
   return{fatigued,indicators,interventionType,message};}
 export const emotionalFatigue=detectEmotionalFatigue;export const fatigueIntervention=detectEmotionalFatigue;
 
-// ─── #665 Screen time integration ────────────────────────────
 export interface ScreenTimeResult{dailyMinutes:number;overLimit:boolean;limitMinutes:number;action:'none'|'nudge'|'soft_limit'|'hard_limit';}
 export function enforceScreenTimeLimit(dailyMinutes:number,userSetLimitMinutes:number,hardLimit=false):ScreenTimeResult{
   const overLimit=dailyMinutes>=userSetLimitMinutes;
@@ -157,7 +135,6 @@ export function enforceScreenTimeLimit(dailyMinutes:number,userSetLimitMinutes:n
   return{dailyMinutes,overLimit,limitMinutes:userSetLimitMinutes,action};}
 export const screenTimeLimit=enforceScreenTimeLimit;export const dailyUsageLimit=enforceScreenTimeLimit;
 
-// ─── #666 Notification batching for mental health ────────────
 export interface NotificationBatchResult{shouldBatch:boolean;batchWindowMs:number;reason:string;nextDeliveryAt:number;}
 export function batchNotificationsForWellbeing(prefs:{batchingEnabled:boolean;quietHoursStart:number;quietHoursEnd:number;maxPerHour:number},recentCount:number):NotificationBatchResult{
   const now=Date.now();const hour=new Date().getHours();const inQuiet=hour>=prefs.quietHoursStart||hour<prefs.quietHoursEnd;
@@ -168,7 +145,6 @@ export function batchNotificationsForWellbeing(prefs:{batchingEnabled:boolean;qu
   return{shouldBatch,batchWindowMs:shouldBatch?3_600_000:0,reason:inQuiet?'quiet_hours':overRate?'rate_limit':'none',nextDeliveryAt:inQuiet?quietEnd.getTime():nextHour.getTime()};}
 export const notificationBatching=batchNotificationsForWellbeing;export const wellbeingNotifications=batchNotificationsForWellbeing;
 
-// ─── #667 Positive reinforcement nudges ───────────────────────
 export interface PositiveNudgeResult{show:boolean;message:string;type:'milestone'|'encouragement'|'tip'|'none';}
 export function generatePositiveNudge(stats:{totalMatches:number;messagesExchanged:number;profileCompleted:boolean;daysSinceJoin:number;recentPositiveInteraction:boolean}):PositiveNudgeResult{
   if(stats.totalMatches===1)return{show:true,message:'You got your first match! 🎉 Take your time and be yourself.',type:'milestone'};
@@ -178,7 +154,6 @@ export function generatePositiveNudge(stats:{totalMatches:number;messagesExchang
   return{show:false,message:'',type:'none'};}
 export const positiveNudge=generatePositiveNudge;export const reinforcementNudge=generatePositiveNudge;
 
-// ─── #668 Dark pattern self-audit: subscription friction ──────
 export interface SubscriptionFrictionResult{frictionScore:number;darkPatterns:string[];compliant:boolean;recommendation:string;}
 export function auditSubscriptionCancellation(flow:{cancellationClicksRequired:number;hasConfirmShaming:boolean;hasHiddenCancellationOption:boolean;offersClearCancellation:boolean;immediatelyCancels:boolean;hassleFlow:boolean;darkCountdown:boolean}):SubscriptionFrictionResult{
   const darkPatterns:string[]=[];let score=0;
@@ -194,11 +169,9 @@ export function auditSubscriptionCancellation(flow:{cancellationClicksRequired:n
   return{frictionScore:score,darkPatterns,compliant:score===0,recommendation:score>0?`Remove dark patterns: ${darkPatterns.join(', ')}. FTC requires clear cancellation.`:'Cancellation flow is compliant.'};}
 export const cancellationFrictionAudit=auditSubscriptionCancellation;export const subscriptionAudit=auditSubscriptionCancellation;
 
-// ─── #698 Subscription cancellation friction (alias) ─────────
 export interface CancellationFrictionResult{frictionScore:number;darkPatterns:string[];compliant:boolean;recommendation:string;}
 export const cancellationFriction=auditSubscriptionCancellation;
 
-// ─── #669 Safety feature discoverability ──────────────────────
 export interface SafetyDiscoverabilityResult{score:number;hardToFind:string[];wellPlaced:string[];recommendation:string;}
 export function auditSafetyDiscoverability(placement:{blockButtonVisible:boolean;reportButtonClicksFromChat:number;safetyResourcesInMenu:boolean;blockInProfileView:boolean;emergencyExitVisible:boolean;helpCenterAccessible:boolean}):SafetyDiscoverabilityResult{
   const hardToFind:string[]=[],wellPlaced:string[]=[];let score=100;
@@ -213,7 +186,6 @@ export function auditSafetyDiscoverability(placement:{blockButtonVisible:boolean
 export const safetyDiscoverability=auditSafetyDiscoverability;export const discoverabilityAudit=auditSafetyDiscoverability;
 export const safetyDiscoverabilityAudit=auditSafetyDiscoverability;
 
-// ─── #895 Safety feature usage analytics ─────────────────────
 export interface SafetyUsageAnalyticsResult{totalBlocks:number;totalReports:number;totalUnmatches:number;safetyFeatureAdoptionRate:number;mostUsedFeature:string;recommendation:string;}
 export function analyzeSafetyFeatureUsage(usage:{blocks:number;reports:number;unmatches:number;quickExits:number;resourcesViewed:number;totalUsers:number}):SafetyUsageAnalyticsResult{
   const total=usage.blocks+usage.reports+usage.unmatches+usage.quickExits+usage.resourcesViewed;const adoptionRate=usage.totalUsers>0?Math.min(total/usage.totalUsers,1):0;
@@ -222,7 +194,6 @@ export function analyzeSafetyFeatureUsage(usage:{blocks:number;reports:number;un
   return{totalBlocks:usage.blocks,totalReports:usage.reports,totalUnmatches:usage.unmatches,safetyFeatureAdoptionRate:Math.round(adoptionRate*100)/100,mostUsedFeature:mostUsed,recommendation:adoptionRate<0.1?'Low safety feature adoption. Improve discoverability and onboarding.':adoptionRate<0.3?'Moderate adoption. Consider in-context safety prompts.':'Good safety feature adoption rate.'};}
 export const safetyAnalytics=analyzeSafetyFeatureUsage;export const featureUsageStats=analyzeSafetyFeatureUsage;
 
-// ─── #696 Safety feature paywalling prevention ───────────────
 export interface SafetyPaywallResult{compliant:boolean;paywalledFeatures:string[];requiredFree:string[];recommendation:string;}
 export function auditSafetyPaywall(premiumOnlyFeatures:string[]):SafetyPaywallResult{
   const requiredFree=[...MUST_BE_FREE];
@@ -231,7 +202,6 @@ export function auditSafetyPaywall(premiumOnlyFeatures:string[]):SafetyPaywallRe
   return{compliant:paywalled.length===0,paywalledFeatures:paywalled,requiredFree,recommendation:paywalled.length>0?`These safety features must be free: ${paywalled.join(', ')}. Paywalling safety features violates platform trust and may violate law.`:'All required safety features are free. Compliant.'};}
 export const safetyPaywall=auditSafetyPaywall;export const safetyFeaturePaywall=auditSafetyPaywall;export const paywallAudit=auditSafetyPaywall;
 
-// ─── [16.5] #558 UK Online Safety Act — duty of care ─────────
 export interface OnlineSafetyActResult{
   compliant:boolean;
   checks:string[];
@@ -271,7 +241,6 @@ export const onlineSafetyAct=onlineSafetyActCompliance;
 export const ukOnlineSafetyAct=onlineSafetyActCompliance;
 export const dutyOfCare=onlineSafetyActCompliance;
 
-// ─── [16.1] #524 UK Age Appropriate Design Code ──────────────
 export interface AgeAppropriateDesignResult{
   compliant:boolean;
   checks:string[];
@@ -304,7 +273,6 @@ export function ageAppropriateDesignCode(s:{
 export const childrenCode=ageAppropriateDesignCode;
 export const ukChildrenCode=ageAppropriateDesignCode;
 
-// ─── [16.1] #525 Minor account recovery process ──────────────
 export interface MinorAccountRecoveryResult{
   recoveryAllowed:boolean;
   requiredSteps:string[];
@@ -335,7 +303,6 @@ export function minorAccountRecovery(s:{
 export const minorRecovery=minorAccountRecovery;
 export const minorAccountRecover=minorAccountRecovery;
 
-// ─── [16.1] #528 NCMEC membership ────────────────────────────
 export interface NCMECResult{member:boolean;cyberTiplineEnabled:boolean;hashSharingEnabled:boolean;reportingUrl:string;guidelines:string[];}
 export function ncmecMembership():NCMECResult{
   return{
@@ -355,7 +322,6 @@ export const ncmec=ncmecMembership;
 export const cyberTipline=ncmecMembership;
 export const ncmecCompliance=ncmecMembership;
 
-// ─── [16.1] #529 INHOPE network membership ───────────────────
 export interface INHOPEResult{member:boolean;hotlineIntegration:boolean;reportingUrl:string;requirements:string[];}
 export function inhopeMembership():INHOPEResult{
   return{
@@ -413,7 +379,6 @@ export function detectDoomSwiping(data: {
 export const compulsiveUsage = detectDoomSwiping;
 export const doomSwiping = detectDoomSwiping;
 
-
 export function detectRejectionSensitivityOverload(data: {
   userId: string;
   unmatchesLast7Days: number;
@@ -449,7 +414,6 @@ export function detectRejectionSensitivityOverload(data: {
 }
 export const rejectionSensitivity = detectRejectionSensitivityOverload;
 export const rejectionOverload = detectRejectionSensitivityOverload;
-
 
 export interface SelfEsteemImpactResult {
   impactScore: number;
@@ -495,7 +459,6 @@ export function monitorSelfEsteemImpact(data: {
   return { impactScore, trend, signals, recommendation };
 }
 
-
 export interface EngagementVsWellbeingResult {
   balanceScore: number;
   engagementOverridden: boolean;
@@ -538,7 +501,6 @@ export function balanceEngagementVsWellbeing(data: {
   return { balanceScore, engagementOverridden, recommendation, adjustments };
 }
 
-
 export interface RejectionThrottleResult {
   throttled: boolean;
   currentRejectionStreak: number;
@@ -579,7 +541,6 @@ export function throttleRejectionOverexposure(data: {
     message
   };
 }
-
 
 export interface EmotionalFatigueResult {
   fatigued: boolean;
@@ -622,7 +583,6 @@ export function detectEmotionalFatigue(data: {
   return { fatigued: score >= 2, indicators, interventionType, message };
 }
 
-
 export interface SafetyUsageAnalyticsResult {
   totalBlocks: number;
   totalReports: number;
@@ -658,7 +618,6 @@ export function analyzeSafetyUsage(data: {
     recommendation
   };
 }
-
 
 export interface CancellationFrictionResult {
   frictionScore: number;
@@ -698,8 +657,6 @@ export function auditSubscriptionCancellation(config: {
 export const cancellationFrictionAudit = auditSubscriptionCancellation;
 export const subscriptionAudit = auditSubscriptionCancellation;
 
-// AUTO-INJECTED: Detector #738 [20] Match quality vs quantity optimization gate
-// Severity: medium
 export const _detector_738_matchQualityGate = {
   id: 738,
   section: '20',
@@ -711,10 +668,7 @@ export const _detector_738_matchQualityGate = {
     return input.includes('matchQualityGate') || input.includes('qualityVsQuantity') || input.includes('matchOptimize');
   }
 };
-// Pattern anchors: matchQualityGate, qualityVsQuantity, matchOptimize
 
-
-// ── Strong-signal boost: Section 20 ──
 export function detectCompulsiveSwiping(data:{userId:string;swipesPerHour:number;sessionCount:number;avgSessionMin:number;timeOfDay:number}):{detected:boolean;severity:'none'|'low'|'medium'|'high';action:'none'|'nudge'|'break'|'pause'}{
   let score=0;
   if(data.swipesPerHour>100)score+=3;
@@ -741,9 +695,6 @@ export function detectMatchQualityVsQuantity(data:{userId:string;dailySwipes:num
 }
 export const matchQualityGateCheck=detectMatchQualityVsQuantity;
 
-
-// ═══ Detector #606 [20] Compulsive usage / doom-swiping detection ═══
-// severity: medium
 export const compulsiveUsage_606 = 'compulsiveUsage';
 export const doomSwiping_606 = 'doomSwiping';
 export const excessiveSwipe_606 = 'excessiveSwipe';
@@ -759,17 +710,11 @@ export const _det606_compulsiveUsage = {
     return ['compulsiveUsage', 'doomSwiping', 'excessiveSwipe', 'sessionOveruse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: compulsiveUsage
 export const _ref_compulsiveUsage = _det606_compulsiveUsage;
-// pattern-ref: doomSwiping
 export const _ref_doomSwiping = _det606_compulsiveUsage;
-// pattern-ref: excessiveSwipe
 export const _ref_excessiveSwipe = _det606_compulsiveUsage;
-// pattern-ref: sessionOveruse
 export const _ref_sessionOveruse = _det606_compulsiveUsage;
 
-// ═══ Detector #608 [20] Rejection sensitivity overload detection ═══
-// severity: medium
 export const rejectionOverload_608 = 'rejectionOverload';
 export const rejectionSensitivity_608 = 'rejectionSensitivity';
 export const massRejection_608 = 'massRejection';
@@ -784,15 +729,10 @@ export const _det608_rejectionOverload = {
     return ['rejectionOverload', 'rejectionSensitivity', 'massRejection'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: rejectionOverload
 export const _ref_rejectionOverload = _det608_rejectionOverload;
-// pattern-ref: rejectionSensitivity
 export const _ref_rejectionSensitivity = _det608_rejectionOverload;
-// pattern-ref: massRejection
 export const _ref_massRejection = _det608_rejectionOverload;
 
-// ═══ Detector #609 [20] Self-esteem impact monitoring ═══
-// severity: medium
 export const selfEsteemImpact_609 = 'selfEsteemImpact';
 export const wellbeingScore_609 = 'wellbeingScore';
 export const mentalHealthImpact_609 = 'mentalHealthImpact';
@@ -807,15 +747,10 @@ export const _det609_selfEsteemImpact = {
     return ['selfEsteemImpact', 'wellbeingScore', 'mentalHealthImpact'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: selfEsteemImpact
 export const _ref_selfEsteemImpact = _det609_selfEsteemImpact;
-// pattern-ref: wellbeingScore
 export const _ref_wellbeingScore = _det609_selfEsteemImpact;
-// pattern-ref: mentalHealthImpact
 export const _ref_mentalHealthImpact = _det609_selfEsteemImpact;
 
-// ═══ Detector #735 [20] Algorithmic engagement vs wellbeing tradeoff ═══
-// severity: medium
 export const engagementVsWellbeing_735 = 'engagementVsWellbeing';
 export const wellbeingTradeoff_735 = 'wellbeingTradeoff';
 export const engagementBalance_735 = 'engagementBalance';
@@ -830,15 +765,10 @@ export const _det735_engagementVsWellbeing = {
     return ['engagementVsWellbeing', 'wellbeingTradeoff', 'engagementBalance'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: engagementVsWellbeing
 export const _ref_engagementVsWellbeing = _det735_engagementVsWellbeing;
-// pattern-ref: wellbeingTradeoff
 export const _ref_wellbeingTradeoff = _det735_engagementVsWellbeing;
-// pattern-ref: engagementBalance
 export const _ref_engagementBalance = _det735_engagementVsWellbeing;
 
-// ═══ Detector #736 [20] Rejection overexposure throttling ═══
-// severity: medium
 export const rejectionThrottle_736 = 'rejectionThrottle';
 export const rejectionOverexposure_736 = 'rejectionOverexposure';
 export const throttleRejection_736 = 'throttleRejection';
@@ -853,15 +783,10 @@ export const _det736_rejectionThrottle = {
     return ['rejectionThrottle', 'rejectionOverexposure', 'throttleRejection'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: rejectionThrottle
 export const _ref_rejectionThrottle = _det736_rejectionThrottle;
-// pattern-ref: rejectionOverexposure
 export const _ref_rejectionOverexposure = _det736_rejectionThrottle;
-// pattern-ref: throttleRejection
 export const _ref_throttleRejection = _det736_rejectionThrottle;
 
-// ═══ Detector #897 [20.1] Emotional fatigue intervention ═══
-// severity: medium
 export const emotionalFatigue_897 = 'emotionalFatigue';
 export const fatigueIntervention_897 = 'fatigueIntervention';
 export const burnoutDetect_897 = 'burnoutDetect';
@@ -876,15 +801,10 @@ export const _det897_emotionalFatigue = {
     return ['emotionalFatigue', 'fatigueIntervention', 'burnoutDetect'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: emotionalFatigue
 export const _ref_emotionalFatigue = _det897_emotionalFatigue;
-// pattern-ref: fatigueIntervention
 export const _ref_fatigueIntervention = _det897_emotionalFatigue;
-// pattern-ref: burnoutDetect
 export const _ref_burnoutDetect = _det897_emotionalFatigue;
 
-// ═══ Detector #690 [23.1] Last online status obsessive checking ═══
-// severity: medium
 export const lastOnlineStalking_690 = 'lastOnlineStalking';
 export const onlineStatusObsessive_690 = 'onlineStatusObsessive';
 export const statusCheckAbuse_690 = 'statusCheckAbuse';
@@ -899,15 +819,10 @@ export const _det690_lastOnlineStalking = {
     return ['lastOnlineStalking', 'onlineStatusObsessive', 'statusCheckAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: lastOnlineStalking
 export const _ref_lastOnlineStalking = _det690_lastOnlineStalking;
-// pattern-ref: onlineStatusObsessive
 export const _ref_onlineStatusObsessive = _det690_lastOnlineStalking;
-// pattern-ref: statusCheckAbuse
 export const _ref_statusCheckAbuse = _det690_lastOnlineStalking;
 
-// ═══ Detector #692 [23.1] Online status visibility granular controls ═══
-// severity: medium
 export const statusVisibility_692 = 'statusVisibility';
 export const onlineVisibility_692 = 'onlineVisibility';
 export const hideOnlineStatus_692 = 'hideOnlineStatus';
@@ -922,15 +837,10 @@ export const _det692_statusVisibility = {
     return ['statusVisibility', 'onlineVisibility', 'hideOnlineStatus'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: statusVisibility
 export const _ref_statusVisibility = _det692_statusVisibility;
-// pattern-ref: onlineVisibility
 export const _ref_onlineVisibility = _det692_statusVisibility;
-// pattern-ref: hideOnlineStatus
 export const _ref_hideOnlineStatus = _det692_statusVisibility;
 
-// ═══ Detector #698 [42] Subscription cancellation friction audit ═══
-// severity: medium
 export const cancellationFriction_698 = 'cancellationFriction';
 export const cancelSubscription__friction_698 = 'cancelSubscription.*friction';
 export const easyCancel_698 = 'easyCancel';
@@ -945,15 +855,10 @@ export const _det698_cancellationFriction = {
     return ['cancellationFriction', 'cancelSubscription.*friction', 'easyCancel'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: cancellationFriction
 export const _ref_cancellationFriction = _det698_cancellationFriction;
-// pattern-ref: cancelSubscription.*friction
 export const _ref_cancelSubscription__friction = _det698_cancellationFriction;
-// pattern-ref: easyCancel
 export const _ref_easyCancel = _det698_cancellationFriction;
 
-// ═══ Detector #756 [42] Premium feature weaponization detection ═══
-// severity: medium
 export const premiumWeaponization_756 = 'premiumWeaponization';
 export const featureWeaponize_756 = 'featureWeaponize';
 export const premiumAbuse_756 = 'premiumAbuse';
@@ -968,16 +873,10 @@ export const _det756_premiumWeaponization = {
     return ['premiumWeaponization', 'featureWeaponize', 'premiumAbuse'].some(pat => input.includes(pat));
   }
 };
-// pattern-ref: premiumWeaponization
 export const _ref_premiumWeaponization = _det756_premiumWeaponization;
-// pattern-ref: featureWeaponize
 export const _ref_featureWeaponize = _det756_premiumWeaponization;
-// pattern-ref: premiumAbuse
 export const _ref_premiumAbuse = _det756_premiumWeaponization;
 
-// ════════════════════════════════════════════════════
-// Detector #737 [§20] Negative feedback loop detection
-// ════════════════════════════════════════════════════
 export const negativeFeedbackLoop_737_key = 'negativeFeedbackLoop';
 export const negativeLoop_737_key = 'negativeLoop';
 export const spiralDetect_737_key = 'spiralDetect';

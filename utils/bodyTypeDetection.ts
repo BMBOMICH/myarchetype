@@ -25,7 +25,6 @@ export interface BodyTypeDetectionResult {
   feedback?: string;
 }
 
-// ─── Face ratio analysis (pure logic, no network) ────────
 
 function analyzeFaceRatio(
   imageWidth: number,
@@ -40,7 +39,6 @@ function analyzeFaceRatio(
     };
   }
 
-  // Use the largest detected face
   let largestFace = faces[0]!;
   for (const face of faces) {
     if (face[2]! * face[3]! > largestFace[2]! * largestFace[3]!) {
@@ -88,7 +86,6 @@ function analyzeFaceRatio(
   };
 }
 
-// ─── Public API ──────────────────────────────────────────
 
 /**
  * Use this when you already have Cloudinary face data from the upload.
