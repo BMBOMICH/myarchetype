@@ -1,4 +1,5 @@
-import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import HeightBadge from '../components/HeightBadge';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
@@ -27,24 +28,23 @@ const LOCAL = {
   white:          '#ffffff',
   cardSurface:    '#16213e',
   deepSurface:    '#0f3460',
-  purple:         '#9b59b6',   // preview notice banner
-  verifiedBlue:   '#3498db',   // verified checkmark + edit button
-  warning:        '#e67e22',   // icebreaker label + personality badge
-  textMuted:      '#666666',   // no-photo placeholder text
+  purple:         '#9b59b6',
+  verifiedBlue:   '#3498db',
+  warning:        '#e67e22',
+  textMuted:      '#666666',
   overlayPhoto:   'rgba(0,0,0,0.6)',
   dotInactive:    'rgba(255,255,255,0.4)',
 } as const;
 
-
 interface UserRatings {
-  totalRatings:         number;
-  averagePhotosMatch:   number;
-  heightAccuracyRate:   number;
-  bodyTypeAccuracyRate: number;
-  ageAccuracyRate:      number;
+  totalRatings:            number;
+  averagePhotosMatch:      number;
+  heightAccuracyRate:      number;
+  bodyTypeAccuracyRate:    number;
+  ageAccuracyRate:         number;
   averagePersonalityMatch: number;
-  averageOverall:       number;
-  trustScore:           number;
+  averageOverall:          number;
+  trustScore:              number;
 }
 
 interface UserData {
@@ -69,7 +69,6 @@ interface UserData {
 
 const isHeightVerified = (h: UserData['height']): boolean =>
   typeof h === 'object' && h !== null && h.verificationMethod === 'manual-measured';
-
 
 interface PhotoPageProps { uri: string; index: number; total: number; }
 const PhotoPage = React.memo(function PhotoPage({ uri, index, total }: PhotoPageProps) {
@@ -121,7 +120,6 @@ const TIPS = [
   'Add a video profile for better matches',
 ] as const;
 
-
 interface PhotoCarouselProps {
   photos:            string[];
   currentPhotoIndex: number;
@@ -146,12 +144,14 @@ const PhotoCarousel = React.memo(function PhotoCarousel({
     [photoCount],
   );
 
+  const keyExtractor = useCallback((_: string, i: number) => `photo-${i}`, []);
+
   return (
     <View style={styles.photoCarouselContainer}>
       <LegendList
         data={photos}
         renderItem={renderPhoto}
-        keyExtractor={(_, i) => `photo-${i}`}
+        keyExtractor={keyExtractor}
         horizontal
         pagingEnabled
         recycleItems={true}
@@ -192,10 +192,139 @@ const PhotoCarousel = React.memo(function PhotoCarousel({
   );
 });
 
-
 interface ProfileItem { type: 'profile'; userData: UserData; }
 type ListItem = ProfileItem;
 
+// ─── Profile card — extracted so hooks are never called after an early return ──
+
+interface ProfileCardProps {
+  userData:          UserData;
+  currentPhotoIndex: number;
+  onPhotoScroll:     (event: { nativeEvent: { contentOffset: { x: number } } }) => void;
+  ageBadge:          ReturnType<typeof getAgeVerificationLevel> | null;
+  heightVerified:    boolean;
+  hasValues:         boolean;
+  hasTrust:          boolean;
+}
+
+const ProfileCard = React.memo<ProfileCardProps>(({
+  userData: u,
+  currentPhotoIndex,
+  onPhotoScroll,
+  ageBadge,
+  heightVerified,
+  hasValues,
+  hasTrust,
+}) => {
+  const photoCount = u.photos?.length ?? 0;
+  return (
+    <View style={styles.scrollContent}>
+      <View style={styles.card}>
+        {photoCount > 0 ? (
+          <PhotoCarousel
+            photos={u.photos!}
+            currentPhotoIndex={currentPhotoIndex}
+            onPhotoScroll={onPhotoScroll}
+            selfieVerified={u.selfieVerified}
+            ratings={u.ratings}
+          />
+        ) : (
+          <View style={styles.noPhotoPlaceholder} accessibilityLabel="No photos added yet">
+            <Text style={styles.noPhotoText}>No Photo</Text>
+          </View>
+        )}
+
+        <View style={styles.nameSection}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{u.name}, {u.age}</Text>
+            {u.selfieVerified && (
+              <Text style={styles.verifiedCheckmark} accessibilityLabel="Verified">✓</Text>
+            )}
+          </View>
+          {ageBadge && ageBadge.level !== 'unverified' && (
+            <View
+              style={[styles.ageBadge, { backgroundColor: ageBadge.color }]}
+              accessibilityLabel={`Age verification: ${ageBadge.label}`}
+            >
+              <Text style={styles.ageBadgeIcon} accessibilityElementsHidden>
+                {ageBadge.icon}
+              </Text>
+              <Text style={styles.ageBadgeText}>{ageBadge.label}</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.lastSeenText}>Online status hidden in preview</Text>
+
+        {u.icebreaker && (
+          <View
+            style={styles.icebreakerSection}
+            accessibilityLabel={`Icebreaker: ${u.icebreakerPrompt ?? 'Question'}: ${u.icebreaker}`}
+          >
+            <Text style={styles.icebreakerLabel}>
+              💬 {u.icebreakerPrompt ?? 'Icebreaker'}
+            </Text>
+            <Text style={styles.icebreakerText}>{u.icebreaker}</Text>
+          </View>
+        )}
+
+        {u.bio && (
+          <Section title="About Me">
+            <Text style={styles.bioText}>"{u.bio}"</Text>
+          </Section>
+        )}
+
+        <View style={styles.infoSection}>
+          <InfoRow label="Height"><HeightBadge height={u.height} /></InfoRow>
+          <InfoRow label="Body Type"><Text style={styles.value}>{u.bodyType}</Text></InfoRow>
+          <InfoRow label="Looking For"><Text style={styles.value}>{u.lookingFor}</Text></InfoRow>
+          {u.location?.city && (
+            <InfoRow label="Location">
+              <Text style={styles.value}>{u.location.city}</Text>
+            </InfoRow>
+          )}
+        </View>
+
+        {hasTrust && (
+          <Section title="Trust & Verification" bordered>
+            <TrustScoreDisplay
+              ratings={u.ratings}
+              selfieVerified={u.selfieVerified}
+              ageVerified={u.ageVerification?.verified}
+              heightVerified={heightVerified}
+              size="small"
+            />
+          </Section>
+        )}
+
+        {hasValues && (
+          <Section title="Beliefs & Values" bordered>
+            {u.religiousViews && (
+              <InfoRow label="Views"><ValueTag value={u.religiousViews} /></InfoRow>
+            )}
+            {u.lifestyle && (
+              <InfoRow label="Lifestyle"><ValueTag value={u.lifestyle} /></InfoRow>
+            )}
+            {u.relationshipGoal && (
+              <InfoRow label="Goal"><ValueTag value={u.relationshipGoal} /></InfoRow>
+            )}
+          </Section>
+        )}
+
+        {u.personalityType && (
+          <Section title="Personality" bordered>
+            <View style={styles.personalityBadge}>
+              <Text style={styles.personalityText}>{u.personalityType}</Text>
+            </View>
+          </Section>
+        )}
+      </View>
+    </View>
+  );
+});
+ProfileCard.displayName = 'ProfileCard';
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ProfilePreviewScreen() {
   const router = useRouter();
@@ -231,7 +360,7 @@ export default function ProfilePreviewScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadProfile();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();
@@ -247,6 +376,7 @@ export default function ProfilePreviewScreen() {
     [],
   );
 
+  // All hooks called unconditionally before any early return
   const ageBadge       = useMemo(() => userData ? getAgeVerificationLevel(userData.ageVerification) : null, [userData]);
   const heightVerified = useMemo(() => userData ? isHeightVerified(userData.height) : false, [userData]);
   const hasValues      = useMemo(() => !!(userData?.religiousViews || userData?.lifestyle || userData?.relationshipGoal), [userData]);
@@ -290,6 +420,24 @@ export default function ProfilePreviewScreen() {
     </View>
   ), [handleBack]);
 
+  const keyExtractor = useCallback((item: ListItem) => item.type, []);
+
+  const renderItem = useCallback(
+    ({ item }: LegendListRenderItemProps<ListItem>) => (
+      <ProfileCard
+        userData={item.userData}
+        currentPhotoIndex={currentPhotoIndex}
+        onPhotoScroll={handlePhotoScroll}
+        ageBadge={ageBadge}
+        heightVerified={heightVerified}
+        hasValues={hasValues}
+        hasTrust={hasTrust}
+      />
+    ),
+    [currentPhotoIndex, handlePhotoScroll, ageBadge, heightVerified, hasValues, hasTrust],
+  );
+
+  // Early returns come AFTER all hooks
   if (loading) {
     return (
       <View style={styles.container}>
@@ -307,123 +455,14 @@ export default function ProfilePreviewScreen() {
     );
   }
 
-  const photoCount   = userData.photos?.length ?? 0;
   const profileData: ListItem[] = [{ type: 'profile', userData }];
-
-  const renderItem = useCallback(({ item }: LegendListRenderItemProps<ListItem>) => {
-    const { userData: u } = item;
-    return (
-      <View style={styles.scrollContent}>
-        <View style={styles.card}>
-          {photoCount > 0 ? (
-            <PhotoCarousel
-              photos={u.photos!}
-              currentPhotoIndex={currentPhotoIndex}
-              onPhotoScroll={handlePhotoScroll}
-              selfieVerified={u.selfieVerified}
-              ratings={u.ratings}
-            />
-          ) : (
-            <View style={styles.noPhotoPlaceholder} accessibilityLabel="No photos added yet">
-              <Text style={styles.noPhotoText}>No Photo</Text>
-            </View>
-          )}
-
-          <View style={styles.nameSection}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{u.name}, {u.age}</Text>
-              {u.selfieVerified && (
-                <Text style={styles.verifiedCheckmark} accessibilityLabel="Verified">✓</Text>
-              )}
-            </View>
-            {ageBadge && ageBadge.level !== 'unverified' && (
-              <View
-                style={[styles.ageBadge, { backgroundColor: ageBadge.color }]}
-                accessibilityLabel={`Age verification: ${ageBadge.label}`}
-              >
-                <Text style={styles.ageBadgeIcon} accessibilityElementsHidden>
-                  {ageBadge.icon}
-                </Text>
-                <Text style={styles.ageBadgeText}>{ageBadge.label}</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.lastSeenText}>Online status hidden in preview</Text>
-
-          {u.icebreaker && (
-            <View
-              style={styles.icebreakerSection}
-              accessibilityLabel={`Icebreaker: ${u.icebreakerPrompt ?? 'Question'}: ${u.icebreaker}`}
-            >
-              <Text style={styles.icebreakerLabel}>
-                💬 {u.icebreakerPrompt ?? 'Icebreaker'}
-              </Text>
-              <Text style={styles.icebreakerText}>{u.icebreaker}</Text>
-            </View>
-          )}
-
-          {u.bio && (
-            <Section title="About Me">
-              <Text style={styles.bioText}>"{u.bio}"</Text>
-            </Section>
-          )}
-
-          <View style={styles.infoSection}>
-            <InfoRow label="Height"><HeightBadge height={u.height} /></InfoRow>
-            <InfoRow label="Body Type"><Text style={styles.value}>{u.bodyType}</Text></InfoRow>
-            <InfoRow label="Looking For"><Text style={styles.value}>{u.lookingFor}</Text></InfoRow>
-            {u.location?.city && (
-              <InfoRow label="Location">
-                <Text style={styles.value}>{u.location.city}</Text>
-              </InfoRow>
-            )}
-          </View>
-
-          {hasTrust && (
-            <Section title="Trust & Verification" bordered>
-              <TrustScoreDisplay
-                ratings={u.ratings}
-                selfieVerified={u.selfieVerified}
-                ageVerified={u.ageVerification?.verified}
-                heightVerified={heightVerified}
-                size="small"
-              />
-            </Section>
-          )}
-
-          {hasValues && (
-            <Section title="Beliefs & Values" bordered>
-              {u.religiousViews && (
-                <InfoRow label="Views"><ValueTag value={u.religiousViews} /></InfoRow>
-              )}
-              {u.lifestyle && (
-                <InfoRow label="Lifestyle"><ValueTag value={u.lifestyle} /></InfoRow>
-              )}
-              {u.relationshipGoal && (
-                <InfoRow label="Goal"><ValueTag value={u.relationshipGoal} /></InfoRow>
-              )}
-            </Section>
-          )}
-
-          {u.personalityType && (
-            <Section title="Personality" bordered>
-              <View style={styles.personalityBadge}>
-                <Text style={styles.personalityText}>{u.personalityType}</Text>
-              </View>
-            </Section>
-          )}
-        </View>
-      </View>
-    );
-  }, [ageBadge, hasTrust, hasValues, heightVerified, currentPhotoIndex, handlePhotoScroll, photoCount]);
 
   return (
     <View style={styles.container}>
       <LegendList
         data={profileData}
         renderItem={renderItem}
-        keyExtractor={(item) => item.type}
+        keyExtractor={keyExtractor}
         estimatedItemSize={900}
         recycleItems={false}
         showsVerticalScrollIndicator={false}

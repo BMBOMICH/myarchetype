@@ -12,7 +12,6 @@ export interface ManipResult {
   severity?:   'low' | 'medium' | 'high' | 'critical';
 }
 
-
 export function loveBombing(text: string): ManipResult {
   const patterns = [
     /you('re| are)\s+(the one|my soulmate|perfect for me)/i,
@@ -558,7 +557,6 @@ export function powerDynamic(text: string): ManipResult {
 export const ageGapManip    = powerDynamic;
 export const authorityAbuse = powerDynamic;
 
-
 export function puaTechnique(text: string): ManipResult {
   const patterns = [
     /push.?pull\s+(technique|method)/i,
@@ -645,7 +643,6 @@ export function pedestalize(text: string): ManipResult {
 }
 export const idealizeStranger = pedestalize;
 
-
 export function aiEmotionalManip(text: string): ManipResult {
   const patterns = [
     /i\s+understand\s+you\s+better\s+than\s+anyone\s+(else|in\s+your\s+life)?/i,
@@ -707,7 +704,6 @@ export function aiGroomingScript(text: string): ManipResult {
 }
 export const syntheticIntimacy = aiGroomingScript;
 export const artificialBond    = aiGroomingScript;
-
 
 export function blockEvasion(text: string): ManipResult {
   const patterns = [
@@ -774,7 +770,6 @@ export function persistentContact(text: string): ManipResult {
 export const ignoreBlock           = persistentContact;
 export const refuseAcceptRejection = persistentContact;
 
-
 export function proxyAccount(text: string): ManipResult {
   const patterns = [
     /using\s+(a\s+)?(friend('s|'s)|different|another|fake)\s+(account|profile)/i,
@@ -830,7 +825,6 @@ export function fakeReferral(text: string): ManipResult {
 }
 export const astroturfing       = fakeReferral;
 export const coordinatedProfile = fakeReferral;
-
 
 export function marriedDeception(text: string): ManipResult {
   const patterns = [
@@ -892,7 +886,6 @@ export function widowerScam(text: string): ManipResult {
 }
 export const bereaved    = widowerScam;
 export const griefExploit = widowerScam;
-
 
 export interface ConversationManipResult {
   detected:        boolean;

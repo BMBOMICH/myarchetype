@@ -2,7 +2,7 @@ import { observable } from '@legendapp/state';
 import { observer } from '@legendapp/state/react';
 import { Audio, AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
@@ -49,6 +49,12 @@ export default observer(function VoiceIntroRecorderScreen() {
   const recordedUri       = screen$.recordedUri.get();
   const isPlaying         = screen$.isPlaying.get();
 
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
   const loadExistingIntro = useCallback(async () => {
     const intro = await getVoiceIntro();
     screen$.existingIntro.set(intro);
@@ -57,10 +63,16 @@ export default observer(function VoiceIntroRecorderScreen() {
 
   useEffect(() => {
     void loadExistingIntro();
-    void AudioModule.requestRecordingPermissionsAsync().catch(() => {}, []);
+    void AudioModule.requestRecordingPermissionsAsync().catch(
+      (err: unknown) => { logger.warn('[VoiceIntro] permission request failed:', err); },
+    );
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      if (playbackSoundRef.current) playbackSoundRef.current.unloadAsync().catch(() => {});
+      if (playbackSoundRef.current) {
+        playbackSoundRef.current.unloadAsync().catch(
+          (err: unknown) => { logger.warn('[VoiceIntro] unload failed:', err); },
+        );
+      }
     };
   }, [loadExistingIntro]);
 
@@ -69,17 +81,30 @@ export default observer(function VoiceIntroRecorderScreen() {
       screen$.waitingForUri.set(false);
       screen$.recordedUri.set(audioRecorder.uri);
     }
-  }, [screen$.waitingForUri.get(), audioRecorder.uri]);
+  }, [audioRecorder.uri]);
 
   useEffect(() => {
     if (!isPlaying || !playbackSoundRef.current) return;
     const check = setInterval(() => {
       try {
         if (!playbackSoundRef.current?.playing) screen$.isPlaying.set(false);
-      } catch {}
+      } catch (err: unknown) {
+        logger.warn('[VoiceIntro] playback check error:', err);
+        screen$.isPlaying.set(false);
+      }
     }, 500);
     return () => clearInterval(check);
   }, [isPlaying]);
+
+  const timerFillStyle = useMemo(
+    () => [s.timerFill, { width: `${(recordingDuration / MAX_VOICE_INTRO_DURATION) * 100}%` as `${number}%` }],
+    [recordingDuration],
+  );
+
+  const saveButtonStyle = useMemo(
+    () => [s.saveButton, uploading && s.saveButtonDisabled],
+    [uploading],
+  );
 
   const startRecording = useCallback(async () => {
     try {
@@ -100,13 +125,17 @@ export default observer(function VoiceIntroRecorderScreen() {
             recordingTimerRef.current = null;
           }
           screen$.isRecording.set(false);
-          try { audioRecorder.stop(); } catch {}
+          try {
+            audioRecorder.stop();
+          } catch (err: unknown) {
+            logger.warn('[VoiceIntro] stop error during auto-stop:', err);
+          }
           screen$.waitingForUri.set(true);
           return;
         }
         screen$.recordingDuration.set(prev + 1);
       }, 1000);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Failed to start recording:', error);
       Alert.alert('Error', 'Could not start recording');
     }
@@ -131,7 +160,11 @@ export default observer(function VoiceIntroRecorderScreen() {
     screen$.isRecording.set(false);
     screen$.recordingDuration.set(0);
     screen$.waitingForUri.set(false);
-    try { audioRecorder.stop(); } catch {}
+    try {
+      audioRecorder.stop();
+    } catch (err: unknown) {
+      logger.warn('[VoiceIntro] stop error during cancel:', err);
+    }
   }, [audioRecorder]);
 
   const playPreview = useCallback(async () => {
@@ -139,7 +172,9 @@ export default observer(function VoiceIntroRecorderScreen() {
     if (!uri) return;
     try {
       if (playbackSoundRef.current) {
-        await playbackSoundRef.current.unloadAsync().catch(() => {});
+        await playbackSoundRef.current.unloadAsync().catch(
+          (err: unknown) => { logger.warn('[VoiceIntro] unload error:', err); },
+        );
         playbackSoundRef.current = null;
       }
       if (screen$.isPlaying.get()) { screen$.isPlaying.set(false); return; }
@@ -153,7 +188,7 @@ export default observer(function VoiceIntroRecorderScreen() {
           playbackSoundRef.current = null;
         }
       });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error playing preview:', error);
       screen$.isPlaying.set(false);
     }
@@ -190,6 +225,8 @@ export default observer(function VoiceIntroRecorderScreen() {
     screen$.recordingDuration.set(0);
   }, []);
 
+  const handleGoBack = useCallback(() => router.back(), [router]);
+
   if (loading) return (
     <View style={s.centerContainer}>
       <ActivityIndicator size="large" color="#53a8b6" />
@@ -199,7 +236,11 @@ export default observer(function VoiceIntroRecorderScreen() {
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity
+          onPress={handleGoBack}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text style={s.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={s.title}>🎤 Voice Intro</Text>
@@ -214,10 +255,21 @@ export default observer(function VoiceIntroRecorderScreen() {
             <Text style={s.existingLabel}>Current Voice Intro</Text>
             <Text style={s.existingDuration}>{formatVoiceDuration(existingIntro.duration)}</Text>
             <View style={s.existingButtons}>
-              <TouchableOpacity style={s.playButton} onPress={playPreview} accessibilityLabel={isPlaying ? 'Pause' : 'Play voice intro'} accessibilityRole="button">
+              <TouchableOpacity
+                style={s.playButton}
+                onPress={playPreview}
+                accessibilityLabel={isPlaying ? 'Pause' : 'Play voice intro'}
+                accessibilityRole="button"
+              >
                 <Text style={s.playButtonText}>{isPlaying ? '⏸ Pause' : '▶️ Play'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.deleteButton} onPress={handleDelete} disabled={deleting} accessibilityLabel="Delete voice intro" accessibilityRole="button">
+              <TouchableOpacity
+                style={s.deleteButton}
+                onPress={handleDelete}
+                disabled={deleting}
+                accessibilityLabel="Delete voice intro"
+                accessibilityRole="button"
+              >
                 <Text style={s.deleteButtonText}>{deleting ? '...' : '🗑️ Delete'}</Text>
               </TouchableOpacity>
             </View>
@@ -232,13 +284,23 @@ export default observer(function VoiceIntroRecorderScreen() {
             </View>
             <Text style={s.timer}>{formatVoiceDuration(recordingDuration)} / {formatVoiceDuration(MAX_VOICE_INTRO_DURATION)}</Text>
             <View style={s.timerBar}>
-              <View style={[s.timerFill, { width: `${(recordingDuration / MAX_VOICE_INTRO_DURATION) * 100}%` as `${number}%` }]} />
+              <View style={timerFillStyle} />
             </View>
             <View style={s.recordingButtons}>
-              <TouchableOpacity style={s.cancelButton} onPress={cancelRecording} accessibilityLabel="Cancel recording" accessibilityRole="button">
+              <TouchableOpacity
+                style={s.cancelButton}
+                onPress={cancelRecording}
+                accessibilityLabel="Cancel recording"
+                accessibilityRole="button"
+              >
                 <Text style={s.cancelButtonText}>✕ Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.stopRecordButton} onPress={stopRecording} accessibilityLabel="Stop recording" accessibilityRole="button">
+              <TouchableOpacity
+                style={s.stopRecordButton}
+                onPress={stopRecording}
+                accessibilityLabel="Stop recording"
+                accessibilityRole="button"
+              >
                 <Text style={s.stopRecordButtonText}>⏹ Stop</Text>
               </TouchableOpacity>
             </View>
@@ -249,14 +311,30 @@ export default observer(function VoiceIntroRecorderScreen() {
           <View style={s.previewContainer}>
             <Text style={s.previewLabel}>Preview Recording</Text>
             <Text style={s.previewDuration}>{formatVoiceDuration(recordingDuration)}</Text>
-            <TouchableOpacity style={s.playButton} onPress={playPreview} accessibilityLabel={isPlaying ? 'Pause' : 'Play recording'} accessibilityRole="button">
+            <TouchableOpacity
+              style={s.playButton}
+              onPress={playPreview}
+              accessibilityLabel={isPlaying ? 'Pause' : 'Play recording'}
+              accessibilityRole="button"
+            >
               <Text style={s.playButtonText}>{isPlaying ? '⏸ Pause' : '▶️ Play'}</Text>
             </TouchableOpacity>
             <View style={s.previewButtons}>
-              <TouchableOpacity style={s.discardButton} onPress={discardRecording} accessibilityLabel="Re-record" accessibilityRole="button">
+              <TouchableOpacity
+                style={s.discardButton}
+                onPress={discardRecording}
+                accessibilityLabel="Re-record"
+                accessibilityRole="button"
+              >
                 <Text style={s.discardButtonText}>Re-record</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.saveButton, uploading && s.saveButtonDisabled]} onPress={handleUpload} disabled={uploading} accessibilityLabel="Save voice intro" accessibilityRole="button">
+              <TouchableOpacity
+                style={saveButtonStyle}
+                onPress={handleUpload}
+                disabled={uploading}
+                accessibilityLabel="Save voice intro"
+                accessibilityRole="button"
+              >
                 <Text style={s.saveButtonText}>{uploading ? 'Saving...' : '✓ Save'}</Text>
               </TouchableOpacity>
             </View>
@@ -264,7 +342,12 @@ export default observer(function VoiceIntroRecorderScreen() {
         )}
 
         {!isRecording && !recordedUri && (
-          <TouchableOpacity style={s.startRecordButton} onPress={startRecording} accessibilityLabel={existingIntro ? 'Record new intro' : 'Start recording'} accessibilityRole="button">
+          <TouchableOpacity
+            style={s.startRecordButton}
+            onPress={startRecording}
+            accessibilityLabel={existingIntro ? 'Record new intro' : 'Start recording'}
+            accessibilityRole="button"
+          >
             <View style={s.micIcon}><Text style={s.micIconText}>🎤</Text></View>
             <Text style={s.startRecordText}>{existingIntro ? 'Record New Intro' : 'Start Recording'}</Text>
           </TouchableOpacity>

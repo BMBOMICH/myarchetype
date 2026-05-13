@@ -1,5 +1,6 @@
-import { createMMKV } from 'react-native-mmkv';
-
+import { Platform } from 'react-native';
+let createMMKV: typeof import('react-native-mmkv').createMMKV | null = null;
+if (Platform.OS !== 'web') { try { createMMKV = require('react-native-mmkv').createMMKV; } catch {} }
 
 export interface StorageAdapter {
   getString:  (key: string) => string | null;
@@ -11,7 +12,6 @@ export interface StorageAdapter {
   getAllKeys:  () => string[];
 }
 
-
 export function createStorage(id: string): StorageAdapter {
   const mmkv = createMMKV({ id });
 
@@ -20,12 +20,11 @@ export function createStorage(id: string): StorageAdapter {
     getBoolean: key => mmkv.getBoolean(key),
     getNumber:  key => mmkv.getNumber(key),
     set:        (key, value) => mmkv.set(key, value),
-    delete:     key => mmkv.delete(key),
+    delete:     key => mmkv.remove(key),
     clearAll:   () => mmkv.clearAll(),
     getAllKeys:  () => mmkv.getAllKeys(),
   };
 }
-
 
 export const appStorage      = createStorage('app-storage');
 export const settingsStorage = createStorage('settings-storage');

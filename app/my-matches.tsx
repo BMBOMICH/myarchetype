@@ -20,7 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import HeightBadge from '../components/HeightBadge';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
 import { app, auth, db } from '../firebaseConfig';
@@ -205,6 +205,10 @@ const MatchCard = React.memo(function MatchCard({
   const unmatchBtnStyle = useMemo(
     () => [s.unmatchButton, isUnmatching && s.unmatchButtonDisabled],
     [isUnmatching],
+  );
+  const saveNoteBtnStyle = useMemo(
+    () => [s.saveNoteButton, s.saveNoteButtonDisabled],
+    [],
   );
 
   return (
@@ -423,7 +427,7 @@ export default observer(function MyMatchesScreen() {
       try {
         [snap1, snap2] = await Promise.all([
           getDocs(query(
-            collection(db, 'likes').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
+            collection(db, 'likes'),
             where('fromUserId', '==', user.uid),
             where('status', '==', 'matched'),
           )),
@@ -469,24 +473,29 @@ export default observer(function MyMatchesScreen() {
       let matchResults: Array<MatchResult | null>;
       try {
         matchResults = await Promise.all(
-          entries.map(async ([matchId, matchedAt]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) => {
-            const [userDoc, hasMessages] = await Promise.all([
-              getDoc(doc(db, 'users', matchId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })),
-              checkIfChatHasMessages(user.uid, matchId),
-            ]);
-            if (!userDoc.exists()) return null;
-            const userData   = userDoc.data() as FirestoreMatchData;
-            const expiryInfo = getMatchExpiryInfo(matchedAt, hasMessages);
-            if (expiryInfo.isExpired) return null;
-            return {
-              matchId,
-              matchedAt,
-              userData,
-              hasMessages,
-              daysRemaining: expiryInfo.daysRemaining,
-              isWarning:     expiryInfo.isWarning,
-              isExpired:     expiryInfo.isExpired,
-            };
+          entries.map(async ([matchId, matchedAt]) => {
+            try {
+              const [userDoc, hasMessages] = await Promise.all([
+                getDoc(doc(db, 'users', matchId)),
+                checkIfChatHasMessages(user.uid, matchId),
+              ]);
+              if (!userDoc.exists()) return null;
+              const userData   = userDoc.data() as FirestoreMatchData;
+              const expiryInfo = getMatchExpiryInfo(matchedAt, hasMessages);
+              if (expiryInfo.isExpired) return null;
+              return {
+                matchId,
+                matchedAt,
+                userData,
+                hasMessages,
+                daysRemaining: expiryInfo.daysRemaining,
+                isWarning:     expiryInfo.isWarning,
+                isExpired:     expiryInfo.isExpired,
+              };
+            } catch (e: unknown) {
+              logger.error('[MyMatches] Failed to fetch match detail:', e);
+              return null;
+            }
           }),
         );
       } catch (err: unknown) {
@@ -501,11 +510,11 @@ export default observer(function MyMatchesScreen() {
       let metaResults: Array<[boolean, string]>;
       try {
         metaResults = await Promise.all(
-          validMatches.map(({ matchId }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) =>
+          validMatches.map(({ matchId }) =>
             Promise.all([
               shouldPromptForRating(user.uid, matchId),
               getMatchNote(matchId),
-            ]),
+            ]) as Promise<[boolean, string]>,
           ),
         );
       } catch (err: unknown) {
@@ -581,7 +590,7 @@ export default observer(function MyMatchesScreen() {
     const task = InteractionManager.runAfterInteractions(() => {
       void loadMatches();
       void checkPhotos();
-    }, []);
+    });
     return () => task.cancel();
   }, [loadMatches, checkPhotos]);
 
@@ -744,6 +753,11 @@ export default observer(function MyMatchesScreen() {
     />
   ), [refreshing, handleRefresh]);
 
+  const saveNoteBtnStyle = useMemo(
+    () => [s.saveNoteButton, savingNote && s.saveNoteButtonDisabled],
+    [savingNote],
+  );
+
   const currentLinesMatch = matches.find(m => m.uid === showOpeningLines);
 
   if (loading) {
@@ -771,7 +785,7 @@ export default observer(function MyMatchesScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={s.dismissReminderButton}
-              onPress={() = accessibilityLabel="button"> void handleDismissPhotoReminder()}
+              onPress={() => void handleDismissPhotoReminder()}
               accessibilityLabel="Dismiss photo reminder"
               accessibilityRole="button"
             >
@@ -787,7 +801,7 @@ export default observer(function MyMatchesScreen() {
           <Text style={s.emptySubtitle}>Keep swiping to find your match!</Text>
           <TouchableOpacity
             style={s.findMatchesButton}
-            onPress={() = accessibilityLabel="button"> router.push('/matches')}
+            onPress={() => router.push('/matches')}
             accessibilityLabel="Find matches"
             accessibilityRole="button"
           >
@@ -825,7 +839,7 @@ export default observer(function MyMatchesScreen() {
                 <TouchableOpacity
                   key={i}
                   style={s.lineItem}
-                  onPress={() = accessibilityLabel="button"> {
+                  onPress={() => {
                     const chatId = showOpeningLines ?? '';
                     const name   = currentLinesMatch?.name ?? '';
                     onCloseLines();
@@ -880,7 +894,7 @@ export default observer(function MyMatchesScreen() {
                 <Text style={s.cancelNoteText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.saveNoteButton, savingNote && s.saveNoteButtonDisabled]}
+                style={saveNoteBtnStyle}
                 onPress={onSaveNote}
                 disabled={savingNote}
                 accessibilityLabel="Save note"

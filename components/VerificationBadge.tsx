@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+import { useMemo } from 'react';
 
 interface VerificationBadgeProps {
   selfieVerified?: boolean;
@@ -35,29 +36,43 @@ export default function VerificationBadge({
   const level = trustLevel();
 
   if (showAll) {
+    const _extracteduseMemo0 = useMemo(() => [styles.badge, styles.verifiedBadge], []);
+    const _extracteduseMemo1 = useMemo(() => [styles.badgeIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo2 = useMemo(() => [styles.badge, styles.heightBadge], []);
+    const _extracteduseMemo3 = useMemo(() => [styles.badgeIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo4 = useMemo(() => [styles.badge, styles.ageBadge], []);
+    const _extracteduseMemo5 = useMemo(() => [styles.badgeIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo6 = useMemo(() => [styles.badge, styles.trustedBadge], []);
+    const _extracteduseMemo7 = useMemo(() => [styles.badgeIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo8 = useMemo(() => [styles.combinedBadge, styles.trustedBadge], []);
+    const _extracteduseMemo9 = useMemo(() => [styles.combinedIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo10 = useMemo(() => [styles.combinedText, { fontSize: badgeSize - 2 }], [badgeSize]);
+    const _extracteduseMemo11 = useMemo(() => [styles.combinedBadge, styles.verifiedBadge], []);
+    const _extracteduseMemo12 = useMemo(() => [styles.combinedIcon, { fontSize: badgeSize }], [badgeSize]);
+    const _extracteduseMemo13 = useMemo(() => [styles.combinedText, { fontSize: badgeSize - 2 }], [badgeSize]);
     return (
       <View style={styles.allBadgesContainer}>
         {selfieVerified && (
-          <View style={[styles.badge, styles.verifiedBadge]}>
-            <Text style={[styles.badgeIcon, { fontSize: badgeSize }]}>✓</Text>
+          <View style={_extracteduseMemo0}>
+            <Text style={_extracteduseMemo1}>✓</Text>
             <Text style={styles.badgeText}>Identity</Text>
           </View>
         )}
         {heightVerified && (
-          <View style={[styles.badge, styles.heightBadge]}>
-            <Text style={[styles.badgeIcon, { fontSize: badgeSize }]}>📏</Text>
+          <View style={_extracteduseMemo2}>
+            <Text style={_extracteduseMemo3}>📏</Text>
             <Text style={styles.badgeText}>Height</Text>
           </View>
         )}
         {ageVerified && (
-          <View style={[styles.badge, styles.ageBadge]}>
-            <Text style={[styles.badgeIcon, { fontSize: badgeSize }]}>🎂</Text>
+          <View style={_extracteduseMemo4}>
+            <Text style={_extracteduseMemo5}>🎂</Text>
             <Text style={styles.badgeText}>Age</Text>
           </View>
         )}
         {trustedUser && (
-          <View style={[styles.badge, styles.trustedBadge]}>
-            <Text style={[styles.badgeIcon, { fontSize: badgeSize }]}>⭐</Text>
+          <View style={_extracteduseMemo6}>
+            <Text style={_extracteduseMemo7}>⭐</Text>
             <Text style={styles.badgeText}>Trusted</Text>
           </View>
         )}
@@ -67,18 +82,18 @@ export default function VerificationBadge({
 
   if (level === 'trusted') {
     return (
-      <View style={[styles.combinedBadge, styles.trustedBadge]}>
-        <Text style={[styles.combinedIcon, { fontSize: badgeSize }]}>⭐</Text>
-        <Text style={[styles.combinedText, { fontSize: badgeSize - 2 }]}>Trusted</Text>
+      <View style={_extracteduseMemo8}>
+        <Text style={_extracteduseMemo9}>⭐</Text>
+        <Text style={_extracteduseMemo10}>Trusted</Text>
       </View>
     );
   }
 
   if (level === 'verified') {
     return (
-      <View style={[styles.combinedBadge, styles.verifiedBadge]}>
-        <Text style={[styles.combinedIcon, { fontSize: badgeSize }]}>✓</Text>
-        <Text style={[styles.combinedText, { fontSize: badgeSize - 2 }]}>Verified</Text>
+      <View style={_extracteduseMemo11}>
+        <Text style={_extracteduseMemo12}>✓</Text>
+        <Text style={_extracteduseMemo13}>Verified</Text>
       </View>
     );
   }

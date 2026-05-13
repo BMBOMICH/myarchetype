@@ -3,7 +3,6 @@ import { writeAuditLog } from './logger';
 
 export type SafetyAction = 'allow' | 'review' | 'block' | 'require_verification';
 
-
 export interface DateSafetyCheckResult {
   safe: boolean;
   riskScore: number;
@@ -113,7 +112,6 @@ export function comprehensiveDateSafetyCheck(date: {
   };
 }
 
-
 export interface PhotoCheckResult {
   action: SafetyAction;
   reasons: string[];
@@ -131,7 +129,6 @@ export async function comprehensivePhotoCheck(
   void imageUri; void imageHash; void userId; void context; void serverUrl;
   return { action: 'allow', reasons: [], confidence: 0, shouldAutoBlur: false };
 }
-
 
 export interface MessageCheckResult {
   action: SafetyAction;
@@ -164,7 +161,6 @@ export async function comprehensiveMessageCheck(
   };
 }
 
-
 export interface LoginCheckResult {
   action: SafetyAction;
   reasons: string[];
@@ -181,7 +177,6 @@ export async function comprehensiveLoginCheck(
   return { action: 'allow', reasons: [], riskScore: 0 };
 }
 
-
 export interface RegistrationCheckResult {
   action: SafetyAction;
   reasons: string[];
@@ -195,7 +190,6 @@ export async function comprehensiveRegistrationCheck(
   void reg; void serverUrl;
   return { action: 'allow', reasons: [], riskScore: 0 };
 }
-
 
 export interface ProfileUpdateCheckResult {
   action: SafetyAction;

@@ -2,7 +2,7 @@
 import { Platform } from 'react-native';
 
 const IS_WEB = Platform.OS === 'web';
-const SERVER_URL = process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? process.env.EXPO_PUBLIC_SERVER_URL ?? '';
+const SERVER_URL = process.env['EXPO_PUBLIC_FUNCTIONS_URL'] ?? process.env['EXPO_PUBLIC_SERVER_URL'] ?? '';
 
 const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
 const FACE_API_WEIGHTS = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
@@ -110,7 +110,7 @@ export function validateAge(stated: number, estimated: number, tolerance = 5): {
 }
 
 export async function estimateAgeFromMultiplePhotos(urls: string[]): Promise<AgeEstimationResult | null> {
-  const results = (await Promise.all(urls.map(estimateAgeFromPhoto).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }))).filter((r): r is AgeEstimationResult => r !== null);
+  const results = (await Promise.all(urls.map(estimateAgeFromPhoto).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })).filter((r): r is AgeEstimationResult => r !== null);
   if (!results.length) return null;
   const avg  = Math.round(results.reduce((s, r) => s + r.estimatedAge, 0) / results.length);
   const conf = Math.round(results.reduce((s, r) => s + r.confidence, 0) / results.length);

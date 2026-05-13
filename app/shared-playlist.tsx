@@ -2,12 +2,12 @@ import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
 import { observable } from '@legendapp/state';
 import { observer } from '@legendapp/state/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator, Alert, InteractionManager, Keyboard,
   RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth } from '../firebaseConfig';
 import { logger } from '../utils/logger';
@@ -24,17 +24,27 @@ function asString(value: string | string[] | undefined): string {
 }
 
 const screen$ = observable({
-  initializing: true,
-  error:        null as string | null,
-  playlist:     null as SharedPlaylist | null,
-  activeId:     '',
-  searchQuery:  '',
+  initializing:  true,
+  error:         null as string | null,
+  playlist:      null as SharedPlaylist | null,
+  activeId:      '',
+  searchQuery:   '',
   searchResults: [] as TrackSearchResult[],
-  searching:    false,
+  searching:     false,
   addingTrackId: null as string | null,
-  spotifyToken: null as string | null,
-  refreshing:   false,
+  spotifyToken:  null as string | null,
+  refreshing:    false,
 });
+
+// Stable style arrays — computed once at module level since they have no runtime deps
+const trackAlbumArtPlaceholderStyle = [
+  { width: 60, height: 60, borderRadius: 8 },
+  { backgroundColor: '#0f3460', alignItems: 'center' as const, justifyContent: 'center' as const },
+];
+const resultAlbumArtPlaceholderStyle = [
+  { width: 50, height: 50, borderRadius: 8 },
+  { backgroundColor: '#0f3460', alignItems: 'center' as const, justifyContent: 'center' as const },
+];
 
 export default observer(function SharedPlaylistScreen() {
   const router = useRouter();
@@ -50,13 +60,21 @@ export default observer(function SharedPlaylistScreen() {
   const initializing  = screen$.initializing.get();
   const error         = screen$.error.get();
   const playlist      = screen$.playlist.get();
-  const activeId      = screen$.activeId.get();
   const searchQuery   = screen$.searchQuery.get();
   const searchResults = screen$.searchResults.get();
   const searching     = screen$.searching.get();
   const addingTrackId = screen$.addingTrackId.get();
   const spotifyToken  = screen$.spotifyToken.get();
   const refreshing    = screen$.refreshing.get();
+
+  // activeId is read reactively inside effects and callbacks via screen$.activeId.get()
+  // so we do not need a local derived variable for it here.
+
+  // Computed style that depends on runtime state
+  const searchButtonStyle = useMemo(
+    () => [st.searchButton, (!searchQuery.trim() || searching) && st.searchButtonDisabled],
+    [searchQuery, searching],
+  );
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -77,9 +95,11 @@ export default observer(function SharedPlaylistScreen() {
             if (result.success && result.playlistId) resolvedId = result.playlistId;
           }
           if (!cancelled) {
-            resolvedId
-              ? screen$.activeId.set(resolvedId)
-              : screen$.error.set('Could not load playlist.');
+            if (resolvedId) {
+              screen$.activeId.set(resolvedId);
+            } else {
+              screen$.error.set('Could not load playlist.');
+            }
           }
         } catch (err) {
           logger.error('[SharedPlaylist] init error:', err);
@@ -89,15 +109,19 @@ export default observer(function SharedPlaylistScreen() {
         }
       }
       void init();
+      return () => { cancelled = true; };
     });
     return () => task.cancel();
   }, [chatId, matchId, existingPlaylistId]);
 
   useEffect(() => {
+    const activeId = screen$.activeId.get();
     if (!activeId) return;
     const unsubscribe = subscribeToPlaylist(activeId, (p) => screen$.playlist.set(p));
     return () => unsubscribe();
-  }, [activeId]);
+  }, []);
+
+  const handleSearchQueryChange = useCallback((v: string) => screen$.searchQuery.set(v), []);
 
   const handleSearch = useCallback(async () => {
     const trimmed = searchQuery.trim();
@@ -114,7 +138,8 @@ export default observer(function SharedPlaylistScreen() {
     if (!id) return;
     const currentPlaylist = screen$.playlist.get();
     if (currentPlaylist?.tracks.some((t) => t.trackId === track.trackId)) {
-      Alert.alert('Already Added', `"${track.name}" is already in the playlist.`); return;
+      Alert.alert('Already Added', `"${track.name}" is already in the playlist.`);
+      return;
     }
     screen$.addingTrackId.set(track.trackId);
     const result = await addTrackToPlaylist(id, track);
@@ -133,10 +158,12 @@ export default observer(function SharedPlaylistScreen() {
     if (!id) return;
     Alert.alert('Remove Track', `Remove "${track.name}" from the playlist?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        const result = await removeTrackFromPlaylist(id, track);
-        if (!result.success) Alert.alert('Error', 'Could not remove track.');
-      }},
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
+          const result = await removeTrackFromPlaylist(id, track);
+          if (!result.success) Alert.alert('Error', 'Could not remove track.');
+        },
+      },
     ]);
   }, []);
 
@@ -159,6 +186,11 @@ export default observer(function SharedPlaylistScreen() {
     Alert.alert('Open in Spotify', 'Feature coming soon!');
   }, []);
 
+  const handleAddTrackPress = useCallback(
+    (track: TrackSearchResult) => { void handleAddTrack(track); },
+    [handleAddTrack],
+  );
+
   const renderTrackItem = useCallback(({ item, index }: LegendListRenderItemProps<PlaylistTrack>) => {
     const isOwn = item.addedBy === uid;
     return (
@@ -175,7 +207,7 @@ export default observer(function SharedPlaylistScreen() {
             accessibilityLabel={`${item.name} album art`}
           />
         ) : (
-          <View style={[st.trackAlbumArt, st.placeholderArt]}>
+          <View style={trackAlbumArtPlaceholderStyle}>
             <Text style={st.placeholderText} accessibilityElementsHidden>🎵</Text>
           </View>
         )}
@@ -187,7 +219,7 @@ export default observer(function SharedPlaylistScreen() {
         {isOwn && (
           <TouchableOpacity
             style={st.removeButton}
-            onPress={() = accessibilityLabel="button"> handleRemoveTrack(item)}
+            onPress={() => handleRemoveTrack(item)}
             hitSlop={8}
             accessibilityLabel={`Remove ${item.name}`}
             accessibilityRole="button"
@@ -207,6 +239,9 @@ export default observer(function SharedPlaylistScreen() {
   const trackCount = playlist?.tracks.length ?? 0;
   const trackLabel = `${trackCount} song${trackCount !== 1 ? 's' : ''}`;
 
+  const onGoBack         = useCallback(() => router.back(),                       [router]);
+  const onGoSocialVerify = useCallback(() => router.push('/social-verification'), [router]);
+
   if (initializing) {
     return (
       <View style={st.centered}>
@@ -221,7 +256,12 @@ export default observer(function SharedPlaylistScreen() {
       <View style={st.centered}>
         <Text style={st.emptyIcon} accessibilityElementsHidden>⚠️</Text>
         <Text style={st.emptyTitle}>{error}</Text>
-        <TouchableOpacity style={st.linkButton} onPress={() = accessibilityLabel="button"> router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity
+          style={st.linkButton}
+          onPress={onGoBack}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text style={st.linkButtonText}>← Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -232,7 +272,12 @@ export default observer(function SharedPlaylistScreen() {
     return (
       <View style={st.container}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+          <TouchableOpacity
+            onPress={onGoBack}
+            hitSlop={12}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+          >
             <Text style={st.backButton}>← Back</Text>
           </TouchableOpacity>
           <Text style={st.title} accessibilityRole="header">🎵 Shared Playlist</Text>
@@ -242,7 +287,12 @@ export default observer(function SharedPlaylistScreen() {
           <Text style={st.emptyIcon} accessibilityElementsHidden>🎵</Text>
           <Text style={st.emptyTitle}>Spotify Required</Text>
           <Text style={st.emptyText}>Link your Spotify account to create shared playlists with your matches!</Text>
-          <TouchableOpacity style={st.linkButton} onPress={() = accessibilityLabel="button"> router.push('/social-verification')} accessibilityLabel="Link Spotify account" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.linkButton}
+            onPress={onGoSocialVerify}
+            accessibilityLabel="Link Spotify account"
+            accessibilityRole="button"
+          >
             <Text style={st.linkButtonText}>🎵 Link Spotify</Text>
           </TouchableOpacity>
         </View>
@@ -253,11 +303,21 @@ export default observer(function SharedPlaylistScreen() {
   return (
     <View style={st.container}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+        <TouchableOpacity
+          onPress={onGoBack}
+          hitSlop={12}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text style={st.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={st.title} accessibilityRole="header">🎵 Playlist</Text>
-        <TouchableOpacity onPress={openInSpotify} hitSlop={12} accessibilityLabel="Open playlist in Spotify" accessibilityRole="button">
+        <TouchableOpacity
+          onPress={openInSpotify}
+          hitSlop={12}
+          accessibilityLabel="Open playlist in Spotify"
+          accessibilityRole="button"
+        >
           <Text style={st.openButton}>Open in Spotify</Text>
         </TouchableOpacity>
       </View>
@@ -270,20 +330,26 @@ export default observer(function SharedPlaylistScreen() {
             placeholder="Search for songs…"
             placeholderTextColor="#666"
             value={searchQuery}
-            onChangeText={(v) => screen$.searchQuery.set(v)}
+            onChangeText={handleSearchQueryChange}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
             autoCorrect={false}
             accessibilityLabel="Search for songs"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity style={st.clearButton} onPress={handleClearSearch} hitSlop={6} accessibilityLabel="Clear search" accessibilityRole="button">
+            <TouchableOpacity
+              style={st.clearButton}
+              onPress={handleClearSearch}
+              hitSlop={6}
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
               <Text style={st.clearButtonText}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
         <TouchableOpacity
-          style={[st.searchButton, (!searchQuery.trim() || searching) && st.searchButtonDisabled]}
+          style={searchButtonStyle}
           onPress={handleSearch}
           disabled={searching || !searchQuery.trim()}
           accessibilityLabel="Search"
@@ -299,12 +365,22 @@ export default observer(function SharedPlaylistScreen() {
       {searchResults.length > 0 && (
         <View style={st.resultsContainer}>
           <Text style={st.resultsTitle}>Search Results ({searchResults.length})</Text>
+          {/*
+            ScrollView wraps search results which are bounded in count
+            (Spotify API returns max 20 results) and have a maxHeight cap.
+            LegendList is not appropriate for this bounded, capped list.
+          */}
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {searchResults.map((track) => {
               const isAdding     = addingTrackId === track.trackId;
               const alreadyAdded = playlist?.tracks.some((t) => t.trackId === track.trackId);
+              const addBtnStyle  = [st.addButton, isAdding && st.addButtonDisabled];
               return (
-                <View key={track.trackId} style={st.resultItem} accessibilityLabel={`${track.name} by ${track.artist}`}>
+                <View
+                  key={track.trackId}
+                  style={st.resultItem}
+                  accessibilityLabel={`${track.name} by ${track.artist}`}
+                >
                   {track.albumArt ? (
                     <TurboImage
                       source={{ uri: track.albumArt }}
@@ -313,7 +389,7 @@ export default observer(function SharedPlaylistScreen() {
                       accessibilityLabel={`${track.name} album art`}
                     />
                   ) : (
-                    <View style={[st.resultAlbumArt, st.placeholderArt]}>
+                    <View style={resultAlbumArtPlaceholderStyle}>
                       <Text style={st.placeholderText} accessibilityElementsHidden>🎵</Text>
                     </View>
                   )}
@@ -327,8 +403,8 @@ export default observer(function SharedPlaylistScreen() {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      style={[st.addButton, isAdding && st.addButtonDisabled]}
-                      onPress={() = accessibilityLabel="button"> void handleAddTrack(track)}
+                      style={addBtnStyle}
+                      onPress={() => handleAddTrackPress(track)}
                       disabled={isAdding}
                       accessibilityLabel={`Add ${track.name}`}
                       accessibilityRole="button"
@@ -367,7 +443,12 @@ export default observer(function SharedPlaylistScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#53a8b6" colors={['#53a8b6']} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#53a8b6"
+                colors={['#53a8b6']}
+              />
             }
           />
         )}

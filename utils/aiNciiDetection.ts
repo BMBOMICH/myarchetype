@@ -1,4 +1,4 @@
-const API = process.env.EXPO_PUBLIC_API_URL ?? '';
+const API = process.env['EXPO_PUBLIC_API_URL'] ?? '';
 
 async function serverCheck(path: string, body: unknown) {
   try {
@@ -14,7 +14,7 @@ export async function detectAINcii(imageUri: string): Promise<AiNciiResult> {
     serverCheck('/safety/ai-metadata', { imageUri }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
     serverCheck('/safety/deepfake-detect', { imageUri }),
     serverCheck('/safety/nudity-detect', { imageUri }),
-  ]);
+  ]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   const AI_TOOLS = ['stable-diffusion','midjourney','dall-e','novelai','automatic1111','comfyui'];
   const hasAIMetadata = AI_TOOLS.some(t => JSON.stringify(meta).toLowerCase().includes(t));
   const syntheticScore = synthetic.confidence ?? 0;
@@ -33,7 +33,7 @@ export async function detectNudificationWatermark(imageUri: string): Promise<{ d
 export const nudificationWatermark = detectNudificationWatermark; export const aiToolWatermark = detectNudificationWatermark;
 
 export async function detectSyntheticIntimate(imageUri: string): Promise<{ isSynthetic: boolean; isExplicit: boolean; shouldBlock: boolean; confidence: number }> {
-  const [synthetic, nude] = await Promise.all([serverCheck('/safety/deepfake-detect', { imageUri }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), serverCheck('/safety/nudity-detect', { imageUri })]);
+  const [synthetic, nude] = await Promise.all([serverCheck('/safety/deepfake-detect', { imageUri }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), serverCheck('/safety/nudity-detect', { imageUri })]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   const isSynthetic = (synthetic.confidence ?? 0) > 0.7, isExplicit = !!nude.isExplicit;
   return { isSynthetic, isExplicit, shouldBlock: isSynthetic && isExplicit, confidence: synthetic.confidence ?? 0 };
 }

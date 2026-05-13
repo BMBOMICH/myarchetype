@@ -44,7 +44,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
         Notifications.setNotificationChannelAsync('matches',  { name: 'New Matches',  importance: Notifications.AndroidImportance.HIGH,    vibrationPattern: [0,500,250,500], lightColor: '#5cb85c' }),
         Notifications.setNotificationChannelAsync('messages', { name: 'Messages',     importance: Notifications.AndroidImportance.HIGH,    vibrationPattern: [0,250],         lightColor: '#53a8b6' }),
         Notifications.setNotificationChannelAsync('likes',    { name: 'Likes',        importance: Notifications.AndroidImportance.DEFAULT,                                    lightColor: '#e67e22' }),
-      ]);
+      ]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
     }
     return token;
   } catch (error) { logger.error('[Notifications] Registration error:', error); return null; }

@@ -412,7 +412,9 @@ export async function ringDetection(imageUrl: string): Promise<{
       const maxScore  = Math.max(ringScore, bandScore);
       return { weddingBand: maxScore >= 0.6, marriedSignal: maxScore >= 0.6, confidence: maxScore };
     }
-  if (__DEV__) } catch (e) { console.warn('[RingDetection]', e); }
+  } catch (e) {
+    if (__DEV__) console.warn('[RingDetection]', e);
+  }
   return { weddingBand: false, marriedSignal: false, confidence: 0 };
 }
 

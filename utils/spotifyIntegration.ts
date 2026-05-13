@@ -6,7 +6,7 @@ import { logger } from './logger';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const SPOTIFY_CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ?? '';
+const SPOTIFY_CLIENT_ID = process.env['EXPO_PUBLIC_SPOTIFY_CLIENT_ID'] ?? '';
 const REDIRECT_URI = AuthSession.makeRedirectUri();
 
 export interface SpotifyProfile {
@@ -48,7 +48,9 @@ export async function handleSpotifyAuthSuccess(accessToken: string): Promise<{ s
     if (!accessToken) return { success: false, error: 'No access token' };
     const profileData = await fetchSpotifyProfile(accessToken);
     if (!profileData) return { success: false, error: 'Failed to fetch Spotify profile' };
-    await updateDoc(doc(db, 'users', user.uid), { spotifyProfile: profileData, spotifyLinkedAt: new Date().toISOString() });
+    await updateDoc(doc(db, 'users', user.uid), {
+      spotifyProfile: profileData, spotifyLinkedAt: new Date().toISOString(),
+    });
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -61,23 +63,21 @@ async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyProfile 
   try {
     const headers = { Authorization: `Bearer ${accessToken}` };
     const [profileRes, artistsRes, tracksRes] = await Promise.all([
-      fetch('https://api.spotify.com/v1/me', { headers }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
+      fetch('https://api.spotify.com/v1/me', { headers }),
       fetch('https://api.spotify.com/v1/me/top/artists?limit=10&time_range=medium_term', { headers }),
       fetch('https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=medium_term', { headers }),
     ]);
     if (!profileRes.ok) { logger.error('[Spotify] Profile fetch failed:', profileRes.status); return null; }
-    const [profile, artistsData, tracksData] = await Promise.all([
-      profileRes.json().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) as Promise<SpotifyProfileApiResponse>,
-      artistsRes.ok ? artistsRes.json() as Promise<SpotifyTopArtistsResponse> : Promise.resolve({ items: [] }),
-      tracksRes.ok ? tracksRes.json() as Promise<SpotifyTopTracksResponse> : Promise.resolve({ items: [] }),
-    ]);
+    const profile = await profileRes.json() as SpotifyProfileApiResponse;
+    const artistsData = artistsRes.ok ? await artistsRes.json() as SpotifyTopArtistsResponse : { items: [] };
+    const tracksData = tracksRes.ok ? await tracksRes.json() as SpotifyTopTracksResponse : { items: [] };
     const topArtists = (artistsData.items ?? []).map(a => a.name);
     const topTracks = (tracksData.items ?? []).map(t => `${t.name} - ${t.artists?.[0]?.name ?? 'Unknown'}`);
     const genreCounts: Record<string, number> = {};
     for (const artist of artistsData.items ?? []) {
       for (const genre of artist.genres ?? []) { genreCounts[genre] = (genreCounts[genre] ?? 0) + 1; }
     }
-    const topGenres = Object.entries(genreCounts).sort(([,a],[,b]) => b-a).slice(0,5).map(([genre]) => genre);
+    const topGenres = Object.entries(genreCounts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([genre]) => genre);
     return {
       accessToken, refreshToken: '',
       displayName: profile.display_name ?? profile.id ?? 'Spotify User',
@@ -106,11 +106,14 @@ export async function getSpotifyProfile(): Promise<SpotifyProfile | null> {
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) return null;
-    return userDoc.data().spotifyProfile as SpotifyProfile ?? null;
+    return (userDoc.data()['spotifyProfile'] as SpotifyProfile | undefined) ?? null;
   } catch (error) { logger.error('[Spotify] Error getting profile:', error); return null; }
 }
 
-export function calculateMusicCompatibility(profile1: SpotifyProfile, profile2: SpotifyProfile): { score: number; sharedArtists: string[]; sharedGenres: string[] } {
+export function calculateMusicCompatibility(
+  profile1: SpotifyProfile,
+  profile2: SpotifyProfile,
+): { score: number; sharedArtists: string[]; sharedGenres: string[] } {
   const sharedArtists = profile1.topArtists.filter(a => profile2.topArtists.includes(a));
   const sharedGenres = profile1.topGenres.filter(g => profile2.topGenres.includes(g));
   const maxArtists = Math.max(profile1.topArtists.length, profile2.topArtists.length, 1);

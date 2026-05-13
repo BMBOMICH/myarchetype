@@ -1,22 +1,17 @@
-/**
- * Privacy Policy screen — pure content definition.
- * All layout, styling, and navigation are handled by LegalDocument.
- */
+import { memo, type ComponentProps } from 'react';
+import LegalDocument, { type LegalSection } from '../components/LegalDocument';
 
-import React from 'react';
-
-import LegalDocument, {
-  type LegalSection,
-} from '../components/LegalDocument';
-
+const SERVICE_NAME = 'MyArchetype';
+const OPERATOR_NAME = 'Elxan Huseynov';
+const PRIVACY_EMAIL = 'privacy@myarchetype.app';
 const LAST_UPDATED = 'April 2026';
 
-const SECTIONS: readonly LegalSection[] = [
+export const PRIVACY_SECTIONS: readonly LegalSection[] = [
   {
     title: '1. Introduction',
     paragraphs: [
-      'Welcome to MyArchetype ("we," "our," or "us"), operated by Elxan Huseynov ("Operator"). We are committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application.',
-      'By downloading and using MyArchetype, you agree to the collection and use of information in accordance with this policy. If you do not agree with the terms of this Privacy Policy, please do not access the application.',
+      `Welcome to ${SERVICE_NAME} ("we," "our," or "us"), operated by ${OPERATOR_NAME} ("Operator"). We are committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application.`,
+      `By downloading and using ${SERVICE_NAME}, you agree to the collection and use of information in accordance with this policy. If you do not agree with the terms of this Privacy Policy, please do not access the application.`,
     ],
   },
   {
@@ -133,7 +128,7 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '8. International Data Transfers',
     paragraphs: [
-      'MyArchetype and our third-party service providers operate globally. If you are accessing the app from outside the United States, your information may be transferred to and processed in the United States or other countries. We ensure appropriate safeguards are in place, such as Standard Contractual Clauses (SCCs) approved by the European Commission, to protect your data during international transfers.',
+      `${SERVICE_NAME} and our third-party service providers operate globally. If you are accessing the app from outside the United States, your information may be transferred to and processed in the United States or other countries. We ensure appropriate safeguards are in place, such as Standard Contractual Clauses (SCCs) approved by the European Commission, to protect your data during international transfers.`,
     ],
   },
   {
@@ -195,7 +190,7 @@ const SECTIONS: readonly LegalSection[] = [
           'Lodge a Complaint: Contact your local data protection authority (e.g., the ICO in the UK, or a DPA in the EU) if you believe your data rights have been violated.',
         ],
       },
-      'To exercise any of these rights, contact us at privacy@myarchetype.app or use the in-app settings.',
+      `To exercise any of these rights, contact us at ${PRIVACY_EMAIL} or use the in-app settings.`,
     ],
   },
   {
@@ -215,37 +210,38 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '14. Children\'s Privacy',
     paragraphs: [
-      'MyArchetype is intended for users 18 years of age and older. We do not knowingly collect information from anyone under 18. If we discover that a user under 18 has created an account, their account will be immediately terminated and their data deleted. If you believe a minor is using the app, please contact us immediately.',
+      `${SERVICE_NAME} is intended for users 18 years of age and older. We do not knowingly collect information from anyone under 18. If we discover that a user under 18 has created an account, their account will be immediately terminated and their data deleted. If you believe a minor is using the app, please contact us immediately.`,
     ],
   },
   {
     title: '15. Changes to This Policy',
     paragraphs: [
-      'We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy on this page, updating the "Last Updated" date, and providing an in-app notification or email prior to the changes taking effect. Your continued use of the app after the changes constitute your acceptance of the updated policy.',
+      'We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy on this page, updating the "Last Updated" date, and providing an in-app notification or email prior to the changes taking effect. Your continued use of the app after the changes constitutes your acceptance of the updated policy.',
     ],
   },
   {
     title: '16. Contact Us & Entity Information',
     paragraphs: [
       'This service is operated by:',
-      'Elxan Huseynov',
+      OPERATOR_NAME,
       'Yeni Guneshli, Surakhani District',
       'Baku, Azerbaijan',
-      '',
       'For questions about this Privacy Policy or to exercise your data rights, contact our Data Protection Officer at:',
-      'Email: privacy@myarchetype.app',
+      `Email: ${PRIVACY_EMAIL}`,
       'We will respond to your request within 30 days.',
     ],
   },
 ];
 
-export default function PrivacyPolicyScreen() {
-  return (
-    <LegalDocument
-      title="Privacy Policy"
-      lastUpdated={LAST_UPDATED}
-      sections={SECTIONS}
-      footerText="By using MyArchetype, you agree to this Privacy Policy."
-    />
-  );
+const legalDocumentProps: ComponentProps<typeof LegalDocument> = {
+  title: 'Privacy Policy',
+  lastUpdated: LAST_UPDATED,
+  sections: PRIVACY_SECTIONS,
+  footerText: `By using ${SERVICE_NAME}, you agree to this Privacy Policy.`,
+};
+
+function PrivacyPolicyScreen() {
+  return <LegalDocument {...legalDocumentProps} />;
 }
+
+export default memo(PrivacyPolicyScreen);

@@ -40,7 +40,7 @@ export async function verifyLowVisionSupport(): Promise<{ passes: boolean; activ
     AccessibilityInfo.isReduceTransparencyEnabled().catch(() => false),
     AccessibilityInfo.isReduceMotionEnabled().catch(() => false),
     AccessibilityInfo.isScreenReaderEnabled().catch(() => false),
-  ]);
+  ]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   const active: LowVisionConfig = { highContrast: rt || Platform.OS === 'android', largeText: b, reduceTransparency: rt, boldText: b, grayscale: g };
   const missing: string[] = [];
   if (!active.highContrast) missing.push('highContrast');

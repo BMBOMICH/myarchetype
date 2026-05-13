@@ -1,8 +1,8 @@
 /**
  * Sextortion Victim Support — Detector #835
- * 
+ *
  * #835 — sextortionVictimSupport | victimAutoRouting | sextortionHelpline
- * 
+ *
  * Auto-routes detected sextortion victims to appropriate support resources.
  */
 

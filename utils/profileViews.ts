@@ -48,7 +48,6 @@ export interface StalkingAlert {
   reason: string;
 }
 
-
 /**
  * Record that a user viewed a profile.
  * Applies rate limiting (#175) and stalking detection (#100).
@@ -106,7 +105,6 @@ export async function recordProfileView(
     return { recorded: false };
   }
 }
-
 
 export async function getProfileViewStats(
   userId?: string

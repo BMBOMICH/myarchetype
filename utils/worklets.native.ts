@@ -1,0 +1,1 @@
+export { scheduleOnRN } from 'react-native-worklets';

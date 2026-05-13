@@ -1,6 +1,6 @@
 /**
  * Location Safety — Detectors #361, #365, #368, #370, #616, #617
- * 
+ *
  * #361 — locationRevoked | stoppedSharing | gpsDisabled
  * #365 — isolatedLocation | remoteArea | noNearbyServices
  * #368 — geofenceEscape | leftSafeZone
@@ -8,7 +8,6 @@
  * #616 — triangulationPrevention | distanceAttack | trilateration
  * #617 — fuzzyDistance | approximateDistance | distanceBucket
  */
-
 
 interface LocationSharingStatus {
   userId: string;
@@ -56,7 +55,6 @@ export function detectLocationSharingRevoked(
     action,
   };
 }
-
 
 interface NearbyPOI {
   type: string;
@@ -126,7 +124,6 @@ export async function detectIsolatedLocation(
   }
 }
 
-
 interface Geofence {
   centerLat: number;
   centerLng: number;
@@ -170,7 +167,6 @@ export function detectGeofenceEscape(
     action,
   };
 }
-
 
 interface LocationReport {
   lat: number;
@@ -276,11 +272,10 @@ function expandCluster(
   }
 }
 
-
 /**
  * #616 — triangulationPrevention / distanceAttack / trilateration
  * Prevents distance-based triangulation by snapping to H3 hex centers.
- * 
+ *
  * #617 — fuzzyDistance / approximateDistance / distanceBucket
  * Displays approximate distance in buckets instead of exact.
  */
@@ -334,7 +329,6 @@ export function addDistanceJitter(
   const randomOffset = (Math.random() - 0.5) * 2 * jitter;
   return Math.max(0, exactDistanceKm + randomOffset);
 }
-
 
 function haversineMeters(
   lat1: number, lng1: number,

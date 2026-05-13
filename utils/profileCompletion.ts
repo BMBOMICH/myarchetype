@@ -51,7 +51,6 @@ interface UserData {
   status?: string;
 }
 
-
 export function calculateProfileCompletion(userData: UserData): ProfileCompletionResult {
   const completed: string[] = [];
   const missing:   string[] = [];
@@ -138,7 +137,6 @@ export function calculateProfileCompletion(userData: UserData): ProfileCompletio
 
   return { percentage, completed, missing, tips: tips.slice(0, 3), verificationLevel, trustBonus };
 }
-
 
 export function deriveVerificationLevel(userData: UserData): VerificationLevel {
   const hasSelfie = !!userData.selfieVerified;

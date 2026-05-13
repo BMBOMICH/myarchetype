@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { logger } from './logger';
 
 const IS_WEB = Platform.OS === 'web';
-const SERVER = process.env.EXPO_PUBLIC_SERVER_URL ?? 'https://myarchetype-server.vercel.app';
+const SERVER = process.env['EXPO_PUBLIC_SERVER_URL'] ?? 'https://myarchetype-server.vercel.app';
 const fetchSafe = async (url: string, opts: RequestInit, t = 10000) => {
   const c = new AbortController(); const id = setTimeout(() => c.abort(), t);
   try { return await fetch(url, { ...opts, signal: c.signal }); } finally { clearTimeout(id); }

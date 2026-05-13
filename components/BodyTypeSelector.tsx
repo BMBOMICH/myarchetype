@@ -1,10 +1,3 @@
-/**
- * BodyTypeSelector
- *
- * Visual body-type picker with anatomically proportioned silhouette
- * illustrations. Supports "describe yourself" and "looking for" modes.
- */
-
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Modal,
@@ -14,7 +7,6 @@ import {
   View,
 } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
-
 
 export type BodyType = 'Slim' | 'Average' | 'Athletic' | 'Curvy';
 export type BodyTypeValue = BodyType | 'Any';
@@ -34,19 +26,16 @@ export interface BodyTypeSelectorProps {
   showLookingFor?: boolean;
 }
 
-
-const LOCAL = {
+const PALETTE = {
   surfaceActive: '#0f3460',
   success:       '#5cb85c',
   warning:       '#e67e22',
   white:         '#ffffff',
   overlay:       'rgba(0, 0, 0, 0.85)',
   skin:          '#53a8b6',
-  skinHighlight: '#6ec5d4',
 } as const;
 
-const HIT = { top: 12, bottom: 12, left: 12, right: 12 } as const;
-
+const DEFAULT_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 } as const;
 
 const BODY_TYPES: readonly BodyTypeOption[] = [
   {
@@ -81,7 +70,6 @@ const ANY_OPTION: BodyTypeOption = {
   description: 'No preference',
   examples: 'Open to all body types',
 };
-
 
 interface TorsoSection {
   readonly w: number;
@@ -205,23 +193,26 @@ const FIGURES: Record<BodyType, FigureConfig> = {
   },
 };
 
-
 const BodyFigure = React.memo(function BodyFigure({
   type,
-  color = LOCAL.skin,
+  color = PALETTE.skin,
 }: {
   type: BodyType;
   color?: string;
 }) {
-  const cfg     = FIGURES[type];
+  const cfg = FIGURES[type];
   const lastLeg = cfg.legs.length - 1;
+
+  const legsRowStyle = useMemo(
+    () => ({ flexDirection: 'row' as const, gap: cfg.legGap }),
+    [cfg.legGap],
+  );
 
   return (
     <View
-      style={figS.container}
+      accessible
       accessibilityLabel={`${type} body type silhouette`}
     >
-      {/* Head */}
       <View
         style={{
           width: cfg.head,
@@ -230,8 +221,6 @@ const BodyFigure = React.memo(function BodyFigure({
           backgroundColor: color,
         }}
       />
-
-      {/* Neck */}
       <View
         style={{
           width: cfg.neck[0],
@@ -240,8 +229,6 @@ const BodyFigure = React.memo(function BodyFigure({
           marginTop: -2,
         }}
       />
-
-      {/* Torso sections */}
       {cfg.torso.map((sec, i) => (
         <View
           key={`t${i}`}
@@ -257,11 +244,9 @@ const BodyFigure = React.memo(function BodyFigure({
           }}
         />
       ))}
-
-      {/* Legs */}
-      <View style={[figS.legsRow, { gap: cfg.legGap }]}>
+      <View style={legsRowStyle}>
         {[0, 1].map((side) => (
-          <View key={side} style={figS.legCol}>
+          <View key={side}>
             {cfg.legs.map((part, i) => (
               <View
                 key={`l${i}`}
@@ -284,27 +269,78 @@ const BodyFigure = React.memo(function BodyFigure({
   );
 });
 
-const figS = StyleSheet.create(() => ({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    height: 165,
-    paddingTop: 5,
-  },
-  legsRow: {
-    flexDirection: 'row',
-    marginTop: -1,
-  },
-  legCol: {
-    alignItems: 'center',
-  },
-}));
-
-
 function isBodyType(v: BodyTypeValue | ''): v is BodyType {
   return v !== '' && v !== 'Any';
 }
 
+interface OptionCardProps {
+  option: BodyTypeOption;
+  isSelected: boolean;
+  isPreviewed: boolean;
+  disabled: boolean;
+  onSelect: (value: BodyTypeValue) => void;
+  onPressIn: (value: BodyTypeValue) => void;
+  onPressOut: () => void;
+}
+
+const OptionCard = React.memo(function OptionCard({
+  option,
+  isSelected,
+  isPreviewed,
+  disabled,
+  onSelect,
+  onPressIn,
+  onPressOut,
+}: OptionCardProps) {
+  const cardStyle = useMemo(
+    () => [
+      styles.card,
+      isSelected && styles.cardSelected,
+      isPreviewed && !isSelected && styles.cardPreview,
+    ],
+    [isSelected, isPreviewed],
+  );
+  const labelStyle = useMemo(
+    () => [styles.optLabel, isSelected && styles.optLabelSelected],
+    [isSelected],
+  );
+  const handlePress = useCallback(() => onSelect(option.value), [onSelect, option.value]);
+  const handlePressIn = useCallback(() => onPressIn(option.value), [onPressIn, option.value]);
+  const handlePressOut = useCallback(() => onPressOut(), [onPressOut]);
+
+  return (
+    <TouchableOpacity
+      style={cardStyle}
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`${option.label}: ${option.description}`}
+      accessibilityState={{ selected: isSelected }}
+      testID={`body-type-option-${option.value}`}
+    >
+      {isBodyType(option.value) ? (
+        <View style={styles.figureWrap} accessible={false}>
+          <BodyFigure type={option.value} />
+        </View>
+      ) : (
+        <View style={styles.anyCircle}>
+          <Text style={styles.anyText}>ALL</Text>
+        </View>
+      )}
+      <Text style={labelStyle}>{option.label}</Text>
+      <Text style={styles.optDesc}>{option.description}</Text>
+      <Text style={styles.optExamples}>{option.examples}</Text>
+      {isSelected && (
+        <View style={styles.checkBadge}>
+          <Text style={styles.checkText}>✓</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
 
 export default function BodyTypeSelector({
   selectedType,
@@ -314,7 +350,7 @@ export default function BodyTypeSelector({
   showLookingFor = false,
 }: BodyTypeSelectorProps) {
   const [modalVisible, setModalVisible] = useState(false);
-  const [previewType,  setPreviewType]  = useState<BodyTypeValue | null>(null);
+  const [previewType, setPreviewType] = useState<BodyTypeValue | null>(null);
 
   const options = useMemo<readonly BodyTypeOption[]>(
     () => (showLookingFor ? [...BODY_TYPES, ANY_OPTION] : BODY_TYPES),
@@ -327,136 +363,88 @@ export default function BodyTypeSelector({
   );
 
   const openModal = useCallback(() => setModalVisible(true), []);
-
   const closeModal = useCallback(() => {
     setModalVisible(false);
     setPreviewType(null);
   }, []);
 
-  const handleSelect = useCallback(
-    (value: BodyTypeValue) => {
-      onSelect(value);
-      closeModal();
-    },
-    [onSelect, closeModal],
-  );
+  const handleSelect = useCallback((value: BodyTypeValue) => { onSelect(value); closeModal(); }, [onSelect, closeModal]);
+  const handlePressIn = useCallback((value: BodyTypeValue) => setPreviewType(value), []);
+  const handlePressOut = useCallback(() => setPreviewType(null), []);
 
   return (
-    <View style={s.container}>
-      <Text style={s.label}>{label}</Text>
-      <Text style={s.hint}>Tap to see visual guide</Text>
-
-      {/* Current selection button */}
+    <View style={styles.container}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.hint}>Tap to see visual guide</Text>
       <TouchableOpacity
-        style={s.selectorBtn}
+        style={styles.selectorBtn}
         onPress={openModal}
         disabled={disabled}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`Select ${label}: ${selectedOption?.label ?? 'not selected'}`}
         accessibilityHint="Opens body type selection modal"
+        testID="body-type-selector-button"
       >
-        <View style={s.selectorRow}>
+        <View style={styles.selectorRow}>
           {isBodyType(selectedType) && (
-            <View style={s.miniSilhouette}>
+            <View style={styles.miniSilhouette} accessible={false}>
               <BodyFigure type={selectedType} />
             </View>
           )}
-          <View style={s.selectorText}>
-            <Text style={s.selectedLabel}>
+          <View style={styles.selectorText}>
+            <Text style={styles.selectedLabel}>
               {selectedOption?.label ?? 'Select body type'}
             </Text>
             {selectedOption?.description != null && (
-              <Text style={s.selectedDesc} numberOfLines={1}>
+              <Text style={styles.selectedDesc} numberOfLines={1}>
                 {selectedOption.description}
               </Text>
             )}
           </View>
-          <Text style={s.arrow}>▼</Text>
+          <Text style={styles.arrow}>▼</Text>
         </View>
       </TouchableOpacity>
-
-      {/* Selection modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
         transparent
         onRequestClose={closeModal}
       >
-        <View style={s.overlay}>
-          <View style={s.modal}>
-            <Text style={s.modalTitle}>Select {label}</Text>
-            <Text style={s.modalSub}>
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Select {label}</Text>
+            <Text style={styles.modalSub}>
               Choose the option that best describes{' '}
               {showLookingFor ? 'your preference' : 'your body'}
             </Text>
-
-            {/*
-              ScrollView wraps 4–5 option cards in a flexWrap grid.
-              This is a bounded, static dataset. LegendList virtualization
-              adds complexity with zero measurable benefit here.
-            */}
             <ScrollView
-              contentContainerStyle={s.grid}
+              contentContainerStyle={styles.grid}
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
-              {options.map((opt) => {
-                const isSelected  = selectedType === opt.value;
-                const isPreviewed = previewType  === opt.value;
-
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      s.card,
-                      isSelected                  && s.cardSelected,
-                      isPreviewed && !isSelected  && s.cardPreview,
-                    ]}
-                    onPress={() = accessibilityLabel="button"> handleSelect(opt.value)}
-                    onPressIn={() => setPreviewType(opt.value)}
-                    onPressOut={() => setPreviewType(null)}
-                    disabled={disabled}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${opt.label}: ${opt.description}`}
-                    accessibilityState={{ selected: isSelected }}
-                  >
-                    {isBodyType(opt.value) ? (
-                      <View style={s.figureWrap}>
-                        <BodyFigure type={opt.value} />
-                      </View>
-                    ) : (
-                      <View style={s.anyCircle}>
-                        <Text style={s.anyText}>ALL</Text>
-                      </View>
-                    )}
-
-                    <Text style={[s.optLabel, isSelected && s.optLabelSelected]}>
-                      {opt.label}
-                    </Text>
-
-                    <Text style={s.optDesc}>{opt.description}</Text>
-                    <Text style={s.optExamples}>{opt.examples}</Text>
-
-                    {isSelected && (
-                      <View style={s.checkBadge}>
-                        <Text style={s.checkText}>✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+              {options.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  option={option}
+                  isSelected={selectedType === option.value}
+                  isPreviewed={previewType === option.value}
+                  disabled={disabled}
+                  onSelect={handleSelect}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                />
+              ))}
             </ScrollView>
-
             <TouchableOpacity
-              style={s.cancelBtn}
+              style={styles.cancelBtn}
               onPress={closeModal}
-              hitSlop={HIT}
+              hitSlop={DEFAULT_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Cancel body type selection"
+              testID="body-type-cancel-button"
             >
-              <Text style={s.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -465,152 +453,34 @@ export default function BodyTypeSelector({
   );
 }
 
-
-const s = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme) => ({
   container: { marginBottom: 20 },
-
-  label: {
-    fontSize: 16,
-    color: theme.colors.text,
-    marginBottom: 5,
-  },
-  hint: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 10,
-    fontStyle: 'italic',
-  },
-
-  /* selector button */
-  selectorBtn: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 15,
-    padding: 15,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  selectorRow:   { flexDirection: 'row', alignItems: 'center' },
-  miniSilhouette: {
-    transform: [{ scale: 0.35 }],
-    marginRight: -20,
-    marginLeft: -15,
-    height: 65,
-    width: 45,
-    overflow: 'hidden',
-  },
-  selectorText:  { flex: 1, marginLeft: 10 },
+  label: { fontSize: 16, color: theme.colors.text, marginBottom: 5 },
+  hint: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 10, fontStyle: 'italic' },
+  selectorBtn: { backgroundColor: theme.colors.surface, borderRadius: 15, padding: 15, borderWidth: 2, borderColor: theme.colors.border },
+  selectorRow: { flexDirection: 'row', alignItems: 'center' },
+  miniSilhouette: { transform: [{ scale: 0.35 }], marginRight: -20, marginLeft: -15, height: 65, width: 45, overflow: 'hidden' },
+  selectorText: { flex: 1, marginLeft: 10 },
   selectedLabel: { fontSize: 16, fontWeight: '600', color: theme.colors.text },
-  selectedDesc:  { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 },
-  arrow:         { color: theme.colors.primary, fontSize: 14 },
-
-  /* modal */
-  overlay: {
-    flex: 1,
-    backgroundColor: LOCAL.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: theme.colors.background,
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    maxHeight: '90%',
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  modalSub: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingBottom: 4,
-  },
-
-  /* option cards */
-  card: {
-    width: '48%',
-    backgroundColor: theme.colors.surface,
-    borderRadius: 15,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    marginBottom: 10,
-    position: 'relative',
-  },
-  cardSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: LOCAL.surfaceActive,
-  },
-  cardPreview: { borderColor: LOCAL.warning },
-
-  figureWrap: {
-    transform: [{ scale: 0.55 }],
-    height: 95,
-    marginTop: -8,
-    marginBottom: -18,
-  },
-  anyCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  anyText: { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
-
-  optLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginTop: 5,
-    marginBottom: 5,
-  },
+  selectedDesc: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 },
+  arrow: { color: theme.colors.primary, fontSize: 14 },
+  overlay: { flex: 1, backgroundColor: PALETTE.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modal: { backgroundColor: theme.colors.background, borderRadius: 20, padding: 20, width: '100%', maxHeight: '90%', borderWidth: 2, borderColor: theme.colors.border },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', color: theme.colors.text, textAlign: 'center', marginBottom: 5 },
+  modalSub: { fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10, paddingBottom: 4 },
+  card: { width: '48%', backgroundColor: theme.colors.surface, borderRadius: 15, padding: 12, alignItems: 'center', borderWidth: 2, borderColor: theme.colors.border, marginBottom: 10, position: 'relative' },
+  cardSelected: { borderColor: theme.colors.primary, backgroundColor: PALETTE.surfaceActive },
+  cardPreview: { borderColor: PALETTE.warning },
+  figureWrap: { transform: [{ scale: 0.55 }], height: 95, marginTop: -8, marginBottom: -18 },
+  anyCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', marginVertical: 20 },
+  anyText: { color: PALETTE.white, fontSize: 16, fontWeight: 'bold' },
+  optLabel: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text, marginTop: 5, marginBottom: 5 },
   optLabelSelected: { color: theme.colors.primary },
-
-  optDesc: {
-    fontSize: 11,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  optExamples: {
-    fontSize: 10,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-
-  checkBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: LOCAL.success,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkText: { color: LOCAL.white, fontSize: 14, fontWeight: 'bold' },
-
-  cancelBtn:  { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
+  optDesc: { fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 4 },
+  optExamples: { fontSize: 10, color: theme.colors.textSecondary, textAlign: 'center', fontStyle: 'italic' },
+  checkBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: PALETTE.success, borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' },
+  checkText: { color: PALETTE.white, fontSize: 14, fontWeight: 'bold' },
+  cancelBtn: { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
   cancelText: { color: theme.colors.error, fontSize: 16 },
 }));

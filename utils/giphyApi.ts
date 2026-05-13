@@ -13,7 +13,6 @@ import { logger } from './logger';
  * ```
  */
 
-
 /**
  * Giphy public beta key — suitable for development only.
  * Replace with a production key from https://developers.giphy.com
@@ -26,7 +25,6 @@ const DEFAULT_LIMIT      = 20;
 const MAX_LIMIT          = 50;
 const CONTENT_RATING     = 'pg-13';
 const REQUEST_TIMEOUT_MS = 10_000;
-
 
 export interface GiphyGif {
   readonly id: string;
@@ -61,7 +59,6 @@ interface GiphyApiGif {
 interface GiphyApiResponse {
   readonly data?: readonly GiphyApiGif[];
 }
-
 
 function clampLimit(limit: number): string {
   return String(Math.max(1, Math.min(Math.round(limit), MAX_LIMIT)));
@@ -113,7 +110,6 @@ async function fetchGiphy(
     if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
 }
-
 
 export async function searchGifs(
   query: string,

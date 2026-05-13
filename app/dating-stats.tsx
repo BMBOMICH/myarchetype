@@ -33,7 +33,7 @@ export default function DatingStatsScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadStats();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();

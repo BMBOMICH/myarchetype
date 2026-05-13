@@ -135,9 +135,9 @@ export async function triggerEmergency(planId: string): Promise<void> {
     const [planSnap, contacts, guardian] = await Promise.all([getDoc(doc(db, 'datePlans', planId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })), getEmergencyContacts(), getGuardianContact()]);
     const plan = planSnap.data() as DatePlan;
     await writeAuditLog('safety.sos_triggered', { planId, location: plan?.location, triggeredAt: new Date().toISOString() });
-    
+
     await Linking.openURL('tel:112').catch(() => Linking.openURL('tel:911').catch(() => Alert.alert('Emergency', 'Please dial your local emergency number manually.')));
-    
+
     const maps = plan?.latitude && plan?.longitude ? `\nMaps: https://maps.google.com/?q=${plan.latitude},${plan.longitude}` : '';
     const all = [...contacts]; if (guardian && !all.find(c => c.phone === guardian.phone)) all.push(guardian);
     const msg = `🚨 EMERGENCY! ${user.displayName ?? 'Your contact'} triggered an emergency alert.\n📍 ${plan?.location ?? 'Unknown'}\n🏠 ${plan?.locationAddress ?? 'Unknown'}${maps}\n⏰ ${new Date().toLocaleString()}\n\nPlease check on them immediately!`;

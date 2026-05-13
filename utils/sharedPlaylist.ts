@@ -10,7 +10,6 @@ import {
 import { auth, db } from '../firebaseConfig';
 import { logger } from './logger';
 
-
 export interface PlaylistTrack {
   trackId: string;
   name: string;

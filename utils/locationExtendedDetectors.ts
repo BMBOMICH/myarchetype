@@ -10,7 +10,6 @@
  * #754 — transportationBarrier | noTransportation | controlMechanism
  */
 
-
 export async function motelDetect(
   lat: number,
   lng: number
@@ -55,7 +54,6 @@ export async function motelDetect(
   return { hotelAddress: false, lodgingDetect: false, lodgingType: null, name: null };
 }
 
-
 export function recurringLocation(
   meetingLocations: Array<{
     lat: number;
@@ -99,7 +97,6 @@ export function recurringLocation(
   };
 }
 
-
 export function postDateSpeed(
   locations: Array<{ lat: number; lng: number; timestamp: number }>
 ): {
@@ -134,7 +131,6 @@ export function postDateSpeed(
   };
 }
 
-
 export async function borderCrossing(
   prevIp: string,
   currentIp: string
@@ -162,7 +158,7 @@ export async function borderCrossing(
 async function getCountryFromIp(ip: string): Promise<string | null> {
   try {
     const response = await fetch(
-      `${process.env.GEOIP_API_URL}/country/${ip}`
+      `${process.env['GEOIP_API_URL']}/country/${ip}`
     );
     if (response.ok) {
       const data = await response.json();
@@ -171,7 +167,6 @@ async function getCountryFromIp(ip: string): Promise<string | null> {
   } catch { /* fall through */ }
   return null;
 }
-
 
 export function lateNightMeeting(
   proposedMeetingTime: Date,
@@ -200,7 +195,6 @@ export function lateNightMeeting(
 
   return { firstDateNight, meetingHourCheck, hour, safetyWarning };
 }
-
 
 export function speedDatingFraud(
   eventSignups: Array<{
@@ -241,7 +235,6 @@ export function speedDatingFraud(
     patterns,
   };
 }
-
 
 export function recurringSameLocation(
   meetingHistory: Array<{
@@ -287,7 +280,6 @@ export function recurringSameLocation(
   };
 }
 
-
 const TRANSPORTATION_CONTROL_PATTERNS = [
   /i('ll| will) (pick you up|drive you|give you a ride)/i,
   /don't worry about (getting|transport|a ride|an uber|a taxi)/i,
@@ -332,7 +324,6 @@ export function transportationBarrier(
     coercionDetected,
   };
 }
-
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   return haversineKm(lat1, lng1, lat2, lng2) * 1000;

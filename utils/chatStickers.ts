@@ -87,7 +87,7 @@ export function searchStickers(query: string): string[] {
   };
 
   const lowerQuery = query.toLowerCase();
-  
+
   for (const [key, emojis] of Object.entries(searchMap)) {
     if (key.includes(lowerQuery) || lowerQuery.includes(key)) {
       return emojis;

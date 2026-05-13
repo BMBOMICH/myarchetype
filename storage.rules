@@ -1,71 +1,109 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
 
-    // ── Profile photos — public read, owner write ──────────
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.admin == true ||
+         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    function isConversationParticipant(conversationId) {
+      let conversation = firestore.get(
+        /databases/(default)/documents/conversations/$(conversationId)
+      );
+      let participantIds = conversation.data.participantIds;
+      return participantIds is map && participantIds[request.auth.uid] == true;
+    }
+
+    function isValidFileId(fileId) {
+      return fileId.matches('^[a-zA-Z0-9_.-]+$');
+    }
+
+    function isValidProfileImageType(contentType) {
+      return contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function isValidMediaType(contentType) {
+      return contentType.matches('image/.*|video/.*|audio/.*');
+    }
+
+    function isUnderSizeLimit(size, limit) {
+      return size < limit;
+    }
+
+    function isValidProfileSize(size) {
+      return isUnderSizeLimit(size, 10 * 1024 * 1024);
+    }
+
+    function isValidMediaSize(size) {
+      return isUnderSizeLimit(size, 50 * 1024 * 1024);
+    }
+
+    function isValidVerificationSize(size) {
+      return size > 1024 && isUnderSizeLimit(size, 5 * 1024 * 1024);
+    }
+
     match /profiles/{userId}/{photoId} {
       allow read: if true;
-      allow write: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if request.auth != null
-        && request.auth.uid == userId;
+      allow create, update: if isOwner(userId)
+        && isValidFileId(photoId)
+        && isValidProfileSize(request.resource.size)
+        && isValidProfileImageType(request.resource.contentType);
+      allow delete: if isOwner(userId);
     }
 
-    // ── User media (legacy path) ───────────────────────────
     match /users/{userId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.size < 50 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*|video/.*|audio/.*');
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId)
+        && isValidMediaSize(request.resource.size)
+        && isValidMediaType(request.resource.contentType);
     }
 
-    // ── Chat media — participants only ─────────────────────
     match /chat_media/{conversationId}/{mediaId} {
-      allow read: if request.auth != null
-        && request.auth.uid in firestore.get(
-          /databases/(default)/documents/conversations/$(conversationId)
-        ).data.participantIds;
-      allow write: if request.auth != null
-        && request.auth.uid in firestore.get(
-          /databases/(default)/documents/conversations/$(conversationId)
-        ).data.participantIds
-        && request.resource.size < 50 * 1024 * 1024
-        && (request.resource.contentType.matches('image/.*')
-          || request.resource.contentType.matches('video/.*')
-          || request.resource.contentType.matches('audio/.*'));
+      allow read: if isAuthenticated() && isConversationParticipant(conversationId);
+      allow create, update: if isAuthenticated()
+        && isConversationParticipant(conversationId)
+        && isValidFileId(mediaId)
+        && request.resource.metadata.customMetadata.conversationId == conversationId
+        && isValidMediaSize(request.resource.size)
+        && isValidMediaType(request.resource.contentType);
     }
 
-    // ── ID verification — owner + admin only ──────────────
     match /verification/{userId}/{docId} {
-      allow read: if request.auth != null
-        && (request.auth.uid == userId
-          || firestore.get(
-              /databases/(default)/documents/users/$(request.auth.uid)
-            ).data.role == 'admin');
-      allow write: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.size < 5 * 1024 * 1024;
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create, update: if isOwner(userId)
+        && isValidFileId(docId)
+        && isValidVerificationSize(request.resource.size);
       allow delete: if false;
     }
 
-    // ── Audit evidence — admin only ────────────────────────
     match /evidence/{caseId}/{fileId} {
-      allow read, write: if request.auth != null
-        && firestore.get(
-            /databases/(default)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin';
+      allow read, write: if isAdmin();
     }
 
-    // ── Public assets ──────────────────────────────────────
-    match /public/{allPaths=**} {
+    match /public/images/{fileId} {
       allow read: if true;
       allow write: if false;
     }
 
-    // ── Default deny ───────────────────────────────────────
+    match /public/fonts/{fileId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /public/assets/{fileId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

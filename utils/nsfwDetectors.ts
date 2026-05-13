@@ -24,7 +24,7 @@ async function extractVideoThumbnail(uri: string) { return uri; }
 export async function checkImageNSFW(uri: string, strict = false): Promise<NSFWResult> {
   if (!IS_WEB) {
     try {
-      const r = await fetchSafe(`${process.env.EXPO_PUBLIC_SERVER_URL ?? ''}/api/verify-photo-nsfw`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUri: uri }) });
+      const r = await fetchSafe(`${process.env['EXPO_PUBLIC_SERVER_URL'] ?? ''}/api/verify-photo-nsfw`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUri: uri }) });
       if (r.ok) { const d = await r.json() as { safe: boolean; confidence: number; reason?: string }; if (!d.safe) writeAuditLog('content.nsfw_blocked_server', { confidence: d.confidence, uri }).catch(() => {}); return { isNSFW: !d.safe, confidence: d.confidence, categories: { porn: 0, hentai: 0, sexy: 0, neutral: d.safe ? 1 : 0, drawing: 0 }, shouldAutoBlur: !d.safe, flagReason: d.reason }; }
     } catch (e) { logger.warn('[checkImageNSFW native]', e); }
     return buildSafe();

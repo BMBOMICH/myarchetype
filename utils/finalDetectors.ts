@@ -16,7 +16,7 @@ export function stiAccess(matchState: 'browsing' | 'matched' | 'mutual_like' | '
   return {
     progressiveDisclosure: true,
     userControlled: true,
-    matchStateRequired: matchState === 'browsing' ? 'mutual_like' : matchState === 'matched' ? 'mutual_like' : matchState as any,
+    matchStateRequired: matchState === 'browsing' ? 'mutual_like' : matchState === 'matched' ? 'mutual_like' : matchState as unknown,
     neverShowOnProfile: true,
     neverIncludeInSearch: true,
     neverIncludeInAnalytics: true,
@@ -33,7 +33,6 @@ export function stiAccess(matchState: 'browsing' | 'matched' | 'mutual_like' | '
     ],
   };
 }
-
 
 export interface DrinkSpikingAlertResult {
   safetyTips: string[];
@@ -106,6 +105,5 @@ export function drinkSpikingAlert(message?: string): DrinkSpikingAlertResult {
 
 export const drinkSafetyTips = drinkSpikingAlert;
 export const spikingAlert = drinkSpikingAlert;
-
 
 export const getDrinkSafetyTips = () => drinkSpikingAlert().safetyTips;

@@ -1,7 +1,7 @@
 import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   InteractionManager,
@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
@@ -62,11 +62,16 @@ export default function SmartPhotosScreen() {
     }
   }, []);
 
+  const optimizeBtnStyle = useMemo(
+    () => [s.optimizeBtn, optimizing && s.optimizeBtnDisabled],
+    [optimizing],
+  );
+
   useEffect(() => {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadData();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();
@@ -100,12 +105,13 @@ export default function SmartPhotosScreen() {
   const renderPhotoCard = useCallback(
     ({ item: stat, index }: LegendListRenderItemProps<PhotoStats>) => {
       const { label, color } = getPhotoPerformanceLabel(stat.score);
+      const perfBadgeStyle = [s.perfBadge, { backgroundColor: color }];
+      const scoreValueStyle = [s.scoreValue, { color }];
       return (
         <View
           style={s.photoCard}
           accessibilityLabel={`Photo ${index + 1}: ${label}, score ${stat.score}%, ${stat.impressions} impressions, ${stat.rightSwipes} right swipes`}
         >
-          {/* TurboImage — Nuke (iOS) / Coil (Android) with disk + memory cache */}
           <TurboImage
             source={{ uri: stat.photoUrl }}
             style={s.photoImage}
@@ -115,9 +121,7 @@ export default function SmartPhotosScreen() {
           />
 
           <View style={s.photoStatsWrap}>
-            {/* color is data-driven from getPhotoPerformanceLabel —
-                cannot be a static theme token, inline is correct here */}
-            <View style={[s.perfBadge, { backgroundColor: color }]}>
+            <View style={perfBadgeStyle}>
               <Text style={s.perfBadgeText}>{label}</Text>
             </View>
 
@@ -133,8 +137,7 @@ export default function SmartPhotosScreen() {
 
             <View style={s.scoreRow}>
               <Text style={s.scoreLabel}>Score</Text>
-              {/* color is data-driven — inline is correct */}
-              <Text style={[s.scoreValue, { color }]}>{stat.score}%</Text>
+              <Text style={scoreValueStyle}>{stat.score}%</Text>
             </View>
           </View>
 
@@ -166,7 +169,7 @@ export default function SmartPhotosScreen() {
     <>
       <View style={s.header}>
         <TouchableOpacity
-          onPress={() = accessibilityLabel="button"> router.back()}
+          onPress={() => router.back()}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
@@ -202,7 +205,7 @@ export default function SmartPhotosScreen() {
       </View>
 
       <TouchableOpacity
-        style={[s.optimizeBtn, optimizing && s.optimizeBtnDisabled]}
+        style={optimizeBtnStyle}
         onPress={handleOptimize}
         disabled={optimizing}
         accessibilityLabel={optimizing ? 'Optimizing photos' : 'Optimize photos now'}
@@ -286,7 +289,6 @@ const s = StyleSheet.create((theme) => ({
   noDataContainer:     { backgroundColor: theme.colors.surface, borderRadius: 15, padding: 30, alignItems: 'center' },
   noDataText:          { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center' },
 
-  photoGrid:           { gap: 15 },
   photoCard:           { backgroundColor: theme.colors.surface, borderRadius: 15, overflow: 'hidden', position: 'relative', marginBottom: 15 },
   photoImage:          { width: '100%', height: 200 },
 

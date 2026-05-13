@@ -16,7 +16,6 @@ export interface MatchNote {
   lastUpdated: string;
 }
 
-
 export async function getMatchNote(matchId: string): Promise<string> {
   const user = auth.currentUser;
   if (!user || !matchId) return '';

@@ -2,7 +2,7 @@ import { writeAuditLog } from './logger';
 
 async function stSim(a: string, b: string): Promise<number> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/ml/similarity`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/ml/similarity`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text_a: a, text_b: b }),
@@ -28,7 +28,7 @@ async function matchScr(text: string, scripts: string[]): Promise<{ max: number;
 
 async function presidioPII(text: string): Promise<Array<{ entity_type: string; text: string; score: number; start: number; end: number }>> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pii/detect`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/pii/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, language: 'en' }),
@@ -52,7 +52,7 @@ async function presidioPII(text: string): Promise<Array<{ entity_type: string; t
 
 async function duoGuard(text: string): Promise<{ safe: boolean; cats: Record<string, number>; max: number; cat: string }> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/ml/duoguard`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/ml/duoguard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -71,7 +71,7 @@ async function duoGuard(text: string): Promise<{ safe: boolean; cats: Record<str
 async function faceCmp(a: number[], b: number[]): Promise<{ sim: number; match: boolean }> {
   if (!a.length || !b.length || a.length !== b.length) return { sim: 0, match: false };
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/face/compare`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/face/compare`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ embedding_a: a, embedding_b: b }),
@@ -87,7 +87,7 @@ async function faceCmp(a: number[], b: number[]): Promise<{ sim: number; match: 
 
 async function whisperT(url: string): Promise<{ text: string; lang: string; conf: number; dur: number }> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/audio/transcribe`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/audio/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_url: url, model: 'whisper-1' }),
@@ -100,7 +100,7 @@ async function whisperT(url: string): Promise<{ text: string; lang: string; conf
 
 async function pyannoteCnt(url: string): Promise<{ count: number; segs: Array<{ speaker: string; start: number; end: number }> }> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/audio/diarize`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/audio/diarize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_url: url }),
@@ -232,7 +232,6 @@ const FORCED_MARR_SCR = [
   "They're planning to take me to get married next week",
   "My family is making me marry my cousin",
 ];
-
 
 export interface BlackmailSetupResult {
   detected: boolean; confidence: number; patterns: string[];
@@ -1296,7 +1295,6 @@ export async function forcedMarriage(msgs: string[]): Promise<ForcedMarriageResu
 export const marriageGrooming = forcedMarriage;
 export const arrangedForced = forcedMarriage;
 
-
 export interface GroupConsent {
   eventId: string; participants: Array<{ userId: string; consented: boolean; consentedAt?: number }>;
   allConsented: boolean; consentMethod: 'explicit' | 'implicit' | 'none';
@@ -1778,7 +1776,7 @@ export async function backgroundNoise(f: {
   if (f.backgroundVoiceOverlap) { ind.push('voice_overlap'); c += 0.3; }
   let tr: string | null = null, sc = f.voiceCount;
   if (f.audioUrl) {
-    const [w, d] = await Promise.all([whisperT(f.audioUrl).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), pyannoteCnt(f.audioUrl)]);
+    const [w, d] = await Promise.all([whisperT(f.audioUrl).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), pyannoteCnt(f.audioUrl)]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
     tr = w.text || null;
     if (d.count > 0) { sc = d.count; if (d.count >= 3) { ind.push('pyannote_multi'); c += 0.35; } }
   }
@@ -1895,10 +1893,6 @@ export async function reportPIILeakage(text: string): Promise<ReportPIILeakageRe
   const rm: string[] = []; let sn = text;
   for (const { regex, type } of PII_PAT) {
     regex.lastIndex = 0;
-    if (regex.test(text)) { rm.push(type); regex.lastIndex = 0; export async function reportPIILeakage(text: string): Promise<ReportPIILeakageResult> {
-  const rm: string[] = []; let sn = text;
-  for (const { regex, type } of PII_PAT) {
-    regex.lastIndex = 0;
     if (regex.test(text)) {
       rm.push(type);
       regex.lastIndex = 0;
@@ -1921,17 +1915,8 @@ export async function reportPIILeakage(text: string): Promise<ReportPIILeakageRe
     removedPII: rm,
     sanitizedText: sn,
     presidioEntities: pE,
-    source: pE.length > 0 && rm.length > pE.length ? 'both' : pE.length > 0 ? 'presidio' : 'regex_fallback'
+    source: pE.length > 0 && rm.length > pE.length ? 'both' : pE.length > 0 ? 'presidio' : 'regex_fallback',
   };
-}
-
-  }
-  const pE: Array<{ type: string; text: string; score: number }> = [];
-  for (const e of await presidioPII(text)) {
-    const t = e.entity_type.toLowerCase();
-    if (!rm.includes(t)) { rm.push(t); pE.push({ type: t, text: e.text, score: e.score }); sn = sn.replace(e.text, `[${t}_REDACTED]`); }
-  }
-  return { sanitized: rm.length > 0, originalLength: text.length, sanitizedLength: sn.length, removedPII: rm, sanitizedText: sn, presidioEntities: pE, source: pE.length > 0 && rm.length > pE.length ? 'both' : pE.length > 0 ? 'presidio' : 'regex_fallback' };
 }
 export const piiInReport = reportPIILeakage;
 export const sanitizeReport = reportPIILeakage;
@@ -2458,7 +2443,7 @@ export async function groupDateVerify(parts: Array<{ participantId: string; hasI
     let v = p.hasIdVerification || (p.hasPhoneVerification && p.hasSocialVerification).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), m = p.hasIdVerification ? 'id_verification' : p.hasPhoneVerification ? 'phone_verification' : 'none', fms = 0;
     if (p.faceEmbedding?.length && p.verifiedFaceEmbedding?.length) { const fr = await faceCmp(p.faceEmbedding, p.verifiedFaceEmbedding); fms = fr.sim; if (fr.match && !v) { v = true; m = 'face_verification'; } }
     return { participantId: p.participantId, verified: v, method: m, faceMatchScore: Math.round(fms * 100) / 100 };
-  }));
+  })).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   const all = res.every(r => r.verified);
   return { verified: all, participantResults: res, allVerified: all, recommendation: all ? 'All participants are verified.' : 'Some participants are not verified. Consider asking them to verify before meeting.' };
 }
@@ -2881,4 +2866,6 @@ export function codeWordDetect(message: string, config: CodeWordConfig): CodeWor
   return { triggered: true, word: found, action: config.action, alertMessage: config.alertMessage, contacts: config.contacts };
 }
 export const distressSignal = codeWordDetect;
+// TS-FIX: TS1005: Syntax error — missing token | '}' expected.
 export const safeWord = codeWordDetect;
+// TS-FIX: TS1005: Syntax error — '}' expected.

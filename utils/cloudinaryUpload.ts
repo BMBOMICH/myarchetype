@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 import { detectFullBodyFromTags, scorePhotoQuality, validateFacesFromCloudinary } from './faceDetection';
 import { checkImageSafety } from './moderation';
 
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME ?? '';
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? '';
+const CLOUD_NAME = process.env['EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME'] ?? '';
+const UPLOAD_PRESET = process.env['EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET'] ?? '';
 const BASE_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}`;
 const IS_WEB = Platform.OS === 'web';
 

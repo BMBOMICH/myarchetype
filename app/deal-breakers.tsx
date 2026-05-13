@@ -2,37 +2,70 @@ import type { LegendListRenderItemProps } from '@legendapp/list';
 import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, InteractionManager, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, Alert, InteractionManager, Switch, Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
-import { DealBreakers, DEFAULT_DEAL_BREAKERS, getDealBreakers, saveDealBreakers } from '../utils/dealBreakers';
+import { type DealBreakers, DEFAULT_DEAL_BREAKERS, getDealBreakers, saveDealBreakers } from '../utils/dealBreakers';
 import { logger } from '../utils/logger';
 
 const RELIGIONS = ['Traditional', 'Modern', 'Spiritual', 'None'] as const;
 
-interface ToggleRowProps { label: string; value: boolean; onChange: (v: boolean) => void; last?: boolean; }
+interface ToggleRowProps {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  last?: boolean;
+}
 const ToggleRow = React.memo(function ToggleRow({ label, value, onChange, last }: ToggleRowProps) {
+  const rowStyle = useMemo(() => [styles.toggleRow, last && styles.toggleRowLast], [last]);
   return (
-    <View style={[styles.toggleRow, last && styles.toggleRowLast]}>
+    <View style={rowStyle}>
       <Text style={styles.toggleLabel}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ false: '#555', true: '#53a8b6' }} thumbColor="#fff" accessibilityLabel={label} accessibilityRole="switch" accessibilityState={{ checked: value }} />
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: '#555', true: '#53a8b6' }}
+        thumbColor="#fff"
+        accessibilityLabel={label}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value }}
+      />
     </View>
   );
 });
 
-interface ReligionButtonProps { religion: string; active: boolean; onPress: (r: string) => void; }
+interface ReligionButtonProps {
+  religion: string;
+  active: boolean;
+  onPress: (r: string) => void;
+}
 const ReligionButton = React.memo(function ReligionButton({ religion, active, onPress }: ReligionButtonProps) {
   const handlePress = useCallback(() => onPress(religion), [onPress, religion]);
+  const btnStyle    = useMemo(() => [styles.religionButton, active && styles.religionButtonActive], [active]);
+  const txtStyle    = useMemo(() => [styles.religionButtonText, active && styles.religionButtonTextActive], [active]);
   return (
-    <TouchableOpacity style={[styles.religionButton, active && styles.religionButtonActive]} onPress={handlePress}
+    <TouchableOpacity
+      style={btnStyle}
+      onPress={handlePress}
       accessibilityLabel={`Religion: ${religion}${active ? ', selected' : ''}`}
-      accessibilityRole="radio" accessibilityState={{ selected: active }}>
-      <Text style={[styles.religionButtonText, active && styles.religionButtonTextActive]}>{religion}</Text>
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={txtStyle}>{religion}</Text>
     </TouchableOpacity>
   );
 });
 
-interface ProfileQualitySectionProps { mustHaveVerified: boolean; mustHaveBio: boolean; mustHaveMultiplePhotos: boolean; onChange: (key: keyof DealBreakers, value: unknown) => void; }
-const ProfileQualitySection = React.memo(function ProfileQualitySection({ mustHaveVerified, mustHaveBio, mustHaveMultiplePhotos, onChange }: ProfileQualitySectionProps) {
+interface ProfileQualitySectionProps {
+  mustHaveVerified: boolean;
+  mustHaveBio: boolean;
+  mustHaveMultiplePhotos: boolean;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
+const ProfileQualitySection = React.memo(function ProfileQualitySection({
+  mustHaveVerified, mustHaveBio, mustHaveMultiplePhotos, onChange,
+}: ProfileQualitySectionProps) {
   const onVerified = useCallback((v: boolean) => onChange('mustHaveVerified', v), [onChange]);
   const onBio      = useCallback((v: boolean) => onChange('mustHaveBio', v), [onChange]);
   const onPhotos   = useCallback((v: boolean) => onChange('mustHaveMultiplePhotos', v), [onChange]);
@@ -46,7 +79,11 @@ const ProfileQualitySection = React.memo(function ProfileQualitySection({ mustHa
   );
 });
 
-interface AgeRangeSectionProps { minAge: number | null; maxAge: number | null; onChange: (key: keyof DealBreakers, value: unknown) => void; }
+interface AgeRangeSectionProps {
+  minAge: number | null;
+  maxAge: number | null;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
 const AgeRangeSection = React.memo(function AgeRangeSection({ minAge, maxAge, onChange }: AgeRangeSectionProps) {
   const onMin = useCallback((t: string) => onChange('minAge', t ? parseInt(t) : null), [onChange]);
   const onMax = useCallback((t: string) => onChange('maxAge', t ? parseInt(t) : null), [onChange]);
@@ -62,7 +99,11 @@ const AgeRangeSection = React.memo(function AgeRangeSection({ minAge, maxAge, on
   );
 });
 
-interface HeightRangeSectionProps { minHeight: number | null; maxHeight: number | null; onChange: (key: keyof DealBreakers, value: unknown) => void; }
+interface HeightRangeSectionProps {
+  minHeight: number | null;
+  maxHeight: number | null;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
 const HeightRangeSection = React.memo(function HeightRangeSection({ minHeight, maxHeight, onChange }: HeightRangeSectionProps) {
   const onMin = useCallback((t: string) => onChange('minHeight', t ? parseInt(t) : null), [onChange]);
   const onMax = useCallback((t: string) => onChange('maxHeight', t ? parseInt(t) : null), [onChange]);
@@ -78,7 +119,12 @@ const HeightRangeSection = React.memo(function HeightRangeSection({ minHeight, m
   );
 });
 
-interface LifestyleSectionProps { noSmoking: boolean; noDrinking: boolean; noDrugs: boolean; onChange: (key: keyof DealBreakers, value: unknown) => void; }
+interface LifestyleSectionProps {
+  noSmoking: boolean;
+  noDrinking: boolean;
+  noDrugs: boolean;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
 const LifestyleSection = React.memo(function LifestyleSection({ noSmoking, noDrinking, noDrugs, onChange }: LifestyleSectionProps) {
   const onSmoke = useCallback((v: boolean) => onChange('noSmoking', v), [onChange]);
   const onDrink = useCallback((v: boolean) => onChange('noDrinking', v), [onChange]);
@@ -93,12 +139,20 @@ const LifestyleSection = React.memo(function LifestyleSection({ noSmoking, noDri
   );
 });
 
-interface KidsSectionProps { mustWantKids: boolean; mustNotWantKids: boolean; mustHaveKids: boolean; mustNotHaveKids: boolean; onChange: (key: keyof DealBreakers, value: unknown) => void; }
-const KidsSection = React.memo(function KidsSection({ mustWantKids, mustNotWantKids, mustHaveKids, mustNotHaveKids, onChange }: KidsSectionProps) {
-  const onWantKids    = useCallback((v: boolean) => { onChange('mustWantKids', v); if (v) onChange('mustNotWantKids', false); }, [onChange]);
-  const onNotWantKids = useCallback((v: boolean) => { onChange('mustNotWantKids', v); if (v) onChange('mustWantKids', false); }, [onChange]);
-  const onHaveKids    = useCallback((v: boolean) => { onChange('mustHaveKids', v); if (v) onChange('mustNotHaveKids', false); }, [onChange]);
-  const onNotHaveKids = useCallback((v: boolean) => { onChange('mustNotHaveKids', v); if (v) onChange('mustHaveKids', false); }, [onChange]);
+interface KidsSectionProps {
+  mustWantKids: boolean;
+  mustNotWantKids: boolean;
+  mustHaveKids: boolean;
+  mustNotHaveKids: boolean;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
+const KidsSection = React.memo(function KidsSection({
+  mustWantKids, mustNotWantKids, mustHaveKids, mustNotHaveKids, onChange,
+}: KidsSectionProps) {
+  const onWantKids    = useCallback((v: boolean) => { onChange('mustWantKids', v);    if (v) onChange('mustNotWantKids', false); }, [onChange]);
+  const onNotWantKids = useCallback((v: boolean) => { onChange('mustNotWantKids', v); if (v) onChange('mustWantKids', false);    }, [onChange]);
+  const onHaveKids    = useCallback((v: boolean) => { onChange('mustHaveKids', v);    if (v) onChange('mustNotHaveKids', false); }, [onChange]);
+  const onNotHaveKids = useCallback((v: boolean) => { onChange('mustNotHaveKids', v); if (v) onChange('mustHaveKids', false);    }, [onChange]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>👶 Kids</Text>
@@ -110,7 +164,11 @@ const KidsSection = React.memo(function KidsSection({ mustWantKids, mustNotWantK
   );
 });
 
-interface ReligionSectionProps { sameReligionOnly: boolean; requiredReligion: string | null; onChange: (key: keyof DealBreakers, value: unknown) => void; }
+interface ReligionSectionProps {
+  sameReligionOnly: boolean;
+  requiredReligion: string | null;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
 const ReligionSection = React.memo(function ReligionSection({ sameReligionOnly, requiredReligion, onChange }: ReligionSectionProps) {
   const onSameOnly = useCallback((v: boolean) => { onChange('sameReligionOnly', v); if (v) onChange('requiredReligion', null); }, [onChange]);
   const onReligion = useCallback((r: string) => {
@@ -131,14 +189,26 @@ const ReligionSection = React.memo(function ReligionSection({ sameReligionOnly, 
   );
 });
 
-interface DistanceSectionProps { maxDistanceKm: number | null; onChange: (key: keyof DealBreakers, value: unknown) => void; }
+interface DistanceSectionProps {
+  maxDistanceKm: number | null;
+  onChange: (key: keyof DealBreakers, value: unknown) => void;
+}
 const DistanceSection = React.memo(function DistanceSection({ maxDistanceKm, onChange }: DistanceSectionProps) {
   const onDistance = useCallback((t: string) => onChange('maxDistanceKm', t ? parseInt(t) : null), [onChange]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>📍 Maximum Distance</Text>
       <View style={styles.distanceRow}>
-        <TextInput style={styles.distanceInput} placeholder="No limit" placeholderTextColor="#666" value={maxDistanceKm?.toString() ?? ''} onChangeText={onDistance} keyboardType="number-pad" maxLength={4} accessibilityLabel="Maximum distance in kilometers" />
+        <TextInput
+          style={styles.distanceInput}
+          placeholder="No limit"
+          placeholderTextColor="#666"
+          value={maxDistanceKm?.toString() ?? ''}
+          onChangeText={onDistance}
+          keyboardType="number-pad"
+          maxLength={4}
+          accessibilityLabel="Maximum distance in kilometers"
+        />
         <Text style={styles.distanceUnit}>km</Text>
       </View>
     </View>
@@ -181,7 +251,7 @@ export default function DealBreakersScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadDealBreakers();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();
@@ -192,12 +262,18 @@ export default function DealBreakersScreen() {
     setSaving(true);
     try {
       const result = await saveDealBreakers(dealBreakers);
-      if (result.success) { Alert.alert('Saved!', 'Your deal breakers have been updated.'); router.back(); }
-      else Alert.alert('Error', 'Failed to save deal breakers.');
+      if (result.success) {
+        Alert.alert('Saved!', 'Your deal breakers have been updated.');
+        router.back();
+      } else {
+        Alert.alert('Error', 'Failed to save deal breakers.');
+      }
     } catch (error) {
       logger.error('[DealBreakers] Save error:', error);
       Alert.alert('Error', 'An unexpected error occurred.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }, [dealBreakers, router]);
 
   const handleReset     = useCallback(() => setDealBreakers(DEFAULT_DEAL_BREAKERS), []);
@@ -218,6 +294,11 @@ export default function DealBreakersScreen() {
 
   const keyExtractor = useCallback((item: SectionItem) => item.key, []);
 
+  const saveButtonStyle = useMemo(
+    () => [styles.saveButton, saving && styles.saveButtonDisabled],
+    [saving],
+  );
+
   const ListHeader = useMemo(() => (
     <View>
       <View style={styles.header}>
@@ -227,13 +308,20 @@ export default function DealBreakersScreen() {
         <Text style={styles.title}>Deal Breakers</Text>
         <View style={styles.headerSpacer} />
       </View>
-      <Text style={styles.subtitle}>Set hard limits. Profiles that don't match these won't be shown.</Text>
+      <Text style={styles.subtitle}>Set hard limits. Profiles that don&apos;t match these won&apos;t be shown.</Text>
     </View>
   ), [handleBack]);
 
   const ListFooter = useMemo(() => (
     <View>
-      <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSavePress} disabled={saving} accessibilityLabel={saving ? 'Saving deal breakers' : 'Save deal breakers'} accessibilityRole="button" accessibilityState={{ disabled: saving, busy: saving }}>
+      <TouchableOpacity
+        style={saveButtonStyle}
+        onPress={handleSavePress}
+        disabled={saving}
+        accessibilityLabel={saving ? 'Saving deal breakers' : 'Save deal breakers'}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: saving, busy: saving }}
+      >
         <Text style={styles.saveButtonText}>{saving ? 'Saving...' : '✓ Save Deal Breakers'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.resetButton} onPress={handleReset} accessibilityLabel="Reset to default deal breakers" accessibilityRole="button">
@@ -241,9 +329,15 @@ export default function DealBreakersScreen() {
       </TouchableOpacity>
       <View style={styles.bottomSpacer} />
     </View>
-  ), [saving, handleSavePress, handleReset]);
+  ), [saving, saveButtonStyle, handleSavePress, handleReset]);
 
-  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#53a8b6" /></View>;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#53a8b6" />
+      </View>
+    );
+  }
 
   return (
     <LegendList
@@ -263,35 +357,35 @@ export default function DealBreakersScreen() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container:               { flex: 1, backgroundColor: theme.colors.background },
-  content:                 { padding: 20 },
-  loadingContainer:        { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
-  header:                  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 30 },
-  headerSpacer:            { width: 50 },
-  backButton:              { color: '#53a8b6', fontSize: 16 },
-  title:                   { fontSize: 24, fontWeight: 'bold', color: theme.colors.text },
-  subtitle:                { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 25, lineHeight: 20 },
-  section:                 { backgroundColor: '#16213e', borderRadius: 15, padding: 16, marginBottom: 20 },
-  sectionTitle:            { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginBottom: 15 },
-  toggleRow:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
-  toggleRowLast:           { borderBottomWidth: 0 },
-  toggleLabel:             { color: theme.colors.text, fontSize: 15 },
-  rangeRow:                { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
-  rangeInput:              { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 100, textAlign: 'center' },
-  rangeDash:               { color: theme.colors.textSecondary, fontSize: 16 },
-  orText:                  { color: theme.colors.textSecondary, fontSize: 13, marginTop: 15, marginBottom: 10 },
-  religionButtons:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  religionButton:          { backgroundColor: '#0f3460', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#0f3460' },
-  religionButtonActive:    { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
-  religionButtonText:      { color: theme.colors.textSecondary, fontSize: 14 },
-  religionButtonTextActive:{ color: '#fff', fontWeight: '600' },
-  distanceRow:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  distanceInput:           { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 120, textAlign: 'center' },
-  distanceUnit:            { color: theme.colors.textSecondary, fontSize: 16 },
-  saveButton:              { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 10 },
-  saveButtonDisabled:      { backgroundColor: '#555' },
-  saveButtonText:          { color: '#fff', fontSize: 18, fontWeight: '600' },
-  resetButton:             { paddingVertical: 14, alignItems: 'center', marginTop: 10 },
-  resetButtonText:         { color: '#d9534f', fontSize: 16 },
-  bottomSpacer:            { height: 50 },
+  container:                { flex: 1, backgroundColor: theme.colors.background },
+  content:                  { padding: 20 },
+  loadingContainer:         { flex: 1, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
+  header:                   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 30 },
+  headerSpacer:             { width: 50 },
+  backButton:               { color: '#53a8b6', fontSize: 16 },
+  title:                    { fontSize: 24, fontWeight: 'bold', color: theme.colors.text },
+  subtitle:                 { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 25, lineHeight: 20 },
+  section:                  { backgroundColor: '#16213e', borderRadius: 15, padding: 16, marginBottom: 20 },
+  sectionTitle:             { color: '#53a8b6', fontSize: 16, fontWeight: '600', marginBottom: 15 },
+  toggleRow:                { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
+  toggleRowLast:            { borderBottomWidth: 0 },
+  toggleLabel:              { color: theme.colors.text, fontSize: 15 },
+  rangeRow:                 { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
+  rangeInput:               { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 100, textAlign: 'center' },
+  rangeDash:                { color: theme.colors.textSecondary, fontSize: 16 },
+  orText:                   { color: theme.colors.textSecondary, fontSize: 13, marginTop: 15, marginBottom: 10 },
+  religionButtons:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  religionButton:           { backgroundColor: '#0f3460', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2, borderColor: '#0f3460' },
+  religionButtonActive:     { backgroundColor: '#53a8b6', borderColor: '#53a8b6' },
+  religionButtonText:       { color: theme.colors.textSecondary, fontSize: 14 },
+  religionButtonTextActive: { color: '#fff', fontWeight: '600' },
+  distanceRow:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  distanceInput:            { backgroundColor: '#0f3460', color: theme.colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, fontSize: 18, fontWeight: '600', width: 120, textAlign: 'center' },
+  distanceUnit:             { color: theme.colors.textSecondary, fontSize: 16 },
+  saveButton:               { backgroundColor: '#5cb85c', paddingVertical: 16, borderRadius: 25, alignItems: 'center', marginTop: 10 },
+  saveButtonDisabled:       { backgroundColor: '#555' },
+  saveButtonText:           { color: '#fff', fontSize: 18, fontWeight: '600' },
+  resetButton:              { paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  resetButtonText:          { color: '#d9534f', fontSize: 16 },
+  bottomSpacer:             { height: 50 },
 }));

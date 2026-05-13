@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { getUserTrustLevel } from '../utils/ratingSystem';
@@ -40,12 +40,16 @@ function calculateDisplayScore(ratings: Ratings): number {
 function RatingBar({ label, value, max, isPercent = false }: RatingBarProps) {
   if (!value || value === 0) return null;
   const percentage = isPercent ? value : (value / max) * 100;
+  const barFillStyle = useMemo(
+    () => [styles.ratingBarFill, { width: `${percentage}%` as `${number}%` }],
+    [percentage],
+  );
   return (
     <View style={styles.ratingItem}>
       <Text style={styles.ratingLabel}>{label}</Text>
       <View style={styles.ratingBarRow}>
         <View style={styles.ratingBarBg}>
-          <View style={[styles.ratingBarFill, { width: `${percentage}%` }]} />
+          <View style={barFillStyle} />
         </View>
         <Text style={styles.ratingValue}>{isPercent ? `${value}%` : `${value.toFixed(1)}/5`}</Text>
       </View>
@@ -55,12 +59,31 @@ function RatingBar({ label, value, max, isPercent = false }: RatingBarProps) {
 
 function DetailedScore({
   ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore,
-}: { ratings: Ratings; selfieVerified: boolean; ageVerified: boolean; heightVerified: boolean; trustLevel: TrustLevel; trustScore: number }) {
+}: {
+  ratings: Ratings; selfieVerified: boolean; ageVerified: boolean;
+  heightVerified: boolean; trustLevel: TrustLevel; trustScore: number;
+}) {
   const hasRatings = ratings && ratings.totalRatings > 0;
+
+  const scoreBadgeStyle = useMemo(
+    () => [styles.scoreBadge, { backgroundColor: trustLevel.color }],
+    [trustLevel.color],
+  );
+  const scoreBarFillStyle = useMemo(
+    () => [
+      styles.scoreBarFill,
+      {
+        width: `${trustScore}%` as `${number}%`,
+        backgroundColor: trustScore >= 75 ? '#5cb85c' : trustScore >= 50 ? '#e67e22' : '#d9534f',
+      },
+    ],
+    [trustScore],
+  );
+
   return (
     <View style={styles.detailContainer}>
       <View style={styles.scoreHeader}>
-        <View style={[styles.scoreBadge, { backgroundColor: trustLevel.color }]}>
+        <View style={scoreBadgeStyle}>
           <Text style={styles.scoreBadgeText}>{trustLevel.label}</Text>
         </View>
         {trustScore > 0 && <Text style={styles.scoreNumber}>{trustScore}%</Text>}
@@ -68,9 +91,11 @@ function DetailedScore({
       {trustScore > 0 && (
         <View style={styles.scoreBarContainer}>
           <View style={styles.scoreBarBg}>
-            <View style={[styles.scoreBarFill, { width: `${trustScore}%`, backgroundColor: trustScore >= 75 ? '#5cb85c' : trustScore >= 50 ? '#e67e22' : '#d9534f' }]} />
+            <View style={scoreBarFillStyle} />
           </View>
-          <Text style={styles.scoreLabel}>{trustScore >= 85 ? 'Excellent' : trustScore >= 70 ? 'Good' : trustScore >= 50 ? 'Fair' : 'Poor'}</Text>
+          <Text style={styles.scoreLabel}>
+            {trustScore >= 85 ? 'Excellent' : trustScore >= 70 ? 'Good' : trustScore >= 50 ? 'Fair' : 'Poor'}
+          </Text>
         </View>
       )}
       <View style={styles.verificationsSection}>
@@ -78,10 +103,12 @@ function DetailedScore({
         {(['selfie', 'age', 'height'] as const).map((type) => {
           const verified = type === 'selfie' ? selfieVerified : type === 'age' ? ageVerified : heightVerified;
           const label    = type === 'selfie' ? 'Identity' : type === 'age' ? 'Age' : 'Height';
+          const dotStyle = [styles.verificationDot, verified && styles.verificationDotActive];
+          const txtStyle = [styles.verificationText, verified && styles.verificationTextActive];
           return (
             <View key={type} style={styles.verificationRow}>
-              <View style={[styles.verificationDot, verified && styles.verificationDotActive]} />
-              <Text style={[styles.verificationText, verified && styles.verificationTextActive]}>{label} {verified ? '✓' : '✗'}</Text>
+              <View style={dotStyle} />
+              <Text style={txtStyle}>{label} {verified ? '✓' : '✗'}</Text>
             </View>
           );
         })}
@@ -105,18 +132,37 @@ function DetailedScore({
   );
 }
 
-function TrustModal({ visible, onClose, ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore }: {
+function TrustModal({
+  visible, onClose, ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore,
+}: {
   visible: boolean; onClose: () => void; ratings: Ratings;
   selfieVerified: boolean; ageVerified: boolean; heightVerified: boolean;
   trustLevel: TrustLevel; trustScore: number;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close trust score modal">
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+        accessibilityLabel="Close trust score modal"
+      >
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Trust Score</Text>
-          <DetailedScore ratings={ratings} selfieVerified={selfieVerified} ageVerified={ageVerified} heightVerified={heightVerified} trustLevel={trustLevel} trustScore={trustScore} />
-          <TouchableOpacity style={styles.modalClose} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button">
+          <DetailedScore
+            ratings={ratings}
+            selfieVerified={selfieVerified}
+            ageVerified={ageVerified}
+            heightVerified={heightVerified}
+            trustLevel={trustLevel}
+            trustScore={trustScore}
+          />
+          <TouchableOpacity
+            style={styles.modalClose}
+            onPress={onClose}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+          >
             <Text style={styles.modalCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -125,16 +171,40 @@ function TrustModal({ visible, onClose, ratings, selfieVerified, ageVerified, he
   );
 }
 
-export default function TrustScoreDisplay({ ratings, selfieVerified = false, ageVerified = false, heightVerified = false, size = 'medium' }: TrustScoreDisplayProps) {
+export default function TrustScoreDisplay({
+  ratings, selfieVerified = false, ageVerified = false,
+  heightVerified = false, size = 'medium',
+}: TrustScoreDisplayProps) {
   const [showModal, setShowModal] = useState(false);
   const trustLevel = getUserTrustLevel(ratings) as TrustLevel;
   const trustScore = calculateDisplayScore(ratings);
   const verCount   = [selfieVerified, ageVerified, heightVerified].filter(Boolean).length;
-  const modalProps = { visible: showModal, onClose: () => setShowModal(false), ratings, selfieVerified, ageVerified, heightVerified, trustLevel, trustScore };
+
+  const onOpen  = useCallback(() => setShowModal(true),  []);
+  const onClose = useCallback(() => setShowModal(false), []);
+
+  const modalProps = {
+    visible: showModal, onClose, ratings,
+    selfieVerified, ageVerified, heightVerified, trustLevel, trustScore,
+  };
+
+  const smallBadgeStyle  = useMemo(
+    () => [styles.smallBadge, { backgroundColor: trustLevel.color }],
+    [trustLevel.color],
+  );
+  const mediumBadgeStyle = useMemo(
+    () => [styles.mediumBadge, { backgroundColor: trustLevel.color }],
+    [trustLevel.color],
+  );
 
   if (size === 'small') {
     return (
-      <TouchableOpacity style={[styles.smallBadge, { backgroundColor: trustLevel.color }]} onPress={() = accessibilityLabel="button"> setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}`} accessibilityRole="button">
+      <TouchableOpacity
+        style={smallBadgeStyle}
+        onPress={onOpen}
+        accessibilityLabel={`Trust level: ${trustLevel.label}`}
+        accessibilityRole="button"
+      >
         <Text style={styles.smallBadgeText}>{trustLevel.label}</Text>
         <TrustModal {...modalProps} />
       </TouchableOpacity>
@@ -143,9 +213,14 @@ export default function TrustScoreDisplay({ ratings, selfieVerified = false, age
 
   if (size === 'medium') {
     return (
-      <TouchableOpacity style={styles.mediumContainer} onPress={() = accessibilityLabel="button"> setShowModal(true)} accessibilityLabel={`Trust level: ${trustLevel.label}, score: ${trustScore}%`} accessibilityRole="button">
+      <TouchableOpacity
+        style={styles.mediumContainer}
+        onPress={onOpen}
+        accessibilityLabel={`Trust level: ${trustLevel.label}, score: ${trustScore}%`}
+        accessibilityRole="button"
+      >
         <View style={styles.mediumRow}>
-          <View style={[styles.mediumBadge, { backgroundColor: trustLevel.color }]}>
+          <View style={mediumBadgeStyle}>
             <Text style={styles.mediumBadgeText}>{trustLevel.label}</Text>
           </View>
           {trustScore > 0 && <Text style={styles.mediumScore}>{trustScore}%</Text>}
@@ -158,7 +233,14 @@ export default function TrustScoreDisplay({ ratings, selfieVerified = false, age
 
   return (
     <View style={styles.largeContainer}>
-      <DetailedScore ratings={ratings} selfieVerified={selfieVerified} ageVerified={ageVerified} heightVerified={heightVerified} trustLevel={trustLevel} trustScore={trustScore} />
+      <DetailedScore
+        ratings={ratings}
+        selfieVerified={selfieVerified}
+        ageVerified={ageVerified}
+        heightVerified={heightVerified}
+        trustLevel={trustLevel}
+        trustScore={trustScore}
+      />
     </View>
   );
 }

@@ -1,14 +1,19 @@
-import type { LegendListRenderItemProps } from '@legendapp/list';
-import { LegendList } from '@legendapp/list';
-import * as Sentry from '@sentry/react-native';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import {
-  AccessibilityInfo, ActivityIndicator,
-  InteractionManager, LayoutAnimation, Platform, Pressable,
-  StyleSheet, Text, UIManager, View, useWindowDimensions,
+  AccessibilityInfo,
+  ActivityIndicator,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../firebaseConfig';
@@ -23,6 +28,13 @@ if (Platform.OS === 'android') {
 const STORAGE_KEY_ONBOARDING = 'onboarding.hasSeenOnboarding';
 const STORAGE_KEY_LANGUAGE   = 'app.language';
 const AUTH_TIMEOUT_MS        = 10_000;
+
+const ROUTES = {
+  login:   '/login',
+  signup:  '/signup',
+  terms:   '/terms',
+  privacy: '/privacy',
+} as const;
 
 const COLORS = {
   background:     '#1a1a2e',
@@ -52,31 +64,47 @@ interface OnboardingSlide {
 }
 
 const SLIDES: readonly OnboardingSlide[] = [
-  { id: '1', icon: '💕', iconLabel: 'Two hearts',  titleKey: 'onboardingTitle1', descriptionKey: 'onboardingDesc1', backgroundColor: COLORS.background     },
-  { id: '2', icon: '🧠', iconLabel: 'Brain',       titleKey: 'onboardingTitle2', descriptionKey: 'onboardingDesc2', backgroundColor: COLORS.backgroundAlt  },
-  { id: '3', icon: '🆓', iconLabel: 'Free label',  titleKey: 'onboardingTitle3', descriptionKey: 'onboardingDesc3', backgroundColor: COLORS.backgroundDeep },
-] as const;
+  { id: '1', icon: '💕', iconLabel: 'Two hearts', titleKey: 'onboardingTitle1', descriptionKey: 'onboardingDesc1', backgroundColor: COLORS.background     },
+  { id: '2', icon: '🧠', iconLabel: 'Brain',      titleKey: 'onboardingTitle2', descriptionKey: 'onboardingDesc2', backgroundColor: COLORS.backgroundAlt  },
+  { id: '3', icon: '🆓', iconLabel: 'Free label', titleKey: 'onboardingTitle3', descriptionKey: 'onboardingDesc3', backgroundColor: COLORS.backgroundDeep },
+];
 
 const SLIDES_COUNT = SLIDES.length;
 const LAST_INDEX   = SLIDES_COUNT - 1;
-const DOT_INDICES  = Array.from({ length: SLIDES_COUNT }, (_, i) => i);
 
 type Lang = Parameters<typeof getTranslation>[0];
-const markOnboardingSeen = () => appStorage.set(STORAGE_KEY_ONBOARDING, true);
-const getStoredLanguage  = (): Lang => (appStorage.getString(STORAGE_KEY_LANGUAGE) ?? 'en') as Lang;
 
-interface LoadingScreenProps { message?: string; timedOut?: boolean; onRetry?: () => void; }
+const markOnboardingSeen = () => appStorage.set(STORAGE_KEY_ONBOARDING, true);
+
+function readStoredLanguage(): Lang {
+  return (appStorage.getString(STORAGE_KEY_LANGUAGE) ?? 'en') as Lang;
+}
+
+const pressableStyle = (base: object) => ({ pressed }: { pressed: boolean }) => [
+  base,
+  pressed && styles.buttonPressed,
+];
+
+interface LoadingScreenProps {
+  message?:  string;
+  timedOut?: boolean;
+  onRetry?:  () => void;
+}
 
 const LoadingScreen = React.memo<LoadingScreenProps>(({ message, timedOut = false, onRetry }) => (
-  <View style={styles.loadingContainer} accessible accessibilityLabel={message ?? 'Loading MyArchetype'}>
+  <View style={styles.loadingContainer} accessible accessibilityLabel={message ?? 'Loading MyArchetype'} testID="loading-screen">
     <Text style={styles.logo}>MyArchetype</Text>
     <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
     {message ? <Text style={styles.loadingMessage}>{message}</Text> : null}
     {timedOut && onRetry ? (
       <Pressable
-        style={styles.retryButton} onPress={onRetry}
-        accessibilityRole="button" accessibilityLabel="Retry connection"
-        accessibilityHint="Attempts to reconnect to the server">
+        style={styles.retryButton}
+        onPress={onRetry}
+        accessibilityRole="button"
+        accessibilityLabel="Retry connection"
+        accessibilityHint="Attempts to reconnect to the server"
+        testID="retry-button"
+      >
         <Text style={styles.retryButtonText}>Tap to retry</Text>
       </Pressable>
     ) : null}
@@ -85,37 +113,37 @@ const LoadingScreen = React.memo<LoadingScreenProps>(({ message, timedOut = fals
 LoadingScreen.displayName = 'LoadingScreen';
 
 interface SlideProps {
-  item: OnboardingSlide;
+  item:        OnboardingSlide;
   screenWidth: number;
-  title: string;
+  title:       string;
   description: string;
 }
 
-const Slide = React.memo<SlideProps>(({ item, screenWidth, title, description }) => (
-  <View
-    style={[styles.slide, { width: screenWidth, backgroundColor: item.backgroundColor }]}
-    accessible
-    accessibilityLabel={`${title}. ${description}`}
-  >
-    <Text style={styles.slideIcon} accessible accessibilityLabel={item.iconLabel}>
-      {item.icon}
-    </Text>
-    <Text style={styles.slideTitle}>{title}</Text>
-    <Text style={styles.slideDescription}>{description}</Text>
-  </View>
-));
+const Slide = React.memo<SlideProps>(({ item, screenWidth, title, description }) => {
+  const slideStyle = useMemo(
+    () => [styles.slide, { width: screenWidth, backgroundColor: item.backgroundColor }],
+    [screenWidth, item.backgroundColor],
+  );
+  return (
+    <View style={slideStyle} accessible accessibilityLabel={`${title}. ${description}`} testID={`onboarding-slide-${item.id}`}>
+      <Text style={styles.slideIcon}>{item.icon}</Text>
+      <Text style={styles.slideTitle}>{title}</Text>
+      <Text style={styles.slideDescription}>{description}</Text>
+    </View>
+  );
+});
 Slide.displayName = 'Slide';
 
-const PaginationDots = React.memo<{ total: number; currentIndex: number }>(
-  ({ total, currentIndex }) => (
+const PaginationDots = React.memo<{ currentIndex: number }>(
+  ({ currentIndex }) => (
     <View
       style={styles.dotsContainer}
       accessible
-      accessibilityLabel={`Slide ${currentIndex + 1} of ${total}`}
-      accessibilityRole="none"
+      accessibilityLabel={`Slide ${currentIndex + 1} of ${SLIDES_COUNT}`}
+      testID="pagination-dots"
     >
-      {DOT_INDICES.map((i) => (
-        <View key={i} style={[styles.dot, currentIndex === i && styles.dotActive]} />
+      {SLIDES.map((_, i) => (
+        <View key={i} style={[styles.dot, currentIndex === i && styles.dotActive]} testID={`pagination-dot-${i}`} />
       ))}
     </View>
   ),
@@ -126,7 +154,8 @@ export default function WelcomeScreen() {
   const router                 = useRouter();
   const insets                 = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const t = useMemo(() => getTranslation(getStoredLanguage()), []);
+
+  const t = useMemo(() => getTranslation(readStoredLanguage()), []);
 
   const [loading,        setLoading]        = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -134,18 +163,16 @@ export default function WelcomeScreen() {
   const [timedOut,       setTimedOut]       = useState(false);
   const [reduceMotion,   setReduceMotion]   = useState(false);
 
-  const listRef        = useRef<any>(null);
-  const isMounted      = useRef(true);
+  const scrollRef      = useRef<ScrollView | null>(null);
   const unsubscribeRef = useRef<(() => void) | undefined>(undefined);
   const timeoutRef     = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((v) => {
-      if (active) setReduceMotion(v);
-    }, []);
-  // FIXME: add removeEventListener cleanup for the listener below
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(v => { if (active) setReduceMotion(v); })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', v => {
       if (active) setReduceMotion(v);
     });
     return () => {
@@ -155,52 +182,46 @@ export default function WelcomeScreen() {
   }, []);
 
   const runAuthCheck = useCallback(() => {
-    if (isMounted.current) { setTimedOut(false); setLoading(true); }
+    unsubscribeRef.current?.();
+    clearTimeout(timeoutRef.current);
+
+    setTimedOut(false);
+    setLoading(true);
 
     try {
       const hasSeenOnboarding = appStorage.getBoolean(STORAGE_KEY_ONBOARDING) === true;
 
       timeoutRef.current = setTimeout(() => {
-        if (!isMounted.current) return;
         unsubscribeRef.current?.();
         setTimedOut(true);
         setShowOnboarding(true);
         setLoading(false);
       }, AUTH_TIMEOUT_MS);
 
-      const task = InteractionManager.runAfterInteractions(() => {
-        if (!isMounted.current) return;
-        unsubscribeRef.current = onAuthStateChanged(auth, (user) => {
-          clearTimeout(timeoutRef.current);
-          if (!isMounted.current) return;
-
-          if (user) {
-            setLoading(false);
-          } else if (hasSeenOnboarding) {
-            router.replace('/login');
-          } else {
-            setShowOnboarding(true);
-            setLoading(false);
-          }
-        });
+      unsubscribeRef.current = onAuthStateChanged(auth, user => {
+        clearTimeout(timeoutRef.current);
+        if (user) {
+          setLoading(false);
+        } else if (hasSeenOnboarding) {
+          router.replace(ROUTES.login);
+        } else {
+          setShowOnboarding(true);
+          setLoading(false);
+        }
       });
-
-      return () => task.cancel();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('[WelcomeScreen] runAuthCheck error:', error);
       clearTimeout(timeoutRef.current);
-      if (isMounted.current) { setShowOnboarding(true); setLoading(false); }
+      setShowOnboarding(true);
+      setLoading(false);
     }
   }, [router]);
 
   useEffect(() => {
-    isMounted.current = true;
-    const cancel = runAuthCheck();
+    runAuthCheck();
     return () => {
-      isMounted.current = false;
       unsubscribeRef.current?.();
       clearTimeout(timeoutRef.current);
-      cancel?.();
     };
   }, [runAuthCheck]);
 
@@ -212,16 +233,16 @@ export default function WelcomeScreen() {
   const handleNext = useCallback(() => {
     const next = currentIndex + 1;
     if (next < SLIDES_COUNT) {
-      listRef.current?.scrollToIndex({ index: next, animated: !reduceMotion });
+      scrollRef.current?.scrollTo({ x: next * screenWidth, animated: !reduceMotion });
       updateIndex(next);
     }
-  }, [currentIndex, reduceMotion, updateIndex]);
+  }, [currentIndex, reduceMotion, screenWidth, updateIndex]);
 
-  const handleSkip       = useCallback(() => { markOnboardingSeen(); router.replace('/login');  }, [router]);
-  const handleGetStarted = useCallback(() => { markOnboardingSeen(); router.replace('/signup'); }, [router]);
-  const handleLoginPress = useCallback(() => { router.push('/login');   }, [router]);
-  const handleTermsPress = useCallback(() => { router.push('/terms');   }, [router]);
-  const handlePrivacyPress = useCallback(() => { router.push('/privacy'); }, [router]);
+  const handleSkip         = useCallback(() => { markOnboardingSeen(); router.replace(ROUTES.login);  }, [router]);
+  const handleGetStarted   = useCallback(() => { markOnboardingSeen(); router.replace(ROUTES.signup); }, [router]);
+  const handleLoginPress   = useCallback(() => { router.push(ROUTES.login);   }, [router]);
+  const handleTermsPress   = useCallback(() => { router.push(ROUTES.terms);   }, [router]);
+  const handlePrivacyPress = useCallback(() => { router.push(ROUTES.privacy); }, [router]);
 
   const handleMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -230,20 +251,6 @@ export default function WelcomeScreen() {
     },
     [screenWidth, currentIndex, updateIndex],
   );
-
-  const renderSlide = useCallback(
-    ({ item }: LegendListRenderItemProps<OnboardingSlide>) => (
-      <Slide
-        item={item}
-        screenWidth={screenWidth}
-        title={t[item.titleKey]}
-        description={t[item.descriptionKey]}
-      />
-    ),
-    [screenWidth, t],
-  );
-
-  const keyExtractor = useCallback((item: OnboardingSlide) => item.id, []);
 
   const containerStyle = useMemo(
     () => [styles.container, { paddingTop: insets.top }],
@@ -280,19 +287,8 @@ export default function WelcomeScreen() {
 
   return (
     <View style={containerStyle}>
-      {/*
-        LegendList replaces FlatList.
-        - Horizontal paging onboarding: only 3 items — recycleItems intentionally
-          omitted because recycling 3 items adds overhead with no benefit.
-        - estimatedItemSize = screenWidth because all slides are full-width.
-        - onMomentumScrollEnd tracks the current page index.
-      */}
-      <LegendList<OnboardingSlide>
-        ref={listRef}
-        data={SLIDES as OnboardingSlide[]}
-        renderItem={renderSlide}
-        keyExtractor={keyExtractor}
-        estimatedItemSize={screenWidth}
+      <ScrollView
+        ref={scrollRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -300,38 +296,51 @@ export default function WelcomeScreen() {
         scrollEventThrottle={16}
         decelerationRate="fast"
         accessibilityLabel="Onboarding slides"
-      />
+      >
+        {SLIDES.map(item => (
+          <Slide
+            key={item.id}
+            item={item}
+            screenWidth={screenWidth}
+            title={t[item.titleKey]}
+            description={t[item.descriptionKey]}
+          />
+        ))}
+      </ScrollView>
 
-      <PaginationDots total={SLIDES_COUNT} currentIndex={currentIndex} />
+      <PaginationDots currentIndex={currentIndex} />
 
       <View style={buttonsContainerStyle}>
         {isLastSlide ? (
           <Pressable
-            style={({ pressed }) = accessibilityLabel="button"> [styles.getStartedButton, pressed && styles.buttonPressed]}
+            style={pressableStyle(styles.getStartedButton)}
             onPress={handleGetStarted}
             accessibilityRole="button"
             accessibilityLabel={t.getStarted}
             accessibilityHint="Takes you to the sign-up screen"
+            testID="get-started-button"
           >
             <Text style={styles.getStartedButtonText}>{t.getStarted} 🚀</Text>
           </Pressable>
         ) : (
           <>
             <Pressable
-              style={({ pressed }) = accessibilityLabel="button"> [styles.skipButton, pressed && styles.buttonPressed]}
+              style={pressableStyle(styles.skipButton)}
               onPress={handleSkip}
               accessibilityRole="button"
               accessibilityLabel={t.skip}
               accessibilityHint="Skips onboarding and takes you to the login screen"
+              testID="skip-button"
             >
               <Text style={styles.skipButtonText}>{t.skip}</Text>
             </Pressable>
             <Pressable
-              style={({ pressed }) = accessibilityLabel="button"> [styles.nextButton, pressed && styles.buttonPressed]}
+              style={pressableStyle(styles.nextButton)}
               onPress={handleNext}
               accessibilityRole="button"
               accessibilityLabel={t.next}
               accessibilityHint={`Goes to slide ${currentIndex + 2} of ${SLIDES_COUNT}`}
+              testID="next-button"
             >
               <Text style={styles.nextButtonText}>{t.next} →</Text>
             </Pressable>
@@ -378,12 +387,6 @@ export default function WelcomeScreen() {
     </View>
   );
 }
-
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  enableNative: true,
-  tracesSampleRate: 0.2,
-});
 
 const styles = StyleSheet.create({
   container:            { flex: 1, backgroundColor: COLORS.background },

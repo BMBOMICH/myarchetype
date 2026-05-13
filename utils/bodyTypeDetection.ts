@@ -25,7 +25,6 @@ export interface BodyTypeDetectionResult {
   feedback?: string;
 }
 
-
 function analyzeFaceRatio(
   imageWidth: number,
   imageHeight: number,
@@ -85,7 +84,6 @@ function analyzeFaceRatio(
     feedback: 'This appears to be a close-up or headshot. Please upload a full-body photo.',
   };
 }
-
 
 /**
  * Use this when you already have Cloudinary face data from the upload.

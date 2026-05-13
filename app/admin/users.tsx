@@ -1,49 +1,180 @@
-import { LegendList, LegendListRenderItemProps } from '@legendapp/list';
+import type { LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList } from '@legendapp/list';
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert,
   RefreshControl, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../../firebaseConfig';
 import { logger } from '../../utils/logger';
 
-const scheduleIdleTask = (cb: () => void): (() => void) => {
-  if (typeof requestIdleCallback === 'function') {
-    const id = requestIdleCallback(cb);
-    return () => cancelIdleCallback(id);
-  }
-  const id = setTimeout(cb, 100);
-  return () => clearTimeout(id);
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface User {
-  uid: string; name: string; email: string; age: number; gender: string;
-  photos?: string[]; selfieVerified?: boolean; isBanned?: boolean;
-  isAdmin?: boolean; warnings?: number; createdAt: string;
+  uid:            string;
+  name:           string;
+  email:          string;
+  age:            number;
+  gender:         string;
+  photos?:        string[];
+  selfieVerified?: boolean;
+  isBanned?:      boolean;
+  isAdmin?:       boolean;
+  warnings?:      number;
+  createdAt:      string;
 }
+
 type FilterType = 'all' | 'verified' | 'unverified' | 'banned';
 
+// ─── User card sub-component ──────────────────────────────────────────────────
+
+interface UserCardProps {
+  item:        User;
+  onBan:       (user: User) => void;
+  onVerify:    (user: User) => void;
+  onMakeAdmin: (user: User) => void;
+}
+
+const UserCard = React.memo<UserCardProps>(({ item, onBan, onVerify, onMakeAdmin }) => {
+  const cardStyle = useMemo(
+    () => [styles.userCard, item.isBanned && styles.userCardBanned],
+    [item.isBanned],
+  );
+  const handleBan       = useCallback(() => onBan(item),       [onBan, item]);
+  const handleVerify    = useCallback(() => onVerify(item),    [onVerify, item]);
+  const handleMakeAdmin = useCallback(() => onMakeAdmin(item), [onMakeAdmin, item]);
+
+  return (
+    <View
+      style={cardStyle}
+      accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}
+    >
+      <View style={styles.userHeader}>
+        {item.photos && item.photos.length > 0 ? (
+          <TurboImage
+            source={{ uri: item.photos[0]! }}
+            style={styles.userPhoto}
+            cachePolicy="dataCache"
+            accessibilityLabel={`Photo of ${item.name}`}
+          />
+        ) : (
+          <View
+            style={styles.userPhotoPlaceholder}
+            accessibilityLabel={`No photo for ${item.name}`}
+          >
+            <Text style={styles.userPhotoText}>?</Text>
+          </View>
+        )}
+        <View style={styles.userInfo}>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName}>{item.name}</Text>
+            {item.selfieVerified && (
+              <Text style={styles.verifiedBadge} accessibilityLabel="Verified">✓</Text>
+            )}
+            {item.isAdmin  && <Text style={styles.adminBadge}>Admin</Text>}
+            {item.isBanned && <Text style={styles.bannedBadge}>Banned</Text>}
+          </View>
+          <Text style={styles.userEmail}>{item.email}</Text>
+          <Text style={styles.userDetails}>
+            {item.age} y/o {item.gender}{item.warnings ? ` • ${item.warnings} warnings` : ''}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.userActions}>
+        {!item.selfieVerified && (
+          <TouchableOpacity
+            style={styles.verifyButton}
+            onPress={handleVerify}
+            accessibilityLabel={`Verify ${item.name}`}
+            accessibilityRole="button"
+          >
+            <Text style={styles.verifyButtonText}>Verify</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={item.isBanned ? styles.unbanButton : styles.banButton}
+          onPress={handleBan}
+          accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`}
+          accessibilityRole="button"
+        >
+          <Text style={styles.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.adminButton}
+          onPress={handleMakeAdmin}
+          accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`}
+          accessibilityRole="button"
+        >
+          <Text style={styles.adminButtonText}>
+            {item.isAdmin ? 'Remove Admin' : 'Make Admin'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+UserCard.displayName = 'UserCard';
+
+// ─── Filter tab sub-component ─────────────────────────────────────────────────
+
+interface FilterTabProps {
+  label:   string;
+  value:   FilterType;
+  current: FilterType;
+  onPress: (f: FilterType) => void;
+}
+
+const FilterTab = React.memo<FilterTabProps>(({ label, value, current, onPress }) => {
+  const isActive  = current === value;
+  const tabStyle  = useMemo(() => [styles.filterTab,     isActive && styles.filterTabActive],     [isActive]);
+  const textStyle = useMemo(() => [styles.filterTabText, isActive && styles.filterTabTextActive], [isActive]);
+  const handlePress = useCallback(() => onPress(value), [onPress, value]);
+  return (
+    <TouchableOpacity
+      style={tabStyle}
+      onPress={handlePress}
+      accessibilityLabel={`Filter by ${label}`}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+    >
+      <Text style={textStyle}>{label}</Text>
+    </TouchableOpacity>
+  );
+});
+FilterTab.displayName = 'FilterTab';
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function AdminUsersScreen() {
-  const router = useRouter();
-  const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [isAdmin, setIsAdmin]         = useState(false);
-  const [users, setUsers]             = useState<User[]>([]);
-  const [filteredUsers, setFiltered]  = useState<User[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter]           = useState<FilterType>('all');
+  const router    = useRouter();
+  const isMounted = useRef(true);
+
+  const [loading,     setLoading]    = useState(true);
+  const [refreshing,  setRefreshing] = useState(false);
+  const [isAdmin,     setIsAdmin]    = useState(false);
+  const [users,       setUsers]      = useState<User[]>([]);
+  const [searchQuery, setSearch]     = useState('');
+  const [filter,      setFilter]     = useState<FilterType>('all');
+
+  useEffect(() => () => { isMounted.current = false; }, []);
+
+  // ── Admin check ─────────────────────────────────────────────────────────────
 
   const checkAdmin = useCallback(async () => {
     try {
       const user = auth.currentUser;
       if (!user) { router.replace('/login'); return; }
       const snap = await getDoc(doc(db, 'users', user.uid));
-      if (!snap.exists() || !(snap.data().isAdmin as boolean | undefined)) { router.replace('/home'); return; }
-      setIsAdmin(true);
+      if (!snap.exists() || !(snap.data().isAdmin as boolean | undefined)) {
+        router.replace('/home');
+        return;
+      }
+      if (isMounted.current) setIsAdmin(true);
     } catch (error) {
       logger.error('[AdminUsers] admin check failed:', error);
       router.replace('/home');
@@ -51,6 +182,8 @@ export default function AdminUsersScreen() {
   }, [router]);
 
   useEffect(() => { void checkAdmin(); }, [checkAdmin]);
+
+  // ── Load users ──────────────────────────────────────────────────────────────
 
   const loadUsers = useCallback(async () => {
     try {
@@ -63,51 +196,56 @@ export default function AdminUsersScreen() {
           email:          String(data.email     ?? ''),
           age:            Number(data.age       ?? 0),
           gender:         String(data.gender    ?? ''),
-          photos:         data.photos           as string[] ?? [],
-          selfieVerified: data.selfieVerified   as boolean  ?? false,
-          isBanned:       data.isBanned         as boolean  ?? false,
-          isAdmin:        data.isAdmin          as boolean  ?? false,
-          warnings:       data.warnings         as number   ?? 0,
+          photos:         (data.photos          as string[]) ?? [],
+          selfieVerified: (data.selfieVerified  as boolean)  ?? false,
+          isBanned:       (data.isBanned        as boolean)  ?? false,
+          isAdmin:        (data.isAdmin         as boolean)  ?? false,
+          warnings:       (data.warnings        as number)   ?? 0,
           createdAt:      String(data.createdAt ?? ''),
         };
       });
 
-      scheduleIdleTask(() => {
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setUsers(list);
-      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (isMounted.current) setUsers(list);
     } catch (error) {
       logger.error('[AdminUsers] loadUsers error:', error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => { if (isAdmin) void loadUsers(); }, [isAdmin, loadUsers]);
 
-  useEffect(() => {
-    return scheduleIdleTask(() => {
-      let result = [...users];
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        result = result.filter(
-          u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
-        );
-      }
-      switch (filter) {
-        case 'verified':   result = result.filter(u => u.selfieVerified);  break;
-        case 'unverified': result = result.filter(u => !u.selfieVerified); break;
-        case 'banned':     result = result.filter(u => u.isBanned);        break;
-      }
-      setFiltered(result);
-    });
+  // ── Filter / search — derived synchronously, no extra state needed ──────────
+
+  const filteredUsers = useMemo(() => {
+    let result = [...users];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result  = result.filter(
+        u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
+      );
+    }
+    switch (filter) {
+      case 'verified':   return result.filter(u => u.selfieVerified);
+      case 'unverified': return result.filter(u => !u.selfieVerified);
+      case 'banned':     return result.filter(u => u.isBanned);
+      default:           return result;
+    }
   }, [users, searchQuery, filter]);
 
-  const handleRefresh = useCallback(() => { setRefreshing(true); void loadUsers(); }, [loadUsers]);
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    void loadUsers();
+  }, [loadUsers]);
+
+  // ── User actions ────────────────────────────────────────────────────────────
 
   const handleBan = useCallback((user: User) => {
-    const label = user.isBanned ? 'Unban' : 'Ban';
+    const label     = user.isBanned ? 'Unban' : 'Ban';
     const onConfirm = async () => {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
@@ -131,7 +269,9 @@ export default function AdminUsersScreen() {
     const onConfirm = async () => {
       try {
         await updateDoc(doc(db, 'users', user.uid), {
-          selfieVerified: true, selfieVerifiedAt: new Date().toISOString(), manuallyVerified: true,
+          selfieVerified:    true,
+          selfieVerifiedAt:  new Date().toISOString(),
+          manuallyVerified:  true,
         });
         Alert.alert('Done', `${user.name} has been verified`);
         void loadUsers();
@@ -148,11 +288,14 @@ export default function AdminUsersScreen() {
   }, [loadUsers]);
 
   const handleMakeAdmin = useCallback((user: User) => {
-    const label = user.isAdmin ? 'Remove Admin' : 'Make Admin';
+    const label     = user.isAdmin ? 'Remove Admin' : 'Make Admin';
     const onConfirm = async () => {
       try {
         await updateDoc(doc(db, 'users', user.uid), { isAdmin: !user.isAdmin });
-        Alert.alert('Done', `${user.name} ${user.isAdmin ? 'is no longer an admin' : 'is now an admin'}`);
+        Alert.alert(
+          'Done',
+          user.isAdmin ? `${user.name} is no longer an admin` : `${user.name} is now an admin`,
+        );
         void loadUsers();
       } catch (error) {
         logger.error('[AdminUsers] makeAdmin error:', error);
@@ -162,79 +305,29 @@ export default function AdminUsersScreen() {
     Alert.alert(
       label,
       user.isAdmin ? `Remove admin from ${user.name}?` : `Make ${user.name} an admin?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: label, onPress: onConfirm },
-      ],
+      [{ text: 'Cancel', style: 'cancel' }, { text: label, onPress: onConfirm }],
     );
   }, [loadUsers]);
 
-  const renderItem = useCallback(({ item }: LegendListRenderItemProps<User>) => (
-    <View
-      style={[styles.userCard, item.isBanned && styles.userCardBanned]}
-      accessibilityLabel={`User: ${item.name}, ${item.age} years old, ${item.gender}${item.isBanned ? ', banned' : ''}${item.selfieVerified ? ', verified' : ''}`}
-    >
-      <View style={styles.userHeader}>
-        {item.photos && item.photos.length > 0 ? (
-          <TurboImage
-            source={{ uri: item.photos[0]! }}
-            style={styles.userPhoto}
-            cachePolicy="dataCache"
-            accessibilityLabel={`Photo of ${item.name}`}
-          />
-        ) : (
-          <View style={styles.userPhotoPlaceholder} accessibilityLabel={`No photo for ${item.name}`}>
-            <Text style={styles.userPhotoText}>?</Text>
-          </View>
-        )}
-        <View style={styles.userInfo}>
-          <View style={styles.userNameRow}>
-            <Text style={styles.userName}>{item.name}</Text>
-            {item.selfieVerified && (
-              <Text style={styles.verifiedBadge} accessibilityLabel="Verified">✓</Text>
-            )}
-            {item.isAdmin && <Text style={styles.adminBadge}>Admin</Text>}
-            {item.isBanned && <Text style={styles.bannedBadge}>Banned</Text>}
-          </View>
-          <Text style={styles.userEmail}>{item.email}</Text>
-          <Text style={styles.userDetails}>
-            {item.age} y/o {item.gender}{item.warnings ? ` • ${item.warnings} warnings` : ''}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.userActions}>
-        {!item.selfieVerified && (
-          <TouchableOpacity
-            style={styles.verifyButton}
-            onPress={() = accessibilityLabel="button"> handleVerify(item)}
-            accessibilityLabel={`Verify ${item.name}`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.verifyButtonText}>Verify</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={item.isBanned ? styles.unbanButton : styles.banButton}
-          onPress={() = accessibilityLabel="button"> handleBan(item)}
-          accessibilityLabel={`${item.isBanned ? 'Unban' : 'Ban'} ${item.name}`}
-          accessibilityRole="button"
-        >
-          <Text style={styles.banButtonText}>{item.isBanned ? 'Unban' : 'Ban'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.adminButton}
-          onPress={() = accessibilityLabel="button"> handleMakeAdmin(item)}
-          accessibilityLabel={`${item.isAdmin ? 'Remove admin from' : 'Make admin'} ${item.name}`}
-          accessibilityRole="button"
-        >
-          <Text style={styles.adminButtonText}>{item.isAdmin ? 'Remove Admin' : 'Make Admin'}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [handleBan, handleVerify, handleMakeAdmin]);
+  // ── List helpers ────────────────────────────────────────────────────────────
 
   const keyExtractor = useCallback((item: User) => item.uid, []);
-  const handleFilter = useCallback((f: FilterType) => () => setFilter(f), []);
+
+  const renderItem = useCallback(
+    ({ item }: LegendListRenderItemProps<User>) => (
+      <UserCard
+        item={item}
+        onBan={handleBan}
+        onVerify={handleVerify}
+        onMakeAdmin={handleMakeAdmin}
+      />
+    ),
+    [handleBan, handleVerify, handleMakeAdmin],
+  );
+
+  const handleSetFilter = useCallback((f: FilterType) => setFilter(f), []);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   if (!isAdmin || loading) {
     return (
@@ -251,41 +344,40 @@ export default function AdminUsersScreen() {
     <View style={styles.container}>
       <Text style={styles.title} accessibilityRole="header">Manage Users</Text>
       <Text style={styles.subtitle}>{users.length} total users</Text>
+
       <TextInput
         style={styles.searchInput}
         placeholder="Search by name or email..."
         placeholderTextColor="#666"
         value={searchQuery}
-        onChangeText={setSearchQuery}
+        onChangeText={setSearch}
         accessibilityLabel="Search users"
         autoCapitalize="none"
         autoCorrect={false}
       />
+
       <View style={styles.filterTabs} accessibilityRole="tablist">
-        {(['all', 'verified', 'unverified', 'banned'] as const).map((f) => (
-          <TouchableOpacity
+        {(['all', 'verified', 'unverified', 'banned'] as const).map(f => (
+          <FilterTab
             key={f}
-            style={[styles.filterTab, filter === f && styles.filterTabActive]}
-            onPress={handleFilter(f)}
-            accessibilityLabel={`Filter by ${f}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: filter === f }}
-          >
-            <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </Text>
-          </TouchableOpacity>
+            label={f.charAt(0).toUpperCase() + f.slice(1)}
+            value={f}
+            current={filter}
+            onPress={handleSetFilter}
+          />
         ))}
       </View>
+
       <Text style={styles.resultsCount} accessibilityLiveRegion="polite">
         Showing {filteredUsers.length} of {users.length} users
       </Text>
+
       <LegendList
         data={filteredUsers}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         estimatedItemSize={140}
-        recycleItems={true}
+        recycleItems
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -302,6 +394,8 @@ export default function AdminUsersScreen() {
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create((theme) => ({
   container:            { flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: 60 },

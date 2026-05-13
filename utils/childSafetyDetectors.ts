@@ -20,19 +20,19 @@ export function detectMinorTargeting(msgs: Array<{text:string;senderId:string}>,
 
 export interface AgeEstimationResult { estimatedAgeRange:[number,number]; possiblyMinor:boolean; confidence:number; requiresManualReview:boolean; }
 export async function estimateAgeFromPhoto(uri:string):Promise<AgeEstimationResult>{
-  try{const r=await fetchSafe(`${process.env.EXPO_PUBLIC_API_URL}/safety/age-estimate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();const a=d.age??25,c=d.confidence??0.5;return{estimatedAgeRange:[Math.max(0,a-3),a+3],possiblyMinor:a<21,confidence:c,requiresManualReview:a<21||(a<25&&c<0.7)};}}catch(e){logger.error('[AgeEstimate]',e);}
+  try{const r=await fetchSafe(`${process.env['EXPO_PUBLIC_API_URL']}/safety/age-estimate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();const a=d.age??25,c=d.confidence??0.5;return{estimatedAgeRange:[Math.max(0,a-3),a+3],possiblyMinor:a<21,confidence:c,requiresManualReview:a<21||(a<25&&c<0.7)};}}catch(e){logger.error('[AgeEstimate]',e);}
   return{estimatedAgeRange:[18,35],possiblyMinor:false,confidence:0,requiresManualReview:true};
 }
 
 export interface ChildPhotoResult { childDetected:boolean; confidence:number; profilePhotoRisk:boolean; action:'none'|'blur'|'remove'|'manual_review'; }
 export async function detectChildInPhoto(uri:string):Promise<ChildPhotoResult>{
-  try{const r=await fetchSafe(`${process.env.EXPO_PUBLIC_API_URL}/safety/child-detect`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();const cd=d.child_detected??false,co=d.confidence??0;const act=cd&&co>=0.8?'remove':cd&&co>=0.5?'manual_review':cd?'blur':'none';if(act!=='none')writeAuditLog('safety.child_photo_detected',{action:act,confidence:co}).catch(()=>{});return{childDetected:cd,confidence:co,profilePhotoRisk:cd,action:act};}}catch(e){logger.error('[ChildPhoto]',e);}
+  try{const r=await fetchSafe(`${process.env['EXPO_PUBLIC_API_URL']}/safety/child-detect`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();const cd=d.child_detected??false,co=d.confidence??0;const act=cd&&co>=0.8?'remove':cd&&co>=0.5?'manual_review':cd?'blur':'none';if(act!=='none')writeAuditLog('safety.child_photo_detected',{action:act,confidence:co}).catch(()=>{});return{childDetected:cd,confidence:co,profilePhotoRisk:cd,action:act};}}catch(e){logger.error('[ChildPhoto]',e);}
   return{childDetected:false,confidence:0,profilePhotoRisk:false,action:'none'};
 }
 
 export interface CSAMHashResult { matched:boolean; hashDatabase:string; action:'none'|'block'|'report_ncmec'; }
 export async function checkCSAMHash(uri:string):Promise<CSAMHashResult>{
-  try{const r=await fetchSafe(`${process.env.EXPO_PUBLIC_API_URL}/safety/csam-check`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();if(d.matched){writeAuditLog('safety.csam_hash_matched',{database:d.database??'unknown'}).catch(()=>{});return{matched:true,hashDatabase:d.database??'unknown',action:'report_ncmec'};}}}catch(e){logger.error('[CSAM]',e);}
+  try{const r=await fetchSafe(`${process.env['EXPO_PUBLIC_API_URL']}/safety/csam-check`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUri:uri})});if(r.ok){const d=await r.json();if(d.matched){writeAuditLog('safety.csam_hash_matched',{database:d.database??'unknown'}).catch(()=>{});return{matched:true,hashDatabase:d.database??'unknown',action:'report_ncmec'};}}}catch(e){logger.error('[CSAM]',e);}
   return{matched:false,hashDatabase:'none',action:'none'};
 }
 

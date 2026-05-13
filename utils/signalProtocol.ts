@@ -1,7 +1,7 @@
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { auth } from '../firebaseConfig';
-import { decryptTextFromSender, encryptTextForRecipient as naclEncrypt } from './e2ee';
+import { decryptTextFromSender as decryptTextFromSenderV1, encryptTextForRecipient as naclEncrypt } from './e2ee';
 import { consumePreKey, ensureIdentityKey, getLocalPreKeyBundle, loadSession, saveSession, type SessionState } from './signalKeyStore';
 import { dhRatchetUpdate, ratchetStep, x3dhAgreement } from './signalRatchet';
 
@@ -90,5 +90,5 @@ export async function decryptTextFromSender(payload: { ciphertext: string; nonce
     const res = await decryptSignalText(payload as SignalPayload, senderId);
     if (res) return res;
   }
-  return decryptTextFromSender(payload); // Fallback to v1
+  return decryptTextFromSenderV1(payload); // Fallback to v1
 }

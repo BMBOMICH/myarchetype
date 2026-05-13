@@ -3,7 +3,6 @@
  * [5.5] #341-352 | [5.4] Engagement Fraud
  */
 
-
 export interface ScriptedConversationResult {
   scriptedConversation:  boolean;
   responsePattern:       'verbose' | 'terse' | 'normal' | 'uniform';
@@ -78,7 +77,6 @@ export function detectScriptedConversation(
   };
 }
 
-
 export interface ResponseTimingResult {
   anomalyDetected:    boolean;
   averageResponseMs:  number;
@@ -122,7 +120,6 @@ export function analyzeResponseTiming(
   };
 }
 
-
 export interface ConversationGraphResult {
   isOneDirectional:     boolean;
   suspectMessageRatio:  number;
@@ -160,7 +157,6 @@ export function analyzeConversationGraph(
     topicsIntroduced,
   };
 }
-
 
 export interface LanguageStyleResult {
   inconsistencyDetected:   boolean;
@@ -224,7 +220,6 @@ export function detectLanguageStyleInconsistency(
   };
 }
 
-
 const PLATFORM_APPS = [
   'whatsapp','telegram','signal','snapchat','instagram','kik',
   'wechat','line','viber','discord','skype','facetime',
@@ -250,7 +245,6 @@ export function offPlatformBehavior(text: string): {
   };
 }
 
-
 const MONEY_REQUEST_PATTERNS = [
   /send\s+(me\s+)?money/i, /lend\s+me/i, /cash\s*app/i, /venmo/i,
   /zelle/i, /wire\s+transfer/i, /western\s+union/i, /gift\s+card/i,
@@ -272,7 +266,6 @@ export function financialRequestBehavior(text: string): {
     patterns:                 matched.map(p => p.source.substring(0, 40)),
   };
 }
-
 
 const CRYPTO_SCAM_PATTERNS = [
   /invest(ment)?\s+opportunit/i, /guaranteed\s+(return|profit)/i,
@@ -298,7 +291,6 @@ export function cryptoScamPattern(text: string): {
     cryptoAddressDetected: hasAddress,
   };
 }
-
 
 const LOVE_BOMB_PHRASES = [
   'soulmate','never felt this way','love at first sight','meant to be',
@@ -339,7 +331,6 @@ export function loveBombingBehavior(
     velocity:            Math.round(velocity * 100) / 100,
   };
 }
-
 
 export function conversationMirroring(
   sent:     string[],

@@ -11,9 +11,9 @@ export async function updateLoginStreak(): Promise<StreakData> {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) return { currentStreak: 0, longestStreak: 0, lastLoginDate: null };
     const data = userDoc.data();
-    const lastLoginDate: string | null = data.lastLoginDate ?? null;
-    const currentStreak: number = data.loginStreak ?? 0;
-    const longestStreak: number = data.longestStreak ?? 0;
+    const lastLoginDate: string | null = (data['lastLoginDate'] as string | undefined) ?? null;
+    const currentStreak: number = (data['loginStreak'] as number | undefined) ?? 0;
+    const longestStreak: number = (data['longestStreak'] as number | undefined) ?? 0;
     const todayStr = new Date().toISOString().split('T')[0]!;
     if (lastLoginDate === todayStr) return { currentStreak, longestStreak, lastLoginDate };
     const yesterday = new Date();
@@ -21,7 +21,9 @@ export async function updateLoginStreak(): Promise<StreakData> {
     const yesterdayStr = yesterday.toISOString().split('T')[0]!;
     const newStreak = lastLoginDate === yesterdayStr ? currentStreak + 1 : 1;
     const newLongest = Math.max(longestStreak, newStreak);
-    await updateDoc(doc(db, 'users', user.uid), { lastLoginDate: todayStr, loginStreak: newStreak, longestStreak: newLongest });
+    await updateDoc(doc(db, 'users', user.uid), {
+      lastLoginDate: todayStr, loginStreak: newStreak, longestStreak: newLongest,
+    });
     return { currentStreak: newStreak, longestStreak: newLongest, lastLoginDate: todayStr };
   } catch (error: unknown) {
     if ((error as { code?: string }).code === 'permission-denied') return { currentStreak: 0, longestStreak: 0, lastLoginDate: null };

@@ -14,7 +14,10 @@ export interface Story {
   viewCount: number; viewTimestamps?: number[]; flagged?: boolean;
 }
 
-export interface StoryGroup { userId: string; userName: string; userPhoto: string; stories: Story[]; hasUnviewed: boolean; latestAt: string; }
+export interface StoryGroup {
+  userId: string; userName: string; userPhoto: string;
+  stories: Story[]; hasUnviewed: boolean; latestAt: string;
+}
 
 function requireAuth() { const u = auth.currentUser; if (!u) throw new Error('Not authenticated'); return u; }
 function storyRef(id: string) { return doc(db, 'stories', id); }
@@ -24,12 +27,12 @@ function computeExpiry(from = new Date()) { return new Date(from.getTime() + STO
 async function getMatchedUserIds(userId: string): Promise<Set<string>> {
   const col = collection(db, 'likes');
   const [fromSnap, toSnap] = await Promise.all([
-    getDocs(query(col, where('fromUserId', '==', userId).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), where('status', '==', 'matched'))),
+    getDocs(query(col, where('fromUserId', '==', userId), where('status', '==', 'matched'))),
     getDocs(query(col, where('toUserId', '==', userId), where('status', '==', 'matched'))),
   ]);
   const ids = new Set<string>();
-  fromSnap.forEach(d => ids.add(d.data().toUserId as string));
-  toSnap.forEach(d => ids.add(d.data().fromUserId as string));
+  fromSnap.forEach(d => ids.add(d.data()['toUserId'] as string));
+  toSnap.forEach(d => ids.add(d.data()['fromUserId'] as string));
   return ids;
 }
 
@@ -54,7 +57,11 @@ function checkCaption(caption: string): { safe: boolean; reason?: string } {
   return { safe: true };
 }
 
-export async function createStory(mediaUri: string, mediaType: 'photo' | 'video', caption?: string): Promise<{ success: boolean; storyId?: string; error?: string }> {
+export async function createStory(
+  mediaUri: string,
+  mediaType: 'photo' | 'video',
+  caption?: string,
+): Promise<{ success: boolean; storyId?: string; error?: string }> {
   try {
     const user = requireAuth();
     if (mediaType === 'photo') {
@@ -67,22 +74,36 @@ export async function createStory(mediaUri: string, mediaType: 'photo' | 'video'
       const videoSafety = await checkVideoFramesSafety(mediaUri, 6);
       if (!videoSafety.safe) return { success: false, error: videoSafety.reason ?? 'Video contains inappropriate content.' };
     }
-    if (caption) { const cc = checkCaption(caption); if (!cc.safe) return { success: false, error: cc.reason }; }
+    if (caption) {
+      const cc = checkCaption(caption);
+      if (!cc.safe) return { success: false, ...(cc.reason !== undefined ? { error: cc.reason } : {}) };
+    }
     const userSnap = await getDoc(doc(db, 'users', user.uid));
     if (!userSnap.exists()) return { success: false, error: 'User profile not found' };
     const userData = userSnap.data();
     const upload = await uploadToCloudinary(mediaUri, mediaType === 'video' ? 'story_video' : 'story_photo');
     if (!upload.success || !upload.url) return { success: false, error: upload.error ?? 'Media upload failed' };
     const now = new Date();
-    const story: Omit<Story, 'id'> = {
-      userId: user.uid, userName: userData.name ?? 'User', userPhoto: userData.photos?.[0] ?? '',
-      mediaUrl: upload.url, mediaType, caption: caption?.trim(),
-      createdAt: now.toISOString(), expiresAt: computeExpiry(now).toISOString(),
-      views: [], viewCount: 0, viewTimestamps: [], flagged: false,
+    const storyData: Omit<Story, 'id'> & { caption?: string } = {
+      userId: user.uid,
+      userName: (userData['name'] as string | undefined) ?? 'User',
+      userPhoto: (userData['photos'] as string[] | undefined)?.[0] ?? '',
+      mediaUrl: upload.url,
+      mediaType,
+      createdAt: now.toISOString(),
+      expiresAt: computeExpiry(now).toISOString(),
+      views: [],
+      viewCount: 0,
+      viewTimestamps: [],
+      flagged: false,
     };
-    const ref = await addDoc(storiesCol(), story);
+    if (caption?.trim()) storyData.caption = caption.trim();
+    const ref = await addDoc(storiesCol(), storyData);
     return { success: true, storyId: ref.id };
-  } catch (e: unknown) { logger.error('[Stories] create error:', e); return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
+  } catch (e: unknown) {
+    logger.error('[Stories] create error:', e);
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
 }
 
 export async function getActiveStories(userId: string): Promise<Story[]> {
@@ -91,7 +112,10 @@ export async function getActiveStories(userId: string): Promise<Story[]> {
     const matchIds = await getMatchedUserIds(userId);
     const snap = await getDocs(query(storiesCol(), where('expiresAt', '>', now)));
     const stories: Story[] = [];
-    snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
+    snap.forEach(d => {
+      const data = d.data() as Omit<Story, 'id'>;
+      if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data });
+    });
     sortStories(stories, userId);
     return stories;
   } catch (e: unknown) { logger.error('[Stories] getActive error:', e); return []; }
@@ -103,7 +127,10 @@ export function subscribeToActiveStories(userId: string, onUpdate: (s: Story[]) 
   getMatchedUserIds(userId).then(ids => { matchIds = ids; }).catch(() => {});
   return onSnapshot(q, snap => {
     const stories: Story[] = [];
-    snap.forEach(d => { const data = d.data() as Omit<Story, 'id'>; if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data }); });
+    snap.forEach(d => {
+      const data = d.data() as Omit<Story, 'id'>;
+      if (data.userId === userId || matchIds.has(data.userId)) stories.push({ id: d.id, ...data });
+    });
     sortStories(stories, userId);
     onUpdate(stories);
   }, () => onUpdate([]));
@@ -121,7 +148,11 @@ export function groupStoriesByUser(stories: Story[], currentUserId: string): Sto
     if (!story.views.includes(currentUserId) && story.userId !== currentUserId) group.hasUnviewed = true;
     if (story.createdAt > group.latestAt) group.latestAt = story.createdAt;
   }
-  return Array.from(map.values()).sort((a, b) => { if (a.userId === currentUserId) return -1; if (b.userId === currentUserId) return 1; return new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime(); });
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.userId === currentUserId) return -1;
+    if (b.userId === currentUserId) return 1;
+    return new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime();
+  });
 }
 
 export async function markStoryViewed(storyId: string): Promise<void> {
@@ -137,7 +168,10 @@ export async function markStoryViewed(storyId: string): Promise<void> {
     const timestamps = [...(data.viewTimestamps ?? []), now];
     if (timestamps.length >= 5) {
       const botCheck = analyzeMessageTiming(timestamps);
-      if (botCheck.isBot) { logger.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`); await updateDoc(ref, { flagged: true }).catch(() => {}); }
+      if (botCheck.isBot) {
+        logger.warn(`[Stories] Bot-like views on ${storyId}: ${botCheck.reason}`);
+        await updateDoc(ref, { flagged: true }).catch(() => {});
+      }
     }
   } catch (e: unknown) { logger.error('[Stories] markViewed error:', e); }
 }
@@ -151,7 +185,10 @@ export async function deleteStory(storyId: string): Promise<{ success: boolean; 
     if ((snap.data() as Story).userId !== user.uid) return { success: false, error: "Cannot delete another user's story" };
     await deleteDoc(ref);
     return { success: true };
-  } catch (e: unknown) { logger.error('[Stories] delete error:', e); return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }; }
+  } catch (e: unknown) {
+    logger.error('[Stories] delete error:', e);
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
 }
 
 export async function cleanupExpiredStories(): Promise<number> {

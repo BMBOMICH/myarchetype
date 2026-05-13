@@ -16,7 +16,6 @@ import {
 import { logger } from '../utils/logger';
 import { checkDateSafety } from '../utils/safetyMiddleware';
 
-
 export interface GuardianAlertConfig {
   alertOnPlanCreation: boolean; alertOnCheckIn: boolean; alertOnMissedCheckIn: boolean;
   alertOnSOS: boolean; alertOnNewMatch: boolean; alertOnLocationShare: boolean;
@@ -104,7 +103,6 @@ export function validateGuardianSetup(params: {
   };
 }
 
-
 interface DateSafetyState {
   loading: boolean; activePlan: DatePlan | null; contacts: EmergencyContact[]; guardian: GuardianContact | null;
   matchName: string; location: string; address: string; dateTime: string; duration: string;
@@ -175,13 +173,12 @@ function reducer(state: DateSafetyState, action: DateSafetyAction): DateSafetySt
   }
 }
 
-const scheduleIdleTask = (cb: () => void): (() => void) => {
+function scheduleIdleTask(cb: () => void): () => void {
   if (typeof requestIdleCallback === 'function') {
     const id = requestIdleCallback(cb); return () => cancelIdleCallback(id);
   }
   const id = setTimeout(cb, 100); return () => clearTimeout(id);
-};
-
+}
 
 interface WarningItem  { key: string; text: string; color?: string }
 interface ResourceItem { key: string; text: string }
@@ -190,11 +187,14 @@ interface AlertLogItem extends GuardianAlertLog { _index: number }
 interface ContactChip  { name: string; phone: string; _index: number }
 
 const WarningRow = React.memo(function WarningRow({ item }: LegendListRenderItemProps<WarningItem>) {
-  return <Text style={[st.warningText, item.color ? { color: item.color } : undefined]}>{item.text}</Text>;
+  const style = useMemo(() => [st.warningText, item.color ? { color: item.color } : undefined], [item.color]);
+  return <Text style={style}>{item.text}</Text>;
 });
+
 const ResourceRow = React.memo(function ResourceRow({ item }: LegendListRenderItemProps<ResourceItem>) {
   return <Text style={st.resourceText}>{item.text}</Text>;
 });
+
 const ReportOptionRow = React.memo(function ReportOptionRow({
   item, onPress,
 }: LegendListRenderItemProps<ReportOption> & { onPress: (value: string) => void }) {
@@ -209,6 +209,7 @@ const ReportOptionRow = React.memo(function ReportOptionRow({
     </TouchableOpacity>
   );
 });
+
 const AlertLogRow = React.memo(function AlertLogRow({ item }: LegendListRenderItemProps<AlertLogItem>) {
   return (
     <View style={st.alertHistoryItem}>
@@ -220,10 +221,16 @@ const AlertLogRow = React.memo(function AlertLogRow({ item }: LegendListRenderIt
     </View>
   );
 });
+
 const ContactChipRow = React.memo(function ContactChipRow({ item }: LegendListRenderItemProps<ContactChip>) {
   return <View style={st.contactChip}><Text style={st.contactChipText}>{item.name} — {item.phone}</Text></View>;
 });
 
+const warningKeyExtractor  = (item: WarningItem)  => item.key;
+const resourceKeyExtractor = (item: ResourceItem) => item.key;
+const reportKeyExtractor   = (item: ReportOption) => item.value;
+const contactKeyExtractor  = (item: ContactChip)  => item.phone;
+const alertLogKeyExtractor = (item: AlertLogItem) => item.id;
 
 export default function DateSafetyScreen() {
   const router = useRouter();
@@ -241,7 +248,9 @@ export default function DateSafetyScreen() {
       void (async () => {
         try {
           const [plan, contacts, guardian] = await Promise.all([
-            getActiveDatePlan().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), getEmergencyContacts(), getGuardianContact(),
+            getActiveDatePlan().catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
+            getEmergencyContacts(),
+            getGuardianContact(),
           ]);
           if (!isMounted.current) return;
           dispatch({ type: 'INIT_FROM_LOAD', payload: { plan: plan ?? null, contacts, guardian: guardian ?? null } });
@@ -288,9 +297,9 @@ export default function DateSafetyScreen() {
     () => (safetyResult?.resources ?? []).map((r, i) => ({ key: `r${i}`, text: r })),
     [safetyResult],
   );
-  const reportOptions  = useMemo(() => getSimplifiedReportOptions(), []);
-  const alertLogItems  = useMemo<AlertLogItem[]>(() => [...state.alertHistory].reverse().map((a, i) => ({ ...a, _index: i })), [state.alertHistory]);
-  const contactChips   = useMemo<ContactChip[]>(() => state.contacts.map((c, i) => ({ ...c, _index: i })), [state.contacts]);
+  const reportOptions = useMemo(() => getSimplifiedReportOptions(), []);
+  const alertLogItems = useMemo<AlertLogItem[]>(() => [...state.alertHistory].reverse().map((a, i) => ({ ...a, _index: i })), [state.alertHistory]);
+  const contactChips  = useMemo<ContactChip[]>(() => state.contacts.map((c, i) => ({ ...c, _index: i })), [state.contacts]);
 
   const handleSaveContact = useCallback(async () => {
     const { contactName, contactPhone, contacts } = state;
@@ -409,11 +418,35 @@ export default function DateSafetyScreen() {
     else Alert.alert('Error', 'Failed to submit report');
   }, [state]);
 
-  const renderWarning      = useCallback((props: LegendListRenderItemProps<WarningItem>)  => <WarningRow {...props} />,    []);
-  const renderResource     = useCallback((props: LegendListRenderItemProps<ResourceItem>) => <ResourceRow {...props} />,   []);
-  const renderReportOption = useCallback((props: LegendListRenderItemProps<ReportOption>) => <ReportOptionRow {...props} onPress={handleReport} />, [handleReport]);
-  const renderAlertLog     = useCallback((props: LegendListRenderItemProps<AlertLogItem>) => <AlertLogRow {...props} />,   []);
-  const renderContactChip  = useCallback((props: LegendListRenderItemProps<ContactChip>)  => <ContactChipRow {...props} />, []);
+  const handleReportNote = useCallback((t: string) => dispatch({ type: 'SET_REPORT_NOTE', payload: t }), []);
+  const handleContactName  = useCallback((t: string) => dispatch({ type: 'SET_CONTACT_NAME',  payload: t }), []);
+  const handleContactPhone = useCallback((t: string) => dispatch({ type: 'SET_CONTACT_PHONE', payload: t }), []);
+  const handleGuardianName  = useCallback((t: string) => dispatch({ type: 'SET_GUARDIAN_NAME',  payload: t }), []);
+  const handleGuardianPhone = useCallback((t: string) => dispatch({ type: 'SET_GUARDIAN_PHONE', payload: t }), []);
+  const handleGuardianNotify = useCallback((v: boolean) => dispatch({ type: 'SET_GUARDIAN_NOTIFY', payload: v }), []);
+  const handleAlertConfig = useCallback((key: keyof GuardianAlertConfig) => (v: boolean) =>
+    dispatch({ type: 'SET_ALERT_CONFIG', payload: { [key]: v } }), []);
+
+  const handleToggleGuardianForm  = useCallback(() => dispatch({ type: 'TOGGLE_GUARDIAN_FORM' }),  []);
+  const handleToggleReport        = useCallback(() => dispatch({ type: 'TOGGLE_REPORT' }),          []);
+  const handleToggleAlertConfig   = useCallback(() => dispatch({ type: 'TOGGLE_ALERT_CONFIG' }),   []);
+  const handleToggleAlertHistory  = useCallback(() => dispatch({ type: 'TOGGLE_ALERT_HISTORY' }),  []);
+
+  const handleFieldChange = useCallback((key: DateSafetyAction['type']) => (t: string) =>
+    dispatch({ type: key as 'SET_MATCH_NAME', payload: t }), []);
+
+  const createButtonStyle = useMemo(() => [st.createButton, state.creating && st.disabled], [state.creating]);
+
+  const renderWarning = useCallback((props: LegendListRenderItemProps<WarningItem>) =>
+    <WarningRow {...props} />, []);
+  const renderResource = useCallback((props: LegendListRenderItemProps<ResourceItem>) =>
+    <ResourceRow {...props} />, []);
+  const renderReportOption = useCallback((props: LegendListRenderItemProps<ReportOption>) =>
+    <ReportOptionRow {...props} onPress={handleReport} />, [handleReport]);
+  const renderAlertLog = useCallback((props: LegendListRenderItemProps<AlertLogItem>) =>
+    <AlertLogRow {...props} />, []);
+  const renderContactChip = useCallback((props: LegendListRenderItemProps<ContactChip>) =>
+    <ContactChipRow {...props} />, []);
 
   if (state.loading) return (
     <View style={st.loadingContainer}>
@@ -433,16 +466,27 @@ export default function DateSafetyScreen() {
     >
       <View style={st.content}>
         <Text style={st.title}>🛡️ Date Safety</Text>
+
         {!guardianSetup.ready && (
           <View style={st.guardianWarningCard}>
             <Text style={st.guardianWarningTitle}>⚠️ Guardian Setup Incomplete</Text>
-            {guardianSetup.issues.map((issue, i) => <Text key={i} style={st.guardianWarningText}>• {issue.replace(/_/g, ' ')}</Text>)}
-            {guardianSetup.recommendations.map((rec, i) => <Text key={i} style={st.guardianRecText}>💡 {rec}</Text>)}
-            <TouchableOpacity style={st.guardianFixButton} onPress={() = accessibilityLabel="button"> dispatch({ type: 'TOGGLE_GUARDIAN_FORM' })} accessibilityLabel="Set up guardian" accessibilityRole="button">
+            {guardianSetup.issues.map((issue) => (
+              <Text key={issue} style={st.guardianWarningText}>• {issue.replace(/_/g, ' ')}</Text>
+            ))}
+            {guardianSetup.recommendations.map((rec) => (
+              <Text key={rec} style={st.guardianRecText}>💡 {rec}</Text>
+            ))}
+            <TouchableOpacity
+              style={st.guardianFixButton}
+              onPress={handleToggleGuardianForm}
+              accessibilityLabel="Set up guardian"
+              accessibilityRole="button"
+            >
               <Text style={st.guardianFixText}>Set Up Guardian →</Text>
             </TouchableOpacity>
           </View>
         )}
+
         {state.activePlan && (
           <View style={st.activeCard}>
             <Text style={st.cardTitle}>📋 Active Date Plan</Text>
@@ -451,97 +495,229 @@ export default function DateSafetyScreen() {
             <Text style={st.cardRow}>🕐 {new Date(state.activePlan.dateTime).toLocaleString()}</Text>
             <Text style={st.cardRow}>📱 Contact: {state.activePlan.trustedContactName}</Text>
             {state.guardian && <Text style={st.cardRow}>👑 Guardian: {state.guardian.name}</Text>}
+
             {warningItems.length > 0 && (
               <View style={st.warningBox}>
-                <LegendList data={warningItems} keyExtractor={(item) => item.key} renderItem={renderWarning} recycleItems={false} estimatedItemSize={24} scrollEnabled={false} />
+                <LegendList
+                  data={warningItems}
+                  keyExtractor={warningKeyExtractor}
+                  renderItem={renderWarning}
+                  recycleItems={false}
+                  estimatedItemSize={24}
+                  scrollEnabled={false}
+                />
               </View>
             )}
+
             {resourceItems.length > 0 && (
               <View style={st.resourcesBox}>
                 <Text style={st.resourcesTitle}>📞 Resources</Text>
-                <LegendList data={resourceItems} keyExtractor={(item) => item.key} renderItem={renderResource} recycleItems={false} estimatedItemSize={24} scrollEnabled={false} />
+                <LegendList
+                  data={resourceItems}
+                  keyExtractor={resourceKeyExtractor}
+                  renderItem={renderResource}
+                  recycleItems={false}
+                  estimatedItemSize={24}
+                  scrollEnabled={false}
+                />
               </View>
             )}
+
             <View style={st.actionRow}>
               {showCheckIn && (
-                <TouchableOpacity style={st.checkInButton} onPress={handleCheckIn} disabled={state.checkingIn} accessibilityLabel="Check in safe" accessibilityRole="button">
-                  {state.checkingIn ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.checkInText}>✅ I'm Safe</Text>}
+                <TouchableOpacity
+                  style={st.checkInButton}
+                  onPress={handleCheckIn}
+                  disabled={state.checkingIn}
+                  accessibilityLabel="Check in safe"
+                  accessibilityRole="button"
+                >
+                  {state.checkingIn
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={st.checkInText}>✅ I&apos;m Safe</Text>
+                  }
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={st.sosButton} onPress={handleSOS} accessibilityLabel="Emergency SOS" accessibilityRole="button">
+              <TouchableOpacity
+                style={st.sosButton}
+                onPress={handleSOS}
+                accessibilityLabel="Emergency SOS"
+                accessibilityRole="button"
+              >
                 <Text style={st.sosText}>🚨 SOS</Text>
               </TouchableOpacity>
             </View>
+
             {state.activePlan.status === 'planned' && (
-              <TouchableOpacity style={st.missedButton} onPress={handleMissed} accessibilityLabel="Missed check-in" accessibilityRole="button">
+              <TouchableOpacity
+                style={st.missedButton}
+                onPress={handleMissed}
+                accessibilityLabel="Missed check-in"
+                accessibilityRole="button"
+              >
                 <Text style={st.missedText}>⚠️ I Missed My Check-in</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={st.reportButton} onPress={() = accessibilityLabel="button"> dispatch({ type: 'TOGGLE_REPORT' })} accessibilityLabel="Report this person" accessibilityRole="button">
+
+            <TouchableOpacity
+              style={st.reportButton}
+              onPress={handleToggleReport}
+              accessibilityLabel="Report this person"
+              accessibilityRole="button"
+            >
               <Text style={st.reportButtonText}>🚩 Report</Text>
             </TouchableOpacity>
+
             {state.showReport && (
               <View style={st.reportPanel}>
                 <Text style={st.reportTitle}>What happened?</Text>
-                <LegendList data={reportOptions} keyExtractor={(item) => item.value} renderItem={renderReportOption} recycleItems={false} estimatedItemSize={72} scrollEnabled={false} />
-                <TextInput style={st.reportNote} placeholder="Additional details (optional)" placeholderTextColor="#666" value={state.reportNote} onChangeText={(t) => dispatch({ type: 'SET_REPORT_NOTE', payload: t })} multiline maxLength={500} accessibilityLabel="Additional report details" />
+                <LegendList
+                  data={reportOptions}
+                  keyExtractor={reportKeyExtractor}
+                  renderItem={renderReportOption}
+                  recycleItems={false}
+                  estimatedItemSize={72}
+                  scrollEnabled={false}
+                />
+                <TextInput
+                  style={st.reportNote}
+                  placeholder="Additional details (optional)"
+                  placeholderTextColor="#666"
+                  value={state.reportNote}
+                  onChangeText={handleReportNote}
+                  multiline
+                  maxLength={500}
+                  accessibilityLabel="Additional report details"
+                />
               </View>
             )}
           </View>
         )}
+
         {!state.activePlan && (
           <View style={st.section}>
             <Text style={st.sectionTitle}>📅 Create Date Plan</Text>
-            <Text style={st.hint}>Tell someone you trust about your date. We'll send them the details and alert your guardian.</Text>
+            <Text style={st.hint}>Tell someone you trust about your date. We&apos;ll send them the details and alert your guardian.</Text>
             {([
-              { label: 'Match Name',        value: state.matchName, key: 'SET_MATCH_NAME' as const, placeholder: 'Their name' },
-              { label: 'Location Name',     value: state.location,  key: 'SET_LOCATION'   as const, placeholder: 'e.g. Starbucks, Central Park' },
-              { label: 'Address',           value: state.address,   key: 'SET_ADDRESS'    as const, placeholder: 'Full address' },
-              { label: 'Date & Time',       value: state.dateTime,  key: 'SET_DATE_TIME'  as const, placeholder: '2025-01-15 19:00' },
-              { label: 'Duration (minutes)', value: state.duration, key: 'SET_DURATION'   as const, placeholder: '60', keyboardType: 'number-pad' as const },
+              { label: 'Match Name',         value: state.matchName, key: 'SET_MATCH_NAME' as const, placeholder: 'Their name' },
+              { label: 'Location Name',      value: state.location,  key: 'SET_LOCATION'   as const, placeholder: 'e.g. Starbucks, Central Park' },
+              { label: 'Address',            value: state.address,   key: 'SET_ADDRESS'    as const, placeholder: 'Full address' },
+              { label: 'Date & Time',        value: state.dateTime,  key: 'SET_DATE_TIME'  as const, placeholder: '2025-01-15 19:00' },
+              { label: 'Duration (minutes)', value: state.duration,  key: 'SET_DURATION'   as const, placeholder: '60', keyboardType: 'number-pad' as const },
             ] as const).map(field => (
               <React.Fragment key={field.key}>
                 <Text style={st.label}>{field.label}</Text>
-                <TextInput style={st.input} value={field.value} onChangeText={(t) => dispatch({ type: field.key, payload: t })} placeholder={field.placeholder} placeholderTextColor="#666" keyboardType={'keyboardType' in field ? field.keyboardType : 'default'} accessibilityLabel={field.label} />
+                <TextInput
+                  style={st.input}
+                  value={field.value}
+                  onChangeText={handleFieldChange(field.key)}
+                  placeholder={field.placeholder}
+                  placeholderTextColor="#666"
+                  keyboardType={'keyboardType' in field ? field.keyboardType : 'default'}
+                  accessibilityLabel={field.label}
+                />
               </React.Fragment>
             ))}
-            <TouchableOpacity style={[st.createButton, state.creating && st.disabled]} onPress={handleCreatePlan} disabled={state.creating} accessibilityLabel="Create date plan" accessibilityRole="button">
-              {state.creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.createText}>📅 Create Plan & Notify Contacts</Text>}
+            <TouchableOpacity
+              style={createButtonStyle}
+              onPress={handleCreatePlan}
+              disabled={state.creating}
+              accessibilityLabel="Create date plan"
+              accessibilityRole="button"
+            >
+              {state.creating
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={st.createText}>📅 Create Plan &amp; Notify Contacts</Text>
+              }
             </TouchableOpacity>
           </View>
         )}
+
         <View style={st.section}>
           <Text style={st.sectionTitle}>📱 Trusted Contact</Text>
           {primaryContactStatus && (
             <View style={st.alertStatusChip}>
-              <Text style={st.alertStatusText}>📤 {primaryContactStatus.totalAlertsSent} alerts sent • ✅ {primaryContactStatus.confirmedReceived} confirmed</Text>
+              <Text style={st.alertStatusText}>
+                📤 {primaryContactStatus.totalAlertsSent} alerts sent • ✅ {primaryContactStatus.confirmedReceived} confirmed
+              </Text>
             </View>
           )}
           <Text style={st.label}>Name</Text>
-          <TextInput style={st.input} value={state.contactName} onChangeText={(t) => dispatch({ type: 'SET_CONTACT_NAME', payload: t })} placeholder="Your trusted person's name" placeholderTextColor="#666" accessibilityLabel="Contact name" />
+          <TextInput
+            style={st.input}
+            value={state.contactName}
+            onChangeText={handleContactName}
+            placeholder="Your trusted person's name"
+            placeholderTextColor="#666"
+            accessibilityLabel="Contact name"
+          />
           <Text style={st.label}>Phone</Text>
-          <TextInput style={st.input} value={state.contactPhone} onChangeText={(t) => dispatch({ type: 'SET_CONTACT_PHONE', payload: t })} placeholder="+994 50 123 4567" placeholderTextColor="#666" keyboardType="phone-pad" accessibilityLabel="Contact phone" />
+          <TextInput
+            style={st.input}
+            value={state.contactPhone}
+            onChangeText={handleContactPhone}
+            placeholder="+994 50 123 4567"
+            placeholderTextColor="#666"
+            keyboardType="phone-pad"
+            accessibilityLabel="Contact phone"
+          />
           <TouchableOpacity style={st.saveButton} onPress={handleSaveContact} accessibilityLabel="Save contact" accessibilityRole="button">
             <Text style={st.saveText}>💾 Save Contact</Text>
           </TouchableOpacity>
-          <LegendList data={contactChips} keyExtractor={(item) => item.phone} renderItem={renderContactChip} recycleItems={false} estimatedItemSize={40} scrollEnabled={false} />
+          <LegendList
+            data={contactChips}
+            keyExtractor={contactKeyExtractor}
+            renderItem={renderContactChip}
+            recycleItems={false}
+            estimatedItemSize={40}
+            scrollEnabled={false}
+          />
         </View>
+
         <View style={st.section}>
-          <TouchableOpacity onPress={() = accessibilityLabel="button"> dispatch({ type: 'TOGGLE_GUARDIAN_FORM' })} accessibilityLabel="Guardian contact settings" accessibilityRole="button">
+          <TouchableOpacity
+            onPress={handleToggleGuardianForm}
+            accessibilityLabel="Guardian contact settings"
+            accessibilityRole="button"
+          >
             <Text style={st.sectionTitle}>👑 Guardian Contact {state.showGuardianForm ? '▲' : '▼'}</Text>
           </TouchableOpacity>
           {state.showGuardianForm && (
             <View>
               <Text style={st.hint}>A guardian receives ALL safety alerts — missed check-ins, SOS, and optionally new match notifications.</Text>
               <Text style={st.label}>Guardian Name</Text>
-              <TextInput style={st.input} value={state.guardianName} onChangeText={(t) => dispatch({ type: 'SET_GUARDIAN_NAME', payload: t })} placeholder="Parent, sibling, or close friend" placeholderTextColor="#666" accessibilityLabel="Guardian name" />
+              <TextInput
+                style={st.input}
+                value={state.guardianName}
+                onChangeText={handleGuardianName}
+                placeholder="Parent, sibling, or close friend"
+                placeholderTextColor="#666"
+                accessibilityLabel="Guardian name"
+              />
               <Text style={st.label}>Guardian Phone</Text>
-              <TextInput style={st.input} value={state.guardianPhone} onChangeText={(t) => dispatch({ type: 'SET_GUARDIAN_PHONE', payload: t })} placeholder="+994 50 123 4567" placeholderTextColor="#666" keyboardType="phone-pad" accessibilityLabel="Guardian phone" />
+              <TextInput
+                style={st.input}
+                value={state.guardianPhone}
+                onChangeText={handleGuardianPhone}
+                placeholder="+994 50 123 4567"
+                placeholderTextColor="#666"
+                keyboardType="phone-pad"
+                accessibilityLabel="Guardian phone"
+              />
               <View style={st.switchRow}>
                 <Text style={st.switchLabel}>Notify on new matches</Text>
-                <Switch value={state.guardianNotifyOnMatch} onValueChange={(v) => dispatch({ type: 'SET_GUARDIAN_NOTIFY', payload: v })} accessibilityLabel="Notify guardian on new matches" />
+                <Switch
+                  value={state.guardianNotifyOnMatch}
+                  onValueChange={handleGuardianNotify}
+                  accessibilityLabel="Notify guardian on new matches"
+                />
               </View>
-              <TouchableOpacity style={st.alertConfigToggle} onPress={() = accessibilityLabel="button"> dispatch({ type: 'TOGGLE_ALERT_CONFIG' })} accessibilityLabel="Alert configuration" accessibilityRole="button">
+              <TouchableOpacity
+                style={st.alertConfigToggle}
+                onPress={handleToggleAlertConfig}
+                accessibilityLabel="Alert configuration"
+                accessibilityRole="button"
+              >
                 <Text style={st.alertConfigToggleText}>🔔 Alert Settings {state.showAlertConfig ? '▲' : '▼'}</Text>
               </TouchableOpacity>
               {state.showAlertConfig && (
@@ -555,7 +731,11 @@ export default function DateSafetyScreen() {
                   ] as const).map(({ label, key }) => (
                     <View key={key} style={st.switchRow}>
                       <Text style={st.switchLabel}>{label}</Text>
-                      <Switch value={state.alertConfig[key]} onValueChange={(v) => dispatch({ type: 'SET_ALERT_CONFIG', payload: { [key]: v } })} accessibilityLabel={label} />
+                      <Switch
+                        value={state.alertConfig[key]}
+                        onValueChange={handleAlertConfig(key)}
+                        accessibilityLabel={label}
+                      />
                     </View>
                   ))}
                   <View style={st.switchRow}>
@@ -567,33 +747,71 @@ export default function DateSafetyScreen() {
               <TouchableOpacity style={st.saveButton} onPress={handleSaveGuardian} accessibilityLabel="Save guardian" accessibilityRole="button">
                 <Text style={st.saveText}>👑 Save Guardian</Text>
               </TouchableOpacity>
-              {state.guardian && <Text style={st.currentGuardian}>Current: {state.guardian.name} ({state.guardian.phone})</Text>}
+              {state.guardian && (
+                <Text style={st.currentGuardian}>Current: {state.guardian.name} ({state.guardian.phone})</Text>
+              )}
             </View>
           )}
         </View>
+
         {state.alertHistory.length > 0 && (
           <View style={st.section}>
-            <TouchableOpacity onPress={() = accessibilityLabel="button"> dispatch({ type: 'TOGGLE_ALERT_HISTORY' })} accessibilityLabel="Alert history" accessibilityRole="button">
-              <Text style={st.sectionTitle}>📜 Alert History ({state.alertHistory.length}) {state.showAlertHistory ? '▲' : '▼'}</Text>
+            <TouchableOpacity
+              onPress={handleToggleAlertHistory}
+              accessibilityLabel="Alert history"
+              accessibilityRole="button"
+            >
+              <Text style={st.sectionTitle}>
+                📜 Alert History ({state.alertHistory.length}) {state.showAlertHistory ? '▲' : '▼'}
+              </Text>
             </TouchableOpacity>
             {state.showAlertHistory && (
-              <LegendList data={alertLogItems} keyExtractor={(item) => item.id} renderItem={renderAlertLog} recycleItems={false} estimatedItemSize={72} scrollEnabled={false} />
+              <LegendList
+                data={alertLogItems}
+                keyExtractor={alertLogKeyExtractor}
+                renderItem={renderAlertLog}
+                recycleItems={false}
+                estimatedItemSize={72}
+                scrollEnabled={false}
+              />
             )}
           </View>
         )}
+
         <View style={st.section}>
           <Text style={st.sectionTitle}>⚡ Quick Actions</Text>
-          <TouchableOpacity style={st.quickButton} onPress={() = accessibilityLabel="button"> Linking.openURL('tel:112')} accessibilityLabel="Call emergency services" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.quickButton}
+            onPress={() => void Linking.openURL('tel:112')}
+            accessibilityLabel="Call emergency services"
+            accessibilityRole="button"
+          >
             <Text style={st.quickText}>📞 Call 112 (Emergency)</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={st.quickButton} onPress={() = accessibilityLabel="button"> Linking.openURL('tel:988')} accessibilityLabel="Call crisis helpline" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.quickButton}
+            onPress={() => void Linking.openURL('tel:988')}
+            accessibilityLabel="Call crisis helpline"
+            accessibilityRole="button"
+          >
             <Text style={st.quickText}>🧠 Call 988 (Crisis Helpline)</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={st.quickButton} onPress={handleSOS} accessibilityLabel="Trigger SOS alert" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.quickButton}
+            onPress={handleSOS}
+            accessibilityLabel="Trigger SOS alert"
+            accessibilityRole="button"
+          >
             <Text style={st.quickText}>🚨 Trigger SOS Alert</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={st.backButton} onPress={() = accessibilityLabel="button"> router.back()} accessibilityLabel="Go back" accessibilityRole="button">
+
+        <TouchableOpacity
+          style={st.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text style={st.backText}>← Back</Text>
         </TouchableOpacity>
       </View>

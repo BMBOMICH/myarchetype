@@ -501,7 +501,6 @@ export function analyzeConversation(
   };
 }
 
-
 export function loveBombing(message: string): ManipResult {
   return analyzeMessage(message).type === 'loveBombing' ? analyzeMessage(message) : { detected: false, type: 'loveBombing', confidence: 0, severity: 'none', patterns: [] };
 }

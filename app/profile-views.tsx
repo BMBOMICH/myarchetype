@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
@@ -21,11 +21,11 @@ import { formatLastSeen } from '../utils/onlineStatus';
 const VIEWER_ITEM_HEIGHT = 85;
 
 const LOCAL = {
-  white:       '#ffffff',
-  success:     '#5cb85c',   // match badge, find-matches button
-  warning:     '#e67e22',   // stats accent
-  verifiedBlue:'#3498db',   // verified badge
-  deepSurface: '#0f3460',   // photo placeholder bg, verified badge border
+  white:        '#ffffff',
+  success:      '#5cb85c',
+  warning:      '#e67e22',
+  verifiedBlue: '#3498db',
+  deepSurface:  '#0f3460',
 } as const;
 
 interface ProfileViewer {
@@ -168,7 +168,7 @@ export default function ProfileViewsScreen() {
               isMatch:        matchedIds.has(viewerId),
             });
           }
-        } catch (e) {
+        } catch {
           logger.warn('[ProfileViews] Could not load viewer:', viewerId);
         }
       }

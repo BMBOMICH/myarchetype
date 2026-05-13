@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
-import { createMMKV } from 'react-native-mmkv';
+import { Platform } from 'react-native';
+let createMMKV: typeof import('react-native-mmkv').createMMKV | null = null;
+if (Platform.OS !== 'web') { try { createMMKV = require('react-native-mmkv').createMMKV; } catch {} }
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { db } from '../firebaseConfig';

@@ -1,9 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-native",
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "allowJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "strict": true,
+    "noEmit": true,
     "noImplicitReturns": true,
+    "skipLibCheck": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
@@ -12,15 +24,16 @@
     "exactOptionalPropertyTypes": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedSideEffectImports": true,
-    "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": false,
+    "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": { "@/*": ["./*"] },
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
     "incremental": true,
-    "tsBuildInfoFile": ".cache/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo"
   },
   "include": [
     "**/*.ts",
@@ -54,7 +67,8 @@
     "**/*.spec.tsx",
     "**/*.spec.js",
     "**/*.spec.jsx",
-    "*.config.js",
-    "*.config.ts"
-  ]
+    "**/*.config.js",
+    "**/*.config.ts"
+  ],
+  "extends": "expo/tsconfig.base"
 }

@@ -1,44 +1,33 @@
-import { observable } from '@legendapp/state';
-import { observer } from '@legendapp/state/react';
-import React, { useCallback, useEffect } from 'react';
-import { ActivityIndicator, InteractionManager, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
 import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
 
 interface ProfileStrengthBarProps { onPress?: () => void; compact?: boolean; }
 
-const bar$ = observable({
-  loading:  true,
-  strength: null as ProfileStrengthResult | null,
-  error:    null as string | null,
-});
+export default function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
-export default observer(function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
-  const loading  = bar$.loading.get();
-  const strength = bar$.strength.get();
-  const error    = bar$.error.get();
+  const [loading,  setLoading]  = useState(true);
+  const [strength, setStrength] = useState<ProfileStrengthResult | null>(null);
+  const [error,    setError]    = useState<string | null>(null);
 
-  const loadStrength = useCallback(() => {
-    const task = InteractionManager.runAfterInteractions(async () => {
-      try {
-        bar$.loading.set(true);
-        bar$.error.set(null);
-        bar$.strength.set(await calculateProfileStrength());
-      } catch (err: unknown) {
-        logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
-        bar$.error.set('Could not load profile strength');
-      } finally {
-        bar$.loading.set(false);
-      }
-    });
-    return task;
+  const loadStrength = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setStrength(await calculateProfileStrength());
+    } catch (err: unknown) {
+      logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
+      if (isMounted.current) setError('Could not load profile strength');
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    const task = loadStrength();
-    return () => task.cancel();
-  }, [loadStrength]);
+  useEffect(() => { void loadStrength(); }, [loadStrength]);
 
   if (loading) return (
     <View style={styles.container}>
@@ -51,7 +40,7 @@ export default observer(function ProfileStrengthBar({ onPress, compact = false }
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
-          onPress={() = accessibilityLabel="button"> { loadStrength(); }}
+          onPress={() => void loadStrength()}
           accessibilityLabel="Retry loading profile strength"
           accessibilityRole="button"
         >
@@ -65,6 +54,13 @@ export default observer(function ProfileStrengthBar({ onPress, compact = false }
 
   const Container = onPress ? TouchableOpacity : View;
 
+  // Computed styles that depend on runtime `strength` — kept here, not in sub-components
+  const compactPercentageStyle = [styles.compactPercentage, { color: strength.color }];
+  const compactBarFillStyle    = [styles.barFill, { width: `${strength.percentage}%` as `${number}%`, backgroundColor: strength.color }];
+  const levelBadgeStyle        = [styles.levelBadge,   { backgroundColor: strength.color }];
+  const percentageStyle        = [styles.percentage,   { color: strength.color }];
+  const barFillStyle           = [styles.barFill, { width: `${strength.percentage}%` as `${number}%`, backgroundColor: strength.color }];
+
   if (compact) {
     return (
       <Container
@@ -75,11 +71,11 @@ export default observer(function ProfileStrengthBar({ onPress, compact = false }
       >
         <View style={styles.compactHeader}>
           <Text style={styles.compactLabel}>Profile Strength</Text>
-          <Text style={[styles.compactPercentage, { color: strength.color }]}>{strength.percentage}%</Text>
+          <Text style={compactPercentageStyle}>{strength.percentage}%</Text>
         </View>
         <View style={styles.barContainer}>
           <View style={styles.barBackground}>
-            <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+            <View style={compactBarFillStyle} />
           </View>
         </View>
       </Container>
@@ -95,17 +91,17 @@ export default observer(function ProfileStrengthBar({ onPress, compact = false }
     >
       <View style={styles.header}>
         <Text style={styles.title}>Profile Strength</Text>
-        <View style={[styles.levelBadge, { backgroundColor: strength.color }]}>
+        <View style={levelBadgeStyle}>
           <Text style={styles.levelText}>{strength.level}</Text>
         </View>
       </View>
       <View style={styles.scoreRow}>
         <Text style={styles.scoreText}>{strength.score} / {strength.maxScore} points</Text>
-        <Text style={[styles.percentage, { color: strength.color }]}>{strength.percentage}%</Text>
+        <Text style={percentageStyle}>{strength.percentage}%</Text>
       </View>
       <View style={styles.barContainer}>
         <View style={styles.barBackground}>
-          <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+          <View style={barFillStyle} />
         </View>
       </View>
       <Text style={styles.message}>{getStrengthMessage(strength.level)}</Text>
@@ -119,7 +115,7 @@ export default observer(function ProfileStrengthBar({ onPress, compact = false }
       )}
     </Container>
   );
-});
+}
 
 const styles = StyleSheet.create((theme) => ({
   container:            { backgroundColor: '#16213e', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#0f3460' },

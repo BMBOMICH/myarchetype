@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -46,6 +46,65 @@ export const DEFAULT_FILTERS: FilterOptions = {
   maxHeight: '',
 };
 
+const DISTANCE_OPTIONS = ['25', '50', '100', '250', '500', '9999'] as const;
+
+// Extracted so each chip gets its own stable callback
+interface OptionChipProps {
+  option:   string;
+  selected: boolean;
+  onToggle: (item: string) => void;
+}
+const OptionChip = React.memo(function OptionChip({ option, selected, onToggle }: OptionChipProps) {
+  const chipStyle = useMemo(
+    () => [styles.optionChip, selected && styles.optionChipActive],
+    [selected],
+  );
+  const txtStyle = useMemo(
+    () => [styles.optionChipText, selected && styles.optionChipTextActive],
+    [selected],
+  );
+  const handlePress = useCallback(() => onToggle(option), [onToggle, option]);
+  return (
+    <TouchableOpacity
+      style={chipStyle}
+      onPress={handlePress}
+      accessibilityLabel={`${option} ${selected ? 'selected' : ''}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      <Text style={txtStyle}>{option}</Text>
+    </TouchableOpacity>
+  );
+});
+
+interface DistanceChipProps {
+  dist:    string;
+  active:  boolean;
+  onPress: (dist: string) => void;
+}
+const DistanceChip = React.memo(function DistanceChip({ dist, active, onPress }: DistanceChipProps) {
+  const chipStyle = useMemo(
+    () => [styles.distanceChip, active && styles.distanceChipActive],
+    [active],
+  );
+  const txtStyle = useMemo(
+    () => [styles.distanceChipText, active && styles.distanceChipTextActive],
+    [active],
+  );
+  const handlePress = useCallback(() => onPress(dist), [onPress, dist]);
+  return (
+    <TouchableOpacity
+      style={chipStyle}
+      onPress={handlePress}
+      accessibilityLabel={`Distance: ${dist === '9999' ? 'Any' : `${dist}km`}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={txtStyle}>{dist === '9999' ? 'Any' : `${dist}km`}</Text>
+    </TouchableOpacity>
+  );
+});
+
 export default function AdvancedFilters({
   visible,
   onClose,
@@ -55,13 +114,55 @@ export default function AdvancedFilters({
 }: AdvancedFiltersProps) {
   const [filters, setFilters] = useState<FilterOptions>(initialFilters);
 
-  const toggleArrayItem = (array: string[], item: string): string[] => {
+  const toggleArrayItem = useCallback((array: string[], item: string): string[] => {
     if (array.includes(item)) return array.filter((i) => i !== item);
     return [...array, item];
-  };
+  }, []);
 
-  const handleApply = () => { onApply(filters); onClose(); };
-  const handleReset = () => { setFilters(DEFAULT_FILTERS); };
+  const handleApply = useCallback(() => { onApply(filters); onClose(); }, [onApply, filters, onClose]);
+  const handleReset = useCallback(() => { setFilters(DEFAULT_FILTERS); },  []);
+
+  const handleMinAge    = useCallback((t: string) => setFilters(f => ({ ...f, minAge:    t.replace(/[^0-9]/g, '') })), []);
+  const handleMaxAge    = useCallback((t: string) => setFilters(f => ({ ...f, maxAge:    t.replace(/[^0-9]/g, '') })), []);
+  const handleMinHeight = useCallback((t: string) => setFilters(f => ({ ...f, minHeight: t.replace(/[^0-9]/g, '') })), []);
+  const handleMaxHeight = useCallback((t: string) => setFilters(f => ({ ...f, maxHeight: t.replace(/[^0-9]/g, '') })), []);
+
+  const handleDistancePress = useCallback((dist: string) => {
+    setFilters(f => ({ ...f, maxDistance: dist }));
+  }, []);
+
+  const handleToggleVerified = useCallback(() => {
+    setFilters(f => ({ ...f, verifiedOnly: !f.verifiedOnly }));
+  }, []);
+
+  const handleTogglePhotos = useCallback(() => {
+    setFilters(f => ({ ...f, hasPhotos: !f.hasPhotos }));
+  }, []);
+
+  const makeToggler = useCallback(
+    (field: keyof FilterOptions) => (item: string) => {
+      setFilters(f => ({
+        ...f,
+        [field]: toggleArrayItem(f[field] as string[], item),
+      }));
+    },
+    [toggleArrayItem],
+  );
+
+  const toggleBodyType       = useMemo(() => makeToggler('bodyTypes'),         [makeToggler]);
+  const toggleReligious      = useMemo(() => makeToggler('religiousViews'),     [makeToggler]);
+  const toggleLifestyle      = useMemo(() => makeToggler('lifestyles'),         [makeToggler]);
+  const toggleRelationship   = useMemo(() => makeToggler('relationshipGoals'),  [makeToggler]);
+  const togglePersonality    = useMemo(() => makeToggler('personalityTypes'),   [makeToggler]);
+
+  const verifiedBoxStyle = useMemo(
+    () => [styles.toggleBox, filters.verifiedOnly && styles.toggleBoxActive],
+    [filters.verifiedOnly],
+  );
+  const photosBoxStyle = useMemo(
+    () => [styles.toggleBox, filters.hasPhotos && styles.toggleBoxActive],
+    [filters.hasPhotos],
+  );
 
   const renderMultiSelect = (
     title: string,
@@ -73,17 +174,12 @@ export default function AdvancedFilters({
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.optionsGrid}>
         {options.map((option) => (
-          <TouchableOpacity
+          <OptionChip
             key={option}
-            style={[styles.optionChip, selected.includes(option) && styles.optionChipActive]}
-            onPress={() = accessibilityLabel="button"> onToggle(option)}
-            accessibilityLabel={`${option} ${selected.includes(option) ? 'selected' : ''}`}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.optionChipText, selected.includes(option) && styles.optionChipTextActive]}>
-              {option}
-            </Text>
-          </TouchableOpacity>
+            option={option}
+            selected={selected.includes(option)}
+            onToggle={onToggle}
+          />
         ))}
       </View>
       {selected.length === 0 && (
@@ -96,15 +192,28 @@ export default function AdvancedFilters({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} accessibilityLabel="Cancel" accessibilityRole="button">
+          <TouchableOpacity
+            onPress={onClose}
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
+          >
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Filters</Text>
-          <TouchableOpacity onPress={handleReset} accessibilityLabel="Reset filters" accessibilityRole="button">
+          <TouchableOpacity
+            onPress={handleReset}
+            accessibilityLabel="Reset filters"
+            accessibilityRole="button"
+          >
             <Text style={styles.resetText}>Reset</Text>
           </TouchableOpacity>
         </View>
 
+        {/*
+          ScrollView wraps a bounded filter form (~12 sections).
+          This is a static config form, not a scrolling data feed.
+          LegendList virtualization is not appropriate here.
+        */}
         <ScrollView style={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Age Range */}
           <View style={styles.section}>
@@ -113,7 +222,7 @@ export default function AdvancedFilters({
               <TextInput
                 style={styles.rangeInput}
                 value={filters.minAge}
-                onChangeText={(t) => setFilters({ ...filters, minAge: t.replace(/[^0-9]/g, '') })}
+                onChangeText={handleMinAge}
                 keyboardType="number-pad"
                 maxLength={2}
                 placeholder="18"
@@ -124,7 +233,7 @@ export default function AdvancedFilters({
               <TextInput
                 style={styles.rangeInput}
                 value={filters.maxAge}
-                onChangeText={(t) => setFilters({ ...filters, maxAge: t.replace(/[^0-9]/g, '') })}
+                onChangeText={handleMaxAge}
                 keyboardType="number-pad"
                 maxLength={2}
                 placeholder="99"
@@ -139,18 +248,13 @@ export default function AdvancedFilters({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Max Distance</Text>
               <View style={styles.distanceOptions}>
-                {['25', '50', '100', '250', '500', '9999'].map((dist) => (
-                  <TouchableOpacity
+                {DISTANCE_OPTIONS.map((dist) => (
+                  <DistanceChip
                     key={dist}
-                    style={[styles.distanceChip, filters.maxDistance === dist && styles.distanceChipActive]}
-                    onPress={() = accessibilityLabel="button"> setFilters({ ...filters, maxDistance: dist })}
-                    accessibilityLabel={`Distance: ${dist === '9999' ? 'Any' : `${dist}km`}`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.distanceChipText, filters.maxDistance === dist && styles.distanceChipTextActive]}>
-                      {dist === '9999' ? 'Any' : `${dist}km`}
-                    </Text>
-                  </TouchableOpacity>
+                    dist={dist}
+                    active={filters.maxDistance === dist}
+                    onPress={handleDistancePress}
+                  />
                 ))}
               </View>
             </View>
@@ -163,7 +267,7 @@ export default function AdvancedFilters({
               <TextInput
                 style={styles.rangeInput}
                 value={filters.minHeight}
-                onChangeText={(t) => setFilters({ ...filters, minHeight: t.replace(/[^0-9]/g, '') })}
+                onChangeText={handleMinHeight}
                 keyboardType="number-pad"
                 maxLength={3}
                 placeholder="Any"
@@ -174,7 +278,7 @@ export default function AdvancedFilters({
               <TextInput
                 style={styles.rangeInput}
                 value={filters.maxHeight}
-                onChangeText={(t) => setFilters({ ...filters, maxHeight: t.replace(/[^0-9]/g, '') })}
+                onChangeText={handleMaxHeight}
                 keyboardType="number-pad"
                 maxLength={3}
                 placeholder="Any"
@@ -184,44 +288,36 @@ export default function AdvancedFilters({
             </View>
           </View>
 
-          {renderMultiSelect('Body Type', BODY_TYPES, filters.bodyTypes, (item) =>
-            setFilters({ ...filters, bodyTypes: toggleArrayItem(filters.bodyTypes, item) })
-          )}
-          {renderMultiSelect('Religious Views', RELIGIOUS_OPTIONS, filters.religiousViews, (item) =>
-            setFilters({ ...filters, religiousViews: toggleArrayItem(filters.religiousViews, item) })
-          )}
-          {renderMultiSelect('Lifestyle', LIFESTYLE_OPTIONS, filters.lifestyles, (item) =>
-            setFilters({ ...filters, lifestyles: toggleArrayItem(filters.lifestyles, item) })
-          )}
-          {renderMultiSelect('Relationship Goal', RELATIONSHIP_OPTIONS, filters.relationshipGoals, (item) =>
-            setFilters({ ...filters, relationshipGoals: toggleArrayItem(filters.relationshipGoals, item) })
-          )}
-          {renderMultiSelect('Personality Type', PERSONALITY_OPTIONS, filters.personalityTypes, (item) =>
-            setFilters({ ...filters, personalityTypes: toggleArrayItem(filters.personalityTypes, item) })
-          )}
+          {renderMultiSelect('Body Type',          BODY_TYPES,           filters.bodyTypes,         toggleBodyType)}
+          {renderMultiSelect('Religious Views',    RELIGIOUS_OPTIONS,    filters.religiousViews,    toggleReligious)}
+          {renderMultiSelect('Lifestyle',          LIFESTYLE_OPTIONS,    filters.lifestyles,         toggleLifestyle)}
+          {renderMultiSelect('Relationship Goal',  RELATIONSHIP_OPTIONS, filters.relationshipGoals, toggleRelationship)}
+          {renderMultiSelect('Personality Type',   PERSONALITY_OPTIONS,  filters.personalityTypes,  togglePersonality)}
 
           {/* Toggles */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Other Filters</Text>
             <TouchableOpacity
               style={styles.toggleRow}
-              onPress={() = accessibilityLabel="button"> setFilters({ ...filters, verifiedOnly: !filters.verifiedOnly })}
+              onPress={handleToggleVerified}
               accessibilityLabel={`Verified users only: ${filters.verifiedOnly ? 'on' : 'off'}`}
               accessibilityRole="switch"
+              accessibilityState={{ checked: filters.verifiedOnly }}
             >
               <Text style={styles.toggleText}>Verified users only</Text>
-              <View style={[styles.toggleBox, filters.verifiedOnly && styles.toggleBoxActive]}>
+              <View style={verifiedBoxStyle}>
                 {filters.verifiedOnly && <Text style={styles.toggleCheck}>✓</Text>}
               </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.toggleRow}
-              onPress={() = accessibilityLabel="button"> setFilters({ ...filters, hasPhotos: !filters.hasPhotos })}
+              onPress={handleTogglePhotos}
               accessibilityLabel={`Must have photos: ${filters.hasPhotos ? 'on' : 'off'}`}
               accessibilityRole="switch"
+              accessibilityState={{ checked: filters.hasPhotos }}
             >
               <Text style={styles.toggleText}>Must have photos</Text>
-              <View style={[styles.toggleBox, filters.hasPhotos && styles.toggleBoxActive]}>
+              <View style={photosBoxStyle}>
                 {filters.hasPhotos && <Text style={styles.toggleCheck}>✓</Text>}
               </View>
             </TouchableOpacity>
@@ -231,7 +327,12 @@ export default function AdvancedFilters({
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.applyButton} onPress={handleApply} accessibilityLabel="Apply filters" accessibilityRole="button">
+          <TouchableOpacity
+            style={styles.applyButton}
+            onPress={handleApply}
+            accessibilityLabel="Apply filters"
+            accessibilityRole="button"
+          >
             <Text style={styles.applyButtonText}>Apply Filters</Text>
           </TouchableOpacity>
         </View>

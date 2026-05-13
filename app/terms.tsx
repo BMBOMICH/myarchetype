@@ -1,28 +1,23 @@
-/**
- * Terms of Service screen — pure content definition.
- * All layout, styling, and navigation are handled by LegalDocument.
- */
+import { memo } from 'react';
+import LegalDocument, { type LegalSection } from '../components/LegalDocument';
 
-import React from 'react';
-
-import LegalDocument, {
-  type LegalSection,
-} from '../components/LegalDocument';
-
+const SERVICE_NAME = 'MyArchetype';
+const OPERATOR_NAME = 'Elxan Huseynov';
+const SUPPORT_EMAIL = 'support@myarchetype.app';
 const LAST_UPDATED = 'April 2026';
 
-const SECTIONS: readonly LegalSection[] = [
+export const TERMS_SECTIONS: readonly LegalSection[] = [
   {
     title: '1. Acceptance of Terms',
     paragraphs: [
-      'By creating an account or using MyArchetype ("Service"), operated by Elxan Huseynov ("Operator"), you agree to be bound by these Terms of Service ("Terms"). These Terms incorporate our Privacy Policy, which explains how we collect, use, and disclose your data.',
+      `By creating an account or using ${SERVICE_NAME} ("Service"), operated by ${OPERATOR_NAME} ("Operator"), you agree to be bound by these Terms of Service ("Terms"). These Terms incorporate our Privacy Policy, which explains how we collect, use, and disclose your data.`,
       'If you do not agree to these Terms, you must not use the Service.',
     ],
   },
   {
     title: '2. Eligibility',
     paragraphs: [
-      'You must be at least 18 years old to use MyArchetype. By using our Service, you represent and warrant that:',
+      `You must be at least 18 years old to use ${SERVICE_NAME}. By using our Service, you represent and warrant that:`,
       {
         items: [
           'You are at least 18 years old',
@@ -76,15 +71,15 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '5. Content Ownership and License',
     paragraphs: [
-      'You retain all ownership rights to the content you submit to MyArchetype (such as photos, bio text, and quiz responses). By submitting content, you grant us a worldwide, non-exclusive, royalty-free license to use, host, store, reproduce, modify, and distribute your content solely for the purpose of operating, improving, and providing the Service to you and other users.',
+      `You retain all ownership rights to the content you submit to ${SERVICE_NAME} (such as photos, bio text, and quiz responses). By submitting content, you grant us a worldwide, non-exclusive, royalty-free license to use, host, store, reproduce, modify, and distribute your content solely for the purpose of operating, improving, and providing the Service to you and other users.`,
       'This license continues as long as your content remains on the Service, and will terminate when you delete your account and associated content, except where residual copies remain in backup systems.',
     ],
   },
   {
     title: '6. Intellectual Property & DMCA',
     paragraphs: [
-      'The MyArchetype application, including its original content, features, and functionality, is owned by Elxan Huseynov and is protected by international copyright, trademark, and other intellectual property laws.',
-      'If you believe that your copyrighted work has been copied in a way that constitutes copyright infringement, please contact us at support@myarchetype.app with a detailed description of the alleged infringement.',
+      `The ${SERVICE_NAME} application, including its original content, features, and functionality, is owned by ${OPERATOR_NAME} and is protected by international copyright, trademark, and other intellectual property laws.`,
+      `If you believe that your copyrighted work has been copied in a way that constitutes copyright infringement, please contact us at ${SUPPORT_EMAIL} with a detailed description of the alleged infringement.`,
     ],
   },
   {
@@ -146,20 +141,20 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '11. Free Service',
     paragraphs: [
-      'MyArchetype is currently 100% free. There are no premium features, subscriptions, or in-app purchases. All features are available to all users equally. We reserve the right to introduce paid features, subscriptions, or in-app purchases in the future. If we do, we will provide clear notice and these Terms will be updated accordingly.',
+      `${SERVICE_NAME} is currently 100% free. There are no premium features, subscriptions, or in-app purchases. All features are available to all users equally. We reserve the right to introduce paid features, subscriptions, or in-app purchases in the future. If we do, we will provide clear notice and these Terms will be updated accordingly.`,
     ],
   },
   {
     title: '12. Termination',
     paragraphs: [
       'We reserve the right to suspend or terminate your account at any time, without prior notice, for conduct that we determine, in our sole discretion, violates these Terms, is harmful to other users, or compromises the integrity of the Service.',
-      'You may delete your account at any time through the app settings. Upon deletion, your profile, matches, and messages will be removed in accordance with our Privacy Policy. If your account is terminated for a violation, you may not re-register for the Service. If you wish to appeal a termination, you may contact us at support@myarchetype.app.',
+      `You may delete your account at any time through the app settings. Upon deletion, your profile, matches, and messages will be removed in accordance with our Privacy Policy. If your account is terminated for a violation, you may not re-register for the Service. If you wish to appeal a termination, you may contact us at ${SUPPORT_EMAIL}.`,
     ],
   },
   {
     title: '13. Disclaimer of Warranties',
     paragraphs: [
-      'MyArchetype is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind, either express or implied. To the fullest extent permitted by law, we disclaim all warranties, express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.',
+      `${SERVICE_NAME} is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind, either express or implied. To the fullest extent permitted by law, we disclaim all warranties, express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.`,
       'We do not guarantee:',
       {
         items: [
@@ -174,7 +169,7 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '14. Limitation of Liability',
     paragraphs: [
-      'To the maximum extent permitted by applicable law, Elxan Huseynov shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from:',
+      `To the maximum extent permitted by applicable law, ${OPERATOR_NAME} shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from:`,
       {
         items: [
           'Your access to or use of (or inability to access or use) the Service',
@@ -188,11 +183,11 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '15. Indemnification',
     paragraphs: [
-      'You agree to defend, indemnify, and hold harmless Elxan Huseynov from and against any claims, liabilities, damages, losses, and expenses, including reasonable legal fees, arising out of or in any way connected with your access to or use of the Service, your violation of these Terms, or your violation of any rights of another party.',
+      `You agree to defend, indemnify, and hold harmless ${OPERATOR_NAME} from and against any claims, liabilities, damages, losses, and expenses, including reasonable legal fees, arising out of or in any way connected with your access to or use of the Service, your violation of these Terms, or your violation of any rights of another party.`,
     ],
   },
   {
-    title: '16. Govering Law and Jurisdiction',
+    title: '16. Governing Law and Jurisdiction',
     paragraphs: [
       'These Terms shall be governed by and construed in accordance with the laws of Azerbaijan, without regard to its conflict of law provisions.',
       'Any disputes arising out of or relating to these Terms or the Service shall be resolved exclusively in the state or federal courts located in Baku, Azerbaijan, and you consent to the personal jurisdiction of such courts.',
@@ -213,27 +208,29 @@ const SECTIONS: readonly LegalSection[] = [
   {
     title: '19. Entire Agreement',
     paragraphs: [
-      'These Terms, together with our Privacy Policy, constitute the entire agreement between you and Elxan Huseynov regarding the use of the Service, superseding any prior agreements or understandings.',
+      `These Terms, together with our Privacy Policy, constitute the entire agreement between you and ${OPERATOR_NAME} regarding the use of the Service, superseding any prior agreements or understandings.`,
     ],
   },
   {
     title: '20. Contact Us',
     paragraphs: [
       'For questions about these Terms of Service, please contact us:',
-      'Elxan Huseynov',
+      OPERATOR_NAME,
       'Yeni Guneshli, Surakhani District',
-      'Email: support@myarchetype.app',
+      `Email: ${SUPPORT_EMAIL}`,
     ],
   },
 ];
 
-export default function TermsOfServiceScreen() {
+function TermsOfServiceScreen() {
   return (
     <LegalDocument
       title="Terms of Service"
       lastUpdated={LAST_UPDATED}
-      sections={SECTIONS}
-      footerText="By using MyArchetype, you agree to these Terms of Service."
+      sections={TERMS_SECTIONS}
+      footerText={`By using ${SERVICE_NAME}, you agree to these Terms of Service.`}
     />
   );
 }
+
+export default memo(TermsOfServiceScreen);

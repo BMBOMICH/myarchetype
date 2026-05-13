@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { doc, updateDoc } from 'firebase/firestore';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,11 +39,11 @@ const webVideoStyle = { width: '100%', height: '100%', objectFit: 'cover' } sati
 const getErrorMessage = (e: unknown) => e instanceof Error ? e.message : 'Something went wrong';
 
 const measurementInstructions = [
-  { step: 1, title: 'Stand Against a Wall',           description: 'Find a flat wall with no baseboard. Stand with heels touching the wall.' },
+  { step: 1, title: 'Stand Against a Wall',            description: 'Find a flat wall with no baseboard. Stand with heels touching the wall.' },
   { step: 2, title: 'Remove Shoes and Stand Straight', description: 'Take off your shoes. Stand up straight with your head level.' },
-  { step: 3, title: 'Mark Your Height',               description: 'Use a book or ruler on top of your head. Mark the wall with a pencil.' },
-  { step: 4, title: 'Measure from Floor to Mark',     description: 'Use a measuring tape from the floor to the mark. Read the measurement.' },
-  { step: 5, title: 'Take a Photo',                   description: 'Take a clear photo showing the measuring tape, the mark, and your feet for reference.' },
+  { step: 3, title: 'Mark Your Height',                description: 'Use a book or ruler on top of your head. Mark the wall with a pencil.' },
+  { step: 4, title: 'Measure from Floor to Mark',      description: 'Use a measuring tape from the floor to the mark. Read the measurement.' },
+  { step: 5, title: 'Take a Photo',                    description: 'Take a clear photo showing the measuring tape, the mark, and your feet for reference.' },
 ];
 
 export default function HeightVerificationScreen() {
@@ -51,6 +51,12 @@ export default function HeightVerificationScreen() {
   const user    = auth.currentUser;
   const cameraRef  = useRef<CameraView>(null);
   const streamRef  = useRef<MediaStream | null>(null);
+  const isMounted  = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   const [method,          setMethod]         = useState<VerificationMethod>('self-reported');
   const [height,          setHeight]         = useState('');
@@ -87,7 +93,7 @@ export default function HeightVerificationScreen() {
           Alert.alert('Inappropriate Content', safety.reason || 'This photo was flagged.');
           return null;
         }
-      } catch {}
+      } catch { /* non-fatal */ }
 
       const response = await fetch(photoUri);
       const blob     = await response.blob();
@@ -192,7 +198,7 @@ export default function HeightVerificationScreen() {
         uri = canvas.toDataURL('image/jpeg', 0.85);
       } else {
         const pic = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
-        uri = pic?.uri || null;
+        uri = pic?.uri ?? null;
       }
 
       if (!uri) { Alert.alert('Error', 'Failed to capture photo'); return; }
@@ -309,6 +315,14 @@ export default function HeightVerificationScreen() {
     }
   }, [aiResult, height, method, photo, router, user]);
 
+  const methodCardSelfStyle   = useMemo(() => [styles.methodCard, method === 'self-reported'  && styles.methodCardActive], [method]);
+  const methodCardManualStyle = useMemo(() => [styles.methodCard, method === 'manual-measured' && styles.methodCardActive], [method]);
+  const methodCardAIStyle     = useMemo(() => [styles.methodCard, method === 'ai-estimated'    && styles.methodCardActive], [method]);
+  const saveButtonStyle       = useMemo(() => [styles.saveButton, saving && styles.saveButtonDisabled], [saving]);
+  const captureBtnStyle       = useMemo(() => [styles.captureBtn, isWeb && !webCameraReady && styles.disabled], [webCameraReady]);
+
+  const onChangeHeightText = useCallback((text: string) => setHeight(text.replace(/[^0-9]/g, '')), []);
+
   return (
     <ScrollView
       style={styles.container}
@@ -321,8 +335,8 @@ export default function HeightVerificationScreen() {
 
       <View style={styles.methodContainer}>
         <TouchableOpacity
-          style={[styles.methodCard, method === 'self-reported' && styles.methodCardActive]}
-          onPress={() = accessibilityLabel="button"> selectMethod('self-reported')}
+          style={methodCardSelfStyle}
+          onPress={() => selectMethod('self-reported')}
           accessibilityRole="button"
           accessibilityLabel="Select self reported verification"
           accessibilityHint="Enter your height manually without proof"
@@ -330,12 +344,12 @@ export default function HeightVerificationScreen() {
           <Text style={styles.methodIcon}>📝</Text>
           <Text style={styles.methodTitle}>Self-Reported</Text>
           <Text style={styles.methodDesc}>Just enter your height</Text>
-          <Text style={styles.methodBadge}>Badge: "Self-Reported"</Text>
+          <Text style={styles.methodBadge}>Badge: &quot;Self-Reported&quot;</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.methodCard, method === 'manual-measured' && styles.methodCardActive]}
-          onPress={() = accessibilityLabel="button"> selectMethod('manual-measured')}
+          style={methodCardManualStyle}
+          onPress={() => selectMethod('manual-measured')}
           accessibilityRole="button"
           accessibilityLabel="Select manual measured verification"
           accessibilityHint="Measure your height and upload a proof photo"
@@ -343,12 +357,12 @@ export default function HeightVerificationScreen() {
           <Text style={styles.methodIcon}>📏</Text>
           <Text style={styles.methodTitle}>Manual Measured</Text>
           <Text style={styles.methodDesc}>Measure with tape, take photo proof</Text>
-          <Text style={styles.methodBadge}>Badge: "Verified"</Text>
+          <Text style={styles.methodBadge}>Badge: &quot;Verified&quot;</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.methodCard, method === 'ai-estimated' && styles.methodCardActive]}
-          onPress={() = accessibilityLabel="button"> selectMethod('ai-estimated')}
+          style={methodCardAIStyle}
+          onPress={() => selectMethod('ai-estimated')}
           accessibilityRole="button"
           accessibilityLabel="Select AI estimated verification"
           accessibilityHint="Upload a full body photo for AI estimation"
@@ -356,7 +370,7 @@ export default function HeightVerificationScreen() {
           <Text style={styles.methodIcon}>🤖</Text>
           <Text style={styles.methodTitle}>AI Estimated</Text>
           <Text style={styles.methodDesc}>Full-body photo, AI estimates height</Text>
-          <Text style={styles.methodBadge}>Badge: "AI Estimated (±10cm)"</Text>
+          <Text style={styles.methodBadge}>Badge: &quot;AI Estimated (±10cm)&quot;</Text>
         </TouchableOpacity>
       </View>
 
@@ -366,14 +380,14 @@ export default function HeightVerificationScreen() {
           <TextInput
             style={styles.input}
             value={height}
-            onChangeText={text => setHeight(text.replace(/[^0-9]/g, ''))}
+            onChangeText={onChangeHeightText}
             keyboardType="number-pad"
             placeholder="175"
             placeholderTextColor="#666"
             maxLength={3}
             accessibilityLabel="Height in centimeters"
           />
-          <Text style={styles.hint}>Your profile will show: "Self-Reported"</Text>
+          <Text style={styles.hint}>Your profile will show: &quot;Self-Reported&quot;</Text>
         </View>
       )}
 
@@ -395,7 +409,7 @@ export default function HeightVerificationScreen() {
 
           <TouchableOpacity
             style={styles.uploadButton}
-            onPress={() = accessibilityLabel="button"> openCamera('manual')}
+            onPress={() => openCamera('manual')}
             disabled={uploading || saving}
             accessibilityRole="button"
             accessibilityLabel={photo ? 'Retake measurement photo' : 'Take measurement photo'}
@@ -418,7 +432,7 @@ export default function HeightVerificationScreen() {
           <TextInput
             style={styles.input}
             value={height}
-            onChangeText={text => setHeight(text.replace(/[^0-9]/g, ''))}
+            onChangeText={onChangeHeightText}
             keyboardType="number-pad"
             placeholder="175"
             placeholderTextColor="#666"
@@ -456,7 +470,7 @@ export default function HeightVerificationScreen() {
 
           <TouchableOpacity
             style={styles.uploadButton}
-            onPress={() = accessibilityLabel="button"> openCamera('ai')}
+            onPress={() => openCamera('ai')}
             disabled={uploading || saving}
             accessibilityRole="button"
             accessibilityLabel={photo ? 'Retake full body photo' : 'Take full body photo'}
@@ -501,11 +515,11 @@ export default function HeightVerificationScreen() {
               <Text style={styles.aiResultConfidence}>Confidence: {aiResult.confidence}%</Text>
               <Text style={styles.aiResultNote}>
                 Based on face-to-body anthropometric ratio.{'\n'}
-                Accuracy: ±10cm. Profile will show "AI Estimated"
+                Accuracy: ±10cm. Profile will show &quot;AI Estimated&quot;
               </Text>
               <TouchableOpacity
                 style={styles.reEstimateButton}
-                onPress={() = accessibilityLabel="button"> {
+                onPress={() => {
                   setAiResult(null);
                   setPhoto(null);
                   setPhotoData(null);
@@ -522,7 +536,7 @@ export default function HeightVerificationScreen() {
       )}
 
       <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        style={saveButtonStyle}
         onPress={handleSave}
         disabled={saving || uploading || aiEstimating}
         accessibilityRole="button"
@@ -533,7 +547,7 @@ export default function HeightVerificationScreen() {
 
       <TouchableOpacity
         style={styles.cancelButton}
-        onPress={() = accessibilityLabel="button"> router.back()}
+        onPress={() => router.back()}
         disabled={saving}
         accessibilityRole="button"
         accessibilityLabel="Cancel and go back"
@@ -557,7 +571,7 @@ export default function HeightVerificationScreen() {
                   <Text style={styles.camErrorText}>{cameraError}</Text>
                   <TouchableOpacity
                     style={styles.retryBtn}
-                    onPress={() = accessibilityLabel="button"> { void startWebCamera(); }}
+                    onPress={() => { void startWebCamera(); }}
                     accessibilityRole="button"
                     accessibilityLabel="Retry camera"
                   >
@@ -572,6 +586,8 @@ export default function HeightVerificationScreen() {
               ) : null}
 
               <View style={webCameraReady ? styles.videoBox : styles.hidden}>
+                {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                {/* @ts-ignore — video is a web-only element */}
                 <video id="height-camera" autoPlay playsInline muted style={webVideoStyle} />
               </View>
             </View>
@@ -583,7 +599,7 @@ export default function HeightVerificationScreen() {
 
           <View style={styles.cameraControls}>
             <TouchableOpacity
-              style={[styles.captureBtn, isWeb && !webCameraReady && styles.disabled]}
+              style={captureBtnStyle}
               onPress={capturePhoto}
               disabled={isWeb && !webCameraReady}
               accessibilityRole="button"

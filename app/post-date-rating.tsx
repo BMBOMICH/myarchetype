@@ -2,7 +2,7 @@ import { observable } from '@legendapp/state';
 import { observer } from '@legendapp/state/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator, Alert, ScrollView,
   Text, TextInput, TouchableOpacity, View,
@@ -31,6 +31,8 @@ StarRow.displayName = 'StarRow';
 const StarButton = React.memo(({ star, active, onPress }: {
   star: number; active: boolean; onPress: (s: number) => void;
 }) => {
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
   const handlePress = useCallback(() => onPress(star), [onPress, star]);
   return (
     <TouchableOpacity
@@ -51,15 +53,23 @@ const AccuracyBtn = React.memo(({ label, val, current, activeStyle, onPress }: {
 }) => {
   const handlePress = useCallback(() => onPress(val), [onPress, val]);
   const isSelected = current === val;
+  const btnStyle = useMemo(
+    () => [s.accuracyBtn, isSelected && activeStyle],
+    [isSelected, activeStyle],
+  );
+  const txtStyle = useMemo(
+    () => [s.accuracyText, isSelected && s.accuracyTextActive],
+    [isSelected],
+  );
   return (
     <TouchableOpacity
-      style={[s.accuracyBtn, isSelected && activeStyle]}
+      style={btnStyle}
       onPress={handlePress}
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected: isSelected }}
     >
-      <Text style={[s.accuracyText, isSelected && s.accuracyTextActive]}>{label}</Text>
+      <Text style={txtStyle}>{label}</Text>
     </TouchableOpacity>
   );
 });
@@ -76,6 +86,13 @@ const screen$ = observable({
   overallExperience: null as number | null,
   comments:          '',
 });
+
+const onPhotosMatch      = (v: number) => screen$.photosMatch.set(v);
+const onHeightAccurate   = (v: string) => screen$.heightAccurate.set(v);
+const onBodyTypeAccurate = (v: string) => screen$.bodyTypeAccurate.set(v);
+const onAgeAccurate      = (v: string) => screen$.ageAccurate.set(v);
+const onPersonalityMatch = (v: number) => screen$.personalityMatch.set(v);
+const onOverallExp       = (v: number) => screen$.overallExperience.set(v);
 
 export default observer(function PostDateRatingScreen() {
   const router  = useRouter();
@@ -221,7 +238,7 @@ export default observer(function PostDateRatingScreen() {
 
         <View style={s.questionCard}>
           <Text style={s.question}>Did their photos match reality?</Text>
-          <StarRow value={photosMatch} onPress={(v) => screen$.photosMatch.set(v)} />
+          <StarRow value={photosMatch} onPress={onPhotosMatch} />
           <Text style={s.starLabel}>{getStarLabel(photosMatch)}</Text>
         </View>
 
@@ -230,7 +247,7 @@ export default observer(function PostDateRatingScreen() {
           <Text style={s.questionHint}>Compared to what they stated on their profile</Text>
           <View style={s.accuracyRow}>
             {HEIGHT_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={heightAccurate} activeStyle={style} onPress={(v) => screen$.heightAccurate.set(v)} />
+              <AccuracyBtn key={val} label={label} val={val} current={heightAccurate} activeStyle={style} onPress={onHeightAccurate} />
             ))}
           </View>
         </View>
@@ -240,7 +257,7 @@ export default observer(function PostDateRatingScreen() {
           <Text style={s.questionHint}>Did it match what they selected on their profile?</Text>
           <View style={s.accuracyRow}>
             {BODY_TYPE_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={bodyTypeAccurate} activeStyle={style} onPress={(v) => screen$.bodyTypeAccurate.set(v)} />
+              <AccuracyBtn key={val} label={label} val={val} current={bodyTypeAccurate} activeStyle={style} onPress={onBodyTypeAccurate} />
             ))}
           </View>
         </View>
@@ -249,20 +266,20 @@ export default observer(function PostDateRatingScreen() {
           <Text style={s.question}>Did they look the age they stated?</Text>
           <View style={s.accuracyRow}>
             {AGE_OPTIONS.map(({ label, val, style }) => (
-              <AccuracyBtn key={val} label={label} val={val} current={ageAccurate} activeStyle={style} onPress={(v) => screen$.ageAccurate.set(v)} />
+              <AccuracyBtn key={val} label={label} val={val} current={ageAccurate} activeStyle={style} onPress={onAgeAccurate} />
             ))}
           </View>
         </View>
 
         <View style={s.questionCard}>
           <Text style={s.question}>Did their personality match expectations?</Text>
-          <StarRow value={personalityMatch} onPress={(v) => screen$.personalityMatch.set(v)} />
+          <StarRow value={personalityMatch} onPress={onPersonalityMatch} />
           <Text style={s.starLabel}>{getStarLabel(personalityMatch)}</Text>
         </View>
 
         <View style={s.questionCard}>
           <Text style={s.question}>Overall experience</Text>
-          <StarRow value={overallExperience} onPress={(v) => screen$.overallExperience.set(v)} />
+          <StarRow value={overallExperience} onPress={onOverallExp} />
           <Text style={s.starLabel}>{getStarLabel(overallExperience)}</Text>
         </View>
 

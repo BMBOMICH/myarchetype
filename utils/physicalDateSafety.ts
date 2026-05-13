@@ -6,7 +6,7 @@
  */
 async function whisperTranscribe(audioUrl: string): Promise<{ text: string; language: string; confidence: number }> {
   try {
-    const resp = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/audio/transcribe`, {
+    const resp = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/audio/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_url: audioUrl, model: 'whisper-1' }),
@@ -37,7 +37,7 @@ async function whisperBatchTranscribe(audioUrls: string[]): Promise<Array<{ text
  */
 async function presidioDetectPII(text: string): Promise<Array<{ entity_type: string; text: string; score: number }>> {
   try {
-    const resp = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pii/detect`, {
+    const resp = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/pii/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, language: 'en' }),
@@ -62,7 +62,7 @@ async function presidioDetectPII(text: string): Promise<Array<{ entity_type: str
  */
 async function googleSafeBrowsingCheck(url: string): Promise<{ safe: boolean; threats: string[] }> {
   try {
-    const apiKey = process.env.EXPO_PUBLIC_SAFE_BROWSING_KEY;
+    const apiKey = process.env['EXPO_PUBLIC_SAFE_BROWSING_KEY'];
     const resp = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,7 +143,7 @@ export async function verifyVenueSafety(venue: {
   lat: number; lng: number; name?: string;
 }): Promise<{ safe: boolean; type?: string; warnings: string[] }> {
   try {
-    const resp = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/venue-check`, {
+    const resp = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/safety/venue-check`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(venue),
     });
@@ -187,7 +187,7 @@ export async function checkCrimeHotspot(location: {
   lat: number; lng: number;
 }): Promise<{ riskLevel: 'low' | 'medium' | 'high'; advisory?: string }> {
   try {
-    const resp = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/crime-check`, {
+    const resp = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/safety/crime-check`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(location),
     });
@@ -195,7 +195,6 @@ export async function checkCrimeHotspot(location: {
     return resp.json();
   } catch { return { riskLevel: 'low' }; }
 }
-
 
 export interface DrinkSpikingAlertResult {
   alertLevel: 'none' | 'caution' | 'warning' | 'urgent';

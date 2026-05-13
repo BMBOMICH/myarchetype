@@ -9,7 +9,6 @@
  * #119 — codedHate | dogWhistle | coded_hate
  */
 
-
 const TRANSPHOBIC_TERMS = [
   'tranny', 'trannies', 'shemale', 'he-she', 'it', 'trap',
   'ladyboy', 'crossdresser', 'mentally ill', 'confused',
@@ -32,7 +31,6 @@ export function transphobicSlur(text: string): {
   };
 }
 
-
 const MISOGYNY_TERMS = [
   'bitch', 'slut', 'whore', 'cunt', 'ho', 'thot', 'hoe',
   'gold digger', 'attention whore', 'feminazi', 'crazy woman',
@@ -54,7 +52,6 @@ export function misogynistic(text: string): {
     termsFound: found,
   };
 }
-
 
 const ANTISEMITIC_TERMS = [
   'kike', 'yid', 'heeb', 'hymie', 'jewess',
@@ -80,7 +77,6 @@ export function antisemitic(text: string): {
   };
 }
 
-
 const ISLAMOPHOBIC_TERMS = [
   'muzzie', 'muzzies', 'sandnigger', 'raghead', 'towelhead',
   'camel jockey', 'paki', 'goatfucker', 'terrorist religion',
@@ -105,7 +101,6 @@ export function islamophobic(text: string): {
   };
 }
 
-
 const ABLEIST_TERMS = [
   'retard', 'retarded', 'tard', 'spaz', 'spastic', 'cripple',
   'gimp', 'invalid', 'psycho', 'lunatic', 'crazy', 'insane',
@@ -129,7 +124,6 @@ export function ableist(text: string): {
   };
 }
 
-
 const MICROAGGRESSION_PATTERNS = [
   /where are you (really )?from/i,
   /you('re| are) so (articulate|well.spoken) for/i,
@@ -150,7 +144,6 @@ export function microAggression(text: string): {
     patterns: found.map(p => p.source.replace(/\\/g, '').substring(0, 50)),
   };
 }
-
 
 const DOG_WHISTLE_TERMS: Record<string, string> = {
   '1488': 'white supremacist code (14 words + Heil Hitler)',

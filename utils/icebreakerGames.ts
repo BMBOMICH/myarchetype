@@ -18,7 +18,6 @@ function secureShuffle<T>(array: T[]): T[] {
   return shuffled;
 }
 
-
 export const WOULD_YOU_RATHER_QUESTIONS: WouldYouRatherQuestion[] = [
   { a: 'Travel to the past', b: 'Travel to the future' },
   { a: 'Be able to fly', b: 'Be able to read minds' },
@@ -121,14 +120,12 @@ export const RAPID_FIRE_QUESTIONS: string[] = [
   'Three words your friends would use to describe you?',
 ];
 
-
 export interface WouldYouRatherQuestion { a: string; b: string; }
 export interface ThisOrThatQuestion     { a: string; b: string; }
 export interface CompatibilityQuestion  { question: string; options: string[]; }
 export interface RapidFireQuestion      { question: string; }
 
 type GameQuestion = WouldYouRatherQuestion | ThisOrThatQuestion | CompatibilityQuestion | RapidFireQuestion;
-
 
 export interface TwoTruthsGame {
   id: string; creatorId: string; matchId: string; statements: string[];
@@ -167,7 +164,6 @@ function getErrorMessage(e: unknown): string {
     : 'Unknown error';
 }
 
-
 function moderateGameAnswer(answer: string): { safe: boolean; reason?: string } {
   if (!answer?.trim()) return { safe: true };
   const emojiSpam = detectEmojiSpam(answer, 0.7);
@@ -187,7 +183,6 @@ function moderateStatements(statements: string[]): { safe: boolean; reason?: str
   }
   return { safe: true };
 }
-
 
 type StandardGameType = 'would_you_rather' | 'this_or_that' | 'compatibility';
 
@@ -230,7 +225,6 @@ function calculateCompatibilityScore(p1Answers: string[], p2Answers: string[], t
 
   return { matchCount, matchPercentage, compatibilityScore, highlights };
 }
-
 
 export async function startGame(chatId: string, matchId: string, gameType: StandardGameType): Promise<{ success: boolean; gameId?: string; error?: string }> {
   const user = auth.currentUser;

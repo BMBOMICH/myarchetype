@@ -75,7 +75,6 @@ interface ReportDoc {
   status?: string;
 }
 
-
 export function bayesianAverage(
   userRatings: number[],
   globalMean         = 3.5,
@@ -138,7 +137,6 @@ function calculateTrustScore(ratings: RatingsData): number {
   );
 }
 
-
 export async function calculateUserTrustScore(userId: string): Promise<TrustScoreResult> {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
@@ -194,7 +192,6 @@ export function determineAutoActions(score: number): TrustAction[] {
   return ['ban'];
 }
 
-
 export async function calculateReporterCredibility(reporterId: string): Promise<ReporterCredibility> {
   try {
     const reportsSnap = await getDocs(query(collection(db, 'reports'), where('reporterId', '==', reporterId)));
@@ -216,7 +213,6 @@ export async function calculateReporterCredibility(reporterId: string): Promise<
     return { userId: reporterId, credibilityScore: 50, totalReports: 0, confirmedReports: 0, dismissedReports: 0, accuracy: 50 };
   }
 }
-
 
 export async function shouldPromptForRating(currentUserId: string, matchId: string): Promise<boolean> {
   try {

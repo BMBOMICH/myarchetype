@@ -1,7 +1,7 @@
 
 async function stSim(a: string, b: string): Promise<number> {
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/ml/similarity`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/ml/similarity`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text_a: a, text_b: b }),
@@ -96,7 +96,6 @@ const MARRIED_SCRIPTS = [
   "We're just roommates at this point"
 ];
 
-
 export interface ContactListScopeResult {
   allowedFields: string[];
   deniedFields: string[];
@@ -115,7 +114,6 @@ export function contactListScope(req: string[]): ContactListScopeResult {
 }
 export const contactScope = contactListScope;
 export const contactListAccess = contactListScope;
-
 
 export interface SdkExfiltrationResult {
   violations: string[];
@@ -357,7 +355,6 @@ export function privacyLabel(
 export const privacyNutritionLabel = privacyLabel;
 export const appStorePrivacyLabel = privacyLabel;
 
-
 export interface ElderFinancialAlertResult {
   triggered: boolean;
   riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
@@ -397,7 +394,6 @@ export function elderFinancialAlert(s: {
 }
 export const elderFraudAlert = elderFinancialAlert;
 export const olderUserFinancialAlert = elderFinancialAlert;
-
 
 export interface PrivacyPreservingVerifyResult {
   method: 'zero_knowledge_range_proof' | 'hash_comparison' | 'selective_disclosure';
@@ -496,7 +492,6 @@ export function minimalCollection(req: string[]): MinimalCollectionResult {
 export const dataMinimization = minimalCollection;
 export const profileMinimize = minimalCollection;
 
-
 export interface SensitiveFieldVisibilityResult {
   visibleFields: string[];
   hiddenFields: string[];
@@ -551,7 +546,6 @@ export function profileMinimization(p: Record<string, string>): ProfileMinimizat
 }
 export const profileDataMinimize = profileMinimization;
 export const profileFieldMinimize = profileMinimization;
-
 
 export interface MilitaryProtectionResult {
   protected: boolean;
@@ -626,7 +620,6 @@ export function govEmployee(p: {
 export const governmentEmployee = govEmployee;
 export const govEmployeeProtect = govEmployee;
 
-
 export interface CommunityModerationResult {
   rules: Array<{ community: string; rule: string; enforcement: 'auto' | 'manual' }>;
   culturalSensitivityFlags: string[];
@@ -654,7 +647,6 @@ export function communityModeration(content: string, communities: string[]): Com
 }
 export const nicheCommunityModeration = communityModeration;
 export const culturalModeration = communityModeration;
-
 
 export interface ExportSanitizeResult {
   sanitized: boolean;
@@ -730,7 +722,6 @@ export function importFraud(d: {
 export const crossPlatformImportFraud = importFraud;
 export const platformMigrationFraud = importFraud;
 
-
 export interface PseudonymousReputationResult {
   reputationScore: number;
   positiveSignals: string[];
@@ -772,7 +763,6 @@ export function pseudonymousReputation(h: {
 }
 export const anonReputation = pseudonymousReputation;
 export const pseudonymReputation = pseudonymousReputation;
-
 
 export interface HolidayScamResult {
   elevated: boolean;
@@ -870,7 +860,6 @@ export function seasonalSurge(
 export const newUserSurgeFraud = seasonalSurge;
 export const signupSurgeDetect = seasonalSurge;
 
-
 export interface MetadataSearchResult {
   searchable: boolean;
   exposedMetadata: string[];
@@ -935,7 +924,6 @@ export function transactionAnonymize(
 }
 export const paymentAnonymize = transactionAnonymize;
 export const transactionPrivacy = transactionAnonymize;
-
 
 export interface AddictiveDesignAuditResult {
   score: number;
@@ -1071,7 +1059,6 @@ export function seeWhoLiked(c: {
 export const whoLikedMePrivacy = seeWhoLiked;
 export const likedProfilePrivacy = seeWhoLiked;
 
-
 export interface SafetyDiscoverabilityResult {
   discoverable: boolean;
   score: number;
@@ -1129,7 +1116,6 @@ export function safetyUsageAnalytics(
 export const safetyFeatureUsage = safetyUsageAnalytics;
 export const safetyMetrics = safetyUsageAnalytics;
 
-
 export interface AccountSellingDetectResult {
   detected: boolean;
   confidence: number;
@@ -1172,7 +1158,7 @@ export async function deletionVerify(userId: string, services: string[]): Promis
   const rem: string[] = [];
   await Promise.all(services.map(async svc => {
     try {
-      const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/deletion-verify`, {
+      const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/safety/deletion-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, service: svc }).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })
@@ -1189,7 +1175,6 @@ export async function deletionVerify(userId: string, services: string[]): Promis
 }
 export const dataDeletionVerify = deletionVerify;
 export const accountDeletionVerify = deletionVerify;
-
 
 export interface AppCloneResult {
   isClone: boolean;
@@ -1219,7 +1204,6 @@ export function appClone(
 }
 export const dualSpace = appClone;
 export const parallelSpace = appClone;
-
 
 export interface ElicitationResult {
   detected: boolean;
@@ -1270,7 +1254,6 @@ export async function elicitationPattern(msgs: string[]): Promise<ElicitationRes
 export const probingClassified = elicitationPattern;
 export const intelligenceElicitation = elicitationPattern;
 
-
 export interface MalwareLinkResult {
   detected: boolean;
   urls: string[];
@@ -1298,7 +1281,7 @@ export async function malwareLink(message: string): Promise<MalwareLinkResult> {
   }
   let sbc = false;
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/url-check`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/safety/url-check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls }),
@@ -1318,7 +1301,6 @@ export async function malwareLink(message: string): Promise<MalwareLinkResult> {
 }
 export const trojanLink = malwareLink;
 export const spywareLink = malwareLink;
-
 
 export interface GeoIntHarvestingResult {
   detected: boolean;
@@ -1364,7 +1346,6 @@ export async function geoIntHarvesting(msgs: string[], _winMs = 86400000): Promi
 }
 export const locationHarvesting = geoIntHarvesting;
 export const geoHarvest = geoIntHarvesting;
-
 
 export interface IncelRadicalizationResult {
   detected: boolean;
@@ -1416,7 +1397,6 @@ export async function incelRadicalization(msgs: string[]): Promise<IncelRadicali
 }
 export const manosphere = incelRadicalization;
 export const blackpill = incelRadicalization;
-
 
 export interface AiEmotionalManipResult {
   detected: boolean;
@@ -1470,7 +1450,6 @@ export const aiGaslighting = aiEmotionalManip;
 export const aiLoveManip = aiEmotionalManip;
 export const aiFalseSentience = aiEmotionalManip;
 
-
 export interface PostBlockContactResult {
   detected: boolean;
   methods: string[];
@@ -1510,7 +1489,6 @@ export function postBlockContact(s: {
 export const blockEvasion = postBlockContact;
 export const contactAfterBlock = postBlockContact;
 export const evadeBlock = postBlockContact;
-
 
 export interface PostRelAbusePatternsResult {
   detected: boolean;
@@ -1558,7 +1536,6 @@ export const exPartnerAbuse = postRelAbusePatterns;
 export const postBreakupHarassment = postRelAbusePatterns;
 export const revengePorn = postRelAbusePatterns;
 
-
 export interface ProxyAccountResult {
   detected: boolean;
   confidence: number;
@@ -1602,7 +1579,6 @@ export async function proxyAccount(msgs: string[]): Promise<ProxyAccountResult> 
 export const proxyMessaging = proxyAccount;
 export const thirdPartyOperation = proxyAccount;
 export const ghostwrittenProfile = proxyAccount;
-
 
 export interface MarriedDeceptionResult {
   detected: boolean;
@@ -1656,7 +1632,6 @@ export const cheatingDetect = marriedDeception;
 export const infidelityDetect = marriedDeception;
 export const hiddenRelationship = marriedDeception;
 
-
 export interface ModWellbeingResult {
   riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
   indicators: string[];
@@ -1690,7 +1665,6 @@ export function modWellbeing(s: {
 export const moderatorHealth = modWellbeing;
 export const secondaryTrauma = modWellbeing;
 
-
 export interface DeceasedUserResult {
   suspected: boolean;
   confidence: number;
@@ -1722,7 +1696,6 @@ export function deceasedUser(s: {
 export const memorialAccount = deceasedUser;
 export const deathNotification = deceasedUser;
 
-
 export interface CognitiveLoadResult {
   loadLevel: 'low' | 'medium' | 'high';
   simplificationRecommendations: string[];
@@ -1752,7 +1725,6 @@ export function cognitiveLoad(ui: {
 export const simplifyUI = cognitiveLoad;
 export const cognitiveAccessibility = cognitiveLoad;
 
-
 export interface DeafAccommodationResult {
   accommodationsEnabled: boolean;
   features: string[];
@@ -1776,7 +1748,6 @@ export function deafAccommodation(p: {
 }
 export const captioning = deafAccommodation;
 export const signLanguage = deafAccommodation;
-
 
 export interface ModWellbeingSupportResult {
   programActive: boolean;
@@ -1802,7 +1773,6 @@ export function modWellbeingSupport(c?: {
 export const moderatorWellbeing = modWellbeingSupport;
 export const secondaryTraumaSupport = modWellbeingSupport;
 
-
 export interface AirGapResult {
   isolated: boolean;
   operationType: string;
@@ -1827,7 +1797,6 @@ export function airGap(op: {
 }
 export const sensitiveOperation = airGap;
 export const isolatedExecution = airGap;
-
 
 export interface BugBountyResult {
   active: boolean;
@@ -1858,7 +1827,6 @@ export function bugBounty(c?: { platform?: string }): BugBountyResult {
 export const responsibleDisclosure = bugBounty;
 export const securityReward = bugBounty;
 
-
 export interface RedTeamResult {
   scheduled: boolean;
   frequency: string;
@@ -1883,7 +1851,6 @@ export function redTeam(c?: { lastTestDate?: string; frequencyMonths?: number })
 }
 export const penTest = redTeam;
 export const penetrationTest = redTeam;
-
 
 export interface ApkCloneResult {
   isClone: boolean;
@@ -1916,7 +1883,6 @@ export function apkClone(s: {
 export const modifiedAPK = apkClone;
 export const appCloneDetect = apkClone;
 
-
 export interface OutnumberDetectResult {
   safe: boolean;
   ratio: string;
@@ -1947,7 +1913,6 @@ export function outnumberDetect(p: {
 export const groupSizeImbalance = outnumberDetect;
 export const meetupImbalance = outnumberDetect;
 
-
 export interface ActivistPrivacyResult {
   enabled: boolean;
   level: 'standard' | 'enhanced' | 'maximum';
@@ -1975,7 +1940,6 @@ export function activistPrivacy(p: {
 }
 export const journalistProtection = activistPrivacy;
 export const enhancedPrivacy = activistPrivacy;
-
 
 export interface CasteDiscriminationResult {
   detected: boolean;
@@ -2027,7 +1991,6 @@ export async function casteDiscrimination(msgs: string[]): Promise<CasteDiscrimi
 export const casteAbuse = casteDiscrimination;
 export const casteBias = casteDiscrimination;
 
-
 export interface BreachCrossRefResult {
   exposed: boolean;
   breaches: Array<{ source: string; date: string; dataTypes: string[]; severity: 'low' | 'medium' | 'high' | 'critical' }>;
@@ -2038,7 +2001,7 @@ export interface BreachCrossRefResult {
 export async function breachCrossRef(userEmail: string): Promise<BreachCrossRefResult> {
   const breaches: BreachCrossRefResult['breaches'] = []; let cc = false;
   try {
-    const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/safety/breach-check`, {
+    const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/safety/breach-check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: userEmail }),
@@ -2073,7 +2036,6 @@ export async function breachCrossRef(userEmail: string): Promise<BreachCrossRefR
 }
 export const breachDefense = breachCrossRef;
 export const leakedDataDefense = breachCrossRef;
-
 
 export interface SupportPhishingResult {
   detected: boolean;
@@ -2119,7 +2081,6 @@ export async function supportPhishing(message: string, senderChannel: string): P
 }
 export const fakeSupport = supportPhishing;
 export const staffImpersonationPhish = supportPhishing;
-
 
 export interface LoveBombingResult {
   detected: boolean;
@@ -2275,7 +2236,6 @@ export const LOVE_BOMBING_PATTERNS = loveBombDetect;
 export const loveBombDetect2 = loveBombDetect;
 export const loveBomb = loveBombDetect;
 
-
 export interface ApiDataExposureResult {
   exposed: boolean;
   exposedFields: string[];
@@ -2314,7 +2274,6 @@ export const apiOverExposure = apiDataExposure;
 export const responseDataLeak = apiDataExposure;
 export const graphCluster = apiDataExposure; // alias for audit scanner
 
-
 export interface IdorDetectionResult {
   detected: boolean;
   riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
@@ -2341,7 +2300,6 @@ export function idorDetection(req: {
 }
 export const objectLevelAuth = idorDetection;
 export const brokenObjectLevel = idorDetection;
-
 
 export interface SqlInjectionResult {
   detected: boolean;
@@ -2415,7 +2373,6 @@ export function csrfProtection(req: {
 }
 export const csrfDefense = csrfProtection;
 export const forgeryProtection = csrfProtection;
-
 
 export interface NetworkGraphResult {
   suspicious: boolean;
@@ -2564,7 +2521,6 @@ export function sybilDetection(
 export const sybilAttack = sybilDetection;
 export const fakeAccountCluster = sybilDetection;
 
-
 export interface FakeDatingAppResult {
   detected: boolean;
   confidence: number;
@@ -2680,7 +2636,6 @@ export function appImpersonation(s: {
 export const fakeAppStore = appImpersonation;
 export const cloneApp = appImpersonation;
 
-
 export interface CrossPlatformBanResult {
   banned: boolean;
   platforms: string[];
@@ -2756,7 +2711,6 @@ export function crossPlatformReport(
 export const multiPlatformReport = crossPlatformReport;
 export const federatedBan = crossPlatformReport;
 
-
 export interface CheaterToolResult {
   detected: boolean;
   tools: string[];
@@ -2818,7 +2772,6 @@ export function ratioManip(s: {
 }
 export const boostAbuse = ratioManip;
 export const likeRateAnomaly = ratioManip;
-
 
 export interface ModelPoisoningResult {
   detected: boolean;
@@ -2943,7 +2896,6 @@ export function modelDrift(
 }
 export const conceptDrift = modelDrift;
 export const distributionShift = modelDrift;
-
 
 export interface AiConsentResult {
   consentGiven: boolean;
@@ -3073,7 +3025,6 @@ export const mlOptOut = aiOptOut;
 export const algorithmOptOut = aiOptOut;
 export const aiTrainingOptOut = aiOptOut;
 
-
 export interface AiAgentSafetyResult {
   safeToSend: boolean;
   issues: string[];
@@ -3125,7 +3076,6 @@ export function aiDisclosure(
 }
 export const aiLabel = aiDisclosure;
 export const syntheticDisclosure = aiDisclosure;
-
 
 export interface AiContentModerationResult {
   action: 'allow' | 'warn' | 'remove' | 'escalate';
@@ -3213,7 +3163,6 @@ export function aiScale(s: {
 export const inferenceScale = aiScale;
 export const mlCapacity = aiScale;
 
-
 export interface AiScamFailureResult {
   falseNegative: boolean;
   falsePositive: boolean;
@@ -3287,7 +3236,6 @@ export function aiEdgeCase(input: {
 }
 export const mlEdgeCase = aiEdgeCase;
 export const modelFallback = aiEdgeCase;
-
 
 export interface AlgorithmicBiasResult {
   biasDetected: boolean;
@@ -3400,7 +3348,6 @@ export function genderBias(
 export const genderAlgorithmBias = genderBias;
 export const matchingFairness = genderBias;
 
-
 export interface DsarWeaponizationResult {
   legitimate: boolean;
   riskIndicators: string[];
@@ -3459,7 +3406,6 @@ export function dsarCompliance(req: {
 }
 export const dsarDeadline = dsarCompliance;
 export const sarCompliance = dsarCompliance;
-
 
 export interface FieldSemanticAbuseResult {
   detected: boolean;
@@ -3590,7 +3536,6 @@ export function promptAnswerAbuse(prompt: string, answer: string): PromptAnswerA
 export const promptAbuse = promptAnswerAbuse;
 export const answerAbuse = promptAnswerAbuse;
 
-
 export interface ScreenTimeLimitResult {
   limitReached: boolean;
   sessionMinutes: number;
@@ -3665,7 +3610,6 @@ export function matchQuality(s: {
 }
 export const swipeHealth = matchQuality;
 export const matchingWellbeing = matchQuality;
-
 
 export interface EmotionalLaborResult {
   detected: boolean;

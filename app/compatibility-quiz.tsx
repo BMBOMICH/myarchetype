@@ -49,30 +49,61 @@ const scheduleIdleTask = (cb: () => void): (() => void) => {
   const id = setTimeout(cb, 100); return () => clearTimeout(id);
 };
 
-const CategoryRowItem = React.memo(function CategoryRowItem({ item }: LegendListRenderItemProps<CategoryRow>) {
+// ─── Fix #1: Remove unused _extracteduseMemo1, _inlineHook0, _inlineHook1,
+//             and unused `color` variable. Use proper named extractors. ────────
+const categoryKeyExtractor = (item: CategoryRow) => item.category;
+const optionKeyExtractor   = (item: string)       => item;
+
+const CategoryRowItem = React.memo(function CategoryRowItem({
+  item,
+}: LegendListRenderItemProps<CategoryRow>) {
+  // Fix #2: Remove `item` from deps of barStyle — item.score IS used so keep it,
+  // but don't spread the whole item object as a dep.
+  const barStyle = useMemo(
+    () => [st.categoryBar, { width: `${item.score}%` as `${number}%` }],
+    [item.score],
+  );
   return (
     <View style={st.categoryRow}>
-      <Text style={st.categoryName}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
+      <Text style={st.categoryName}>
+        {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+      </Text>
       <View style={st.categoryBarContainer}>
-        <View style={[st.categoryBar, { width: `${item.score}%` as `${number}%` }]} />
+        <View style={barStyle} />
       </View>
       <Text style={st.categoryScore}>{item.score}%</Text>
     </View>
   );
 });
 
-const OptionItem = React.memo(function OptionItem({ option, isSelected, onPress }: { option: string; isSelected: boolean; onPress: (option: string) => void }) {
+const OptionItem = React.memo(function OptionItem({
+  option, isSelected, onPress,
+}: {
+  option: string; isSelected: boolean; onPress: (option: string) => void;
+}) {
   const handlePress = useCallback(() => onPress(option), [onPress, option]);
   return (
-    <TouchableOpacity style={isSelected ? [st.optionButton, st.optionButtonSelected] : st.optionButton} onPress={handlePress} accessibilityLabel={option} accessibilityRole="button" accessibilityState={{ selected: isSelected }}>
-      <Text style={isSelected ? [st.optionText, st.optionTextSelected] : st.optionText}>{option}</Text>
+    <TouchableOpacity
+      style={isSelected ? [st.optionButton, st.optionButtonSelected] : st.optionButton}
+      onPress={handlePress}
+      accessibilityLabel={option}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+    >
+      <Text style={isSelected ? [st.optionText, st.optionTextSelected] : st.optionText}>
+        {option}
+      </Text>
     </TouchableOpacity>
   );
 });
 
 export default function CompatibilityQuizScreen() {
   const router = useRouter();
-  const { chatId, matchId, matchName, quizId: existingQuizId } = useLocalSearchParams<{ chatId: string; matchId: string; matchName: string; quizId?: string }>();
+  const {
+    chatId, matchId, matchName, quizId: existingQuizId,
+  } = useLocalSearchParams<{
+    chatId: string; matchId: string; matchName: string; quizId?: string;
+  }>();
   const user = auth.currentUser;
 
   const [state, dispatch] = useReducer(quizReducer, {
@@ -86,7 +117,7 @@ export default function CompatibilityQuizScreen() {
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
     if (initRan.current) return;
@@ -145,7 +176,10 @@ export default function CompatibilityQuizScreen() {
       }
     } catch (error: unknown) {
       logger.error('[Quiz] submit error:', error);
-      if (isMounted.current) { Alert.alert('Error', 'Failed to submit your answers. Please try again.'); dispatch({ type: 'SET_ERROR', payload: 'Submit failed' }); }
+      if (isMounted.current) {
+        Alert.alert('Error', 'Failed to submit your answers. Please try again.');
+        dispatch({ type: 'SET_ERROR', payload: 'Submit failed' });
+      }
     }
   }, [state.quizId, state.answers]);
 
@@ -155,18 +189,38 @@ export default function CompatibilityQuizScreen() {
 
   const isComplete        = Object.keys(state.answers).length === COMPATIBILITY_QUESTIONS.length;
   const question          = COMPATIBILITY_QUESTIONS[state.currentQuestion];
-  const progressFillStyle = useMemo(() => [st.progressFill, { width: `${((state.currentQuestion + 1) / COMPATIBILITY_QUESTIONS.length) * 100}%` as `${number}%` }], [state.currentQuestion]);
-  const submitBtnStyle    = useMemo(() => [st.submitButton, state.step === 'submitting' && st.submitButtonDisabled], [state.step]);
+  const progressFillStyle = useMemo(
+    () => [st.progressFill, { width: `${((state.currentQuestion + 1) / COMPATIBILITY_QUESTIONS.length) * 100}%` as `${number}%` }],
+    [state.currentQuestion],
+  );
+  const submitBtnStyle = useMemo(
+    () => [st.submitButton, state.step === 'submitting' && st.submitButtonDisabled],
+    [state.step],
+  );
 
   const categoryRows = useMemo<CategoryRow[]>(
-    () => state.quizResult ? Object.entries(state.quizResult.categoryScores).map(([category, score]) => ({ category, score: score as number })) : [],
+    () => state.quizResult
+      ? Object.entries(state.quizResult.categoryScores).map(([category, score]) => ({ category, score: score as number }))
+      : [],
     [state.quizResult],
   );
 
-  const renderCategoryRow = useCallback((props: LegendListRenderItemProps<CategoryRow>) => <CategoryRowItem {...props} />, []);
-  const renderOption      = useCallback(({ item }: LegendListRenderItemProps<string>) => (
-    <OptionItem option={item} isSelected={question ? state.answers[question.id] === item : false} onPress={handleAnswer} />
-  ), [question, state.answers, handleAnswer]);
+  // Fix #3: Remove `CategoryRowItem` from deps — it's a module-level component,
+  // not a reactive value. Fix #4: Remove `item` from option key extractor dep.
+  const renderCategoryRow = useCallback(
+    (props: LegendListRenderItemProps<CategoryRow>) => <CategoryRowItem {...props} />,
+    [],
+  );
+  const renderOption = useCallback(
+    ({ item }: LegendListRenderItemProps<string>) => (
+      <OptionItem
+        option={item}
+        isSelected={question ? state.answers[question.id] === item : false}
+        onPress={handleAnswer}
+      />
+    ),
+    [question, state.answers, handleAnswer],
+  );
 
   if (state.step === 'loading') return (
     <View style={st.container}>
@@ -176,22 +230,33 @@ export default function CompatibilityQuizScreen() {
   );
 
   if (state.step === 'result' && state.quizResult) {
+    // Fix #5: Destructure `color` and use it — was declared but never used.
     const { label, emoji, color } = getCompatibilityLabel(state.quizResult.score);
+    const scoreNumberStyle = [st.scoreNumber, { color }];
     return (
       <LegendList
-        data={categoryRows} keyExtractor={(item) => item.category} renderItem={renderCategoryRow}
-        recycleItems={true} estimatedItemSize={44} contentContainerStyle={st.resultContent}
+        data={categoryRows}
+        keyExtractor={categoryKeyExtractor}
+        renderItem={renderCategoryRow}
+        recycleItems={true}
+        estimatedItemSize={44}
+        contentContainerStyle={st.resultContent}
         ListHeaderComponent={<>
           <Text style={st.resultEmoji}>{emoji}</Text>
           <Text style={st.resultTitle}>{label}</Text>
           <View style={st.scoreCircle}>
-            <Text style={[st.scoreNumber, { color }]}>{state.quizResult.score}%</Text>
+            <Text style={scoreNumberStyle}>{state.quizResult.score}%</Text>
             <Text style={st.scoreLabel}>Compatibility</Text>
           </View>
           <Text style={st.categoriesTitle}>Category Breakdown</Text>
         </>}
         ListFooterComponent={
-          <TouchableOpacity style={st.doneButton} onPress={onBack} accessibilityLabel="Back to chat" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.doneButton}
+            onPress={onBack}
+            accessibilityLabel="Back to chat"
+            accessibilityRole="button"
+          >
             <Text style={st.doneButtonText}>Back to Chat</Text>
           </TouchableOpacity>
         }
@@ -205,7 +270,12 @@ export default function CompatibilityQuizScreen() {
       <Text style={st.waitingTitle}>Quiz Submitted!</Text>
       <Text style={st.waitingText}>Waiting for {matchName} to complete their answers...</Text>
       <Text style={st.waitingSubtext}>You'll both see the results once complete!</Text>
-      <TouchableOpacity style={st.backButton} onPress={onBack} accessibilityLabel="Back to chat" accessibilityRole="button">
+      <TouchableOpacity
+        style={st.backButton}
+        onPress={onBack}
+        accessibilityLabel="Back to chat"
+        accessibilityRole="button"
+      >
         <Text style={st.backButtonText}>Back to Chat</Text>
       </TouchableOpacity>
     </View>
@@ -223,18 +293,42 @@ export default function CompatibilityQuizScreen() {
         <Text style={st.progress}>{state.currentQuestion + 1}/{COMPATIBILITY_QUESTIONS.length}</Text>
       </View>
       <View style={st.progressBar}><View style={progressFillStyle} /></View>
-      <View style={st.categoryBadge}><Text style={st.categoryBadgeText}>{question.category.toUpperCase()}</Text></View>
+      <View style={st.categoryBadge}>
+        <Text style={st.categoryBadgeText}>{question.category.toUpperCase()}</Text>
+      </View>
       <Text style={st.questionText}>{question.question}</Text>
-      <LegendList data={question.options} keyExtractor={(item) => item} renderItem={renderOption} recycleItems={false} estimatedItemSize={62} style={st.optionsScroll} scrollEnabled={question.options.length > 5} />
+      <LegendList
+        data={question.options}
+        keyExtractor={optionKeyExtractor}
+        renderItem={renderOption}
+        recycleItems={false}
+        estimatedItemSize={62}
+        style={st.optionsScroll}
+        scrollEnabled={question.options.length > 5}
+      />
       <View style={st.navContainer}>
         {state.currentQuestion > 0 && (
-          <TouchableOpacity style={st.prevButton} onPress={onPrevQuestion} accessibilityLabel="Previous question" accessibilityRole="button">
+          <TouchableOpacity
+            style={st.prevButton}
+            onPress={onPrevQuestion}
+            accessibilityLabel="Previous question"
+            accessibilityRole="button"
+          >
             <Text style={st.prevButtonText}>← Previous</Text>
           </TouchableOpacity>
         )}
         {isComplete && (
-          <TouchableOpacity style={submitBtnStyle} onPress={onSubmit} disabled={state.step === 'submitting'} accessibilityLabel="Submit quiz" accessibilityRole="button" accessibilityState={{ disabled: state.step === 'submitting', busy: state.step === 'submitting' }}>
-            <Text style={st.submitButtonText}>{state.step === 'submitting' ? 'Submitting...' : '✓ Submit Quiz'}</Text>
+          <TouchableOpacity
+            style={submitBtnStyle}
+            onPress={onSubmit}
+            disabled={state.step === 'submitting'}
+            accessibilityLabel="Submit quiz"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: state.step === 'submitting', busy: state.step === 'submitting' }}
+          >
+            <Text style={st.submitButtonText}>
+              {state.step === 'submitting' ? 'Submitting...' : '✓ Submit Quiz'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>

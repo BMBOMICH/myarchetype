@@ -1,6 +1,6 @@
 export async function shareNciiHash(imageHash: string): Promise<boolean> {
   try {
-    const res = await fetch('https://api.stopncii.org/v1/hashes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.STOPNCII_API_KEY}` }, body: JSON.stringify({ hash: imageHash, hashType: 'PDQ', source: 'myarchetype', category: 'ai_generated_ncii' }) });
+    const res = await fetch('https://api.stopncii.org/v1/hashes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env['STOPNCII_API_KEY']}` }, body: JSON.stringify({ hash: imageHash, hashType: 'PDQ', source: 'myarchetype', category: 'ai_generated_ncii' }) });
     return res.ok;
   } catch { return false; }
 }

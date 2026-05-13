@@ -1,6 +1,6 @@
 import { writeAuditLog } from './logger';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
-const API = process.env.SAFETY_API_URL;
+const API = process.env['SAFETY_API_URL'];
 
 export interface IdVerificationResult { idVerification: boolean; documentVerify: boolean; idScan: boolean; documentLiveness: boolean; idLiveness: boolean; holdID: boolean; idAuthenticity: boolean; documentAuthentic: boolean; fakeIDDetect: boolean; verificationMethod: 'none' | 'manual' | 'commercial_api' | 'insightface_basic'; confidence: number; issues: string[]; }
 

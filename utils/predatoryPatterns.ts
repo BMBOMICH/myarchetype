@@ -3,7 +3,6 @@
  * [5.2] #323-333 | #326 hoovering | #327 pepDetection | #328 journalist
  */
 
-
 interface BoundaryMessage {
   text: string;
   timestamp: number;
@@ -139,7 +138,6 @@ export const boundaryTesting = detectEscalatingBoundaryTesting;
 export const escalatingBoundary = detectEscalatingBoundaryTesting;
 export const pushingLimits = detectEscalatingBoundaryTesting;
 
-
 const PHOTO_REQUEST_PATTERNS = [
   /send\s+(me\s+)?(a\s+)?(pic|photo|selfie|image|picture)/i,
   /show\s+me\s+(what\s+you\s+look\s+like|yourself|your\s+face|more)/i,
@@ -229,7 +227,6 @@ export const photoRequestPressure = detectPhotoRequestPressure;
 export const pressureForPhotos = detectPhotoRequestPressure;
 export const sendMePhotos = detectPhotoRequestPressure;
 
-
 const VULNERABILITY_SIGNALS = [
   { pattern: /just\s+(got\s+out\s+of|went\s+through)\s+a\s+(divorce|breakup|separation)/i, type: 'recent_breakup' },
   { pattern: /recently\s+(widowed|lost\s+my\s+(husband|wife|partner|spouse))/i, type: 'bereavement' },
@@ -298,7 +295,6 @@ export function detectVictimTargeting(
 export const predatoryPattern = detectVictimTargeting;
 export const victimSelection = detectVictimTargeting;
 export const targetingVulnerable = detectVictimTargeting;
-
 
 const GROOMING_STAGES = {
   trustBuilding: {
@@ -392,7 +388,6 @@ export function detectGroomingSequence(
 }
 
 export const grooming = detectGroomingSequence;
-
 
 const SCAM_SCRIPTS: Record<string, { patterns: RegExp[]; minMatches: number }> = {
   loveScam: {
@@ -496,7 +491,6 @@ export const militaryScam = detectScamScript;
 export const inheritanceScam = detectScamScript;
 export const oilRigScam = detectScamScript;
 
-
 export function hoovering(
   events: Array<{
     type: 'message' | 'block' | 'unmatch' | 'report' | 'view';
@@ -544,7 +538,6 @@ export function hoovering(
   };
 }
 
-
 export async function pepDetection(
   fullName: string,
   country: string
@@ -560,7 +553,7 @@ export async function pepDetection(
       `https://api.opensanctions.org/search/default?q=${query}&schema=Person&countries=${country}`,
       {
         headers: {
-          Authorization: `ApiKey ${process.env.OPENSANCTIONS_API_KEY ?? ''}`,
+          Authorization: `ApiKey ${process.env['OPENSANCTIONS_API_KEY'] ?? ''}`,
         },
       }
     );
@@ -593,7 +586,6 @@ export async function pepDetection(
 
   return { politicallyExposed: false, pepMatch: false, source: 'none' };
 }
-
 
 const JOURNALIST_TERMS = [
   'journalist', 'reporter', 'editor', 'correspondent', 'press',

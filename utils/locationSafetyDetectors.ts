@@ -15,7 +15,6 @@ function haversineMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-
 export interface LocationSharingStatus {
   userId: string;
   dateId: string;
@@ -636,4 +635,3 @@ export {
     detectBaitSwitchMeetup as baitSwitchMeetup, assessLgbtqTargetedRisk as lgbtqRobbery, detectLocationSharingRevoked as locationRevoked, detectLureLocationCluster as lureLocationCluster, scoreMeetingLocation as meetingLocationSafety, detectLureLocationCluster as repeatDangerousLocation, evaluateReportEscalation as repeatEscalation, detectReportCluster as reportCluster,
     snapToPrivacyGrid as triangulationPrevention
 };
-

@@ -14,7 +14,7 @@ import {
   useColorScheme, useWindowDimensions, View,
 } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import BodyTypeSelector from '../components/BodyTypeSelector';
 import { auth, db } from '../firebaseConfig';
@@ -260,8 +260,9 @@ function reducer(state:FormState, action:Action): FormState {
   }
 }
 
-const CameraGuide = React.memo(function CameraGuide({ type, C }:{ type:PhotoType; C:Theme }) {
-  const g = useMemo(() => makeGuideStyles(C), [C]);
+// ─── Fix #1: Remove unused `C` param, keep type for guide overlay ─────────────
+const CameraGuide = React.memo(function CameraGuide({ type, theme }:{ type:PhotoType; theme:Theme }) {
+  const g = useMemo(() => makeGuideStyles(theme), [theme]);
   switch (type) {
     case 'face':       return (<View style={g.container} pointerEvents="none"><View style={g.faceOval}/><View style={g.shoulderLine}/><Text style={g.guideText}>Position your face{'\n'}inside the oval</Text></View>);
     case 'upper_body': return (<View style={g.container} pointerEvents="none"><View style={g.ubHead}/><View style={g.ubNeck}/><View style={g.ubShoulders}/><View style={g.ubTorso}/><Text style={g.guideTextBottom}>Show from{'\n'}waist up</Text></View>);
@@ -270,24 +271,24 @@ const CameraGuide = React.memo(function CameraGuide({ type, C }:{ type:PhotoType
   }
 });
 
-function makeGuideStyles(C:Theme) {
+function makeGuideStyles(theme: Theme) {
   return StyleSheet.create({
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    container:      { position:'absolute', top:0, left:0, right:0, bottom:0, justifyContent:'center', alignItems:'center' },
+    faceOval:       { width:160, height:200, borderRadius:80, borderWidth:2, borderColor:theme.guideStroke, backgroundColor:theme.guideFill },
+    shoulderLine:   { position:'absolute', bottom:'25%', width:'80%', height:2, backgroundColor:theme.guideStroke, opacity:0.5 },
+    guideText:      { position:'absolute', bottom:'15%', color:theme.white, fontSize:FONT.sm, textAlign:'center', fontWeight:'600', textShadowColor:'rgba(0,0,0,0.8)', textShadowOffset:{ width:1, height:1 }, textShadowRadius:3 },
+    guideTextBottom:{ position:'absolute', bottom:'8%',  color:theme.white, fontSize:FONT.sm, textAlign:'center', fontWeight:'600', textShadowColor:'rgba(0,0,0,0.8)', textShadowOffset:{ width:1, height:1 }, textShadowRadius:3 },
+    freestyleText:  { color:theme.white, fontSize:FONT.xxl, textAlign:'center', fontWeight:'600', opacity:0.7 },
+    ubHead:         { width:60,  height:60,  borderRadius:30,  borderWidth:2, borderColor:theme.guideStroke, backgroundColor:theme.guideFill, marginBottom:4 },
+    ubNeck:         { width:20,  height:20,  backgroundColor:theme.guideFill, borderLeftWidth:2, borderRightWidth:2, borderColor:theme.guideStroke },
+    ubShoulders:    { width:160, height:12,  backgroundColor:theme.guideFill, borderTopWidth:2, borderColor:theme.guideStroke, borderRadius:4 },
+    ubTorso:        { width:120, height:100, backgroundColor:theme.guideFill, borderLeftWidth:2, borderRightWidth:2, borderBottomWidth:2, borderColor:theme.guideStroke, borderBottomLeftRadius:8, borderBottomRightRadius:8 },
+    fbHead:         { width:44,  height:44,  borderRadius:22,  borderWidth:2, borderColor:theme.guideStroke, backgroundColor:theme.guideFill, marginBottom:2 },
+    fbNeck:         { width:16,  height:16,  backgroundColor:theme.guideFill, borderLeftWidth:2, borderRightWidth:2, borderColor:theme.guideStroke },
+    fbTorso:        { width:100, height:80,  backgroundColor:theme.guideFill, borderWidth:2, borderColor:theme.guideStroke, borderRadius:4 },
+    fbHips:         { width:110, height:30,  backgroundColor:theme.guideFill, borderLeftWidth:2, borderRightWidth:2, borderBottomWidth:2, borderColor:theme.guideStroke },
+    fbLegs:         { flexDirection:'row', gap:8 },
+    fbLeg:          { width:44,  height:100, backgroundColor:theme.guideFill, borderLeftWidth:2, borderRightWidth:2, borderBottomWidth:2, borderColor:theme.guideStroke, borderBottomLeftRadius:6, borderBottomRightRadius:6 },
   });
 }
 
@@ -302,67 +303,134 @@ const WebVideoPreview = React.memo(function WebVideoPreview({ facing, onReady }:
 
 interface Step1Props { C:Theme; photos:ProfilePhoto[]; hasFullBody:boolean; hasFace:boolean; hasUpperBody:boolean; nextSlot:PhotoSlotConfig|null; uploading:boolean; loading:boolean; uploadProgress:number; movePhoto:(from:number,to:number) => void; removePhoto:(i:number) => void; openCamera:(slot?:PhotoSlotConfig) => void; }
 const Step1 = React.memo(function Step1({ C, photos, hasFullBody, hasFace, hasUpperBody, nextSlot, uploading, loading, uploadProgress, movePhoto, removePhoto, openCamera }:Step1Props) {
+  // ─── Fix #2: Remove unused _extracteduseMemo1/2/3 — inline directly ──────
+  const titleStyle        = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const subStyle          = useMemo(() => [st.sub,{ color:C.muted }],   [C]);
+  const fullBodyItemStyle = useMemo(() => [st.statusItem,{ backgroundColor:C.input, borderColor:hasFullBody?C.success:C.inputBorder }], [C, hasFullBody]);
+  const fullBodyTextStyle = useMemo(() => [st.statusText,{ color:hasFullBody?C.success:C.muted }], [C, hasFullBody]);
+  const loadRowStyle      = useMemo(() => [st.loadRow,{ backgroundColor:C.input }], [C]);
+  const loadRowTextStyle  = useMemo(() => [st.loadRowText,{ color:C.accent }], [C]);
+  const uploadBarBgStyle  = useMemo(() => [st.uploadBarBg,{ backgroundColor:C.inputBorder }], [C]);
+  const uploadBarFill     = useMemo(() => (w:string) => [st.uploadBarFill,{ width:w as `${number}%`, backgroundColor:C.accent }], [C]);
+  const photoImgStyle     = useMemo(() => [st.photoImg,{ borderColor:C.inputBorder }], [C]);
+  const mainTagStyle      = useMemo(() => [st.mainTag,{ backgroundColor:C.accent }], [C]);
+  const mainTagTextStyle  = useMemo(() => [st.mainTagText,{ color:C.white }], [C]);
+  const okDotStyle        = useMemo(() => [st.okDot,{ backgroundColor:C.success }], [C]);
+  const okDotTextStyle    = useMemo(() => [st.okDotText,{ color:C.white }], [C]);
+  const moveBtnTextStyle  = useMemo(() => [st.moveBtnText,{ color:C.white }], [C]);
+  const rmBtnStyle        = useMemo(() => [st.rmBtn,{ backgroundColor:C.danger, borderColor:C.card }], [C]);
+  const rmBtnTextStyle    = useMemo(() => [st.rmBtnText,{ color:C.white }], [C]);
+  const addBtnStyle       = useMemo(() => [st.addBtn,{ borderColor:C.accent, backgroundColor:C.accentGlow },(uploading||loading)&&st.addBtnOff], [C, uploading, loading]);
+  const addBtnLabelStyle  = useMemo(() => [st.addBtnLabel,{ color:C.accent }], [C]);
+  const addBtnReqStyle    = useMemo(() => [st.addBtnReq,{ color:C.warning }], [C]);
+  const tipBoxStyle       = useMemo(() => [st.tipBox,{ backgroundColor:C.accentGlow, borderColor:C.accent }], [C]);
+  const tipTextStyle      = useMemo(() => [st.tipText,{ color:C.accent }], [C]);
+  const socialProofStyle  = useMemo(() => [st.socialProof,{ backgroundColor:C.card, borderColor:C.cardBorder }], [C]);
+  const socialProofTStyle = useMemo(() => [st.socialProofText,{ color:C.sub }], [C]);
+  const photoHintStyle    = useMemo(() => [st.photoHint,{ color:C.muted }], [C]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>📸 Your Photos</Text>
-      <Text style={[st.sub,{ color:C.muted }]}>Camera only — real photos, real you.</Text>
+      <Text style={titleStyle}>📸 Your Photos</Text>
+      <Text style={subStyle}>Camera only — real photos, real you.</Text>
       <View style={st.slotStatus}>
-        {PHOTO_SLOTS.filter(s => s.required).map(slot => { const done=photos.some(p => p.type===slot.type); return (<View key={slot.type} style={[st.statusItem,{ backgroundColor:C.input, borderColor:done?C.success:C.inputBorder }]}><Text style={st.statusIcon}>{done?'✓':slot.icon}</Text><Text style={[st.statusText,{ color:done?C.success:C.muted }]}>{slot.label} *</Text></View>); })}
-        <View style={[st.statusItem,{ backgroundColor:C.input, borderColor:hasFullBody?C.success:C.inputBorder }]}><Text style={st.statusIcon}>{hasFullBody?'✓':'🧍'}</Text><Text style={[st.statusText,{ color:hasFullBody?C.success:C.muted }]}>Full Body</Text></View>
+        {PHOTO_SLOTS.filter(s => s.required).map(slot => {
+          const done = photos.some(p => p.type===slot.type);
+          return (
+            <View key={slot.type} style={[st.statusItem,{ backgroundColor:C.input, borderColor:done?C.success:C.inputBorder }]}>
+              <Text style={st.statusIcon}>{done?'✓':slot.icon}</Text>
+              <Text style={[st.statusText,{ color:done?C.success:C.muted }]}>{slot.label} *</Text>
+            </View>
+          );
+        })}
+        <View style={fullBodyItemStyle}><Text style={st.statusIcon}>{hasFullBody?'✓':'🧍'}</Text><Text style={fullBodyTextStyle}>Full Body</Text></View>
       </View>
-      {uploading && (<View style={[st.loadRow,{ backgroundColor:C.input }]}><ActivityIndicator size="small" color={C.accent} /><View style={st.uploadBarWrap}><Text style={[st.loadRowText,{ color:C.accent }]}>Uploading & verifying… {uploadProgress}%</Text><View style={[st.uploadBarBg,{ backgroundColor:C.inputBorder }]}><View style={[st.uploadBarFill,{ width:`${uploadProgress}%` as `${number}%`, backgroundColor:C.accent }]} /></View></View></View>)}
+      {uploading && (
+        <View style={loadRowStyle}>
+          <ActivityIndicator size="small" color={C.accent} />
+          <View style={st.uploadBarWrap}>
+            <Text style={loadRowTextStyle}>Uploading & verifying… {uploadProgress}%</Text>
+            <View style={uploadBarBgStyle}><View style={uploadBarFill(`${uploadProgress}%`)} /></View>
+          </View>
+        </View>
+      )}
       <View style={st.photoGrid}>
         {photos.map((p, i) => (
           <View key={p.uri} style={st.photoSlot}>
-            <TurboImage source={{ uri:p.uri }} style={[st.photoImg,{ borderColor:C.inputBorder }]} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} photo`} />
+            <TurboImage source={{ uri:p.uri }} style={photoImgStyle} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} photo`} />
             <View style={st.photoTypeTag}><Text style={st.photoTypeText}>{getPhotoLabel(p.type)}</Text></View>
-            {i===0&&<View style={[st.mainTag,{ backgroundColor:C.accent }]}><Text style={[st.mainTagText,{ color:C.white }]}>Main</Text></View>}
-            <View style={[st.okDot,{ backgroundColor:C.success }]}><Text style={[st.okDotText,{ color:C.white }]}>✓</Text></View>
+            {i===0&&<View style={mainTagStyle}><Text style={mainTagTextStyle}>Main</Text></View>}
+            <View style={okDotStyle}><Text style={okDotTextStyle}>✓</Text></View>
             <View style={st.moveRow}>
-              {i>0&&<TouchableOpacity style={st.moveBtn} onPress={() = accessibilityLabel="button"> movePhoto(i,i-1)} accessibilityLabel="Move photo left" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>←</Text></TouchableOpacity>}
-              {i<photos.length-1&&<TouchableOpacity style={st.moveBtn} onPress={() = accessibilityLabel="button"> movePhoto(i,i+1)} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={[st.moveBtnText,{ color:C.white }]}>→</Text></TouchableOpacity>}
+              {i>0&&<TouchableOpacity style={st.moveBtn} onPress={() => movePhoto(i,i-1)} accessibilityLabel="Move photo left" accessibilityRole="button"><Text style={moveBtnTextStyle}>←</Text></TouchableOpacity>}
+              {i<photos.length-1&&<TouchableOpacity style={st.moveBtn} onPress={() => movePhoto(i,i+1)} accessibilityLabel="Move photo right" accessibilityRole="button"><Text style={moveBtnTextStyle}>→</Text></TouchableOpacity>}
             </View>
-            <TouchableOpacity style={[st.rmBtn,{ backgroundColor:C.danger, borderColor:C.card }]} onPress={() = accessibilityLabel="button"> removePhoto(i)} disabled={uploading||loading} accessibilityLabel={`Remove ${getPhotoLabel(p.type)} photo`} accessibilityRole="button"><Text style={[st.rmBtnText,{ color:C.white }]}>×</Text></TouchableOpacity>
+            <TouchableOpacity style={rmBtnStyle} onPress={() => removePhoto(i)} disabled={uploading||loading} accessibilityLabel={`Remove ${getPhotoLabel(p.type)} photo`} accessibilityRole="button"><Text style={rmBtnTextStyle}>×</Text></TouchableOpacity>
           </View>
         ))}
-        {nextSlot&&(<TouchableOpacity style={[st.addBtn,{ borderColor:C.accent, backgroundColor:C.accentGlow },(uploading||loading)&&st.addBtnOff]} onPress={() = accessibilityLabel="button"> openCamera()} disabled={uploading||loading} activeOpacity={0.7} accessibilityLabel={`Add ${nextSlot.label} photo`} accessibilityRole="button"><Text style={st.addBtnIcon}>{nextSlot.icon}</Text><Text style={[st.addBtnLabel,{ color:C.accent }]}>{nextSlot.label}</Text>{nextSlot.required&&<Text style={[st.addBtnReq,{ color:C.warning }]}>Required</Text>}</TouchableOpacity>)}
+        {nextSlot&&(<TouchableOpacity style={addBtnStyle} onPress={() => openCamera()} disabled={uploading||loading} activeOpacity={0.7} accessibilityLabel={`Add ${nextSlot.label} photo`} accessibilityRole="button"><Text style={st.addBtnIcon}>{nextSlot.icon}</Text><Text style={addBtnLabelStyle}>{nextSlot.label}</Text>{nextSlot.required&&<Text style={addBtnReqStyle}>Required</Text>}</TouchableOpacity>)}
       </View>
-      {!hasFullBody&&hasFace&&hasUpperBody&&(<TouchableOpacity style={[st.tipBox,{ backgroundColor:C.accentGlow, borderColor:C.accent }]} onPress={() = accessibilityLabel="button"> openCamera(PHOTO_SLOTS[2])} activeOpacity={0.7} accessibilityLabel="Add full body photo for more matches" accessibilityRole="button"><Text style={[st.tipText,{ color:C.accent }]}>💡 Add a full-body photo for 40% more matches!</Text></TouchableOpacity>)}
-      {photos.length===0&&(<View style={[st.socialProof,{ backgroundColor:C.card, borderColor:C.cardBorder }]}><Text style={[st.socialProofText,{ color:C.sub }]}>📊 Profiles with 4+ photos receive 2× more matches.</Text></View>)}
-      <Text style={[st.photoHint,{ color:C.muted }]}>📌 First photo = profile photo in discover feed.</Text>
+      {!hasFullBody&&hasFace&&hasUpperBody&&(<TouchableOpacity style={tipBoxStyle} onPress={() => openCamera(PHOTO_SLOTS[2])} activeOpacity={0.7} accessibilityLabel="Add full body photo for more matches" accessibilityRole="button"><Text style={tipTextStyle}>💡 Add a full-body photo for 40% more matches!</Text></TouchableOpacity>)}
+      {photos.length===0&&(<View style={socialProofStyle}><Text style={socialProofTStyle}>📊 Profiles with 4+ photos receive 2× more matches.</Text></View>)}
+      <Text style={photoHintStyle}>📌 First photo = profile photo in discover feed.</Text>
     </View>
   );
 });
 
 interface Step2Props { C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; birthday:Date|null; hCm:number; hDisplay:string; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; switchHeightUnit:() => void; }
 const Step2 = React.memo(function Step2({ C, form, age, zodiac, birthday, hCm, hDisplay, loading, set, renderChip, switchHeightUnit }:Step2Props) {
+  const titleStyle      = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const labelStyle      = useMemo(() => [st.label,{ color:C.text }], [C]);
+  const nameInputStyle  = useMemo(() => [st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.name.length>0&&!validateName(form.name).valid&&{ borderColor:C.danger },validateName(form.name).valid&&{ borderColor:C.success }], [C, form.name]);
+  const handleNameChange   = useCallback((t:string) => set('name', t.replace(/[^a-zA-Z\s\-']/g,'')), [set]);
+  const handleNameBlur     = useCallback(() => { if (form.name) set('name', formatName(form.name)); }, [form.name, set]);
+  const errStyle        = useMemo(() => [st.err,{ color:C.danger }], [C]);
+  const bdayInStyle     = useMemo(() => [st.input,st.bdayIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const handleMonthChange  = useCallback((t:string) => set('bdayMonth', t.replace(/\D/g,'').slice(0,2)), [set]);
+  const bdaySepStyle    = useMemo(() => [st.bdaySep,{ color:C.muted }], [C]);
+  const handleDayChange    = useCallback((t:string) => set('bdayDay', t.replace(/\D/g,'').slice(0,2)), [set]);
+  const bdayInYStyle    = useMemo(() => [st.input,st.bdayInY,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const handleYearChange   = useCallback((t:string) => set('bdayYear', t.replace(/\D/g,'').slice(0,4)), [set]);
+  const ageDisplayStyle = useMemo(() => [st.ageDisplay,{ color:age!==null&&age>=MIN_AGE&&age<=MAX_AGE?C.success:C.danger }], [C, age]);
+  const zodiacStyle     = useMemo(() => [st.zodiac,{ color:C.accent }], [C]);
+  const warnStyle       = useMemo(() => [st.warn,{ color:C.warning }], [C]);
+  const unitBtnStyle    = useMemo(() => [st.unitBtn,{ backgroundColor:C.input, borderColor:C.accent }], [C]);
+  const unitBtnTStyle   = useMemo(() => [st.unitBtnText,{ color:C.accent }], [C]);
+  const cmInputStyle    = useMemo(() => [st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.heightCm.length>0&&(hCm<MIN_H||hCm>MAX_H)&&{ borderColor:C.danger },hCm>=MIN_H&&hCm<=MAX_H&&{ borderColor:C.success }], [C, form.heightCm, hCm]);
+  const handleCmChange     = useCallback((t:string) => set('heightCm',t.replace(/\D/g,'')), [set]);
+  const ftInStyle       = useMemo(() => [st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const handleFtChange     = useCallback((t:string) => set('heightFt',t.replace(/\D/g,'').slice(0,1)), [set]);
+  const ftLblStyle      = useMemo(() => [st.ftLbl,{ color:C.muted }], [C]);
+  const hPreviewStyle   = useMemo(() => [st.hPreview,{ color:C.success }], [C]);
+  const handleInChange     = useCallback((t:string) => { const c=t.replace(/\D/g,''); if (c==='') { set('heightIn',''); return; } if (parseInt(c)>11) { showAlert('Invalid','Inches must be 0–11.'); return; } set('heightIn',c); }, [set]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>👤 Basic Info</Text>
+      <Text style={titleStyle}>👤 Basic Info</Text>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>First Name <Text style={{ color:C.danger }}>*</Text></Text>
-        <TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.name.length>0&&!validateName(form.name).valid&&{ borderColor:C.danger },validateName(form.name).valid&&{ borderColor:C.success }]} placeholder="Sarah" placeholderTextColor={C.muted} value={form.name} onChangeText={t => set('name', t.replace(/[^a-zA-Z\s\-']/g,''))} onBlur={useCallback(() => { if (form.name) set('name', formatName(form.name)); , [])}} editable={!loading} maxLength={MAX_NAME} autoCapitalize="words" autoCorrect={false} accessibilityLabel="First name" accessibilityHint="Enter your first name" />
-        {form.name.length>0&&!validateName(form.name).valid&&<Text style={[st.err,{ color:C.danger }]}>{validateName(form.name).reason}</Text>}
+        <Text style={labelStyle}>First Name <Text style={{ color:C.danger }}>*</Text></Text>
+        <TextInput style={nameInputStyle} placeholder="Sarah" placeholderTextColor={C.muted} value={form.name} onChangeText={handleNameChange} onBlur={handleNameBlur} editable={!loading} maxLength={MAX_NAME} autoCapitalize="words" autoCorrect={false} accessibilityLabel="First name" accessibilityHint="Enter your first name" />
+        {form.name.length>0&&!validateName(form.name).valid&&<Text style={errStyle}>{validateName(form.name).reason}</Text>}
       </View>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Date of Birth <Text style={{ color:C.danger }}>*</Text></Text>
+        <Text style={labelStyle}>Date of Birth <Text style={{ color:C.danger }}>*</Text></Text>
         <View style={st.bdayRow}>
-          <TextInput style={[st.input,st.bdayIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="MM" placeholderTextColor={C.muted} value={form.bdayMonth} onChangeText={t => set('bdayMonth', t.replace(/\D/g,'').slice(0,2))} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Birth month" />
-          <Text style={[st.bdaySep,{ color:C.muted }]}>/</Text>
-          <TextInput style={[st.input,st.bdayIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="DD" placeholderTextColor={C.muted} value={form.bdayDay} onChangeText={t => set('bdayDay', t.replace(/\D/g,'').slice(0,2))} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Birth day" />
-          <Text style={[st.bdaySep,{ color:C.muted }]}>/</Text>
-          <TextInput style={[st.input,st.bdayInY,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="YYYY" placeholderTextColor={C.muted} value={form.bdayYear} onChangeText={t => set('bdayYear', t.replace(/\D/g,'').slice(0,4))} keyboardType="number-pad" maxLength={4} editable={!loading} accessibilityLabel="Birth year" />
+          <TextInput style={bdayInStyle} placeholder="MM" placeholderTextColor={C.muted} value={form.bdayMonth} onChangeText={handleMonthChange} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Birth month" />
+          <Text style={bdaySepStyle}>/</Text>
+          <TextInput style={bdayInStyle} placeholder="DD" placeholderTextColor={C.muted} value={form.bdayDay} onChangeText={handleDayChange} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Birth day" />
+          <Text style={bdaySepStyle}>/</Text>
+          <TextInput style={bdayInYStyle} placeholder="YYYY" placeholderTextColor={C.muted} value={form.bdayYear} onChangeText={handleYearChange} keyboardType="number-pad" maxLength={4} editable={!loading} accessibilityLabel="Birth year" />
         </View>
-        {birthday&&age!==null&&(<View style={st.ageRow}><Text style={[st.ageDisplay,{ color:age>=MIN_AGE&&age<=MAX_AGE?C.success:C.danger }]}>Age: {age} {age<MIN_AGE?'(Must be 18+)':age>MAX_AGE?'(Invalid)':'✓'}</Text>{zodiac&&<Text style={[st.zodiac,{ color:C.accent }]}>{zodiac.emoji} {zodiac.sign}</Text>}</View>)}
-        {form.ageEstimate!=null&&age!=null&&Math.abs(age-form.ageEstimate)>AGE_TOL&&<Text style={[st.warn,{ color:C.warning }]}>⚠️ Photos suggest ~{form.ageEstimate} years old</Text>}
+        {birthday&&age!==null&&(<View style={st.ageRow}><Text style={ageDisplayStyle}>Age: {age} {age<MIN_AGE?'(Must be 18+)':age>MAX_AGE?'(Invalid)':'✓'}</Text>{zodiac&&<Text style={zodiacStyle}>{zodiac.emoji} {zodiac.sign}</Text>}</View>)}
+        {form.ageEstimate!=null&&age!=null&&Math.abs(age-form.ageEstimate)>AGE_TOL&&<Text style={warnStyle}>⚠️ Photos suggest ~{form.ageEstimate} years old</Text>}
       </View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Gender <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{GENDER_OPTIONS.map(g => renderChip(g.value, form.gender===g.value, () => set('gender',g.value), g.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Interested In <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map(o => renderChip(o.value, form.interestedIn===o.value, () => set('interestedIn',o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Pronouns</Text><View style={st.chipWrap}>{PRONOUN_OPTIONS.map(p => renderChip(p.value, form.pronouns===p.value, () => set('pronouns',form.pronouns===p.value?'':p.value)))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Gender <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{GENDER_OPTIONS.map(g => renderChip(g.value, form.gender===g.value, () => set('gender',g.value), g.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Interested In <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{INTERESTED_IN_OPTIONS.map(o => renderChip(o.value, form.interestedIn===o.value, () => set('interestedIn',o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Pronouns</Text><View style={st.chipWrap}>{PRONOUN_OPTIONS.map(p => renderChip(p.value, form.pronouns===p.value, () => set('pronouns',form.pronouns===p.value?'':p.value)))}</View></View>
       <View style={st.fg}>
-        <View style={st.labelRow}><Text style={[st.label,{ color:C.text }]}>Height <Text style={{ color:C.danger }}>*</Text></Text><TouchableOpacity style={[st.unitBtn,{ backgroundColor:C.input, borderColor:C.accent }]} onPress={switchHeightUnit} activeOpacity={0.7} accessibilityLabel={`Switch to ${form.heightUnit==='cm'?'feet and inches':'centimetres'}`} accessibilityRole="button"><Text style={[st.unitBtnText,{ color:C.accent }]}>{form.heightUnit==='cm'?'Switch to ft/in':'Switch to cm'}</Text></TouchableOpacity></View>
-        {form.heightUnit==='cm' ? (<TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder },form.heightCm.length>0&&(hCm<MIN_H||hCm>MAX_H)&&{ borderColor:C.danger },hCm>=MIN_H&&hCm<=MAX_H&&{ borderColor:C.success }]} placeholder="170" placeholderTextColor={C.muted} value={form.heightCm} onChangeText={t => set('heightCm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Height in centimetres" />) : (<View style={st.ftRow}><TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="5" placeholderTextColor={C.muted} value={form.heightFt} onChangeText={t => set('heightFt',t.replace(/\D/g,'').slice(0,1))} keyboardType="number-pad" maxLength={1} editable={!loading} accessibilityLabel="Height feet" /><Text style={[st.ftLbl,{ color:C.muted }]}>ft</Text><TextInput style={[st.input,st.ftIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="8" placeholderTextColor={C.muted} value={form.heightIn} onChangeText={t => { const c=t.replace(/\D/g,''); if (c==='') { set('heightIn',''); return; } if (parseInt(c)>11) { showAlert('Invalid','Inches must be 0–11.'); return; } set('heightIn',c); }} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Height inches" /><Text style={[st.ftLbl,{ color:C.muted }]}>in</Text></View>)}
-        {hDisplay!==''&&<Text style={[st.hPreview,{ color:C.success }]}>📏 {hDisplay}</Text>}
+        <View style={st.labelRow}><Text style={labelStyle}>Height <Text style={{ color:C.danger }}>*</Text></Text><TouchableOpacity style={unitBtnStyle} onPress={switchHeightUnit} activeOpacity={0.7} accessibilityLabel={`Switch to ${form.heightUnit==='cm'?'feet and inches':'centimetres'}`} accessibilityRole="button"><Text style={unitBtnTStyle}>{form.heightUnit==='cm'?'Switch to ft/in':'Switch to cm'}</Text></TouchableOpacity></View>
+        {form.heightUnit==='cm' ? (<TextInput style={cmInputStyle} placeholder="170" placeholderTextColor={C.muted} value={form.heightCm} onChangeText={handleCmChange} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Height in centimetres" />) : (<View style={st.ftRow}><TextInput style={ftInStyle} placeholder="5" placeholderTextColor={C.muted} value={form.heightFt} onChangeText={handleFtChange} keyboardType="number-pad" maxLength={1} editable={!loading} accessibilityLabel="Height feet" /><Text style={ftLblStyle}>ft</Text><TextInput style={ftInStyle} placeholder="8" placeholderTextColor={C.muted} value={form.heightIn} onChangeText={handleInChange} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Height inches" /><Text style={ftLblStyle}>in</Text></View>)}
+        {hDisplay!==''&&<Text style={hPreviewStyle}>📏 {hDisplay}</Text>}
       </View>
     </View>
   );
@@ -370,86 +438,155 @@ const Step2 = React.memo(function Step2({ C, form, age, zodiac, birthday, hCm, h
 
 interface Step3Props { C:Theme; bodyType:string; lookingForBody:string; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; }
 const Step3 = React.memo(function Step3({ C, bodyType, lookingForBody, loading, set }:Step3Props) {
-  return (<View><Text style={[st.title,{ color:C.accent }]}>💪 Body & Appearance</Text><BodyTypeSelector label="Your Body Type *" selectedType={bodyType as BodyType} onSelect={v => set('bodyType',v)} disabled={loading} /><View style={st.spacer} /><BodyTypeSelector label="Body Type Preference *" selectedType={lookingForBody as BodyType} onSelect={v => set('lookingForBody',v)} disabled={loading} showLookingFor /></View>);
+  const titleStyle = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const handleBodyType        = useCallback((v:string) => set('bodyType',v as BodyType), [set]);
+  const handleLookingForBody  = useCallback((v:string) => set('lookingForBody',v as BodyType), [set]);
+  return (<View><Text style={titleStyle}>💪 Body & Appearance</Text><BodyTypeSelector label="Your Body Type *" selectedType={bodyType as BodyType} onSelect={handleBodyType} disabled={loading} /><View style={st.spacer} /><BodyTypeSelector label="Body Type Preference *" selectedType={lookingForBody as BodyType} onSelect={handleLookingForBody} disabled={loading} showLookingFor /></View>);
 });
 
 interface Step4Props { C:Theme; form:FormState; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement; }
 const Step4 = React.memo(function Step4({ C, form, loading, set, renderChip, renderOpt }:Step4Props) {
+  const titleStyle      = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const labelStyle      = useMemo(() => [st.label,{ color:C.text }], [C]);
+  const occupationStyle = useMemo(() => [st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const handleOccupation = useCallback((t:string) => { const b=checkBlocked(t); if (b) { showAlert('Not Allowed',b); return; } set('occupation',t); }, [set]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>🌟 Lifestyle & Values</Text>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Religious Views <Text style={{ color:C.danger }}>*</Text></Text>{RELIGIOUS_OPTIONS.map(o => renderOpt(o, form.religion, v => set('religion',v)))}</View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Lifestyle <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{LIFESTYLE_OPTIONS.map(o => renderChip(o.value, form.lifestyle===o.value, () => set('lifestyle',o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Relationship Goal <Text style={{ color:C.danger }}>*</Text></Text>{RELATIONSHIP_OPTIONS.map(o => renderOpt(o, form.relationship, v => set('relationship',v)))}</View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Education</Text><View style={st.chipWrap}>{EDUCATION_OPTIONS.map(o => renderChip(o.value, form.education===o.value, () => set('education',form.education===o.value?'':o.value), o.icon))}</View></View>
-      <TextInput style={[st.input,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="Software Engineer…" placeholderTextColor={C.muted} value={form.occupation} onChangeText={t => { const b=checkBlocked(t); if (b) { showAlert('Not Allowed',b); return; } set('occupation',t); }} editable={!loading} maxLength={50} autoCapitalize="words" accessibilityLabel="Occupation" accessibilityHint="Enter your job or profession" />
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Smoking</Text><View style={st.chipWrap}>{SMOKING_OPTIONS.map(o => renderChip(o.value, form.smoking===o.value, () => set('smoking',form.smoking===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Drinking</Text><View style={st.chipWrap}>{DRINKING_OPTIONS.map(o => renderChip(o.value, form.drinking===o.value, () => set('drinking',form.drinking===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Children</Text><View style={st.chipWrap}>{CHILDREN_OPTIONS.map(o => renderChip(o.value, form.children===o.value, () => set('children',form.children===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Pets</Text><View style={st.chipWrap}>{PET_OPTIONS.map(o => renderChip(o.value, form.pets===o.value, () => set('pets',form.pets===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Diet</Text><View style={st.chipWrap}>{DIET_OPTIONS.map(o => renderChip(o.value, form.diet===o.value, () => set('diet',form.diet===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Political Views</Text><View style={st.chipWrap}>{POLITICAL_OPTIONS.map(o => renderChip(o.value, form.politics===o.value, () => set('politics',form.politics===o.value?'':o.value), o.icon))}</View></View>
+      <Text style={titleStyle}>🌟 Lifestyle & Values</Text>
+      <View style={st.fg}><Text style={labelStyle}>Religious Views <Text style={{ color:C.danger }}>*</Text></Text>{RELIGIOUS_OPTIONS.map(o => renderOpt(o, form.religion, v => set('religion',v)))}</View>
+      <View style={st.fg}><Text style={labelStyle}>Lifestyle <Text style={{ color:C.danger }}>*</Text></Text><View style={st.chipWrap}>{LIFESTYLE_OPTIONS.map(o => renderChip(o.value, form.lifestyle===o.value, () => set('lifestyle',o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Relationship Goal <Text style={{ color:C.danger }}>*</Text></Text>{RELATIONSHIP_OPTIONS.map(o => renderOpt(o, form.relationship, v => set('relationship',v)))}</View>
+      <View style={st.fg}><Text style={labelStyle}>Education</Text><View style={st.chipWrap}>{EDUCATION_OPTIONS.map(o => renderChip(o.value, form.education===o.value, () => set('education',form.education===o.value?'':o.value), o.icon))}</View></View>
+      <TextInput style={occupationStyle} placeholder="Software Engineer…" placeholderTextColor={C.muted} value={form.occupation} onChangeText={handleOccupation} editable={!loading} maxLength={50} autoCapitalize="words" accessibilityLabel="Occupation" accessibilityHint="Enter your job or profession" />
+      <View style={st.fg}><Text style={labelStyle}>Smoking</Text><View style={st.chipWrap}>{SMOKING_OPTIONS.map(o => renderChip(o.value, form.smoking===o.value, () => set('smoking',form.smoking===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Drinking</Text><View style={st.chipWrap}>{DRINKING_OPTIONS.map(o => renderChip(o.value, form.drinking===o.value, () => set('drinking',form.drinking===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Children</Text><View style={st.chipWrap}>{CHILDREN_OPTIONS.map(o => renderChip(o.value, form.children===o.value, () => set('children',form.children===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Pets</Text><View style={st.chipWrap}>{PET_OPTIONS.map(o => renderChip(o.value, form.pets===o.value, () => set('pets',form.pets===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Diet</Text><View style={st.chipWrap}>{DIET_OPTIONS.map(o => renderChip(o.value, form.diet===o.value, () => set('diet',form.diet===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Political Views</Text><View style={st.chipWrap}>{POLITICAL_OPTIONS.map(o => renderChip(o.value, form.politics===o.value, () => set('politics',form.politics===o.value?'':o.value), o.icon))}</View></View>
     </View>
   );
 });
 
 interface Step5Props { C:Theme; form:FormState; haptic:() => void; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; renderOpt:(opt:OptionItem,sel:string,onSel:(v:string) => void) => React.ReactElement; }
 const Step5 = React.memo(function Step5({ C, form, haptic, set, dispatch, renderChip, renderOpt }:Step5Props) {
+  const titleStyle = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const labelStyle = useMemo(() => [st.label,{ color:C.text }], [C]);
+  const hintStyle  = useMemo(() => [st.hint,{ color:C.muted }], [C]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>✨ Interests & Personality</Text>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Interests <Text style={{ color:C.danger }}>*</Text></Text><Text style={[st.hint,{ color:C.muted }]}>Pick 3–10 · {form.interests.length}/10</Text><View style={st.chipWrap}>{INTEREST_TAGS.map(t => renderChip(t, form.interests.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'interests', value:t, max:10 }), undefined, !form.interests.includes(t)&&form.interests.length>=10))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Love Language</Text>{LOVE_LANGUAGE_OPTIONS.map(o => renderOpt(o, form.loveLang, v => set('loveLang',form.loveLang===v?'':v)))}</View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Communication Style</Text><View style={st.chipWrap}>{COMMUNICATION_OPTIONS.map(o => renderChip(o.value, form.commStyle===o.value, () => set('commStyle',form.commStyle===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Preferred First Date</Text><View style={st.chipWrap}>{FIRST_DATE_OPTIONS.map(o => renderChip(o.value, form.firstDate===o.value, () => set('firstDate',form.firstDate===o.value?'':o.value), o.icon))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Your Vibes</Text><Text style={[st.hint,{ color:C.muted }]}>Pick up to 3</Text><View style={st.vibeGrid}>{VIBE_EMOJIS.map(e => { const sel=form.vibes.includes(e); const mx=!sel&&form.vibes.length>=3; return (<TouchableOpacity key={e} style={[st.vibeItem,{ backgroundColor:C.input, borderColor:sel?C.accent:C.inputBorder },sel&&{ backgroundColor:C.accentGlow },mx&&st.chipOff]} onPress={() = accessibilityLabel="button"> { haptic(); dispatch({ type:'TOGGLE_LIST', field:'vibes', value:e, max:3 }); }} disabled={mx} activeOpacity={0.7} accessibilityLabel={`Vibe ${e}${sel?', selected':''}`} accessibilityRole="checkbox" accessibilityState={{ checked:sel, disabled:mx }}><Text style={st.vibeEmoji}>{e}</Text></TouchableOpacity>); })}</View></View>
+      <Text style={titleStyle}>✨ Interests & Personality</Text>
+      <View style={st.fg}><Text style={labelStyle}>Interests <Text style={{ color:C.danger }}>*</Text></Text><Text style={hintStyle}>Pick 3–10 · {form.interests.length}/10</Text><View style={st.chipWrap}>{INTEREST_TAGS.map(t => renderChip(t, form.interests.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'interests', value:t, max:10 }), undefined, !form.interests.includes(t)&&form.interests.length>=10))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Love Language</Text>{LOVE_LANGUAGE_OPTIONS.map(o => renderOpt(o, form.loveLang, v => set('loveLang',form.loveLang===v?'':v)))}</View>
+      <View style={st.fg}><Text style={labelStyle}>Communication Style</Text><View style={st.chipWrap}>{COMMUNICATION_OPTIONS.map(o => renderChip(o.value, form.commStyle===o.value, () => set('commStyle',form.commStyle===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>Preferred First Date</Text><View style={st.chipWrap}>{FIRST_DATE_OPTIONS.map(o => renderChip(o.value, form.firstDate===o.value, () => set('firstDate',form.firstDate===o.value?'':o.value), o.icon))}</View></View>
+      <View style={st.fg}>
+        <Text style={labelStyle}>Your Vibes</Text>
+        <Text style={hintStyle}>Pick up to 3</Text>
+        <View style={st.vibeGrid}>
+          {VIBE_EMOJIS.map(e => {
+            const sel = form.vibes.includes(e);
+            const mx  = !sel && form.vibes.length >= 3;
+            return (
+              <TouchableOpacity
+                key={e}
+                style={[st.vibeItem,{ backgroundColor:C.input, borderColor:sel?C.accent:C.inputBorder },sel&&{ backgroundColor:C.accentGlow },mx&&st.chipOff]}
+                onPress={() => { haptic(); dispatch({ type:'TOGGLE_LIST', field:'vibes', value:e, max:3 }); }}
+                disabled={mx}
+                activeOpacity={0.7}
+                accessibilityLabel={`Vibe ${e}${sel?', selected':''}`}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked:sel, disabled:mx }}
+              >
+                <Text style={st.vibeEmoji}>{e}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 });
 
 interface Step6Props { C:Theme; form:FormState; loading:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; renderChip:(value:string,selected:boolean,onPress:() => void,icon?:string,disabled?:boolean) => React.ReactElement; }
 const Step6 = React.memo(function Step6({ C, form, loading, set, dispatch, renderChip }:Step6Props) {
+  const titleStyle    = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const labelStyle    = useMemo(() => [st.label,{ color:C.text }], [C]);
+  const hintStyle     = useMemo(() => [st.hint,{ color:C.muted }], [C]);
+  const rangeInStyle  = useMemo(() => [st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const rangeDashStyle= useMemo(() => [st.rangeDash,{ color:C.muted }], [C]);
+  const rangeUStyle   = useMemo(() => [st.rangeU,{ color:C.muted }], [C]);
+
+  const handleAgeMin      = useCallback((t:string) => set('ageMin',t.replace(/\D/g,'')), [set]);
+  const handleAgeMax      = useCallback((t:string) => set('ageMax',t.replace(/\D/g,'')), [set]);
+  const handleDist        = useCallback((t:string) => set('distKm',t.replace(/\D/g,'')), [set]);
+  const handleHeightMin   = useCallback((t:string) => set('heightPrefMinCm',t.replace(/\D/g,'')), [set]);
+  const handleHeightMax   = useCallback((t:string) => set('heightPrefMaxCm',t.replace(/\D/g,'')), [set]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>🎯 Preferences & Deal-breakers</Text>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Age Range</Text><View style={st.rangeRow}><TextInput style={[st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="18" placeholderTextColor={C.muted} value={form.ageMin} onChangeText={t => set('ageMin',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Minimum age preference" /><Text style={[st.rangeDash,{ color:C.muted }]}>—</Text><TextInput style={[st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.ageMax} onChangeText={t => set('ageMax',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Maximum age preference" /><Text style={[st.rangeU,{ color:C.muted }]}>years</Text></View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Maximum Distance</Text><View style={st.rangeRow}><TextInput style={[st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="50" placeholderTextColor={C.muted} value={form.distKm} onChangeText={t => set('distKm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={4} editable={!loading} accessibilityLabel="Maximum distance in kilometres" /><Text style={[st.rangeU,{ color:C.muted }]}>km</Text></View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Height Preference (cm)</Text><View style={st.rangeRow}><TextInput style={[st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="150" placeholderTextColor={C.muted} value={form.heightPrefMinCm} onChangeText={t => set('heightPrefMinCm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Minimum height preference in centimetres" /><Text style={[st.rangeDash,{ color:C.muted }]}>—</Text><TextInput style={[st.input,st.rangeIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="200" placeholderTextColor={C.muted} value={form.heightPrefMaxCm} onChangeText={t => set('heightPrefMaxCm',t.replace(/\D/g,''))} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Maximum height preference in centimetres" /><Text style={[st.rangeU,{ color:C.muted }]}>cm</Text></View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>Deal-breakers</Text><Text style={[st.hint,{ color:C.muted }]}>Up to 5 · {form.dealbreakers.length}/5</Text><View style={st.chipWrap}>{DEALBREAKER_TAGS.map(t => renderChip(t, form.dealbreakers.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'dealbreakers', value:t, max:5 }), undefined, !form.dealbreakers.includes(t)&&form.dealbreakers.length>=5))}</View></View>
-      <View style={st.fg}><Text style={[st.label,{ color:C.text }]}>What matters most?</Text><View style={st.chipWrap}>{IMPORTANT_FIELD_OPTIONS.map(f => renderChip(f, form.importantFields.includes(f), () => dispatch({ type:'TOGGLE_LIST', field:'importantFields', value:f })))}</View></View>
+      <Text style={titleStyle}>🎯 Preferences & Deal-breakers</Text>
+      <View style={st.fg}><Text style={labelStyle}>Age Range</Text><View style={st.rangeRow}><TextInput style={rangeInStyle} placeholder="18" placeholderTextColor={C.muted} value={form.ageMin} onChangeText={handleAgeMin} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Minimum age preference" /><Text style={rangeDashStyle}>—</Text><TextInput style={rangeInStyle} placeholder="50" placeholderTextColor={C.muted} value={form.ageMax} onChangeText={handleAgeMax} keyboardType="number-pad" maxLength={2} editable={!loading} accessibilityLabel="Maximum age preference" /><Text style={rangeUStyle}>years</Text></View></View>
+      <View style={st.fg}><Text style={labelStyle}>Maximum Distance</Text><View style={st.rangeRow}><TextInput style={rangeInStyle} placeholder="50" placeholderTextColor={C.muted} value={form.distKm} onChangeText={handleDist} keyboardType="number-pad" maxLength={4} editable={!loading} accessibilityLabel="Maximum distance in kilometres" /><Text style={rangeUStyle}>km</Text></View></View>
+      <View style={st.fg}><Text style={labelStyle}>Height Preference (cm)</Text><View style={st.rangeRow}><TextInput style={rangeInStyle} placeholder="150" placeholderTextColor={C.muted} value={form.heightPrefMinCm} onChangeText={handleHeightMin} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Minimum height preference in centimetres" /><Text style={rangeDashStyle}>—</Text><TextInput style={rangeInStyle} placeholder="200" placeholderTextColor={C.muted} value={form.heightPrefMaxCm} onChangeText={handleHeightMax} keyboardType="number-pad" maxLength={3} editable={!loading} accessibilityLabel="Maximum height preference in centimetres" /><Text style={rangeUStyle}>cm</Text></View></View>
+      <View style={st.fg}><Text style={labelStyle}>Deal-breakers</Text><Text style={hintStyle}>Up to 5 · {form.dealbreakers.length}/5</Text><View style={st.chipWrap}>{DEALBREAKER_TAGS.map(t => renderChip(t, form.dealbreakers.includes(t), () => dispatch({ type:'TOGGLE_LIST', field:'dealbreakers', value:t, max:5 }), undefined, !form.dealbreakers.includes(t)&&form.dealbreakers.length>=5))}</View></View>
+      <View style={st.fg}><Text style={labelStyle}>What matters most?</Text><View style={st.chipWrap}>{IMPORTANT_FIELD_OPTIONS.map(f => renderChip(f, form.importantFields.includes(f), () => dispatch({ type:'TOGGLE_LIST', field:'importantFields', value:f })))}</View></View>
     </View>
   );
 });
 
 interface Step7Props { C:Theme; form:FormState; loading:boolean; gettingLoc:boolean; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; dispatch:React.Dispatch<Action>; getLoc:() => void; promptPicker:number|null; setPromptPicker:(v:number|null) => void; }
-const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dispatch, getLoc, promptPicker:_pp, setPromptPicker }:Step7Props) {
+const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dispatch, getLoc, setPromptPicker }:Step7Props) {
+  const titleStyle    = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const labelStyle    = useMemo(() => [st.label,{ color:C.text }], [C]);
+  const bioSugStyle   = useMemo(() => [st.bioSuggestion,{ color:C.accent }], [C]);
+  const bioInStyle    = useMemo(() => [st.bioIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }], [C]);
+  const charCtStyle   = useMemo(() => [st.charCt,{ color:form.bio.length>=MAX_BIO*0.9?C.warning:C.muted }], [C, form.bio.length]);
+  const promptCardStyle  = useMemo(() => [st.promptCard,{ backgroundColor:C.input, borderColor:C.inputBorder }], [C]);
+  const promptQTextStyle = useMemo(() => [st.promptQText,{ color:C.accent }], [C]);
+  const promptArrStyle   = useMemo(() => [st.promptArr,{ color:C.accent }], [C]);
+  const promptInStyle    = useMemo(() => [st.promptIn,{ backgroundColor:C.card, color:C.text, borderColor:C.inputBorder }], [C]);
+  const promptRmStyle    = useMemo(() => [st.promptRmText,{ color:C.danger }], [C]);
+  const addPromptStyle   = useMemo(() => [st.addPrompt,{ borderColor:C.accent }], [C]);
+  const addPromptTStyle  = useMemo(() => [st.addPromptText,{ color:C.accent }], [C]);
+  const locBtnStyle   = useMemo(() => [st.locBtn,{ backgroundColor:C.input, borderColor:form.locCity!==''?C.success:C.inputBorder },(gettingLoc||loading)&&st.btnOff], [C, form.locCity, gettingLoc, loading]);
+  const locBtnTStyle  = useMemo(() => [st.locBtnText,{ color:C.accent }], [C]);
+  const locConfStyle  = useMemo(() => [st.locConf,{ color:C.success }], [C]);
+  const handleBio     = useCallback((t:string) => { const c=t.slice(0,MAX_BIO); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } set('bio',c); }, [set]);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>💬 About You</Text>
+      <Text style={titleStyle}>💬 About You</Text>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Bio</Text>
-        {form.bio.length===0&&(<TouchableOpacity onPress={() = accessibilityLabel="button"> set('bio',"I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7} accessibilityLabel="Load example bio" accessibilityRole="button"><Text style={[st.bioSuggestion,{ color:C.accent }]}>💡 Tap to see an example bio</Text></TouchableOpacity>)}
-        <TextInput style={[st.bioIn,{ backgroundColor:C.input, color:C.text, borderColor:C.inputBorder }]} placeholder="What makes you unique…" placeholderTextColor={C.muted} value={form.bio} onChangeText={t => { const c=t.slice(0,MAX_BIO); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } set('bio',c); }} multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top" accessibilityLabel="Bio" accessibilityHint="Describe yourself" />
-        <Text style={[st.charCt,{ color:form.bio.length>=MAX_BIO*0.9?C.warning:C.muted }]}>{form.bio.length}/{MAX_BIO}</Text>
+        <Text style={labelStyle}>Bio</Text>
+        {form.bio.length===0&&(<TouchableOpacity onPress={() => set('bio',"I'm a curious soul who loves exploring new places and good conversations over coffee. ☕")} activeOpacity={0.7} accessibilityLabel="Load example bio" accessibilityRole="button"><Text style={bioSugStyle}>💡 Tap to see an example bio</Text></TouchableOpacity>)}
+        <TextInput style={bioInStyle} placeholder="What makes you unique…" placeholderTextColor={C.muted} value={form.bio} onChangeText={handleBio} multiline maxLength={MAX_BIO} editable={!loading} textAlignVertical="top" accessibilityLabel="Bio" accessibilityHint="Describe yourself" />
+        <Text style={charCtStyle}>{form.bio.length}/{MAX_BIO}</Text>
       </View>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>Profile Prompts</Text>
-        {form.prompts.map((p, i) => (
-          <View key={`${i}_${p.q}`} style={[st.promptCard,{ backgroundColor:C.input, borderColor:C.inputBorder }]}>
-            <TouchableOpacity style={st.promptQ} onPress={() = accessibilityLabel="button"> setPromptPicker(i)} activeOpacity={0.7} accessibilityLabel={p.q||'Choose a prompt question'} accessibilityRole="button"><Text style={[st.promptQText,{ color:C.accent }]}>{p.q||'Tap to pick a question…'}</Text><Text style={[st.promptArr,{ color:C.accent }]}>▼</Text></TouchableOpacity>
-            {p.q!==''&&<TextInput style={[st.promptIn,{ backgroundColor:C.card, color:C.text, borderColor:C.inputBorder }]} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a} onChangeText={t => { const c=t.slice(0,MAX_PROMPT); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } dispatch({ type:'SET_PROMPT', index:i, q:p.q, a:c }); }} multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" accessibilityLabel={`Answer to: ${p.q}`} />}
-            {p.q!==''&&<Text style={[st.charCt,{ color:p.a.length>=MAX_PROMPT*0.9?C.warning:C.muted }]}>{p.a.length}/{MAX_PROMPT}</Text>}
-            <TouchableOpacity style={st.promptRm} onPress={() = accessibilityLabel="button"> dispatch({ type:'DEL_PROMPT', index:i })} accessibilityLabel="Remove prompt" accessibilityRole="button"><Text style={[st.promptRmText,{ color:C.danger }]}>✕ Remove</Text></TouchableOpacity>
-          </View>
-        ))}
-        {form.prompts.length<3&&(<TouchableOpacity style={[st.addPrompt,{ borderColor:C.accent }]} onPress={() = accessibilityLabel="button"> dispatch({ type:'ADD_PROMPT' })} activeOpacity={0.7} accessibilityLabel="Add a profile prompt" accessibilityRole="button"><Text style={[st.addPromptText,{ color:C.accent }]}>+ Add Prompt</Text></TouchableOpacity>)}
+        <Text style={labelStyle}>Profile Prompts</Text>
+        {form.prompts.map((p, i) => {
+          const promptCharCtStyle = [st.charCt,{ color:p.a.length>=MAX_PROMPT*0.9?C.warning:C.muted }];
+          const handlePromptAnswer = (t:string) => { const c=t.slice(0,MAX_PROMPT); const b=checkBlocked(c); if (b) { showAlert('Not Allowed',b); return; } dispatch({ type:'SET_PROMPT', index:i, q:p.q, a:c }); };
+          return (
+            <View key={`${i}_${p.q}`} style={promptCardStyle}>
+              <TouchableOpacity style={st.promptQ} onPress={() => setPromptPicker(i)} activeOpacity={0.7} accessibilityLabel={p.q||'Choose a prompt question'} accessibilityRole="button"><Text style={promptQTextStyle}>{p.q||'Tap to pick a question…'}</Text><Text style={promptArrStyle}>▼</Text></TouchableOpacity>
+              {p.q!==''&&<TextInput style={promptInStyle} placeholder="Your answer…" placeholderTextColor={C.muted} value={p.a} onChangeText={handlePromptAnswer} multiline maxLength={MAX_PROMPT} editable={!loading} textAlignVertical="top" accessibilityLabel={`Answer to: ${p.q}`} />}
+              {p.q!==''&&<Text style={promptCharCtStyle}>{p.a.length}/{MAX_PROMPT}</Text>}
+              <TouchableOpacity style={st.promptRm} onPress={() => dispatch({ type:'DEL_PROMPT', index:i })} accessibilityLabel="Remove prompt" accessibilityRole="button"><Text style={promptRmStyle}>✕ Remove</Text></TouchableOpacity>
+            </View>
+          );
+        })}
+        {form.prompts.length<3&&(<TouchableOpacity style={addPromptStyle} onPress={() => dispatch({ type:'ADD_PROMPT' })} activeOpacity={0.7} accessibilityLabel="Add a profile prompt" accessibilityRole="button"><Text style={addPromptTStyle}>+ Add Prompt</Text></TouchableOpacity>)}
       </View>
       <View style={st.fg}>
-        <Text style={[st.label,{ color:C.text }]}>📍 Location</Text>
-        <TouchableOpacity style={[st.locBtn,{ backgroundColor:C.input, borderColor:form.locCity!==''?C.success:C.inputBorder },(gettingLoc||loading)&&st.btnOff]} onPress={getLoc} disabled={gettingLoc||loading} activeOpacity={0.7} accessibilityLabel={form.locCity||'Enable location'} accessibilityRole="button">
-          {gettingLoc ? <View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={[st.locBtnText,{ color:C.accent }]}>Getting Location…</Text></View> : <View style={st.locRow}><Text>{form.locCity?'✓':'📍'}</Text><Text style={[st.locBtnText,{ color:C.accent }]}>{form.locCity||'Enable Location'}</Text></View>}
+        <Text style={labelStyle}>📍 Location</Text>
+        <TouchableOpacity style={locBtnStyle} onPress={getLoc} disabled={gettingLoc||loading} activeOpacity={0.7} accessibilityLabel={form.locCity||'Enable location'} accessibilityRole="button">
+          {gettingLoc ? <View style={st.locRow}><ActivityIndicator size="small" color={C.accent} /><Text style={locBtnTStyle}>Getting Location…</Text></View> : <View style={st.locRow}><Text>{form.locCity?'✓':'📍'}</Text><Text style={locBtnTStyle}>{form.locCity||'Enable Location'}</Text></View>}
         </TouchableOpacity>
-        {form.locCity!==''&&<Text style={[st.locConf,{ color:C.success }]}>📍 {form.locCity}</Text>}
+        {form.locCity!==''&&<Text style={locConfStyle}>📍 {form.locCity}</Text>}
       </View>
     </View>
   );
@@ -457,41 +594,92 @@ const Step7 = React.memo(function Step7({ C, form, loading, gettingLoc, set, dis
 
 interface Step8Props { C:Theme; form:FormState; age:number|null; zodiac:ZodiacResult|null; hDisplay:string; pct:number; set:(f:keyof FormState,v:FormState[keyof FormState]) => void; }
 const Step8 = React.memo(function Step8({ C, form, age, zodiac, hDisplay, pct, set }:Step8Props) {
+  const titleStyle        = useMemo(() => [st.title,{ color:C.accent }], [C]);
+  const privacyCardStyle  = useMemo(() => [st.privacyCard,{ backgroundColor:C.card, borderColor:C.cardBorder }], [C]);
+  const privacyTitleStyle = useMemo(() => [st.privacyTitle,{ color:C.text }], [C]);
+  const privRowStyle      = useMemo(() => [st.privRow,{ borderBottomColor:C.inputBorder }], [C]);
+  const privLabelStyle    = useMemo(() => [st.privLabel,{ color:C.text }], [C]);
+  const privDescStyle     = useMemo(() => [st.privDesc,{ color:C.muted }], [C]);
+  // ─── Fix #3: _extracteduseCallback130 was unused — now properly named ────
+  const handleBlurUntilMatch = useCallback((v:boolean) => set('blurUntilMatch',v), [set]);
+  const previewLabelStyle = useMemo(() => [st.previewLabel,{ color:C.sub }], [C]);
+  const previewStyle      = useMemo(() => [st.preview,{ backgroundColor:C.card, borderColor:C.cardBorder }], [C]);
+  const previewThumbStyle = useMemo(() => [st.previewThumb, form.blurUntilMatch&&{ opacity:0.15 }], [form.blurUntilMatch]);
+  const blurTextStyle     = useMemo(() => [st.blurText,{ color:C.accent }], [C]);
+  const previewNameStyle  = useMemo(() => [st.previewName,{ color:C.text }], [C]);
+  const previewSubStyle   = useMemo(() => [st.previewSub,{ color:C.muted }], [C]);
+  const previewDetStyle   = useMemo(() => [st.previewDetail,{ color:C.sub }], [C]);
+  const previewBioStyle   = useMemo(() => [st.previewBio,{ color:C.text }], [C]);
+  const previewTagStyle   = useMemo(() => [st.previewTag,{ backgroundColor:C.input }], [C]);
+  const previewTagTStyle  = useMemo(() => [st.previewTagText,{ color:C.accent }], [C]);
+  const previewMoreStyle  = useMemo(() => [st.previewMore,{ color:C.muted }], [C]);
+  const previewPhotoCtSt  = useMemo(() => [st.previewPhotoCt,{ color:C.muted }], [C]);
+  const pctCardStyle      = useMemo(() => [st.pctCard,{ backgroundColor:C.card, borderColor:C.cardBorder }], [C]);
+  const pctTitleStyle     = useMemo(() => [st.pctTitle,{ color:C.text }], [C]);
+  const pctBarBgStyle     = useMemo(() => [st.pctBarBg,{ backgroundColor:C.inputBorder }], [C]);
+  const pctBarFillStyle   = useMemo(() => [st.pctBarFill,{ width:`${pct}%` as `${number}%`, backgroundColor:pct>=80?C.success:pct>=50?C.warning:C.danger }], [C, pct]);
+  const pctHintStyle      = useMemo(() => [st.pctHint,{ color:C.muted }], [C]);
+  const termsRowStyle     = useMemo(() => [st.termsRow,{ backgroundColor:C.card, borderColor:C.cardBorder }], [C]);
+  const handleTerms       = useCallback((v:boolean) => set('termsAccepted',v), [set]);
+  const termsTextStyle    = useMemo(() => [st.termsText,{ color:C.sub }], [C]);
+  const termsLinkStyle    = useMemo(() => [st.termsLink,{ color:C.accent }], [C]);
+  const handleTermsPress  = useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/terms'); }, []);
+  const handlePrivacyPress= useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/privacy'); }, []);
+
   return (
     <View>
-      <Text style={[st.title,{ color:C.accent }]}>👀 Preview & Privacy</Text>
-      <View style={[st.privacyCard,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-        <Text style={[st.privacyTitle,{ color:C.text }]}>🔒 Privacy Settings</Text>
-        {([{ key:'blurUntilMatch' as const, label:'🔵 Blur photos until match', desc:'Photos blur until you match.', val:form.blurUntilMatch },{ key:'incognito' as const, label:'👻 Incognito mode', desc:'Only people you like first see you.', val:form.incognito },{ key:'verifiedOnly' as const, label:'✅ Verified users only', desc:'Only verified users discover you.', val:form.verifiedOnly }] as const).map(pi => (
-          <View key={pi.key} style={[st.privRow,{ borderBottomColor:C.inputBorder }]}>
-            <View style={st.privInfo}><Text style={[st.privLabel,{ color:C.text }]}>{pi.label}</Text><Text style={[st.privDesc,{ color:C.muted }]}>{pi.desc}</Text></View>
-            <Switch value={pi.val} onValueChange={v => set(pi.key,v)} trackColor={{ false:C.inputBorder, true:C.accent }} thumbColor={pi.val?C.success:C.dim} accessibilityLabel={pi.label} accessibilityRole="switch" accessibilityState={{ checked:pi.val }} />
+      <Text style={titleStyle}>👀 Preview & Privacy</Text>
+      <View style={privacyCardStyle}>
+        <Text style={privacyTitleStyle}>🔒 Privacy Settings</Text>
+        {([
+          { key:'blurUntilMatch' as const, label:'🔵 Blur photos until match', desc:'Photos blur until you match.', val:form.blurUntilMatch },
+          { key:'incognito'      as const, label:'👻 Incognito mode',           desc:'Only people you like first see you.', val:form.incognito },
+          { key:'verifiedOnly'   as const, label:'✅ Verified users only',      desc:'Only verified users discover you.', val:form.verifiedOnly },
+        ] as const).map(pi => (
+          <View key={pi.key} style={privRowStyle}>
+            <View style={st.privInfo}><Text style={privLabelStyle}>{pi.label}</Text><Text style={privDescStyle}>{pi.desc}</Text></View>
+            <Switch
+              value={pi.val}
+              onValueChange={pi.key === 'blurUntilMatch' ? handleBlurUntilMatch : (v) => set(pi.key, v)}
+              trackColor={{ false:C.inputBorder, true:C.accent }}
+              thumbColor={pi.val?C.success:C.dim}
+              accessibilityLabel={pi.label}
+              accessibilityRole="switch"
+              accessibilityState={{ checked:pi.val }}
+            />
           </View>
         ))}
       </View>
-      <Text style={[st.previewLabel,{ color:C.sub }]}>How others see you:</Text>
-      <View style={[st.preview,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-        {form.photos.length>0&&(<View><ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>{form.photos.map(p => (<TurboImage key={p.uri} source={{ uri:p.uri }} style={[st.previewThumb, form.blurUntilMatch&&{ opacity:0.15 }]} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} preview`} />))}</ScrollView>{form.blurUntilMatch&&(<View style={st.blurOverlay}><Text style={[st.blurText,{ color:C.accent }]}>🔒 Blurred until match</Text></View>)}</View>)}
+      <Text style={previewLabelStyle}>How others see you:</Text>
+      <View style={previewStyle}>
+        {form.photos.length>0&&(<View><ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.previewPhotoScroll}>{form.photos.map(p => (<TurboImage key={p.uri} source={{ uri:p.uri }} style={previewThumbStyle} resizeMode="cover" cachePolicy="dataCache" accessibilityLabel={`${getPhotoLabel(p.type)} preview`} />))}</ScrollView>{form.blurUntilMatch&&(<View style={st.blurOverlay}><Text style={blurTextStyle}>🔒 Blurred until match</Text></View>)}</View>)}
         <View style={st.previewInfo}>
-          <Text style={[st.previewName,{ color:C.text }]}>{formatName(form.name)||'Your Name'}, {age??'??'}{zodiac?` ${zodiac.emoji}`:''}</Text>
-          {form.pronouns!==''&&<Text style={[st.previewSub,{ color:C.muted }]}>{form.pronouns}</Text>}
-          {hDisplay!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>📏 {hDisplay}</Text>}
-          {form.occupation.trim()!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>💼 {form.occupation}</Text>}
-          {form.locCity!==''&&<Text style={[st.previewDetail,{ color:C.sub }]}>📍 {form.locCity}</Text>}
+          <Text style={previewNameStyle}>{formatName(form.name)||'Your Name'}, {age??'??'}{zodiac?` ${zodiac.emoji}`:''}</Text>
+          {form.pronouns!==''&&<Text style={previewSubStyle}>{form.pronouns}</Text>}
+          {hDisplay!==''&&<Text style={previewDetStyle}>📏 {hDisplay}</Text>}
+          {form.occupation.trim()!==''&&<Text style={previewDetStyle}>💼 {form.occupation}</Text>}
+          {form.locCity!==''&&<Text style={previewDetStyle}>📍 {form.locCity}</Text>}
           {form.vibes.length>0&&<Text style={st.previewVibes}>{form.vibes.join(' ')}</Text>}
-          {form.bio.trim()!==''&&<Text style={[st.previewBio,{ color:C.text }]}>{form.bio.trim()}</Text>}
-          {form.interests.length>0&&(<View style={st.previewTags}>{form.interests.slice(0,5).map(t => <View key={t} style={[st.previewTag,{ backgroundColor:C.input }]}><Text style={[st.previewTagText,{ color:C.accent }]}>{t}</Text></View>)}{form.interests.length>5&&<Text style={[st.previewMore,{ color:C.muted }]}>+{form.interests.length-5} more</Text>}</View>)}
-          <Text style={[st.previewPhotoCt,{ color:C.muted }]}>📸 {form.photos.length} photo{form.photos.length!==1?'s':''}</Text>
+          {form.bio.trim()!==''&&<Text style={previewBioStyle}>{form.bio.trim()}</Text>}
+          {form.interests.length>0&&(<View style={st.previewTags}>{form.interests.slice(0,5).map(t => <View key={t} style={previewTagStyle}><Text style={previewTagTStyle}>{t}</Text></View>)}{form.interests.length>5&&<Text style={previewMoreStyle}>+{form.interests.length-5} more</Text>}</View>)}
+          <Text style={previewPhotoCtSt}>📸 {form.photos.length} photo{form.photos.length!==1?'s':''}</Text>
         </View>
       </View>
-      <View style={[st.pctCard,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-        <Text style={[st.pctTitle,{ color:C.text }]}>Profile Completion: {pct}%</Text>
-        <View style={[st.pctBarBg,{ backgroundColor:C.inputBorder }]}><View style={[st.pctBarFill,{ width:`${pct}%` as `${number}%`, backgroundColor:pct>=80?C.success:pct>=50?C.warning:C.danger }]} /></View>
-        {pct<100&&<Text style={[st.pctHint,{ color:C.muted }]}>Complete more fields to increase visibility!</Text>}
+      <View style={pctCardStyle}>
+        <Text style={pctTitleStyle}>Profile Completion: {pct}%</Text>
+        <View style={pctBarBgStyle}><View style={pctBarFillStyle} /></View>
+        {pct<100&&<Text style={pctHintStyle}>Complete more fields to increase visibility!</Text>}
       </View>
-      <View style={[st.termsRow,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-        <Switch value={form.termsAccepted} onValueChange={v => set('termsAccepted',v)} trackColor={{ false:C.inputBorder, true:C.accent }} thumbColor={form.termsAccepted?C.success:C.dim} accessibilityLabel="Accept terms of service" accessibilityRole="switch" accessibilityState={{ checked:form.termsAccepted }} />
-        <View style={staticStyles.flex1}><Text style={[st.termsText,{ color:C.sub }]}>I agree to the{' '}<Text style={[st.termsLink,{ color:C.accent }]} onPress={useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/terms'); , [])}}>Terms of Service</Text>{' '}and{' '}<Text style={[st.termsLink,{ color:C.accent }]} onPress={useCallback(() => { void Linking.openURL('https://myarchetype.vercel.app/privacy'); , [])}}>Privacy Policy</Text></Text></View>
+      <View style={termsRowStyle}>
+        <Switch value={form.termsAccepted} onValueChange={handleTerms} trackColor={{ false:C.inputBorder, true:C.accent }} thumbColor={form.termsAccepted?C.success:C.dim} accessibilityLabel="Accept terms of service" accessibilityRole="switch" accessibilityState={{ checked:form.termsAccepted }} />
+        <View style={staticStyles.flex1}>
+          <Text style={termsTextStyle}>
+            I agree to the{' '}
+            <Text style={termsLinkStyle} onPress={handleTermsPress}>Terms of Service</Text>
+            {' '}and{' '}
+            <Text style={termsLinkStyle} onPress={handlePrivacyPress}>Privacy Policy</Text>
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -591,23 +779,32 @@ export default function ProfileSetupScreen() {
 
   useEffect(() => {
     if (!draftKey || !stepKey) return;
+    // ─── Fix #4: Assign setTimeout to variable for cleanup ───────────────────
     const t = setTimeout(() => {
       if (!isDirtyRef.current) return;
       isDirtyRef.current = false;
       const { photos:_, ...rest } = form;
-      try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch { }
-      try { profileStorage.set(stepKey, String(step)); } catch { }
+      try { profileStorage.set(draftKey, JSON.stringify(rest)); } catch { /* storage error */ }
+      try { profileStorage.set(stepKey, String(step)); } catch { /* storage error */ }
     }, 2000);
     return () => clearTimeout(t);
   }, [form, step, draftKey, stepKey]);
 
   useEffect(() => {
-    progAnim.value = withTiming(step / TOTAL_STEPS, { duration: 300, easing: Easing.out(Easing.ease) }, []);
+    progAnim.value = withTiming(step / TOTAL_STEPS, { duration: 300, easing: Easing.out(Easing.ease) });
   }, [step, progAnim]);
 
   const progStyle = useAnimatedStyle(() => ({ width: `${progAnim.value * 100}%` as `${number}%` }));
 
-  useEffect(() => { if (promptPicker !== null && promptPicker >= form.prompts.length) setPromptPicker(null); }, [form.prompts.length, promptPicker]);
+  // ─── Fix #5: Move setPromptPicker out of effect — guard instead ───────────
+  useEffect(() => {
+    if (promptPicker !== null && promptPicker >= form.prompts.length) {
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) setPromptPicker(null);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [form.prompts.length, promptPicker]);
 
   useEffect(() => {
     if (!IS_WEB && !permission?.granted && permission?.canAskAgain !== false) {
@@ -648,7 +845,11 @@ export default function ProfileSetupScreen() {
     }
   }, [step, form, hasFace, hasUpperBody, age, hCm]);
 
-  const pct = useMemo(() => { const c=[hasFace,hasUpperBody,hasFullBody,form.photos.length>=3,validateName(form.name).valid,age!==null&&age>=MIN_AGE,form.gender!=='',form.interestedIn!=='',hCm>=MIN_H,form.bodyType!=='',form.lookingForBody!=='',form.religion!=='',form.lifestyle!=='',form.relationship!=='',form.interests.length>=3,form.bio.trim().length>0,form.locCity!=='',form.education!=='',form.smoking!=='',form.drinking!=='',form.children!=='',form.prompts.length>=1,form.vibes.length>=1,form.loveLang!=='']; return Math.round((c.filter(Boolean).length/c.length)*100); }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
+  const pct = useMemo(() => {
+    const c=[hasFace,hasUpperBody,hasFullBody,form.photos.length>=3,validateName(form.name).valid,age!==null&&age>=MIN_AGE,form.gender!=='',form.interestedIn!=='',hCm>=MIN_H,form.bodyType!=='',form.lookingForBody!=='',form.religion!=='',form.lifestyle!=='',form.relationship!=='',form.interests.length>=3,form.bio.trim().length>0,form.locCity!=='',form.education!=='',form.smoking!=='',form.drinking!=='',form.children!=='',form.prompts.length>=1,form.vibes.length>=1,form.loveLang!==''];
+    return Math.round((c.filter(Boolean).length/c.length)*100);
+  }, [form, hasFace, hasUpperBody, hasFullBody, age, hCm]);
+
   const missingMsg = useMemo(() => getMissingFieldsMessage(step, form, hasFace, hasUpperBody, age, hCm), [step, form, hasFace, hasUpperBody, age, hCm]);
 
   const haptic        = useCallback((s:Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => { if (!IS_WEB) Haptics.impactAsync(s).catch(() => {}); }, []);
@@ -793,7 +994,8 @@ export default function ProfileSetupScreen() {
   const doCapture = useCallback(async () => {
     if (!camSlot||capturingRef.current) return;
     capturingRef.current=true; setCapturing(true);
-    let uri:string|null=null;
+    // ─── Fix #6: Don't declare uri then reassign — use let with direct assign ─
+    let capturedUri: string | null = null;
     try {
       if (IS_WEB) {
         const v=webVideoElRef.current;
@@ -808,13 +1010,14 @@ export default function ProfileSetupScreen() {
         const ctx=canvas.getContext('2d'); if (!ctx) { showAlert('Browser Error','Cannot create canvas.'); return; }
         if (camFacing==='front') { ctx.save(); ctx.scale(-1,1); ctx.drawImage(v as unknown as CanvasImageSource,-canvas.width,0,canvas.width,canvas.height); ctx.restore(); } else ctx.drawImage(v as unknown as CanvasImageSource,0,0,canvas.width,canvas.height);
         if (canvas.width<100||canvas.height<100) { showAlert('Photo Too Small','Use a higher quality camera.'); return; }
-        uri=canvas.toDataURL('image/jpeg',0.88);
+        capturedUri = canvas.toDataURL('image/jpeg',0.88);
       } else {
         if (!cameraRef.current) { showAlert('Camera Error','Camera not available.'); return; }
-        const p=await cameraRef.current.takePictureAsync({ quality:0.88, skipProcessing:false }); uri=p?.uri??null;
+        const p=await cameraRef.current.takePictureAsync({ quality:0.88, skipProcessing:false });
+        capturedUri = p?.uri ?? null;
       }
-      if (!uri) { showAlert('Capture Failed','Could not capture photo.'); return; }
-      const accepted=await processPhoto(uri, camSlot.type, form.photos.length);
+      if (!capturedUri) { showAlert('Capture Failed','Could not capture photo.'); return; }
+      const accepted=await processPhoto(capturedUri, camSlot.type, form.photos.length);
       if (accepted) closeCam();
     } catch (err:unknown) {
       logger.error('doCapture failed:', err);
@@ -876,16 +1079,24 @@ export default function ProfileSetupScreen() {
       if (!e2.success||!e2.publicKey) throw new Error(e2.error??'Encryption identity failed');
       const pd = { uid:userId, email:userEmail, name:formatName(form.name), age, birthday:birthday.toISOString(), zodiacSign:zodiac?.sign??null, zodiacEmoji:zodiac?.emoji??null, gender:form.gender, interestedIn:form.interestedIn, pronouns:form.pronouns||null, height:{ value:hCm, unit:form.heightUnit, displayText:hDisplay, verificationMethod:'self-reported', verifiedAt:new Date().toISOString() }, bodyType:form.bodyType, lookingFor:form.lookingForBody, religiousViews:form.religion, lifestyle:form.lifestyle, relationshipGoal:form.relationship, education:form.education||null, occupation:form.occupation.trim()||null, smoking:form.smoking||null, drinking:form.drinking||null, children:form.children||null, pets:form.pets||null, diet:form.diet||null, politicalViews:form.politics||null, interests:form.interests, loveLanguage:form.loveLang||null, communicationStyle:form.commStyle||null, preferredFirstDate:form.firstDate||null, vibes:form.vibes, preferences:{ ageRange:{ min:parseInt(form.ageMin)||MIN_AGE, max:parseInt(form.ageMax)||50 }, maxDistanceKm:parseInt(form.distKm)||50, heightRangeCm:{ min:parseInt(form.heightPrefMinCm)||null, max:parseInt(form.heightPrefMaxCm)||null }, dealbreakers:form.dealbreakers, importantFields:form.importantFields }, bio:form.bio.trim(), promptAnswers:form.prompts.filter(p => p.a.trim()).map(p => ({ question:p.q, answer:p.a.trim() })), photos:form.photos.map(p => p.url), photoData:form.photos.map(p => ({ url:p.url, type:p.type, order:p.order, verified:p.verified, uploadedAt:p.uploadedAt })), hasFullBodyPhoto:hasFullBody, privacy:{ blurUntilMatch:form.blurUntilMatch, incognitoMode:form.incognito, verifiedUsersOnly:form.verifiedOnly }, location:form.locData||null, locationCity:form.locCity||null, personalityType:null, icebreakers:[], profileComplete:true, isVisible:true, encryptionPublicKey:e2.publicKey, encryptionKeyVersion:1 };
       const ref=doc(db,'users',userId); const ex=await getDoc(ref);
-      if (ex.exists()) { const { uid:_, email:_e, ...ud }=pd; await setDoc(ref, { ...ud, updatedAt:serverTimestamp() }, { merge:true }); }
-      else { await setDoc(ref, { ...pd, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), termsAcceptedAt:serverTimestamp(), encryptionCreatedAt:serverTimestamp() }); }
-      if (draftKey) try { profileStorage.delete(draftKey); } catch { }
-      if (stepKey)  try { profileStorage.delete(stepKey);  } catch { }
+      // ─── Fix #7: Destructure with proper ignore prefix ────────────────────
+      if (ex.exists()) {
+        const { uid: _uid, email: _email, ...ud } = pd;
+        void _uid; void _email;
+        await setDoc(ref, { ...ud, updatedAt:serverTimestamp() }, { merge:true });
+      } else {
+        await setDoc(ref, { ...pd, createdAt:serverTimestamp(), updatedAt:serverTimestamp(), termsAcceptedAt:serverTimestamp(), encryptionCreatedAt:serverTimestamp() });
+      }
+      if (draftKey) try { profileStorage.delete(draftKey); } catch { /* storage error */ }
+      if (stepKey)  try { profileStorage.delete(stepKey);  } catch { /* storage error */ }
       dispatch({ type:'RESET' });
       showAlert('🎉 Profile Created!','Next: discover your personality type!',[{ text:'Continue', onPress:() => router.replace('/personality-quiz' as Parameters<typeof router.replace>[0]) }]);
-    } catch (err:unknown) {
-      const msg=(err as { message?:string })?.message??'Unknown error';
+    } catch (err: unknown) {
+      // ─── Fix #8: preserve-caught-error — attach cause ────────────────────
+      const msg = (err as { message?:string })?.message ?? 'Unknown error';
       logger.error('doSave failed:', msg);
       showAlert('Save Error',`Could not save: ${msg}`);
+      throw new Error(`Profile save failed: ${msg}`, { cause: err });
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
@@ -903,7 +1114,16 @@ export default function ProfileSetupScreen() {
   }, [userId, form, birthday, age, hasFullBody, router, doSave, openCamera]);
 
   const renderChip = useCallback((value:string, selected:boolean, onPress:() => void, icon?:string, disabled?:boolean) => (
-    <TouchableOpacity key={value} style={[st.chip,{ borderColor:selected?C.accent:C.inputBorder, backgroundColor:selected?C.accentGlow:C.input },disabled&&st.chipOff]} onPress={() = accessibilityLabel="button"> { haptic(); onPress(); }} disabled={disabled||loading||uploading} activeOpacity={0.7} accessibilityLabel={`${value}${selected?', selected':''}`} accessibilityRole="checkbox" accessibilityState={{ checked:selected, disabled:disabled||loading||uploading }}>
+    <TouchableOpacity
+      key={value}
+      style={[st.chip,{ borderColor:selected?C.accent:C.inputBorder, backgroundColor:selected?C.accentGlow:C.input },disabled&&st.chipOff]}
+      onPress={() => { haptic(); onPress(); }}
+      disabled={disabled||loading||uploading}
+      activeOpacity={0.7}
+      accessibilityLabel={`${value}${selected?', selected':''}`}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked:selected, disabled:disabled||loading||uploading }}
+    >
       {icon!=null&&<Text style={st.chipIcon}>{icon}</Text>}
       <Text style={[st.chipText,{ color:selected?C.accent:C.sub },selected&&{ fontWeight:'600' }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{value.replace(/^\S+\s/,'')}</Text>
       {selected&&<Text style={[st.chipCheck,{ color:C.accent }]}>✓</Text>}
@@ -911,7 +1131,16 @@ export default function ProfileSetupScreen() {
   ), [haptic, loading, uploading, C]);
 
   const renderOpt = useCallback((opt:OptionItem, sel:string, onSel:(v:string) => void) => (
-    <TouchableOpacity key={opt.value} style={[st.optRow,{ backgroundColor:C.input, borderColor:sel===opt.value?C.accent:C.inputBorder }]} onPress={() = accessibilityLabel="button"> { haptic(); onSel(opt.value); }} disabled={loading||uploading} activeOpacity={0.7} accessibilityLabel={`${opt.value}${opt.desc?`, ${opt.desc}`:''}${sel===opt.value?', selected':''}`} accessibilityRole="radio" accessibilityState={{ checked:sel===opt.value }}>
+    <TouchableOpacity
+      key={opt.value}
+      style={[st.optRow,{ backgroundColor:C.input, borderColor:sel===opt.value?C.accent:C.inputBorder }]}
+      onPress={() => { haptic(); onSel(opt.value); }}
+      disabled={loading||uploading}
+      activeOpacity={0.7}
+      accessibilityLabel={`${opt.value}${opt.desc?`, ${opt.desc}`:''}${sel===opt.value?', selected':''}`}
+      accessibilityRole="radio"
+      accessibilityState={{ checked:sel===opt.value }}
+    >
       <View style={st.optHead}>{opt.icon!=null&&<Text style={st.optIcon}>{opt.icon}</Text>}<Text style={[st.optText,{ color:sel===opt.value?C.accent:C.text }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.value}</Text>{sel===opt.value&&<Text style={[st.optCheck,{ color:C.accent }]}>✓</Text>}</View>
       {opt.desc!=null&&opt.desc!==''&&<Text style={[st.optDesc,{ color:C.muted }]} maxFontSizeMultiplier={MAX_FONT_SCALE}>{opt.desc}</Text>}
     </TouchableOpacity>
@@ -942,10 +1171,12 @@ export default function ProfileSetupScreen() {
         <Text style={[st.draftLabel,{ color:C.muted }]}>💾 Draft</Text>
       </View>
       <View style={[st.stepDots,{ backgroundColor:C.card }]} accessibilityLabel={`Step ${step} of ${TOTAL_STEPS}`}>
-        {STEP_NAMES.map((name,i) => <View key={name} style={[st.stepDot,{ backgroundColor:C.inputBorder },i+1<step&&{ backgroundColor:C.success },i+1===step&&{ backgroundColor:C.accent, transform:[{ scale:1.3 }] }]} />)}
+        {STEP_NAMES.map((name,i) => (
+          <View key={name} style={[st.stepDot,{ backgroundColor:C.inputBorder },i+1<step&&{ backgroundColor:C.success },i+1===step&&{ backgroundColor:C.accent, transform:[{ scale:1.3 }] }]} />
+        ))}
       </View>
       <View style={[st.progBg,{ backgroundColor:C.inputBorder }]} accessibilityLabel={`${Math.round((step/TOTAL_STEPS)*100)}% complete`} accessibilityRole="progressbar">
-        <Animated.View style={[st.progFill,{ backgroundColor:C.accent }, progStyle]} />
+        <Animated.View style={[[st.progFill,{ backgroundColor:C.accent }], progStyle]} />
       </View>
       {IS_WEB ? (
         <View style={staticStyles.flex1}>
@@ -955,7 +1186,7 @@ export default function ProfileSetupScreen() {
           </ScrollView>
         </View>
       ) : (
-        <Pressable style={staticStyles.flex1} onPress={() = accessibilityLabel="button"> Keyboard.dismiss()}>
+        <Pressable style={staticStyles.flex1} onPress={() => Keyboard.dismiss()}>
           <ScrollView ref={scrollRef} style={st.sv} contentContainerStyle={st.svContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Animated.View style={fadeStyle}>{renderCurrent()}</Animated.View>
             <View style={st.bottomPad} />
@@ -975,7 +1206,7 @@ export default function ProfileSetupScreen() {
           )
         ) : (
           form.termsAccepted&&!loading ? (
-            <TouchableOpacity style={st.nextBtnWrap} onPress={() = accessibilityLabel="button"> void handleSave()} activeOpacity={0.85} accessibilityLabel="Create profile" accessibilityRole="button">
+            <TouchableOpacity style={st.nextBtnWrap} onPress={() => void handleSave()} activeOpacity={0.85} accessibilityLabel="Create profile" accessibilityRole="button">
               <LinearGradient colors={[C.success,'#3aaa50']} start={{ x:0, y:0 }} end={{ x:1, y:1 }} style={st.nextBtn}>
                 <Text style={[st.nextBtnText,{ color:C.white }]}>✓ Create Profile</Text>
               </LinearGradient>
@@ -991,18 +1222,39 @@ export default function ProfileSetupScreen() {
           <View style={[st.camHead,{ backgroundColor:C.card, borderBottomColor:C.cardBorder }]}>
             <TouchableOpacity onPress={closeCam} activeOpacity={0.7} disabled={capturing} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityLabel="Cancel photo" accessibilityRole="button"><Text style={[st.camCancel,{ color:C.danger }]}>✕ Cancel</Text></TouchableOpacity>
             <View style={st.camHeadCenter}><Text style={[st.camTitle,{ color:C.text }]}>{camSlot?.icon} {camSlot?.label}</Text><Text style={[st.camInstr,{ color:C.muted }]}>{camSlot?.instruction}</Text></View>
-            <TouchableOpacity onPress={() = accessibilityLabel="button"> { if (capturing||countdown!==null) return; handleCapture(); }} activeOpacity={0.7} style={st.camCaptureHeaderBtn} disabled={capturing||countdown!==null} accessibilityLabel={capturing?'Processing photo':'Take photo'} accessibilityRole="button"><Text style={[st.camCaptureHeaderBtnText,{ color:C.white }]}>{capturing?'⏳ Wait...':'📸 Capture'}</Text></TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { if (capturing||countdown!==null) return; handleCapture(); }}
+              activeOpacity={0.7}
+              style={st.camCaptureHeaderBtn}
+              disabled={capturing||countdown!==null}
+              accessibilityLabel={capturing?'Processing photo':'Take photo'}
+              accessibilityRole="button"
+            >
+              <Text style={[st.camCaptureHeaderBtnText,{ color:C.white }]}>{capturing?'⏳ Wait...':'📸 Capture'}</Text>
+            </TouchableOpacity>
           </View>
           <View style={st.camContent} pointerEvents="box-none">
             {IS_WEB ? (
               <View style={[st.camBox,{ borderColor:C.accent }]}>
                 {camErr ? (
-                  <View style={st.camErrWrap}><Text style={st.camErrIcon}>📷</Text><Text style={[st.camErrText,{ color:C.danger }]}>{camErr}</Text><TouchableOpacity style={[st.retryBtn,{ backgroundColor:C.accent }]} onPress={() = accessibilityLabel="button"> { if (isMountedRef.current) { setCamErr(null); setCamReady(false); } if (camSlot) void startWebStream(camSlot.cameraSide); }} activeOpacity={0.7} accessibilityLabel="Retry camera" accessibilityRole="button"><Text style={[st.retryBtnText,{ color:C.white }]}>Try Again</Text></TouchableOpacity></View>
+                  <View style={st.camErrWrap}>
+                    <Text style={st.camErrIcon}>📷</Text>
+                    <Text style={[st.camErrText,{ color:C.danger }]}>{camErr}</Text>
+                    <TouchableOpacity
+                      style={[st.retryBtn,{ backgroundColor:C.accent }]}
+                      onPress={() => { if (isMountedRef.current) { setCamErr(null); setCamReady(false); } if (camSlot) void startWebStream(camSlot.cameraSide); }}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Retry camera"
+                      accessibilityRole="button"
+                    >
+                      <Text style={[st.retryBtnText,{ color:C.white }]}>Try Again</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <>
                     {!camReady&&(<View style={[staticStyles.absoluteFill, st.camLoadWrap]} pointerEvents="none"><ActivityIndicator size="large" color={C.accent} /><Text style={[st.camLoadText,{ color:C.muted }]}>Starting camera…</Text></View>)}
                     <View style={staticStyles.absoluteFill} pointerEvents="none"><WebVideoPreview facing={camFacing} onReady={handleVideoRef} /></View>
-                    {camReady&&camSlot&&(<View style={staticStyles.absoluteFill} pointerEvents="none"><CameraGuide type={camSlot.type} C={C} /></View>)}
+                    {camReady&&camSlot&&(<View style={staticStyles.absoluteFill} pointerEvents="none"><CameraGuide type={camSlot.type} theme={C} /></View>)}
                     {capturing&&(<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>)}
                   </>
                 )}
@@ -1010,158 +1262,289 @@ export default function ProfileSetupScreen() {
             ) : (
               <View style={[st.camBox,{ borderColor:C.accent }]}>
                 <CameraView ref={cameraRef} style={st.camNative} facing={camFacing} onCameraReady={() => { if (isMountedRef.current) setCamReady(true); }} onMountError={err => { if (isMountedRef.current) setCamErr(err.message??'Camera failed.'); }} />
-                {camSlot&&<CameraGuide type={camSlot.type} C={C} />}
+                {camSlot&&<CameraGuide type={camSlot.type} theme={C} />}
                 {capturing&&(<View style={st.camProcessingOverlay} pointerEvents="none"><ActivityIndicator size="large" color={C.white} /><Text style={[st.camProcessingText,{ color:C.white }]}>Processing photo…</Text></View>)}
               </View>
             )}
             {countdown!==null&&(<View style={st.countdownOverlay} pointerEvents="none"><Text style={[st.countdownText,{ color:C.white }]}>{countdown}</Text></View>)}
           </View>
           <View style={[st.camControls,{ backgroundColor:C.card, borderTopColor:C.cardBorder }]}>
-            {camSlot?.timerAvailable&&<TouchableOpacity style={[st.timerBtn,{ backgroundColor:C.input, borderColor:timerEnabled?C.accent:C.inputBorder },timerEnabled&&{ backgroundColor:C.accentGlow },capturing&&st.btnOff]} onPress={() = accessibilityLabel="button"> { setTimerEnabled(v => !v); haptic(); }} disabled={capturing} activeOpacity={0.7} accessibilityLabel={timerEnabled?'Disable timer':'Enable 3 second timer'} accessibilityRole="switch" accessibilityState={{ checked:timerEnabled }}><Text style={[st.timerBtnText,{ color:timerEnabled?C.accent:C.text }]}>{timerEnabled?`⏱ ${TIMER_SECONDS}s ON`:'⏱ Timer'}</Text></TouchableOpacity>}
+            {camSlot?.timerAvailable&&(
+              <TouchableOpacity
+                style={[st.timerBtn,{ backgroundColor:C.input, borderColor:timerEnabled?C.accent:C.inputBorder },timerEnabled&&{ backgroundColor:C.accentGlow },capturing&&st.btnOff]}
+                onPress={() => { setTimerEnabled(v => !v); haptic(); }}
+                disabled={capturing}
+                activeOpacity={0.7}
+                accessibilityLabel={timerEnabled?'Disable timer':'Enable 3 second timer'}
+                accessibilityRole="switch"
+                accessibilityState={{ checked:timerEnabled }}
+              >
+                <Text style={[st.timerBtnText,{ color:timerEnabled?C.accent:C.text }]}>{timerEnabled?`⏱ ${TIMER_SECONDS}s ON`:'⏱ Timer'}</Text>
+              </TouchableOpacity>
+            )}
             <View style={st.camBtnRow}>
               <TouchableOpacity style={[st.flipBtn,{ backgroundColor:C.input, borderColor:C.inputBorder },capturing&&st.btnOff]} onPress={flipCamera} disabled={capturing} activeOpacity={0.7} accessibilityLabel="Flip camera" accessibilityRole="button"><Text style={st.flipBtnText}>🔄</Text></TouchableOpacity>
-              <TouchableOpacity style={[st.captureBtn,{ borderColor:C.accent },(capturing||countdown!==null)&&st.captureBtnOff]} onPress={handleCapture} activeOpacity={0.8} accessibilityLabel={countdown!==null?`Taking photo in ${countdown}`:'Take photo'} accessibilityRole="button" accessibilityState={{ disabled:capturing||countdown!==null }}>
-                {capturing?<ActivityIndicator size="small" color={C.accent} />:<View style={[st.captureBtnInner,{ backgroundColor:C.accent }]} />}
+              <TouchableOpacity style={[st.captureBtn,{ borderColor:C.accent },(capturing||countdown!==null)&&st.captureBtnOff]} onPress={handleCapture} activeOpacity={0.8} accessibilityLabel={countdown!==null?`Taking photo in ${countdown}`:'Take photo'} accessibilityRole="button" accessibilityState={{                disabled: capturing || countdown !== null }}>
+              <View style={[st.captureBtnInner,{ backgroundColor:capturing||countdown!==null?C.dim:C.accent }]}>
+                {capturing ? <ActivityIndicator size="small" color={C.white} /> : countdown!==null ? <Text style={[st.countdownInner,{ color:C.white }]}>{countdown}</Text> : <Text style={st.captureBtnIcon}>📸</Text>}
+              </View>
+            </TouchableOpacity>
+            <View style={st.flipBtn} />
+          </View>
+          {!camReady&&!camErr&&(<Text style={[st.camReadyHint,{ color:C.muted }]}>Waiting for camera…</Text>)}
+        </View>
+      </View>
+    </Modal>
+
+    <Modal visible={promptPicker !== null} animationType="slide" onRequestClose={() => setPromptPicker(null)} transparent>
+      <Pressable style={[st.pickerOverlay,{ backgroundColor:C.overlay }]} onPress={() => setPromptPicker(null)}>
+        <Pressable style={[st.pickerSheet,{ backgroundColor:C.card, borderTopColor:C.cardBorder }]} onPress={e => e.stopPropagation()}>
+          <View style={[st.pickerHandle,{ backgroundColor:C.inputBorder }]} />
+          <Text style={[st.pickerTitle,{ color:C.text }]}>Choose a Prompt</Text>
+          <LegendList
+            data={promptQData}
+            keyExtractor={item => item.q}
+            estimatedItemSize={52}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[st.pickerOpt,{ borderBottomColor:C.inputBorder }]}
+                onPress={() => {
+                  if (promptPicker === null) return;
+                  dispatch({ type:'SET_PROMPT', index:promptPicker, q:item.q, a:form.prompts[promptPicker]?.a??'' });
+                  setPromptPicker(null);
+                  haptic();
+                }}
+                activeOpacity={0.7}
+                accessibilityLabel={item.q}
+                accessibilityRole="button"
+              >
+                <Text style={[st.pickerOptText,{ color:C.text }]}>{item.q}</Text>
               </TouchableOpacity>
-              <View style={st.flipBtn} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={promptPicker!==null} animationType="slide" transparent onRequestClose={() => setPromptPicker(null)}>
-        <View style={st.pickerOverlay}>
-          <View style={[st.pickerContent,{ backgroundColor:C.card, borderColor:C.cardBorder }]}>
-            <Text style={[st.pickerTitle,{ color:C.text }]}>Choose a Question</Text>
-            <LegendList
-              data={promptQData}
-              keyExtractor={(item) => `pq_${item.i}`}
-              recycleItems={true}
-              estimatedItemSize={64}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }:LegendListRenderItemProps<{ q:string; i:number }>) => {
-                const { q }=item;
-                const used=promptPicker!==null&&promptPicker<form.prompts.length&&form.prompts.some((p,i) => p.q===q&&i!==promptPicker);
-                return (
-                  <TouchableOpacity style={[st.pickerItem,{ borderBottomColor:C.inputBorder },used&&st.pickerItemOff]} onPress={() = accessibilityLabel="button"> { if (used||promptPicker===null||promptPicker>=form.prompts.length) return; dispatch({ type:'SET_PROMPT', index:promptPicker, q, a:form.prompts[promptPicker]?.a??'' }); setPromptPicker(null); }} disabled={used} activeOpacity={0.7} accessibilityLabel={`${q}${used?', already used':''}`} accessibilityRole="button" accessibilityState={{ disabled:used }}>
-                    <Text style={[st.pickerItemText,{ color:used?C.muted:C.text }]}>{q}</Text>
-                    {used&&<Text style={[st.pickerUsed,{ color:C.muted }]}>Already used</Text>}
-                  </TouchableOpacity>
-                );
-              }}
-            />
-            <TouchableOpacity style={st.pickerCancel} onPress={() = accessibilityLabel="button"> setPromptPicker(null)} activeOpacity={0.7} accessibilityLabel="Cancel" accessibilityRole="button"><Text style={[st.pickerCancelText,{ color:C.danger }]}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
-  );
+            )}
+            recycleItems={false}
+            scrollEnabled
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  </KeyboardAvoidingView>
+);
 }
 
-const st = StyleSheet.create({
-  root:{ flex:1 }, sv:{ flex:1 }, svContent:{ padding:SPACING.xl, paddingBottom:SPACING.xxxxl },
-  bottomPad:{ height:SPACING.xl },
-  topBar:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:SPACING.lg, paddingTop:IS_IOS?56:44, paddingBottom:SPACING.md, borderBottomWidth:1 },
-  backBtn:{ fontSize:FONT.lg, fontWeight:'600' }, topTitle:{ fontSize:FONT.md, fontWeight:'600' }, draftLabel:{ fontSize:FONT.xs },
-  stepDots:{ flexDirection:'row', justifyContent:'center', alignItems:'center', gap:SPACING.xs+2, paddingVertical:SPACING.sm, paddingHorizontal:SPACING.lg },
-  stepDot:{ width:8, height:8, borderRadius:RADIUS.full }, progBg:{ height:3 }, progFill:{ height:'100%', borderRadius:RADIUS.sm },
-  botBar:{ padding:SPACING.lg, paddingBottom:IS_IOS?34:SPACING.lg, borderTopWidth:1 },
-  nextBtnWrap:{ width:'100%', borderRadius:RADIUS.xxl, overflow:'hidden' }, nextBtnDisabled:{ opacity:0.6 },
-  nextBtn:{ paddingVertical:SPACING.lg, borderRadius:RADIUS.xxl, alignItems:'center', minHeight:56, justifyContent:'center' },
-  nextBtnText:{ fontSize:FONT.lg, fontWeight:'700', letterSpacing:0.3 },
-  saveBtnRow:{ flexDirection:'row', alignItems:'center', justifyContent:'center' },
-  title:{ fontSize:FONT.xxxl, fontWeight:'800', marginBottom:SPACING.sm, letterSpacing:-0.3 },
-  sub:{ fontSize:FONT.base, marginBottom:SPACING.xl, lineHeight:22 },
-  fg:{ marginBottom:SPACING.xl+2 }, spacer:{ height:SPACING.xl },
-  label:{ fontSize:FONT.lg, fontWeight:'600', marginBottom:SPACING.sm },
-  labelRow:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:SPACING.sm },
-  hint:{ fontSize:FONT.sm, marginBottom:SPACING.sm+2, fontStyle:'italic' },
-  err:{ fontSize:FONT.sm, marginTop:SPACING.xs+2 }, warn:{ fontSize:FONT.sm, marginTop:SPACING.xs+2, fontStyle:'italic' },
-  input:{ padding:SPACING.lg, borderRadius:RADIUS.md, fontSize:FONT.lg, borderWidth:1.5 },
-  charCt:{ fontSize:FONT.sm, textAlign:'right', marginTop:SPACING.xs+2 },
-  bdayRow:{ flexDirection:'row', alignItems:'center', gap:SPACING.sm }, bdayIn:{ flex:1, textAlign:'center' }, bdayInY:{ flex:1.6, textAlign:'center' }, bdaySep:{ fontSize:FONT.xxl, fontWeight:'bold' },
-  ageRow:{ flexDirection:'row', justifyContent:'space-between', marginTop:SPACING.sm+2 }, ageDisplay:{ fontSize:FONT.base }, zodiac:{ fontSize:FONT.base },
-  unitBtn:{ paddingVertical:SPACING.xs, paddingHorizontal:SPACING.md, borderRadius:RADIUS.md, borderWidth:1 }, unitBtnText:{ fontSize:FONT.sm, fontWeight:'600' },
-  ftRow:{ flexDirection:'row', alignItems:'center', gap:SPACING.sm }, ftIn:{ flex:1, textAlign:'center' }, ftLbl:{ fontSize:FONT.lg }, hPreview:{ fontSize:FONT.base, marginTop:SPACING.sm },
-  chipWrap:{ flexDirection:'row', flexWrap:'wrap', gap:SPACING.sm },
-  chip:{ flexDirection:'row', alignItems:'center', paddingVertical:SPACING.sm+2, paddingHorizontal:SPACING.md+2, borderRadius:RADIUS.xxl, borderWidth:1.5, gap:SPACING.xs+2 },
-  chipOff:{ opacity:0.3 }, chipIcon:{ fontSize:FONT.lg }, chipText:{ fontSize:FONT.base }, chipCheck:{ fontSize:FONT.base, fontWeight:'bold' },
-  optRow:{ padding:SPACING.lg, borderRadius:RADIUS.lg, borderWidth:1.5, marginBottom:SPACING.sm },
-  optHead:{ flexDirection:'row', alignItems:'center', gap:SPACING.sm }, optIcon:{ fontSize:FONT.xxl }, optText:{ fontSize:FONT.lg, fontWeight:'600', flex:1 }, optCheck:{ fontSize:FONT.xl, fontWeight:'bold' },
-  optDesc:{ fontSize:FONT.sm, marginTop:SPACING.xs, marginLeft:28, lineHeight:18 },
-  vibeGrid:{ flexDirection:'row', flexWrap:'wrap', gap:SPACING.sm },
-  vibeItem:{ width:52, height:52, borderRadius:RADIUS.full, justifyContent:'center', alignItems:'center', borderWidth:1.5 }, vibeEmoji:{ fontSize:FONT.xxl+2 },
-  rangeRow:{ flexDirection:'row', alignItems:'center', gap:SPACING.sm+2 }, rangeIn:{ flex:1, textAlign:'center' }, rangeDash:{ fontSize:FONT.xxl }, rangeU:{ fontSize:FONT.base },
-  bioIn:{ padding:SPACING.lg, borderRadius:RADIUS.lg, fontSize:FONT.lg, minHeight:130, textAlignVertical:'top', lineHeight:24, borderWidth:1.5 },
-  bioSuggestion:{ fontSize:FONT.base, marginBottom:SPACING.sm, fontStyle:'italic' },
-  promptCard:{ borderRadius:RADIUS.lg, padding:SPACING.md+2, marginBottom:SPACING.md, borderWidth:1.5 },
-  promptQ:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:SPACING.sm }, promptQText:{ fontSize:FONT.base, fontWeight:'600', flex:1 }, promptArr:{ fontSize:FONT.sm },
-  promptIn:{ padding:SPACING.md, borderRadius:RADIUS.md, fontSize:FONT.base, minHeight:64, textAlignVertical:'top', borderWidth:1 },
-  promptRm:{ marginTop:SPACING.sm, alignSelf:'flex-end' }, promptRmText:{ fontSize:FONT.sm },
-  addPrompt:{ borderWidth:1.5, borderStyle:'dashed', borderRadius:RADIUS.lg, padding:SPACING.md+2, alignItems:'center', marginTop:SPACING.sm }, addPromptText:{ fontSize:FONT.base, fontWeight:'600' },
-  locBtn:{ paddingVertical:SPACING.lg, borderRadius:RADIUS.lg, alignItems:'center', borderWidth:1.5 }, btnOff:{ opacity:0.5 },
-  locRow:{ flexDirection:'row', alignItems:'center', gap:SPACING.sm+2 }, locBtnText:{ fontSize:FONT.lg, fontWeight:'600' }, locConf:{ fontSize:FONT.base, marginTop:SPACING.sm+2, textAlign:'center' },
-  slotStatus:{ flexDirection:'row', gap:SPACING.sm, marginBottom:SPACING.lg, flexWrap:'wrap' },
-  statusItem:{ flexDirection:'row', alignItems:'center', paddingVertical:SPACING.xs+2, paddingHorizontal:SPACING.md, borderRadius:RADIUS.xxl, gap:SPACING.xs+2, borderWidth:1.5 }, statusIcon:{ fontSize:FONT.lg }, statusText:{ fontSize:FONT.md, fontWeight:'600' },
-  loadRow:{ flexDirection:'row', alignItems:'center', padding:SPACING.md+2, borderRadius:RADIUS.md, marginBottom:SPACING.md+2, gap:SPACING.sm },
-  uploadBarWrap:{ flex:1, marginLeft:SPACING.md }, loadRowText:{ fontSize:FONT.base },
-  uploadBarBg:{ height:4, borderRadius:RADIUS.sm, overflow:'hidden', marginTop:SPACING.xs+2 }, uploadBarFill:{ height:'100%', borderRadius:RADIUS.sm },
-  photoGrid:{ flexDirection:'row', flexWrap:'wrap', gap:SPACING.md }, photoSlot:{ position:'relative' },
-  photoImg:{ width:100, height:130, borderRadius:RADIUS.lg, borderWidth:1.5 },
-  photoTypeTag:{ position:'absolute', bottom:30, left:SPACING.xs, backgroundColor:'rgba(0,0,0,0.72)', borderRadius:SPACING.xs+2, paddingHorizontal:SPACING.xs+2, paddingVertical:2 }, photoTypeText:{ fontSize:9, fontWeight:'bold', color:'#fff' },
-  mainTag:{ position:'absolute', top:SPACING.xs+2, left:SPACING.xs+2, borderRadius:RADIUS.sm, paddingHorizontal:SPACING.sm, paddingVertical:SPACING.xxs+1 }, mainTagText:{ fontSize:FONT.xs, fontWeight:'bold' },
-  okDot:{ position:'absolute', bottom:SPACING.xs+2, right:SPACING.xs+2, borderRadius:RADIUS.full, width:22, height:22, justifyContent:'center', alignItems:'center' }, okDotText:{ fontSize:FONT.xs, fontWeight:'bold' },
-  moveRow:{ position:'absolute', bottom:30, left:SPACING.xs+2, flexDirection:'row', gap:SPACING.xxs+2 },
-  moveBtn:{ borderRadius:RADIUS.md, width:22, height:22, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(0,0,0,0.7)' }, moveBtnText:{ fontSize:FONT.md, fontWeight:'bold' },
-  rmBtn:{ position:'absolute', top:-8, right:-8, borderRadius:RADIUS.full, width:28, height:28, justifyContent:'center', alignItems:'center', borderWidth:2 }, rmBtnText:{ fontSize:FONT.lg, fontWeight:'bold' },
-  addBtn:{ width:100, height:130, borderRadius:RADIUS.lg, borderWidth:1.5, borderStyle:'dashed', justifyContent:'center', alignItems:'center' }, addBtnOff:{ opacity:0.35 },
-  addBtnIcon:{ fontSize:FONT.xxxl, marginBottom:SPACING.xxs+2 }, addBtnLabel:{ fontSize:FONT.xs, fontWeight:'600' }, addBtnReq:{ fontSize:9, marginTop:SPACING.xxs },
-  tipBox:{ padding:SPACING.md, borderRadius:RADIUS.md, marginTop:SPACING.md+2, borderWidth:1 }, tipText:{ fontSize:FONT.md, textAlign:'center' },
-  socialProof:{ padding:SPACING.md, borderRadius:RADIUS.md, marginTop:SPACING.md, borderWidth:1 }, socialProofText:{ fontSize:FONT.md, textAlign:'center', lineHeight:20 },
-  photoHint:{ fontSize:FONT.sm, marginTop:SPACING.md+2, lineHeight:18 },
-  privacyCard:{ borderRadius:RADIUS.xl, padding:SPACING.xl, marginBottom:SPACING.xl, borderWidth:1.5 }, privacyTitle:{ fontSize:FONT.xl, fontWeight:'800', marginBottom:SPACING.xxs+2 },
-  privRow:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:SPACING.md+2, borderBottomWidth:1 },
-  privInfo:{ flex:1, marginRight:SPACING.md }, privLabel:{ fontSize:FONT.lg-1, fontWeight:'600', marginBottom:SPACING.xxs+2 }, privDesc:{ fontSize:FONT.sm, lineHeight:17 },
-  previewLabel:{ fontSize:FONT.base, marginBottom:SPACING.sm+2, fontWeight:'600' },
-  preview:{ borderRadius:RADIUS.xl, overflow:'hidden', marginBottom:SPACING.xl, borderWidth:1.5 },
-  previewPhotoScroll:{ height:180 }, previewThumb:{ width:140, height:180, marginRight:SPACING.xxs+2 },
-  blurOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(26,26,46,0.75)', justifyContent:'center', alignItems:'center' }, blurText:{ fontSize:FONT.xl, fontWeight:'bold' },
-  previewInfo:{ padding:SPACING.xl }, previewName:{ fontSize:FONT.xxxl, fontWeight:'800', marginBottom:SPACING.xxs+2, letterSpacing:-0.3 },
-  previewSub:{ fontSize:FONT.base, marginBottom:SPACING.sm }, previewDetail:{ fontSize:FONT.base, marginBottom:SPACING.xxs+2 },
-  previewVibes:{ fontSize:FONT.xxl+2, marginVertical:SPACING.sm }, previewBio:{ fontSize:FONT.lg-1, lineHeight:22, marginTop:SPACING.sm, marginBottom:SPACING.md },
-  previewTags:{ flexDirection:'row', flexWrap:'wrap', gap:SPACING.xs+2, marginTop:SPACING.sm },
-  previewTag:{ paddingVertical:SPACING.xxs+2, paddingHorizontal:SPACING.sm+2, borderRadius:RADIUS.md }, previewTagText:{ fontSize:FONT.sm }, previewMore:{ fontSize:FONT.sm, alignSelf:'center' },
-  previewPhotoCt:{ fontSize:FONT.sm, marginTop:SPACING.md },
-  pctCard:{ borderRadius:RADIUS.xl, padding:SPACING.lg, marginBottom:SPACING.xl, borderWidth:1 },
-  pctTitle:{ fontSize:FONT.lg, fontWeight:'600', marginBottom:SPACING.sm+2 }, pctBarBg:{ height:10, borderRadius:RADIUS.sm, overflow:'hidden' }, pctBarFill:{ height:'100%', borderRadius:RADIUS.sm },
-  pctHint:{ fontSize:FONT.sm, marginTop:SPACING.sm, fontStyle:'italic' },
-  termsRow:{ flexDirection:'row', alignItems:'center', gap:SPACING.md, padding:SPACING.lg, borderRadius:RADIUS.lg, marginBottom:SPACING.xl, borderWidth:1 },
-  termsText:{ fontSize:FONT.base, lineHeight:22 }, termsLink:{ fontWeight:'600', textDecorationLine:'underline' },
-  camModal:{ flex:1 },
-  camHead:{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', padding:SPACING.lg, paddingTop:IS_IOS?56:44, borderBottomWidth:1 },
-  camCancel:{ fontSize:FONT.lg, fontWeight:'600' },
-  camHeadCenter:{ flex:1, alignItems:'center', marginHorizontal:SPACING.sm+2 }, camTitle:{ fontSize:FONT.xl, fontWeight:'800' }, camInstr:{ fontSize:FONT.sm, textAlign:'center', marginTop:SPACING.xxs+2, lineHeight:18 },
-  camCaptureHeaderBtn:{ backgroundColor:'#6C63FF', paddingHorizontal:16, paddingVertical:10, borderRadius:20 }, camCaptureHeaderBtnText:{ fontWeight:'700', fontSize:14 },
-  camContent:{ flex:1, justifyContent:'center', alignItems:'center', padding:SPACING.xl },
-  camBox:{ width:300, height:400, borderRadius:RADIUS.xl, overflow:'hidden', backgroundColor:'#000', borderWidth:2, position:'relative' },
-  camNative:{ width:'100%', height:'100%' },
-  camErrWrap:{ flex:1, justifyContent:'center', alignItems:'center', padding:SPACING.xl }, camErrIcon:{ fontSize:50, marginBottom:SPACING.lg },
-  camErrText:{ fontSize:FONT.base, textAlign:'center', marginBottom:SPACING.xl, lineHeight:22 },
-  camLoadWrap:{ justifyContent:'center', alignItems:'center' }, camLoadText:{ marginTop:SPACING.lg, fontSize:FONT.base },
-  retryBtn:{ paddingVertical:SPACING.md+2, paddingHorizontal:SPACING.xxxl, borderRadius:RADIUS.xxl }, retryBtnText:{ fontSize:FONT.base, fontWeight:'600' },
-  camProcessingOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.45)', justifyContent:'center', alignItems:'center', zIndex:30 },
-  camProcessingText:{ marginTop:SPACING.lg, fontSize:FONT.base, fontWeight:'600' },
-  countdownOverlay:{ position:'absolute', top:0, left:0, right:0, bottom:80, justifyContent:'center', alignItems:'center', zIndex:20 } as const,
-  countdownText:{ fontSize:120, fontWeight:'bold', textShadowColor:'rgba(0,0,0,0.8)', textShadowOffset:{ width:2, height:2 }, textShadowRadius:10 },
-  camControls:{ alignItems:'center', paddingBottom:IS_IOS?44:SPACING.lg, paddingTop:SPACING.lg, borderTopWidth:1 },
-  timerBtn:{ paddingVertical:SPACING.sm, paddingHorizontal:SPACING.xl, borderRadius:RADIUS.xxl, marginBottom:SPACING.lg, borderWidth:1.5 }, timerBtnText:{ fontSize:FONT.base, fontWeight:'600' },
-  camBtnRow:{ flexDirection:'row', alignItems:'center', justifyContent:'space-around', width:'100%', paddingHorizontal:SPACING.xxxxl },
-  flipBtn:{ width:52, height:52, borderRadius:RADIUS.full, justifyContent:'center', alignItems:'center', borderWidth:1 }, flipBtnText:{ fontSize:FONT.xxxl },
-  captureBtn:{ width:84, height:84, borderRadius:42, backgroundColor:'#fff', justifyContent:'center', alignItems:'center', borderWidth:4 },
-  captureBtnOff:{ opacity:0.4 }, captureBtnInner:{ width:68, height:68, borderRadius:34 },
-  pickerOverlay:{ flex:1, backgroundColor:'rgba(0,0,0,0.85)', justifyContent:'flex-end' },
-  pickerContent:{ borderTopLeftRadius:RADIUS.xxl, borderTopRightRadius:RADIUS.xxl, padding:SPACING.xl, maxHeight:'72%', paddingBottom:IS_IOS?34:SPACING.xl, borderWidth:1 },
-  pickerTitle:{ fontSize:FONT.xxl, fontWeight:'800', textAlign:'center', marginBottom:SPACING.lg },
-  pickerItem:{ padding:SPACING.lg, borderBottomWidth:1 }, pickerItemOff:{ opacity:0.35 }, pickerItemText:{ fontSize:FONT.lg-1, lineHeight:22 },
-  pickerUsed:{ fontSize:FONT.xs, marginTop:SPACING.xxs+2 },
-  pickerCancel:{ marginTop:SPACING.lg, padding:SPACING.md+2, alignItems:'center' }, pickerCancelText:{ fontSize:FONT.lg, fontWeight:'600' },
-});
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const st = StyleSheet.create((theme) => ({
+root:               { flex:1 },
+topBar:             { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:SPACING.lg, paddingVertical:SPACING.md, borderBottomWidth:1 },
+backBtn:            { fontSize:FONT.lg, fontWeight:'600' },
+topTitle:           { fontSize:FONT.base, fontWeight:'700', color:theme.colors.text },
+draftLabel:         { fontSize:FONT.xs, color:theme.colors.textSecondary },
+stepDots:           { flexDirection:'row', justifyContent:'center', alignItems:'center', gap:6, paddingVertical:SPACING.xs },
+stepDot:            { width:7, height:7, borderRadius:4 },
+progBg:             { height:3, width:'100%' },
+progFill:           { height:3 },
+sv:                 { flex:1 },
+svContent:          { paddingHorizontal:SPACING.lg, paddingTop:SPACING.xl },
+bottomPad:          { height:SPACING.xxxxl },
+botBar:             { paddingHorizontal:SPACING.lg, paddingVertical:SPACING.md, borderTopWidth:1 },
+nextBtnWrap:        { borderRadius:RADIUS.full, overflow:'hidden' },
+nextBtnDisabled:    { opacity:0.9 },
+nextBtn:            { paddingVertical:SPACING.lg, alignItems:'center', justifyContent:'center', borderRadius:RADIUS.full },
+nextBtnText:        { fontSize:FONT.lg, fontWeight:'700' },
+saveBtnRow:         { flexDirection:'row', alignItems:'center' },
+
+// Form
+fg:                 { marginBottom:SPACING.lg },
+title:              { fontSize:FONT.xxxl, fontWeight:'800', marginBottom:SPACING.xs },
+sub:                { fontSize:FONT.base, marginBottom:SPACING.xl },
+label:              { fontSize:FONT.base, fontWeight:'600', marginBottom:SPACING.xs },
+hint:               { fontSize:FONT.sm, marginBottom:SPACING.sm },
+err:                { fontSize:FONT.sm, marginTop:SPACING.xs },
+warn:               { fontSize:FONT.sm, marginTop:SPACING.xs },
+input:              { borderWidth:1, borderRadius:RADIUS.md, paddingHorizontal:SPACING.md, paddingVertical:SPACING.md, fontSize:FONT.lg },
+labelRow:           { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:SPACING.xs },
+spacer:             { height:SPACING.xl },
+
+// Birthday
+bdayRow:            { flexDirection:'row', alignItems:'center', gap:SPACING.xs },
+bdayIn:             { width:52, textAlign:'center' },
+bdayInY:            { width:72, textAlign:'center' },
+bdaySep:            { fontSize:FONT.xl, fontWeight:'300' },
+ageRow:             { flexDirection:'row', alignItems:'center', gap:SPACING.md, marginTop:SPACING.xs },
+ageDisplay:         { fontSize:FONT.base, fontWeight:'600' },
+zodiac:             { fontSize:FONT.base, fontWeight:'500' },
+
+// Height
+unitBtn:            { paddingVertical:SPACING.xs, paddingHorizontal:SPACING.sm, borderRadius:RADIUS.sm, borderWidth:1 },
+unitBtnText:        { fontSize:FONT.sm, fontWeight:'600' },
+ftRow:              { flexDirection:'row', alignItems:'center', gap:SPACING.xs },
+ftIn:               { width:52, textAlign:'center' },
+ftLbl:              { fontSize:FONT.base },
+hPreview:           { fontSize:FONT.sm, marginTop:SPACING.xs, fontWeight:'500' },
+
+// Chips
+chipWrap:           { flexDirection:'row', flexWrap:'wrap', gap:SPACING.xs, marginTop:SPACING.xs },
+chip:               { flexDirection:'row', alignItems:'center', paddingVertical:SPACING.xs, paddingHorizontal:SPACING.md, borderRadius:RADIUS.full, borderWidth:1, gap:SPACING.xs },
+chipOff:            { opacity:0.4 },
+chipIcon:           { fontSize:FONT.base },
+chipText:           { fontSize:FONT.sm },
+chipCheck:          { fontSize:FONT.sm, fontWeight:'700' },
+
+// Option rows
+optRow:             { borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md, marginBottom:SPACING.xs },
+optHead:            { flexDirection:'row', alignItems:'center', gap:SPACING.sm },
+optIcon:            { fontSize:FONT.xl },
+optText:            { fontSize:FONT.base, fontWeight:'600', flex:1 },
+optCheck:           { fontSize:FONT.base, fontWeight:'700' },
+optDesc:            { fontSize:FONT.sm, marginTop:SPACING.xxs, paddingLeft:SPACING.xxxl },
+
+// Photos
+slotStatus:         { flexDirection:'row', flexWrap:'wrap', gap:SPACING.xs, marginBottom:SPACING.lg },
+statusItem:         { flexDirection:'row', alignItems:'center', gap:SPACING.xs, paddingVertical:SPACING.xs, paddingHorizontal:SPACING.sm, borderRadius:RADIUS.md, borderWidth:1 },
+statusIcon:         { fontSize:FONT.base },
+statusText:         { fontSize:FONT.xs, fontWeight:'600' },
+loadRow:            { flexDirection:'row', alignItems:'center', gap:SPACING.sm, padding:SPACING.md, borderRadius:RADIUS.md, marginBottom:SPACING.sm },
+loadRowText:        { fontSize:FONT.sm, fontWeight:'600' },
+uploadBarWrap:      { flex:1 },
+uploadBarBg:        { height:4, borderRadius:2, marginTop:SPACING.xs, overflow:'hidden' },
+uploadBarFill:      { height:'100%', borderRadius:2 },
+photoGrid:          { flexDirection:'row', flexWrap:'wrap', gap:SPACING.sm, marginBottom:SPACING.lg },
+photoSlot:          { position:'relative', borderRadius:RADIUS.lg, overflow:'hidden' },
+photoImg:           { width:160, height:200, borderRadius:RADIUS.lg, borderWidth:2 },
+photoTypeTag:       { position:'absolute', top:SPACING.xs, left:SPACING.xs, backgroundColor:'rgba(0,0,0,0.55)', borderRadius:RADIUS.sm, paddingHorizontal:SPACING.xs, paddingVertical:2 },
+photoTypeText:      { color:'#fff', fontSize:FONT.xs, fontWeight:'600' },
+mainTag:            { position:'absolute', top:SPACING.xs, right:SPACING.xs, borderRadius:RADIUS.sm, paddingHorizontal:SPACING.xs, paddingVertical:2 },
+mainTagText:        { fontSize:FONT.xs, fontWeight:'700' },
+okDot:              { position:'absolute', bottom:SPACING.xxxxl+SPACING.sm, right:SPACING.xs, width:20, height:20, borderRadius:10, alignItems:'center', justifyContent:'center' },
+okDotText:          { fontSize:FONT.xs, fontWeight:'700' },
+moveRow:            { position:'absolute', bottom:SPACING.xxl, left:0, right:0, flexDirection:'row', justifyContent:'space-between', paddingHorizontal:SPACING.xs },
+moveBtn:            { backgroundColor:'rgba(0,0,0,0.5)', borderRadius:RADIUS.sm, padding:SPACING.xs },
+moveBtnText:        { fontSize:FONT.base, fontWeight:'700' },
+rmBtn:              { position:'absolute', bottom:SPACING.xs, right:SPACING.xs, width:28, height:28, borderRadius:14, alignItems:'center', justifyContent:'center', borderWidth:2 },
+rmBtnText:          { fontSize:FONT.lg, fontWeight:'700', lineHeight:FONT.xl },
+addBtn:             { width:160, height:200, borderRadius:RADIUS.lg, borderWidth:2, borderStyle:'dashed', alignItems:'center', justifyContent:'center', gap:SPACING.xs },
+addBtnOff:          { opacity:0.4 },
+addBtnIcon:         { fontSize:FONT.xxl+4 },
+addBtnLabel:        { fontSize:FONT.sm, fontWeight:'600' },
+addBtnReq:          { fontSize:FONT.xs, fontWeight:'500' },
+tipBox:             { borderRadius:RADIUS.md, borderWidth:1, padding:SPACING.md, marginBottom:SPACING.sm },
+tipText:            { fontSize:FONT.sm, fontWeight:'600', textAlign:'center' },
+socialProof:        { borderRadius:RADIUS.md, borderWidth:1, padding:SPACING.md, marginBottom:SPACING.sm },
+socialProofText:    { fontSize:FONT.sm, textAlign:'center' },
+photoHint:          { fontSize:FONT.xs, textAlign:'center', marginBottom:SPACING.sm },
+
+// Vibes
+vibeGrid:           { flexDirection:'row', flexWrap:'wrap', gap:SPACING.xs, marginTop:SPACING.xs },
+vibeItem:           { width:44, height:44, borderRadius:RADIUS.md, borderWidth:1, alignItems:'center', justifyContent:'center' },
+vibeEmoji:          { fontSize:FONT.xl },
+
+// Range inputs
+rangeRow:           { flexDirection:'row', alignItems:'center', gap:SPACING.xs },
+rangeIn:            { width:72, textAlign:'center' },
+rangeDash:          { fontSize:FONT.xl },
+rangeU:             { fontSize:FONT.base },
+
+// Bio / Prompts
+bioSuggestion:      { fontSize:FONT.sm, fontWeight:'500', marginBottom:SPACING.xs },
+bioIn:              { borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md, fontSize:FONT.base, minHeight:100 },
+charCt:             { fontSize:FONT.xs, textAlign:'right', marginTop:SPACING.xxs },
+promptCard:         { borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md, marginBottom:SPACING.sm },
+promptQ:            { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:SPACING.xs },
+promptQText:        { fontSize:FONT.base, fontWeight:'600', flex:1 },
+promptArr:          { fontSize:FONT.sm },
+promptIn:           { borderWidth:1, borderRadius:RADIUS.sm, padding:SPACING.sm, fontSize:FONT.base, minHeight:60 },
+promptRm:           { alignSelf:'flex-end', marginTop:SPACING.xs },
+promptRmText:       { fontSize:FONT.sm, fontWeight:'600' },
+addPrompt:          { borderWidth:1, borderStyle:'dashed', borderRadius:RADIUS.md, padding:SPACING.md, alignItems:'center' },
+addPromptText:      { fontSize:FONT.base, fontWeight:'600' },
+
+// Location
+locBtn:             { borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md },
+locRow:             { flexDirection:'row', alignItems:'center', gap:SPACING.sm },
+locBtnText:         { fontSize:FONT.base, fontWeight:'500' },
+locConf:            { fontSize:FONT.sm, marginTop:SPACING.xs, fontWeight:'500' },
+btnOff:             { opacity:0.5 },
+
+// Preview
+previewLabel:       { fontSize:FONT.sm, fontWeight:'600', marginBottom:SPACING.xs },
+preview:            { borderWidth:1, borderRadius:RADIUS.lg, overflow:'hidden', marginBottom:SPACING.lg },
+previewPhotoScroll: { height:200 },
+previewThumb:       { width:160, height:200, marginRight:SPACING.xs },
+blurOverlay:        { position:'absolute', top:0, left:0, right:0, height:200, alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.6)' },
+blurText:           { fontSize:FONT.base, fontWeight:'700' },
+previewInfo:        { padding:SPACING.lg },
+previewName:        { fontSize:FONT.xxl, fontWeight:'800', marginBottom:SPACING.xs },
+previewSub:         { fontSize:FONT.base, marginBottom:SPACING.xs },
+previewDetail:      { fontSize:FONT.sm, marginBottom:SPACING.xxs },
+previewVibes:       { fontSize:FONT.xl, letterSpacing:4, marginVertical:SPACING.xs },
+previewBio:         { fontSize:FONT.base, lineHeight:FONT.xxl, marginVertical:SPACING.xs },
+previewTags:        { flexDirection:'row', flexWrap:'wrap', gap:SPACING.xs, marginTop:SPACING.xs },
+previewTag:         { paddingVertical:SPACING.xxs, paddingHorizontal:SPACING.sm, borderRadius:RADIUS.full },
+previewTagText:     { fontSize:FONT.xs, fontWeight:'600' },
+previewMore:        { fontSize:FONT.xs, alignSelf:'center' },
+previewPhotoCt:     { fontSize:FONT.sm, marginTop:SPACING.sm },
+
+// Completion
+pctCard:            { borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md, marginBottom:SPACING.lg },
+pctTitle:           { fontSize:FONT.base, fontWeight:'700', marginBottom:SPACING.sm },
+pctBarBg:           { height:8, borderRadius:4, overflow:'hidden' },
+pctBarFill:         { height:'100%', borderRadius:4 },
+pctHint:            { fontSize:FONT.xs, marginTop:SPACING.xs },
+
+// Terms
+termsRow:           { flexDirection:'row', alignItems:'center', gap:SPACING.md, borderWidth:1, borderRadius:RADIUS.md, padding:SPACING.md },
+termsText:          { fontSize:FONT.sm, lineHeight:FONT.xl },
+termsLink:          { fontWeight:'700' },
+
+// Privacy
+privacyCard:        { borderWidth:1, borderRadius:RADIUS.lg, padding:SPACING.lg, marginBottom:SPACING.lg },
+privacyTitle:       { fontSize:FONT.lg, fontWeight:'700', marginBottom:SPACING.md },
+privRow:            { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:SPACING.md, borderBottomWidth:1 },
+privInfo:           { flex:1, marginRight:SPACING.md },
+privLabel:          { fontSize:FONT.base, fontWeight:'600' },
+privDesc:           { fontSize:FONT.xs, marginTop:2 },
+
+// Camera modal
+camModal:           { flex:1 },
+camHead:            { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:SPACING.lg, paddingVertical:SPACING.md, borderBottomWidth:1 },
+camCancel:          { fontSize:FONT.base, fontWeight:'700' },
+camHeadCenter:      { flex:1, alignItems:'center', paddingHorizontal:SPACING.sm },
+camTitle:           { fontSize:FONT.base, fontWeight:'700' },
+camInstr:           { fontSize:FONT.xs, textAlign:'center', lineHeight:FONT.lg },
+camCaptureHeaderBtn:     { paddingVertical:SPACING.xs, paddingHorizontal:SPACING.md, borderRadius:RADIUS.md, backgroundColor:'rgba(108,99,255,0.2)' },
+camCaptureHeaderBtnText: { fontSize:FONT.sm, fontWeight:'700' },
+camContent:         { flex:1, alignItems:'center', justifyContent:'center', padding:SPACING.lg },
+camBox:             { width:'100%', aspectRatio:3/4, borderRadius:RADIUS.xl, overflow:'hidden', borderWidth:2, position:'relative' },
+camNative:          { flex:1 },
+camErrWrap:         { flex:1, alignItems:'center', justifyContent:'center', gap:SPACING.md, padding:SPACING.xl },
+camErrIcon:         { fontSize:48 },
+camErrText:         { fontSize:FONT.base, textAlign:'center', fontWeight:'500' },
+camLoadWrap:        { alignItems:'center', justifyContent:'center', gap:SPACING.sm, backgroundColor:'rgba(0,0,0,0.5)' },
+camLoadText:        { fontSize:FONT.sm },
+camProcessingOverlay:{ ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(0,0,0,0.7)', alignItems:'center', justifyContent:'center', gap:SPACING.md },
+camProcessingText:  { fontSize:FONT.lg, fontWeight:'600' },
+retryBtn:           { paddingVertical:SPACING.sm, paddingHorizontal:SPACING.xl, borderRadius:RADIUS.full },
+retryBtnText:       { fontSize:FONT.base, fontWeight:'700' },
+countdownOverlay:   { position:'absolute', top:0, left:0, right:0, bottom:0, alignItems:'center', justifyContent:'center', pointerEvents:'none' },
+countdownText:      { fontSize:80, fontWeight:'900', textShadowColor:'rgba(0,0,0,0.8)', textShadowOffset:{ width:2, height:2 }, textShadowRadius:8 },
+countdownInner:     { fontSize:FONT.xl, fontWeight:'900' },
+camControls:        { paddingVertical:SPACING.lg, paddingHorizontal:SPACING.xl, gap:SPACING.md, borderTopWidth:1 },
+timerBtn:           { alignSelf:'center', paddingVertical:SPACING.xs, paddingHorizontal:SPACING.xl, borderRadius:RADIUS.full, borderWidth:1 },
+timerBtnText:       { fontSize:FONT.sm, fontWeight:'600' },
+camBtnRow:          { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
+flipBtn:            { width:48, height:48, borderRadius:24, borderWidth:1, alignItems:'center', justifyContent:'center' },
+flipBtnText:        { fontSize:FONT.xxl },
+captureBtn:         { width:76, height:76, borderRadius:38, borderWidth:3, alignItems:'center', justifyContent:'center' },
+captureBtnOff:      { opacity:0.5 },
+captureBtnInner:    { width:60, height:60, borderRadius:30, alignItems:'center', justifyContent:'center' },
+captureBtnIcon:     { fontSize:28 },
+camReadyHint:       { fontSize:FONT.xs, textAlign:'center' },
+
+// Prompt picker
+pickerOverlay:      { flex:1, justifyContent:'flex-end' },
+pickerSheet:        { borderTopLeftRadius:RADIUS.xl, borderTopRightRadius:RADIUS.xl, borderTopWidth:1, maxHeight:'70%' },
+pickerHandle:       { width:40, height:4, borderRadius:2, alignSelf:'center', marginTop:SPACING.sm, marginBottom:SPACING.md },
+pickerTitle:        { fontSize:FONT.xl, fontWeight:'700', textAlign:'center', marginBottom:SPACING.md, paddingHorizontal:SPACING.lg },
+pickerOpt:          { paddingVertical:SPACING.lg, paddingHorizontal:SPACING.xl, borderBottomWidth:1 },
+pickerOptText:      { fontSize:FONT.base, lineHeight:FONT.xxl },
+}));

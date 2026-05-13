@@ -2,14 +2,13 @@
 import crypto from 'crypto';
 import { writeAuditLog } from './logger';
 
-
 async function pdqHashImage(imageUrl: string): Promise<{ hash: string; quality: number }> {
-  try { const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/hash/pdq`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl }), signal: AbortSignal.timeout(10000) }); if (r.ok) return await r.json() as { hash: string; quality: number }; } catch {}
+  try { const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/hash/pdq`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl }), signal: AbortSignal.timeout(10000) }); if (r.ok) return await r.json() as { hash: string; quality: number }; } catch {}
   return { hash: crypto?.createHash('sha256').update(imageUrl).digest('hex') ?? 'fallback', quality: 0 };
 }
 
 async function photoDNAHash(imageUrl: string): Promise<{ hash: string; match: boolean; isCSAM: boolean }> {
-  try { const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/hash/photodna`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl }), signal: AbortSignal.timeout(15000) }); if (r.ok) return await r.json() as { hash: string; match: boolean; isCSAM: boolean }; } catch {}
+  try { const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/hash/photodna`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: imageUrl }), signal: AbortSignal.timeout(15000) }); if (r.ok) return await r.json() as { hash: string; match: boolean; isCSAM: boolean }; } catch {}
   return { hash: '', match: false, isCSAM: false };
 }
 
@@ -19,7 +18,7 @@ function pdqHamming(a: string, b: string): number {
 }
 
 async function presidioDetectPII(text: string): Promise<Array<{ entity_type: string; text: string; score: number; start: number; end: number }>> {
-  try { const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/pii/detect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, language: 'en' }), signal: AbortSignal.timeout(8000) }); if (r.ok) return (await r.json() as { entities: Array<{ entity_type: string; text: string; score: number; start: number; end: number }> }).entities; } catch {}
+  try { const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/pii/detect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, language: 'en' }), signal: AbortSignal.timeout(8000) }); if (r.ok) return (await r.json() as { entities: Array<{ entity_type: string; text: string; score: number; start: number; end: number }> }).entities; } catch {}
   const e: Array<{ entity_type: string; text: string; score: number; start: number; end: number }> = []; let m: RegExpExecArray | null;
   const ph = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, em = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, ss = /\d{3}-\d{2}-\d{4}/g;
   while ((m = ph.exec(text)) !== null) e.push({ entity_type: 'PHONE_NUMBER', text: m[0], score: 0.7, start: m.index, end: m.index + m[0].length });
@@ -33,7 +32,6 @@ async function presidioBatch(fields: Record<string, string>): Promise<Record<str
   for (const [k, v] of Object.entries(fields)) if (v.length > 3) r[k] = (await presidioDetectPII(v)).map(e => ({ entity_type: e.entity_type, text: e.text, score: e.score }));
   return r;
 }
-
 
 export interface CoppaResult { allowed: boolean; age: number; reason?: 'coppa_under_13'|'under_18_not_permitted'; parentalConsentRequired?: boolean; dataDeletionRequired?: boolean; }
 export function coppaCompliance(dob: string): CoppaResult {
@@ -51,7 +49,6 @@ export function ageVerificationGate(claimed: number, verified?: number): AgeGate
   return { passes: a >= 18, method: verified ? 'verified' : 'claimed', discrepancy: d, requiresReverification: rv, enforcementAction: ea };
 }
 export const ageGate = ageVerificationGate; export const minimumAgeEnforce = ageVerificationGate;
-
 
 export interface GdprConsentRecord { userId: string; version: string; purposes: string[]; timestamp: string; ipHash: string; method: 'explicit'|'implicit'; withdrawable: boolean; withdrawalUrl: string; dataController: string; dpoContact: string; }
 export function gdprConsent(userId: string, purposes: string[], ipHash: string): GdprConsentRecord {
@@ -117,7 +114,6 @@ export const appCompliance = australianPrivacyAct; export const australiaPrivacy
 export function ccpaCompliance(_u: string) { return { doNotSellOptOut: true, rightToKnow: true, rightToDelete: true, rightToCorrect: true, rightToLimitSensitiveDataUse: true, optOutUrl: 'https://myarchetype.app/privacy/ccpa', verificationRequired: true, responseDeadlineDays: 45, agentRequestsAccepted: true, categoryDisclosure: true, saleDisclosure: true }; }
 export const caPrivacyRights = ccpaCompliance; export const californiaPrivacy = ccpaCompliance;
 
-
 export interface BiometricConsentResult { consentId: string; type: 'face'|'fingerprint'|'voice'; revocable: boolean; expiresAt: string; purpose: string; retentionDays: number; deletionOnRevoke: boolean; thirdPartySharing: boolean; }
 export function biometricConsent(userId: string, type: 'face'|'fingerprint'|'voice'): BiometricConsentResult { return { consentId: `BIO-${userId.slice(0,6)}-${Date.now().toString(36)}`, type, revocable: true, expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(), purpose: 'identity_verification_only', retentionDays: 90, deletionOnRevoke: true, thirdPartySharing: false }; }
 export const biometricDataConsent = biometricConsent; export const facialDataConsent = biometricConsent;
@@ -138,7 +134,6 @@ export const religionData = religiousDataProtect; export const faithData = relig
 export function politicalDataProtect() { return { fieldLevelEncryption: true, acl: true, fields: ['political_views','political_affiliation'], encryptionAlgorithm: 'AES-256-GCM', neverExport: true, neverIncludeInAnalytics: true, neverIncludeInSearch: true, deleteOnAccountDeletion: true, accessLogRequired: true }; }
 export const politicalOpinion = politicalDataProtect; export const politicsData = politicalDataProtect;
 
-
 export interface HealthDataResult { sensitive: boolean; storageLevel: 'encrypted'|'standard'; sharePermission: 'never'|'explicit_only'|'default'; retentionDays: number; auditRequired: boolean; }
 const SENS_HEALTH = new Set(['hivStatus','stdStatus','mentalHealth','disability','medication','pregnancy','substanceUse','eatingDisorder','sexualHealth','geneticData','abortionHistory']);
 export function healthDataProtect(field: string): HealthDataResult { const s = SENS_HEALTH.has(field); return { sensitive: s, storageLevel: s ? 'encrypted' : 'standard', sharePermission: s ? 'never' : 'explicit_only', retentionDays: s ? 0 : 90, auditRequired: s }; }
@@ -155,7 +150,6 @@ export const reproData = reproductiveHealth; export const fertilityData = reprod
 
 export function healthDataSharing() { return { thirdPartyAudit: true, noSharing: true, approvedProcessors: [], dataProcessingAgreementsRequired: true, auditFrequency: 'quarterly', breachNotificationHours: 72 }; }
 export const thirdPartyHealth = healthDataSharing; export const healthAudit = healthDataSharing;
-
 
 export function dsaCompliance() { return { transparencyReportRequired: true, transparencyReportFrequency: 'biannual', algorithmicAuditRequired: true, reportingMechanism: true, contentModeration: true, illegalContentResponseHours: 24, trustedFlaggerProgram: true, riskAssessmentRequired: true, crisisProtocolRequired: true, adsTransparency: true, recommenderSystemTransparency: true, outOfCourtDisputeSettlement: true, complianceOfficer: 'dsa-compliance@myarchetype.app' }; }
 export const digitalServicesAct = dsaCompliance;
@@ -183,7 +177,6 @@ export const sdnScreen = ofacIndividual; export const sanctionsScreenName = ofac
 
 export function dataResidency() { return { geoFenced: true, multiRegion: true, euDataInEU: true, ukDataInUK: true, auDataInAU: true, defaultRegion: 'us-east-1', replicationRegions: ['eu-west-1','ap-southeast-1'], encryptionInTransit: true, encryptionAtRest: true }; }
 export const geoFencedData = dataResidency; export const regionBound = dataResidency;
-
 
 export interface TakeItDownResult { deadline48h: string; hashRequired: boolean; pdqHash: string|null; photoDNAMatch: boolean; photoDNAIsCSAM: boolean; victimNotification: boolean; platformResponse: string; escalationPath: string[]; evidencePreservation: boolean; lawEnforcementReferral: boolean; reuploadPreventionActive: boolean; }
 
@@ -214,11 +207,10 @@ export async function nciiReupload(imageUrl: string, isReport = false): Promise<
 export const nciiHashBlock = nciiReupload; export const preventReuploadNcii = nciiReupload;
 
 export async function stopNciiIntegration(imageHash: string) {
-  try { const r = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/ncii-check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash: imageHash }), signal: AbortSignal.timeout(8000) }); if (r.ok) { const d = await r.json() as { matched: boolean }; return { matched: d.matched, action: d.matched ? 'block' as const : 'allow' as const }; } } catch {}
+  try { const r = await fetch(`${process.env['EXPO_PUBLIC_API_URL']}/api/ncii-check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash: imageHash }), signal: AbortSignal.timeout(8000) }); if (r.ok) { const d = await r.json() as { matched: boolean }; return { matched: d.matched, action: d.matched ? 'block' as const : 'allow' as const }; } } catch {}
   return { matched: false as const, action: 'allow' as const };
 }
 export const stopNciiApi = stopNciiIntegration; export const nciiHashIntegration = stopNciiIntegration;
-
 
 export function romanceScamActCompliance() { return { warningRequired: true, reportingLink: true, sessionBreakReminders: true, warningText: "Never send money to someone you haven't met in person. Report suspicious activity.", triggerPoints: ['first_financial_keyword_detected','off_platform_redirect_detected','investment_topic_detected','crypto_address_detected','gift_card_mention_detected'], warningFrequency: 'per_trigger', educationalResources: ['https://www.ftc.gov/romance-scams','https://www.ic3.gov'] }; }
 export const scamActCompliance = romanceScamActCompliance; export const warningLabelRequired = romanceScamActCompliance;
@@ -231,7 +223,6 @@ export const bannedInteraction = bannedUserHistory;
 
 export function offPlatformWarning() { return { notification: true, scamContinuationWarning: true, warningText: 'Be careful — this person wants to move off-platform. Scammers often do this to avoid our safety protections.', showOnPlatformSwitch: true, delayBeforeSwitch: 5000, educationalLink: 'https://www.ftc.gov/romance-scams' }; }
 export const scamContinuation = offPlatformWarning; export const contactedByBanned = offPlatformWarning;
-
 
 export interface LegalProcessResult { acknowledged: boolean; responseDeadline: string; scope: string; legalReviewRequired: boolean; dataSubjectNotification: boolean; gagOrderCheck: boolean; }
 export function legalProcessCompliance(req: { type: 'subpoena'|'court_order'|'emergency'|'national_security_letter'|'warrant'; jurisdiction: string; caseId: string; dataTypes?: string[]; dateRange?: { start: string; end: string }; }): LegalProcessResult {
@@ -247,7 +238,6 @@ export function MLAT() { return { handling: true, workflow: true, treatyDatabase
 export const mlatRequest = MLAT; export const mutualLegalAssistance = MLAT;
 
 export function transparencyReportGen() { return { automated: true, biannual: true, sections: ['total_reports_received','action_taken_breakdown','average_response_time','appeals_received_and_outcomes','csam_reports_to_ncmec','law_enforcement_requests_received','data_retention_policy_updates','safety_feature_usage_stats'], format: 'PDF + JSON', publishedAt: 'https://myarchetype.app/transparency' }; }
-
 
 export interface AuditTrailEntry { action: string; actorId: string; targetId: string; timestamp: string; hash: string; previousHash: string; chainIndex: number; tamperProof: boolean; }
 let ci = 0, ph = '0000000000000000000000000000000000000000000000000000000000000000';
@@ -292,7 +282,6 @@ export const marketingAccuracy = safetyMarketingAudit; export const safetyClaimV
 export function knownDangerousUserProtocol(userId: string) { void userId; writeAuditLog('safety.dangerous_user_protocol', { userId }).catch(() => {}); return { priorityEscalation: true, maxResponseHours: 4, lawEnforcementRefer: true, preserveEvidence: true, notifyAffectedUsers: true, accountAction: 'suspend_pending_review', safetyTeamAlert: true, evidencePackageGenerated: true }; }
 export const dangerousUserProtocol = knownDangerousUserProtocol; export const priorityEscalation = knownDangerousUserProtocol;
 
-
 export function addictionLitigationDefense() { return { wellbeingFeatures: ['session_time_caps','break_reminders','usage_dashboard','daily_match_limits','notification_scheduling','mindful_swiping_prompts','wellbeing_checkins'], avoidedDarkPatterns: ['infinite_scroll','variable_reward_hiding','manufactured_urgency','loss_aversion_tactics','social_proof_pressure','confirm_shaming','default_auto_play'], documentationDate: new Date().toISOString(), annualReview: true, thirdPartyAudit: true }; }
 export const designForWellbeing = addictionLitigationDefense; export const antiAddictiveDesign = addictionLitigationDefense;
 
@@ -322,7 +311,6 @@ export const minorEngagement = minorEngagementDetection; export const minorBehav
 export function algorithmicConsentRequired() { return { required: true, explanation: 'We use algorithms to suggest matches based on your preferences.', consentUrl: 'https://myarchetype.app/privacy/algorithmic', optOutAvailable: true, rightToExplanation: true, humanReviewAvailable: true }; }
 export const algorithmicConsent = algorithmicConsentRequired; export const algoConsentNotice = algorithmicConsentRequired;
 
-
 const dsarH: Record<string, number[]> = {};
 export interface DsarResult { suspicious: boolean; requestCount: number; action: 'process'|'flag'|'refuse'; reason?: string; reviewRequired: boolean; piiDiscoveryComplete: boolean; piiFieldsFound: string[]; }
 
@@ -338,7 +326,6 @@ export const dsarAbuse = dsarWeaponization; export const bulkDsarDetect = dsarWe
 
 export function dsarIdentityVerify(requestorId: string, authenticatedId: string) { return requestorId === authenticatedId ? { authorized: true, method: 'identity_match' } : { authorized: false, reason: 'requestor_not_subject', method: 'identity_mismatch' }; }
 export const dsarVerify = dsarIdentityVerify; export const dsarAuthCheck = dsarIdentityVerify;
-
 
 export interface BreachNotificationResult { notify72h: boolean; deadline: string; supervisoryAuthority: string; notifyUsers: boolean; notificationTemplate: string; actionsRequired: string[]; evidencePreservation: boolean; legalReviewRequired: boolean; fineRisk: string; piiClassificationComplete: boolean; piiTypesBreached: string[]; sensitiveDataCategoriesBreached: string[]; recommendedMitigations: string[]; }
 
@@ -360,7 +347,6 @@ export async function breachNotificationCompliance(b: { affectedCount: number; d
   return { notify72h: true, deadline: dl.toISOString(), supervisoryAuthority: 'ICO/DPC/FTC', notifyUsers: b.affectedCount > 0 && (isU || isS), notificationTemplate: b.affectedCount > 0 ? 'We are writing to inform you of a data security incident that may have affected your personal information. We take your privacy seriously and are taking immediate steps.' : '', actionsRequired: ar, evidencePreservation: true, legalReviewRequired: true, fineRisk: fr, piiClassificationComplete: pcc, piiTypesBreached: [...new Set(ptb)], sensitiveDataCategoriesBreached: [...new Set(sdc)], recommendedMitigations: [...new Set(rm)] };
 }
 export const breach72hNotify = breachNotificationCompliance; export const gdprBreachNotify = breachNotificationCompliance;
-
 
 export interface RetentionResult { messages: string; profileData: string; paymentData: string; auditLogs: string; biometricData: string; locationData: string; encryptionKeys: string; reportData: string; autoDeleteSchedule: boolean; complianceFramework: string[]; }
 export function dataRetentionPolicy(): RetentionResult { return { messages: '90d after unmatch/deletion', profileData: '30d after deletion', paymentData: '7y (tax/legal)', auditLogs: '2y', biometricData: '90d after verification (or consent withdrawal)', locationData: '30d rolling', encryptionKeys: 'rotated every 90d', reportData: '2y (legal hold extends)', autoDeleteSchedule: true, complianceFramework: ['GDPR Art.5(1)(e)','CCPA §1798.105','DSA Art.11','PIPEDA Principle 5'] }; }

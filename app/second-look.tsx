@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import HeightBadge from '../components/HeightBadge';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
@@ -81,20 +81,43 @@ async function sendPush(token: string, title: string, body: string, type: string
   }
 }
 
+// ─── PhotoItem ────────────────────────────────────────────────────────────────
+
+interface PhotoItemProps {
+  uri:            string;
+  index:          number;
+  name:           string;
+  photoCount:     number;
+  isCurrentPhoto: boolean;
+}
+
 const PhotoItem = React.memo(function PhotoItem({
-  uri, index, name, photoCount,
-}: { uri: string; index: number; name: string; photoCount: number }) {
-  const photoStyle = useMemo(() => [styles.photo, { width: PHOTO_WIDTH }], []);
+  uri, index, name, photoCount, isCurrentPhoto,
+}: PhotoItemProps) {
+  // PHOTO_WIDTH is a module-level constant — safe to use without listing as dep
+  const photoStyle = useMemo(
+    () => [styles.photo, { width: PHOTO_WIDTH }],
+    [],
+  );
+  const dotStyle = useMemo(
+    () => [styles.dot, isCurrentPhoto && styles.dotActive],
+    [isCurrentPhoto],
+  );
   return (
-    <TurboImage
-      source={{ uri }}
-      style={photoStyle}
-      resizeMode="cover"
-      cachePolicy="dataCache"
-      accessibilityLabel={`${name}'s photo ${index + 1} of ${photoCount}`}
-    />
+    <View>
+      <TurboImage
+        source={{ uri }}
+        style={photoStyle}
+        resizeMode="cover"
+        cachePolicy="dataCache"
+        accessibilityLabel={`${name}'s photo ${index + 1} of ${photoCount}`}
+      />
+      <View style={dotStyle} />
+    </View>
   );
 });
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SecondLookScreen() {
   const router = useRouter();
@@ -129,7 +152,7 @@ export default function SecondLookScreen() {
         let likeSnap: Awaited<ReturnType<typeof getDocs>>;
         try {
           [userDoc, likeSnap] = await Promise.all([
-            getDoc(doc(db, 'users', uid).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; })),
+            getDoc(doc(db, 'users', uid)),
             getDocs(query(
               collection(db, 'likes'),
               where('fromUserId', '==', user.uid),
@@ -171,12 +194,15 @@ export default function SecondLookScreen() {
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       void loadSkippedProfiles();
-    }, []);
+    });
     return () => task.cancel();
   }, [loadSkippedProfiles]);
 
+  // Reset photo index when active profile changes.
+  // setPhotoIndex(0) is synchronous inside an effect body; this is the standard
+  // React idiom for resetting derived UI state on a dependency change.
   useEffect(() => {
-    if (isMounted.current) setPhotoIndex(0);
+    setPhotoIndex(0);
   }, [currentIndex]);
 
   const nextProfile = useCallback(() => setCurrentIndex(prev => prev + 1), []);
@@ -205,7 +231,7 @@ export default function SecondLookScreen() {
         if (!theirDoc) throw new Error('Like doc missing');
         try {
           await Promise.all([
-            setDoc(doc(db, 'likes', theirDoc.id).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), {
+            setDoc(doc(db, 'likes', theirDoc.id), {
               ...theirDoc.data(),
               status:    'matched',
               matchedAt: new Date().toISOString(),
@@ -297,6 +323,9 @@ export default function SecondLookScreen() {
     [],
   );
 
+  const keyExtractor      = useCallback((item: UserProfile) => item.uid, []);
+  const photoKeyExtractor = useCallback((uri: string, i: number) => `${uri}_${i}`, []);
+
   const onGoMatches = useCallback(() => router.push('/matches'), [router]);
   const onGoBack    = useCallback(() => router.back(),           [router]);
   const onLike      = useCallback(() => void handleLike(),       [handleLike]);
@@ -379,23 +408,19 @@ export default function SecondLookScreen() {
   const likeBtnStyle  = [styles.likeButton, actionLoading && styles.likeButtonDisabled];
 
   const renderPhoto = ({ item: uri, index: i }: LegendListRenderItemProps<string>) => (
-    <PhotoItem uri={uri} index={i} name={profile.name} photoCount={photoCount} />
+    <PhotoItem
+      uri={uri}
+      index={i}
+      name={profile.name}
+      photoCount={photoCount}
+      isCurrentPhoto={currentPhotoIndex === i}
+    />
   );
 
-  const photoKeyExtractor = (uri: string, i: number) => `${uri}_${i}`;
-
   return (
-    /*
-      data={[profile]} — single-item LegendList used to get scrollable
-      card body with the profile as the only item. This replaces the
-      previous pattern of data={profiles} with an isCurrentProfile guard
-      inside renderItem (which rendered null for all non-current items —
-      wasteful virtualization of the entire profiles array).
-      recycleItems={false} — profile card JSX is unique per profile.
-    */
     <LegendList
       data={[profile]}
-      keyExtractor={(item) => item.uid}
+      keyExtractor={keyExtractor}
       recycleItems={false}
       estimatedItemSize={800}
       showsVerticalScrollIndicator={false}
@@ -446,14 +471,10 @@ export default function SecondLookScreen() {
                   accessibilityLabel={`${currentProfile.name}'s photos, ${photoCount} total`}
                 />
                 {photoCount > 1 && (
-                  <View style={styles.photoIndicator} accessibilityElementsHidden>
-                    {(currentProfile.photos ?? []).map((_, index) => (
-                      <View
-                        key={index}
-                        style={[styles.dot, currentPhotoIndex === index && styles.dotActive]}
-                      />
-                    ))}
-                  </View>
+                  <View
+                    style={styles.photoIndicator}
+                    accessibilityElementsHidden
+                  />
                 )}
                 {currentProfile.selfieVerified && (
                   <View style={styles.verifiedBadge} accessibilityLabel="Identity verified">

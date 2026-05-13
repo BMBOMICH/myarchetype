@@ -1,7 +1,7 @@
 import { observable } from '@legendapp/state';
 import { observer } from '@legendapp/state/react';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
@@ -25,12 +25,37 @@ const screen$ = observable({
   exiting:     false,
 });
 
+// ─── AnniversaryCard ──────────────────────────────────────────────────────────
+// Extracted from the IIFE that previously lived inside JSX so the linter
+// doesn't flag it as an immediately-invoked function expression in JSX.
+
+interface AnniversaryCardProps {
+  anniversary: string;
+}
+
+const AnniversaryCard = React.memo<AnniversaryCardProps>(({ anniversary }) => {
+  const { date, daysUntil } = getNextAnniversary(anniversary);
+  return (
+    <View style={styles.anniversaryCard}>
+      <Text style={styles.anniversaryIcon}>🎉</Text>
+      <View style={styles.anniversaryInfo}>
+        <Text style={styles.anniversaryLabel}>Next Anniversary</Text>
+        <Text style={styles.anniversaryDate}>{date.toLocaleDateString()}</Text>
+        <Text style={styles.anniversaryCountdown}>
+          {daysUntil === 0 ? 'Today! 🎊' : daysUntil === 1 ? 'Tomorrow!' : `in ${daysUntil} days`}
+        </Text>
+      </View>
+    </View>
+  );
+});
+AnniversaryCard.displayName = 'AnniversaryCard';
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default observer(function RelationshipModeScreen() {
   const router = useRouter();
 
-  useEffect(() => { void loadStatus(); }, []);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
       const relationshipStatus = await getRelationshipStatus();
       screen$.status.set(relationshipStatus);
@@ -40,9 +65,11 @@ export default observer(function RelationshipModeScreen() {
     } finally {
       screen$.loading.set(false);
     }
-  };
+  }, []);
 
-  const handleEnter = async () => {
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const handleEnter = useCallback(async () => {
     const partnerName = screen$.partnerName.get().trim();
     if (!partnerName) {
       Alert.alert('Missing Info', "Please enter your partner's name");
@@ -62,7 +89,7 @@ export default observer(function RelationshipModeScreen() {
         screen$.showSetup.set(false);
         await loadStatus();
       } else {
-        Alert.alert('Error', result.error || 'Could not activate relationship mode');
+        Alert.alert('Error', result.error ?? 'Could not activate relationship mode');
       }
     } catch (error) {
       logger.error('[RelationshipMode] enter error:', error);
@@ -70,24 +97,9 @@ export default observer(function RelationshipModeScreen() {
     } finally {
       screen$.entering.set(false);
     }
-  };
+  }, [loadStatus]);
 
-  const confirmExit = useCallback(() => {
-    Alert.alert(
-      'Exit Relationship Mode?',
-      'This will:\n- Show your profile in discovery again\n- Remove relationship status\n- Allow you to receive likes/matches\n\nAre you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Exit',
-          style: 'destructive',
-          onPress: () => void handleExit(),
-        },
-      ]
-    );
-  }, []);
-
-  const handleExit = async () => {
+  const handleExit = useCallback(async () => {
     screen$.exiting.set(true);
     try {
       const result = await exitRelationshipMode();
@@ -95,7 +107,7 @@ export default observer(function RelationshipModeScreen() {
         Alert.alert('Relationship Mode Ended', 'Your profile is now visible again');
         await loadStatus();
       } else {
-        Alert.alert('Error', result.error || 'Could not exit relationship mode');
+        Alert.alert('Error', result.error ?? 'Could not exit relationship mode');
       }
     } catch (error) {
       logger.error('[RelationshipMode] exit error:', error);
@@ -103,7 +115,18 @@ export default observer(function RelationshipModeScreen() {
     } finally {
       screen$.exiting.set(false);
     }
-  };
+  }, [loadStatus]);
+
+  const confirmExit = useCallback(() => {
+    Alert.alert(
+      'Exit Relationship Mode?',
+      'This will:\n- Show your profile in discovery again\n- Remove relationship status\n- Allow you to receive likes/matches\n\nAre you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Exit', style: 'destructive', onPress: () => void handleExit() },
+      ],
+    );
+  }, [handleExit]);
 
   const loading     = screen$.loading.get();
   const status      = screen$.status.get();
@@ -112,6 +135,15 @@ export default observer(function RelationshipModeScreen() {
   const startDate   = screen$.startDate.get();
   const entering    = screen$.entering.get();
   const exiting     = screen$.exiting.get();
+
+  const exitButtonStyle    = useMemo(() => [styles.exitButton,  exiting  && styles.exitButtonDisabled],  [exiting]);
+  const enterButtonStyle   = useMemo(() => [styles.enterButton, entering && styles.enterButtonDisabled], [entering]);
+  const onPartnerNameChange = useCallback((v: string) => screen$.partnerName.set(v), []);
+  const onStartDateChange   = useCallback((v: string) => screen$.startDate.set(v),   []);
+  const onShowSetup         = useCallback(() => screen$.showSetup.set(true),  []);
+  const onHideSetup         = useCallback(() => screen$.showSetup.set(false), []);
+  const onGoBack            = useCallback(() => router.back(), [router]);
+  const onHandleEnter       = useCallback(() => void handleEnter(), [handleEnter]);
 
   if (loading) return (
     <View style={styles.container}>
@@ -126,7 +158,11 @@ export default observer(function RelationshipModeScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()}>
+        <TouchableOpacity
+          onPress={onGoBack}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>💕 Relationship Mode</Text>
@@ -143,24 +179,14 @@ export default observer(function RelationshipModeScreen() {
 
           <View style={styles.durationCard}>
             <Text style={styles.durationLabel}>Together for:</Text>
-            <Text style={styles.durationValue}>{calculateRelationshipDuration(status.startDate || status.anniversary || '')}</Text>
+            <Text style={styles.durationValue}>
+              {calculateRelationshipDuration(status.startDate ?? status.anniversary ?? '')}
+            </Text>
           </View>
 
-          {status.anniversary && (() => {
-            const { date, daysUntil } = getNextAnniversary(status.anniversary);
-            return (
-              <View style={styles.anniversaryCard}>
-                <Text style={styles.anniversaryIcon}>🎉</Text>
-                <View style={styles.anniversaryInfo}>
-                  <Text style={styles.anniversaryLabel}>Next Anniversary</Text>
-                  <Text style={styles.anniversaryDate}>{date.toLocaleDateString()}</Text>
-                  <Text style={styles.anniversaryCountdown}>
-                    {daysUntil === 0 ? 'Today! 🎊' : daysUntil === 1 ? 'Tomorrow!' : `in ${daysUntil} days`}
-                  </Text>
-                </View>
-              </View>
-            );
-          })()}
+          {status.anniversary && (
+            <AnniversaryCard anniversary={status.anniversary} />
+          )}
 
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>ℹ️ What this means:</Text>
@@ -171,17 +197,21 @@ export default observer(function RelationshipModeScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.exitButton, exiting && styles.exitButtonDisabled]}
+            style={exitButtonStyle}
             onPress={confirmExit}
             disabled={exiting}
-           accessibilityLabel="button">
+            accessibilityRole="button"
+            accessibilityLabel="Exit relationship mode"
+          >
             <Text style={styles.exitButtonText}>{exiting ? 'Exiting...' : 'Exit Relationship Mode'}</Text>
           </TouchableOpacity>
         </View>
       ) : showSetup ? (
         <View style={styles.setupForm}>
           <Text style={styles.setupTitle}>Enter Relationship Mode</Text>
-          <Text style={styles.setupSubtitle}>This will hide your profile from discovery and mark you as "in a relationship"</Text>
+          <Text style={styles.setupSubtitle}>
+            This will hide your profile from discovery and mark you as "in a relationship"
+          </Text>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Partner's Name *</Text>
@@ -190,7 +220,7 @@ export default observer(function RelationshipModeScreen() {
               placeholder="Who are you dating?"
               placeholderTextColor="#666"
               value={partnerName}
-              onChangeText={(v) => screen$.partnerName.set(v)}
+              onChangeText={onPartnerNameChange}
             />
           </View>
 
@@ -201,20 +231,29 @@ export default observer(function RelationshipModeScreen() {
               placeholder="YYYY-MM-DD (e.g., 2024-01-15)"
               placeholderTextColor="#666"
               value={startDate}
-              onChangeText={(v) => screen$.startDate.set(v)}
+              onChangeText={onStartDateChange}
             />
             <Text style={styles.inputHint}>For anniversary tracking. Leave blank if unsure.</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.enterButton, entering && styles.enterButtonDisabled]}
-            onPress={() = accessibilityLabel="button"> void handleEnter()}
+            style={enterButtonStyle}
+            onPress={onHandleEnter}
             disabled={entering}
+            accessibilityRole="button"
+            accessibilityLabel="Activate relationship mode"
           >
-            <Text style={styles.enterButtonText}>{entering ? 'Activating...' : '💕 Enter Relationship Mode'}</Text>
+            <Text style={styles.enterButtonText}>
+              {entering ? 'Activating...' : '💕 Enter Relationship Mode'}
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.cancelSetupButton} onPress={() = accessibilityLabel="button"> screen$.showSetup.set(false)}>
+          <TouchableOpacity
+            style={styles.cancelSetupButton}
+            onPress={onHideSetup}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel setup"
+          >
             <Text style={styles.cancelSetupButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -232,11 +271,18 @@ export default observer(function RelationshipModeScreen() {
             <Text style={styles.featureItem}>✨ Celebrate milestones together</Text>
           </View>
 
-          <TouchableOpacity style={styles.setupButton} onPress={() = accessibilityLabel="button"> screen$.showSetup.set(true)}>
+          <TouchableOpacity
+            style={styles.setupButton}
+            onPress={onShowSetup}
+            accessibilityRole="button"
+            accessibilityLabel="Enter relationship mode"
+          >
             <Text style={styles.setupButtonText}>💕 Enter Relationship Mode</Text>
           </TouchableOpacity>
 
-          <Text style={styles.disclaimer}>You can exit relationship mode anytime to start dating again.</Text>
+          <Text style={styles.disclaimer}>
+            You can exit relationship mode anytime to start dating again.
+          </Text>
         </View>
       )}
     </ScrollView>

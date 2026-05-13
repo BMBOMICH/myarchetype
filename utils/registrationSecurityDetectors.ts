@@ -1,5 +1,5 @@
 import { writeAuditLog } from './logger';
-const API = process.env.EXPO_PUBLIC_API_URL ?? '';
+const API = process.env['EXPO_PUBLIC_API_URL'] ?? '';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
 
 const DISP = new Set(['mailinator.com', 'guerrillamail.com', 'tempmail.com', 'throwam.com', 'yopmail.com', 'sharklasers.com', 'guerrillamailblock.com', 'grr.la', 'guerrillamail.info', 'guerrillamail.biz', 'guerrillamail.de', 'guerrillamail.net', 'guerrillamail.org', 'spam4.me', 'trashmail.com', 'trashmail.me', 'trashmail.net', 'dispostable.com', 'spamgourmet.com', 'spamgourmet.net', 'spamgourmet.org', 'mailnull.com', 'maildrop.cc', 'getairmail.com', 'filzmail.com', '20minutemail.com', 'fakeinbox.com', 'mailexpire.com', 'discard.email', 'spamhereplease.com', 'mytemp.email', 'temp-mail.org', 'tempmail.io', 'getnada.com', 'mohmal.com', 'tempr.email', 'anonaddy.com', 'simplelogin.io']);

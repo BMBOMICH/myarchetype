@@ -53,7 +53,7 @@ async function uploadEncrypted(encrypted: Uint8Array, mime: string): Promise<{ m
     const tempUri = FileSystem.cacheDirectory + `enc_${Date.now()}.bin`;
     await FileSystem.writeAsStringAsync(tempUri, b64E(encrypted), { encoding: FileSystem.EncodingType.Base64 });
     const fd = new FormData();
-    fd.append('file', { uri: tempUri, type: 'application/octet-stream', name: 'encrypted.bin' } as any);
+    fd.append('file', { uri: tempUri, type: 'application/octet-stream', name: 'encrypted.bin' } as unknown);
     fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/raw/upload`, { method: 'POST', body: fd });
     const json = await res.json();

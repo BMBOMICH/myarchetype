@@ -37,7 +37,6 @@ import logger from '../utils/logger';
 import { checkTextSafety } from '../utils/moderation';
 import { profileStorage as storage } from '../utils/storage';
 
-
 const LOCAL = {
   white:        '#ffffff',
   success:      '#5cb85c',
@@ -52,7 +51,6 @@ const LOCAL = {
   textMuted:    '#888888',
   textDim:      '#666666',
 } as const;
-
 
 interface SettingsState {
   notifyMatches:      boolean;
@@ -97,7 +95,6 @@ interface FirestoreUserData {
   referralCount?:      number;
 }
 
-
 const defaultSettings: SettingsState = {
   notifyMatches: true, notifyMessages: true,
   notifyLikes: true, notifyProfileViews: true,
@@ -127,7 +124,6 @@ function bugReducer(state: BugState, action: BugAction): BugState {
   }
 }
 
-
 const DONATION_LINKS: Record<string, string> = {
   kofi:          'https://ko-fi.com/myarchetype',
   buymeacoffee:  'https://buymeacoffee.com/myarchetype',
@@ -143,7 +139,6 @@ const DONATION_ITEMS = [
 ] as const;
 
 const SWITCH_TRACK = { false: LOCAL.trackFalse, true: '#53a8b6' } as const;
-
 
 interface SwitchRowProps {
   label:    string;
@@ -177,9 +172,13 @@ interface NavRowProps {
   disabled?: boolean;
 }
 const NavRow = React.memo(function NavRow({ label, onPress, danger, disabled }: NavRowProps) {
+  const rowStyle = useMemo(
+    () => [styles.settingRow, danger && styles.dangerRow],
+    [danger],
+  );
   return (
     <TouchableOpacity
-      style={[styles.settingRow, danger && styles.dangerRow]}
+      style={rowStyle}
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
@@ -198,15 +197,23 @@ interface LangOptionProps {
 }
 const LangOption = React.memo(function LangOption({ lang, selected, onSelect }: LangOptionProps) {
   const handlePress = useCallback(() => onSelect(lang), [onSelect, lang]);
+  const rowStyle  = useMemo(
+    () => [styles.languageOption, selected && styles.languageOptionActive],
+    [selected],
+  );
+  const txtStyle  = useMemo(
+    () => [styles.languageOptionText, selected && styles.languageOptionTextActive],
+    [selected],
+  );
   return (
     <TouchableOpacity
-      style={[styles.languageOption, selected && styles.languageOptionActive]}
+      style={rowStyle}
       onPress={handlePress}
       accessibilityLabel={`Select ${languageNames[lang]}${selected ? ', currently selected' : ''}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
     >
-      <Text style={[styles.languageOptionText, selected && styles.languageOptionTextActive]}>
+      <Text style={txtStyle}>
         {languageNames[lang]}
       </Text>
       {selected && <Text style={styles.checkmark}>✓</Text>}
@@ -236,7 +243,6 @@ const DonateOption = React.memo(function DonateOption({
     </TouchableOpacity>
   );
 });
-
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -274,7 +280,7 @@ export default function SettingsScreen() {
   const handleCancelBug        = useCallback(() => {
     closeModal('bugReport'); dispatchBug({ type: 'RESET' });
   }, [closeModal]);
-  const handleCancelDelete     = useCallback(() => {
+  const handleCancelDelete = useCallback(() => {
     closeModal('deleteAccount'); setDeletePassword(''); setDeleteError('');
   }, [closeModal]);
   const handleBugTitle       = useCallback((v: string) => dispatchBug({ type: 'SET_TITLE', value: v }), []);
@@ -301,7 +307,6 @@ export default function SettingsScreen() {
     { label: 'Show last seen',     field: 'showLastSeen'     as const, value: settings.showLastSeen     },
     { label: 'Show profile views', field: 'showProfileViews' as const, value: settings.showProfileViews },
   ], [settings.showOnlineStatus, settings.showLastSeen, settings.showProfileViews]);
-
 
   const generateReferralCode = useCallback(
     (uid: string) => `MA${uid.substring(0, 6).toUpperCase()}`,
@@ -353,13 +358,12 @@ export default function SettingsScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadSettings();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();
     };
   }, [loadSettings]);
-
 
   const saveSettings = useCallback(async () => {
     if (!user) return;
@@ -382,7 +386,6 @@ export default function SettingsScreen() {
       setSaving(false);
     }
   }, [user, settings, t]);
-
 
   const handleDeleteAccount = useCallback(() => {
     if (!auth.currentUser) {
@@ -449,13 +452,11 @@ export default function SettingsScreen() {
     }
   }, [deletePassword, router, closeModal]);
 
-
   const handleLanguageChange = useCallback(async (lang: Language) => {
     storage.set('app_language', lang);
     await setLanguage(lang);
     closeModal('language');
   }, [setLanguage, closeModal]);
-
 
   const handleCopyReferralCode = useCallback(async () => {
     await Clipboard.setStringAsync(settings.referralCode);
@@ -468,7 +469,6 @@ export default function SettingsScreen() {
     );
     Alert.alert(t.success, 'Share message copied to clipboard!');
   }, [settings.referralCode, t]);
-
 
   const handleSubmitBugReport = useCallback(async () => {
     if (!bug.title.trim() || !bug.description.trim()) {
@@ -502,11 +502,32 @@ export default function SettingsScreen() {
     }
   }, [bug, user, t, closeModal]);
 
-
   const openDonationLink = useCallback((platform: string) => {
-    Linking.openURL(DONATION_LINKS[platform] ?? DONATION_LINKS.kofi!);
+    Linking.openURL(DONATION_LINKS[platform] ?? DONATION_LINKS['kofi']!);
   }, []);
 
+  // Computed styles that depend on runtime state — kept in main component
+  const saveButtonStyle = useMemo(
+    () => [styles.saveButton, saving && styles.saveButtonDisabled],
+    [saving],
+  );
+  const bugSubmitBtnStyle = useMemo(
+    () => [styles.modalButtonSubmit, bug.submitting && styles.modalButtonDisabled],
+    [bug.submitting],
+  );
+  const deleteInputStyle = useMemo(
+    () => [styles.input, deleteError ? styles.inputError : null],
+    [deleteError],
+  );
+  const deleteBtnStyle = useMemo(
+    () => [styles.modalButtonSubmit, styles.deleteButton],
+    [],
+  );
+  const referralShareBtnStyle = useMemo(
+    () => [styles.referralButton, styles.referralButtonPrimary],
+    [],
+  );
+  const textAreaStyle = useMemo(() => [styles.input, styles.textArea], []);
 
   if (loading || deleting) {
     return (
@@ -518,7 +539,6 @@ export default function SettingsScreen() {
       </View>
     );
   }
-
 
   return (
     <ScrollView
@@ -600,7 +620,7 @@ export default function SettingsScreen() {
               <Text style={styles.referralButtonText}>📋 {t.copyCode}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.referralButton, styles.referralButtonPrimary]}
+              style={referralShareBtnStyle}
               onPress={handleShareReferralCode}
               accessibilityLabel="Share referral code"
               accessibilityRole="button"
@@ -643,7 +663,7 @@ export default function SettingsScreen() {
 
       {/* SAVE */}
       <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        style={saveButtonStyle}
         onPress={saveSettings}
         disabled={saving}
         accessibilityLabel="Save settings"
@@ -666,6 +686,11 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t.language}</Text>
+            {/*
+              ScrollView wraps a bounded list of supported languages (~10 items).
+              This is a fixed-size config list, not a scrolling data feed.
+              LegendList is not appropriate here.
+            */}
             <ScrollView style={styles.languageList}>
               {SUPPORTED_LANGUAGES.map((lang) => (
                 <LangOption
@@ -710,7 +735,7 @@ export default function SettingsScreen() {
             />
             <Text style={styles.inputLabel}>Details</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={textAreaStyle}
               placeholder="What happened? What did you expect? Steps to reproduce..."
               placeholderTextColor={LOCAL.textDim}
               value={bug.description}
@@ -731,7 +756,7 @@ export default function SettingsScreen() {
                 <Text style={styles.modalButtonCancelText}>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonSubmit, bug.submitting && styles.modalButtonDisabled]}
+                style={bugSubmitBtnStyle}
                 onPress={handleSubmitBugReport}
                 disabled={bug.submitting}
                 accessibilityLabel="Submit bug report"
@@ -800,7 +825,7 @@ export default function SettingsScreen() {
             </Text>
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
-              style={[styles.input, deleteError ? styles.inputError : null]}
+              style={deleteInputStyle}
               placeholder="Enter your password"
               placeholderTextColor={LOCAL.textDim}
               value={deletePassword}
@@ -823,7 +848,7 @@ export default function SettingsScreen() {
                 <Text style={styles.modalButtonCancelText}>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonSubmit, styles.deleteButton]}
+                style={deleteBtnStyle}
                 onPress={executeDeleteAccount}
                 disabled={deleting}
                 accessibilityLabel="Confirm delete account forever"
@@ -840,7 +865,6 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create((theme) => ({
   container:       { flex: 1, backgroundColor: theme.colors.background },

@@ -13,15 +13,15 @@ catch{return{compromised:false,count:0,severity:'none',action:'none',recommendat
 export const hibpPasswordCheck=isPasswordCompromised;
 
 export async function checkEmailBreaches(email:string):Promise<{breached:boolean;breaches:string[]}>{
-const ak=process.env.EXPO_PUBLIC_HIBP_API_KEY;if(!ak)return{breached:false,breaches:[]};
+const ak=process.env['EXPO_PUBLIC_HIBP_API_KEY'];if(!ak)return{breached:false,breaches:[]};
 try{const r=await fS(`${HIBP_B}/breachedaccount/${encodeURIComponent(email)}?truncateResponse=true`,{headers:{'hibp-api-key':ak,'user-agent':'MyArchetype-SafetyCheck'}});
 if(r.status===404)return{breached:false,breaches:[]};if(!r.ok)return{breached:false,breaches:[]};const d=await r.json() as Array<{Name:string}>;return{breached:true,breaches:d.map(b=>b.Name)};}catch{return{breached:false,breaches:[]};}}
 export const emailBreachCheck=checkEmailBreaches;
 
-if (__DEV__) export async function initiateForceReset(uid:string,reason:string):Promise<void>{try{await fS(`${process.env.EXPO_PUBLIC_API_URL}/auth/force-reset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,reason,timestamp:Date.now()})});await writeAuditLog('safety.breach_force_reset',{userId:uid,reason});}catch(e){console.error('[BreachDefense] force reset failed:',e);}}
+if (__DEV__) export async function initiateForceReset(uid:string,reason:string):Promise<void>{try{await fS(`${process.env['EXPO_PUBLIC_API_URL']}/auth/force-reset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,reason,timestamp:Date.now()})});await writeAuditLog('safety.breach_force_reset',{userId:uid,reason});}catch(e){console.error('[BreachDefense] force reset failed:',e);}}
 
 export async function proactiveBreachCheck(uid:string,email:string,pw:string):Promise<{passwordCompromised:boolean;emailBreached:boolean;breachNames:string[];action:'none'|'force_reset'|'notify_user'}>{
-const[pc,ec]=await Promise.all([isPasswordCompromised(pw).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),checkEmailBreaches(email)]);const a=pc.compromised&&pc.count>1000?'force_reset':pc.compromised||ec.breached?'notify_user':'none';
+const[pc,ec]=await Promise.all([isPasswordCompromised(pw).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),checkEmailBreaches(email)]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });const a=pc.compromised&&pc.count>1000?'force_reset':pc.compromised||ec.breached?'notify_user':'none';
 if(a==='force_reset')await initiateForceReset(uid,`password_found_in_${pc.count}_breaches`);
 if(a!=='none')await writeAuditLog('safety.proactive_breach_check',{userId:uid,action:a,emailBreached:ec.breached,passwordBreachCount:pc.count}).catch(()=>{});
 return{passwordCompromised:pc.compromised,emailBreached:ec.breached,breachNames:ec.breaches,action:a};}
@@ -93,7 +93,7 @@ export const exfiltrationDetect=detectDataExfiltration;
 
 export interface DarkWebMonitorResult{found:boolean;sources:string[];recommendedActions:string[];severity:'none'|'low'|'medium'|'high'|'critical';}
 export async function checkDarkWebExposure(emailHash:string):Promise<DarkWebMonitorResult>{
-try{const r=await fS(`${process.env.EXPO_PUBLIC_API_URL}/security/darkweb-check`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emailHash})});
+try{const r=await fS(`${process.env['EXPO_PUBLIC_API_URL']}/security/darkweb-check`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emailHash})});
 if(r.ok){const d=await r.json() as{found:boolean;sources:string[];severity:string};
 if(d.found){void writeAuditLog('breach.darkweb_exposure',{sources:d.sources}).catch(()=>{});return{found:true,sources:d.sources,severity:(d.severity as DarkWebMonitorResult['severity'])||'high',recommendedActions:['Force password reset','Enable 2FA','Review active sessions','Check for account takeover signs']};}}}catch{}
 return{found:false,sources:[],severity:'none',recommendedActions:[]};}

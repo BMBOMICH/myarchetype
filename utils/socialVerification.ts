@@ -283,7 +283,7 @@ export function verifyInstagramProfile(data:{username:string;exists:boolean;acco
   const level=confidence>=80?'full':confidence>=60?'enhanced':confidence>=30?'basic':'none';
   return{verified:confidence>=30,confidence,level};
 }
-export const instagramVerify=verifyInstagramProfile;
+export const instagramProfileVerify=verifyInstagramProfile;
 
 export function checkSocialAccountAge(platform:string,accountAgeDays:number):{ageVerified:boolean;estimatedAgeDays:number;confidence:number;risk:'none'|'low'|'medium'|'high'}{
   const risk=accountAgeDays<7?'high':accountAgeDays<30?'medium':accountAgeDays<90?'low':'none';
@@ -307,7 +307,7 @@ export function checkSocialActivityRecency(data:{platform:string;lastPostDays:nu
   const riskLevel=data.lastPostDays>365?'high':data.lastPostDays>90?'medium':data.lastPostDays>30?'low':'none';
   return{active:!inactive,riskLevel,recommendation:inactive?'Account appears inactive. Verify ownership.':'Account is recently active.'};
 }
-export const socialActivityRecency=checkSocialActivityRecency;
+export const socialActivityRecencyCheck=checkSocialActivityRecency;
 
 export const checkInstagramProfileExists_440 = 'checkInstagramProfileExists';
 export const checkInstagram_440 = 'checkInstagram';

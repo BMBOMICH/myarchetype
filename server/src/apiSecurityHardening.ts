@@ -55,7 +55,7 @@ export class BulkFetchDetector {
     const key = `${userId}:bulk`;
     let w = this.windows.get(key);
     if (!w || now - w.since > this.WIN_MS) w = { reqs: 0, since: now, ids: new Set(), ips: new Set() };
-    
+
     w.reqs++; w.ids.add(profileId); w.ips.add(ip);
     this.windows.set(key, w);
 

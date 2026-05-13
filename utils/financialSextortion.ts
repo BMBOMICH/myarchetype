@@ -1,8 +1,8 @@
 /**
  * Financial Sextortion Detection — Detector #831
- * 
+ *
  * #831 — financialSextortionEscalation | sextortionPaymentDemand | moneyThreatEscalation
- * 
+ *
  * Detects the pattern: intimate content exchange → threat → financial demand → escalating demands
  */
 

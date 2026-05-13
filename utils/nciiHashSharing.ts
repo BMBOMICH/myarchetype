@@ -15,14 +15,14 @@ export const nciiHashExchange = generateAndShareNciiHash; export const aiNciiHas
 
 async function computePdqHash(imageBuffer: Buffer): Promise<string> {
   try {
-    const res = await fetch(`${process.env.SAFETY_API_URL}/hash/pdq`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: imageBuffer });
+    const res = await fetch(`${process.env['SAFETY_API_URL']}/hash/pdq`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: imageBuffer });
     if (!res.ok) throw new Error('PDQ failed');
     return ((await res.json()) as { hash: string }).hash;
   } catch { return `dhash_${createHash('md5').update(imageBuffer).digest('hex')}`; }
 }
 
 async function shareWithStopNcii(pdqHash: string, sha256: string, metadata: { detectionMethod: string; confidence: number }): Promise<boolean> {
-  const apiKey = process.env.STOPNCII_API_KEY;
+  const apiKey = process.env['STOPNCII_API_KEY'];
   if (!apiKey) return false;
   try {
     const res = await fetch('https://api.stopncii.org/v1/hashes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ hashes: [{ type: 'PDQ', value: pdqHash }, { type: 'SHA256', value: sha256 }], source: 'myarchetype', category: metadata.detectionMethod === 'ai_generated' ? 'AI_GENERATED_INTIMATE' : 'NON_CONSENSUAL_INTIMATE', confidence: metadata.confidence, timestamp: new Date().toISOString() }) });
@@ -31,7 +31,7 @@ async function shareWithStopNcii(pdqHash: string, sha256: string, metadata: { de
 }
 
 async function shareWithGifct(pdqHash: string, sha256: string, _metadata: { detectionMethod: string; confidence: number }): Promise<boolean> {
-  const apiKey = process.env.GIFCT_API_KEY;
+  const apiKey = process.env['GIFCT_API_KEY'];
   if (!apiKey) return false;
   try {
     const res = await fetch('https://api.gifct.org/v1/signals', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ signal_type: 'hash', hash_type: 'PDQ', hash_value: pdqHash, content_type: 'intimate_image', source_platform: 'myarchetype' }) });

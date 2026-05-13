@@ -4,18 +4,15 @@ import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   InteractionManager,
   RefreshControl,
   Text,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const LOCAL = {
   white:        '#ffffff',
@@ -56,7 +53,7 @@ interface EntryCardProps {
 const EntryCard = React.memo(function EntryCard({ item, isCurrentUser }: EntryCardProps) {
   const rankInfo = getRankDisplay(item.rank);
 
-  const cardStyle    = useMemo(
+  const cardStyle = useMemo(
     () => [styles.entryCard, isCurrentUser && styles.entryCardCurrent],
     [isCurrentUser],
   );
@@ -173,7 +170,7 @@ export default function ReferralLeaderboardScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadLeaderboard();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();
@@ -205,58 +202,68 @@ export default function ReferralLeaderboardScreen() {
     />
   ), [refreshing, handleRefresh]);
 
-  const listHeader = useMemo(() => (
-    <View style={styles.header}>
-      <Text style={styles.title} accessibilityRole="header">🏆 Referral Leaderboard</Text>
-      <Text style={styles.subtitle}>Top community champions who spread the love</Text>
+  const listHeader = useMemo(() => {
+    // Defined inside useMemo so they are not recreated on every render
+    // and don't trigger the exhaustive-deps warning.
+    const podiumSizes  = [styles.podiumPhoto2, styles.podiumPhoto1, styles.podiumPhoto3] as const;
+    const podiumEmojis = ['🥈', '🥇', '🥉'] as const;
 
-      {leaderboard.length >= 3 && (
-        <View style={styles.podium} accessibilityElementsHidden>
-          {([1, 0, 2] as const).map((pos) => {
-            const entry   = leaderboard[pos];
-            if (!entry) return null;
-            const sizes   = [styles.podiumPhoto2, styles.podiumPhoto1, styles.podiumPhoto3] as const;
-            const emojis  = ['🥈', '🥇', '🥉'] as const;
-            const sizeIdx = pos === 0 ? 1 : pos === 1 ? 0 : 2;
-            return (
-              <View key={pos} style={styles.podiumItem}>
-                {entry.photo ? (
-                  <TurboImage
-                    source={{ uri: entry.photo }}
-                    style={sizes[sizeIdx]}
-                    cachePolicy="dataCache"
-                    accessibilityLabel={`${entry.name} in position ${entry.rank}`}
-                  />
-                ) : (
-                  <View style={[styles.podiumPhotoPlaceholder, sizes[sizeIdx]]}>
-                    <Text style={styles.podiumPhotoText} accessibilityElementsHidden>?</Text>
-                  </View>
-                )}
-                <Text style={styles.podiumEmoji} accessibilityElementsHidden>
-                  {emojis[sizeIdx]}
-                </Text>
-                <Text style={styles.podiumName} numberOfLines={1}>{entry.name}</Text>
-                <Text style={styles.podiumCount}>{entry.referralCount}</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
+    return (
+      <View style={styles.header}>
+        <Text style={styles.title} accessibilityRole="header">🏆 Referral Leaderboard</Text>
+        <Text style={styles.subtitle}>Top community champions who spread the love</Text>
 
-      {userEntry && (
-        <View
-          style={styles.yourRankCard}
-          accessibilityLabel={`Your rank is ${userEntry.rank} with ${userEntry.referralCount} referrals`}
-        >
-          <Text style={styles.yourRankLabel}>Your Rank</Text>
-          <Text style={styles.yourRankNumber}>#{userEntry.rank}</Text>
-          <Text style={styles.yourRankReferrals}>{userEntry.referralCount} referrals</Text>
-        </View>
-      )}
+        {leaderboard.length >= 3 && (
+          <View style={styles.podium} accessibilityElementsHidden>
+            {([1, 0, 2] as const).map((pos) => {
+              const entry = leaderboard[pos];
+              if (!entry) return null;
+              // pos 0 = 1st place (center, index 1 in sizes/emojis)
+              // pos 1 = 2nd place (left,   index 0 in sizes/emojis)
+              // pos 2 = 3rd place (right,  index 2 in sizes/emojis)
+              const sizeIdx        = pos === 0 ? 1 : pos === 1 ? 0 : 2;
+              const photoStyle     = podiumSizes[sizeIdx];
+              const placeholderStyle = [styles.podiumPhotoPlaceholder, photoStyle];
+              return (
+                <View key={pos} style={styles.podiumItem}>
+                  {entry.photo ? (
+                    <TurboImage
+                      source={{ uri: entry.photo }}
+                      style={photoStyle}
+                      cachePolicy="dataCache"
+                      accessibilityLabel={`${entry.name} in position ${entry.rank}`}
+                    />
+                  ) : (
+                    <View style={placeholderStyle}>
+                      <Text style={styles.podiumPhotoText} accessibilityElementsHidden>?</Text>
+                    </View>
+                  )}
+                  <Text style={styles.podiumEmoji} accessibilityElementsHidden>
+                    {podiumEmojis[sizeIdx]}
+                  </Text>
+                  <Text style={styles.podiumName} numberOfLines={1}>{entry.name}</Text>
+                  <Text style={styles.podiumCount}>{entry.referralCount}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-      <Text style={styles.listTitle} accessibilityRole="header">All Rankings</Text>
-    </View>
-  ), [leaderboard, userEntry]);
+        {userEntry && (
+          <View
+            style={styles.yourRankCard}
+            accessibilityLabel={`Your rank is ${userEntry.rank} with ${userEntry.referralCount} referrals`}
+          >
+            <Text style={styles.yourRankLabel}>Your Rank</Text>
+            <Text style={styles.yourRankNumber}>#{userEntry.rank}</Text>
+            <Text style={styles.yourRankReferrals}>{userEntry.referralCount} referrals</Text>
+          </View>
+        )}
+
+        <Text style={styles.listTitle} accessibilityRole="header">All Rankings</Text>
+      </View>
+    );
+  }, [leaderboard, userEntry]);
 
   if (loading) {
     return (
@@ -293,8 +300,6 @@ export default function ReferralLeaderboardScreen() {
     />
   );
 }
-
-void SCREEN_WIDTH;
 
 const styles = StyleSheet.create((theme) => ({
   container:              { flex: 1, backgroundColor: theme.colors.background },

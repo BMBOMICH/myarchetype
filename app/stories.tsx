@@ -17,7 +17,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ViewStyle,
+  type ViewStyle,
 } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -25,26 +25,28 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth } from '../firebaseConfig';
 import { logger } from '../utils/logger';
 import { checkImageSafety } from '../utils/moderation';
 import {
-  type Story,
-  type StoryGroup,
   createStory,
   deleteStory,
   getActiveStories,
   getStoryTimeRemaining,
   groupStoriesByUser,
   markStoryViewed,
+  type Story,
+  type StoryGroup,
 } from '../utils/stories';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STORY_VIEW_MS     = 5_000;
 const TOP_INSET         = Platform.OS === 'ios' ? 60 : 50;
-const CIRCLE_ITEM_WIDTH = 80 + 15; // width + gap
+const CIRCLE_ITEM_WIDTH = 80 + 15;
 
 const LOCAL = {
   black:        '#000000',
@@ -60,6 +62,8 @@ const LOCAL = {
   accent:       '#5cb85c',
 } as const;
 
+// ─── Observable state ─────────────────────────────────────────────────────────
+
 const screen$ = observable({
   loading:    true,
   stories:    [] as Story[],
@@ -69,11 +73,16 @@ const screen$ = observable({
   uploading:  false,
 });
 
+// ─── StoryVideo ───────────────────────────────────────────────────────────────
 
 const StoryVideo = React.memo(function StoryVideo({
-  uri, style,
-}: { uri: string; style: ViewStyle }) {
-  const player = useVideoPlayer(uri, (p) => { p.loop = true; p.play(); });
+  uri,
+  style,
+}: {
+  uri:   string;
+  style: ViewStyle;
+}) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.play(); });
   return (
     <VideoView
       player={player}
@@ -84,6 +93,32 @@ const StoryVideo = React.memo(function StoryVideo({
   );
 });
 
+// ─── ProgressBar ─────────────────────────────────────────────────────────────
+// Extracted to avoid array-index-key warning when rendering progress bars.
+// Each story has a stable identity via its id, so we key by that.
+
+interface ProgressBarProps {
+  storyId:     string;
+  isCurrent:   boolean;
+  isPast:      boolean;
+  fillStyle:   ReturnType<typeof useAnimatedStyle>;
+}
+
+const ProgressBar = React.memo(function ProgressBar({
+  storyId, isCurrent, isPast, fillStyle,
+}: ProgressBarProps) {
+  return (
+    <View key={storyId} style={styles.progBg}>
+      {isCurrent ? (
+        <Animated.View style={[styles.progFill, fillStyle]} />
+      ) : isPast ? (
+        <View style={styles.progDone} />
+      ) : null}
+    </View>
+  );
+});
+
+// ─── StoryCircle ──────────────────────────────────────────────────────────────
 
 interface StoryCircleProps {
   item:    StoryGroup;
@@ -92,12 +127,19 @@ interface StoryCircleProps {
 }
 
 const StoryCircle = React.memo(function StoryCircle({
-  item: g, uid, onPress,
+  item: g,
+  uid,
+  onPress,
 }: StoryCircleProps) {
   const own        = g.userId === uid;
   const firstStory = g.stories[0];
 
   const handlePress = useCallback(() => onPress(g), [onPress, g]);
+
+  const ringStyle = [
+    styles.ring,
+    !own && !g.hasUnviewed && styles.ringViewed,
+  ];
 
   return (
     <TouchableOpacity
@@ -107,7 +149,7 @@ const StoryCircle = React.memo(function StoryCircle({
       accessibilityLabel={`${g.userName}'s story${g.hasUnviewed ? ', new' : ''}`}
       accessibilityRole="button"
     >
-      <View style={[styles.ring, !own && !g.hasUnviewed && styles.ringViewed]}>
+      <View style={ringStyle}>
         {g.userPhoto ? (
           <TurboImage
             source={{ uri: g.userPhoto }}
@@ -116,7 +158,7 @@ const StoryCircle = React.memo(function StoryCircle({
             accessibilityLabel={`${g.userName}'s photo`}
           />
         ) : (
-          <View style={[styles.circleImg, styles.placeholder]}>
+          <View style={styles.circleImgPlaceholder}>
             <Text style={styles.placeholderEmoji} accessibilityElementsHidden>👤</Text>
           </View>
         )}
@@ -131,6 +173,7 @@ const StoryCircle = React.memo(function StoryCircle({
   );
 });
 
+// ─── StoriesScreen ────────────────────────────────────────────────────────────
 
 export default observer(function StoriesScreen() {
   const router = useRouter();
@@ -150,17 +193,16 @@ export default observer(function StoriesScreen() {
   indexRef.current = storyIndex;
 
   const currentStory: Story | undefined = stories[storyIndex];
+  const storyGroups: StoryGroup[]        = uid ? groupStoriesByUser(stories, uid) : [];
 
-  const storyGroups: StoryGroup[] = uid
-    ? groupStoriesByUser(stories, uid)
-    : [];
+  // ── Data loading ────────────────────────────────────────────────────────────
 
   const loadStories = useCallback(async () => {
     if (!uid) return;
     try {
       const data = await getActiveStories(uid);
       screen$.stories.set(data);
-    } catch (e) {
+    } catch (e: unknown) {
       logger.error('[StoriesScreen] load:', e);
     } finally {
       screen$.loading.set(false);
@@ -170,9 +212,11 @@ export default observer(function StoriesScreen() {
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       void loadStories();
-    }, []);
+    });
     return () => task.cancel();
   }, [loadStories]);
+
+  // ── Timer / progress ────────────────────────────────────────────────────────
 
   const clearTimers = useCallback(() => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
@@ -208,12 +252,16 @@ export default observer(function StoriesScreen() {
     return clearTimers;
   }, [viewerOpen, storyIndex, startTimer, clearTimers, stories.length]);
 
+  // ── Mark viewed ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!viewerOpen || !currentStory || !uid) return;
     if (currentStory.userId !== uid) {
-      markStoryViewed(currentStory.id).catch(() => {}, []);
+      markStoryViewed(currentStory.id).catch(() => {});
     }
   }, [viewerOpen, currentStory, uid]);
+
+  // ── Viewer controls ─────────────────────────────────────────────────────────
 
   const closeViewer = useCallback(() => {
     clearTimers();
@@ -221,20 +269,21 @@ export default observer(function StoriesScreen() {
     screen$.storyIndex.set(0);
   }, [clearTimers]);
 
+  // ── Back handler ────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!viewerOpen) return;
-  // FIXME: add removeEventListener cleanup for the listener below
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       closeViewer();
       return true;
-    }, []);
+    });
     return () => sub.remove();
   }, [viewerOpen, closeViewer]);
 
   const openGroup = useCallback((group: StoryGroup) => {
     const firstStory = group.stories[0];
     if (!firstStory) return;
-    const idx = stories.findIndex((s) => s.id === firstStory.id);
+    const idx = stories.findIndex(s => s.id === firstStory.id);
     if (idx < 0) return;
     screen$.storyIndex.set(idx);
     screen$.viewerOpen.set(true);
@@ -243,6 +292,8 @@ export default observer(function StoriesScreen() {
   const handleTap = useCallback((x: number) => {
     if (x < SCREEN_WIDTH / 3) goPrev(); else goNext();
   }, [goPrev, goNext]);
+
+  // ── Create story ────────────────────────────────────────────────────────────
 
   const handleOpenCreate  = useCallback(() => screen$.createOpen.set(true),  []);
   const handleCloseCreate = useCallback(() => screen$.createOpen.set(false), []);
@@ -261,9 +312,9 @@ export default observer(function StoriesScreen() {
         ? ImagePicker.launchCameraAsync
         : ImagePicker.launchImageLibraryAsync;
       const result = await launch({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsEditing: true,
-        quality: 0.8,
+        mediaTypes:       ImagePicker.MediaTypeOptions.All,
+        allowsEditing:    true,
+        quality:          0.8,
         videoMaxDuration: 15,
       });
       if (result.canceled || !result.assets?.[0]) return;
@@ -283,7 +334,7 @@ export default observer(function StoriesScreen() {
       } else {
         Alert.alert('Upload Failed', res.error ?? 'Please try again.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       screen$.uploading.set(false);
       logger.error('[StoriesScreen] pickMedia:', err);
       Alert.alert('Error', 'Could not process media.');
@@ -297,7 +348,7 @@ export default observer(function StoriesScreen() {
     Alert.alert('Delete Story', 'Are you sure you want to delete this story?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text:  'Delete',
         style: 'destructive',
         onPress: async () => {
           const res = await deleteStory(id);
@@ -308,6 +359,8 @@ export default observer(function StoriesScreen() {
     ]);
   }, [closeViewer, loadStories]);
 
+  // ── List renderers ──────────────────────────────────────────────────────────
+
   const renderCircle = useCallback(
     ({ item: g }: LegendListRenderItemProps<StoryGroup>) => (
       <StoryCircle item={g} uid={uid} onPress={openGroup} />
@@ -317,9 +370,24 @@ export default observer(function StoriesScreen() {
 
   const circleKey = useCallback((g: StoryGroup) => g.userId, []);
 
-  const progressStyle = useAnimatedStyle(() => ({
+  // ── Animated progress ───────────────────────────────────────────────────────
+
+  const progressFillStyle = useAnimatedStyle(() => ({
     width: `${progressAnim.value * 100}%` as `${number}%`,
   }));
+
+  // ── Stable handlers ─────────────────────────────────────────────────────────
+
+  const handleMediaPress = useCallback(
+    (e: { nativeEvent: { locationX: number } }) => handleTap(e.nativeEvent.locationX),
+    [handleTap],
+  );
+
+  const handleDeletePress = useCallback(() => {
+    if (currentStory) confirmDelete(currentStory.id);
+  }, [currentStory, confirmDelete]);
+
+  // ── Loading gate ────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -329,6 +397,8 @@ export default observer(function StoriesScreen() {
       </View>
     );
   }
+
+  // ── JSX ─────────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.root}>
@@ -362,7 +432,7 @@ export default observer(function StoriesScreen() {
           contentContainerStyle={styles.circlesRow}
           style={styles.circlesWrap}
           estimatedItemSize={CIRCLE_ITEM_WIDTH}
-          recycleItems={true}
+          recycleItems
         />
       )}
 
@@ -392,16 +462,17 @@ export default observer(function StoriesScreen() {
       >
         {currentStory != null && (
           <View style={styles.viewer}>
-            {/* Progress bars */}
+
+            {/* Progress bars — keyed by story.id, not array index */}
             <View style={styles.progRow}>
-              {stories.map((_, i) => (
-                <View key={`prog_${i}`} style={styles.progBg}>
-                  {i === storyIndex ? (
-                    <Animated.View style={[styles.progFill, progressStyle]} />
-                  ) : i < storyIndex ? (
-                    <View style={styles.progDone} />
-                  ) : null}
-                </View>
+              {stories.map((story, i) => (
+                <ProgressBar
+                  key={story.id}
+                  storyId={story.id}
+                  isCurrent={i === storyIndex}
+                  isPast={i < storyIndex}
+                  fillStyle={progressFillStyle}
+                />
               ))}
             </View>
 
@@ -415,7 +486,7 @@ export default observer(function StoriesScreen() {
                   accessibilityLabel={`${currentStory.userId === uid ? 'Your' : currentStory.userName + "'s"} photo`}
                 />
               ) : (
-                <View style={[styles.vHeadImg, styles.placeholder]}>
+                <View style={styles.vHeadImgPlaceholder}>
                   <Text style={styles.placeholderEmoji} accessibilityElementsHidden>👤</Text>
                 </View>
               )}
@@ -441,7 +512,7 @@ export default observer(function StoriesScreen() {
             <TouchableOpacity
               style={styles.mediaWrap}
               activeOpacity={1}
-              onPress={(e) = accessibilityLabel="button"> handleTap(e.nativeEvent.locationX)}
+              onPress={handleMediaPress}
               accessibilityLabel="Tap left for previous story, right for next"
               accessibilityRole="button"
             >
@@ -468,7 +539,7 @@ export default observer(function StoriesScreen() {
                 </View>
                 <TouchableOpacity
                   style={styles.delBtn}
-                  onPress={() = accessibilityLabel="button"> confirmDelete(currentStory.id)}
+                  onPress={handleDeletePress}
                   activeOpacity={0.8}
                   accessibilityLabel="Delete this story"
                   accessibilityRole="button"
@@ -535,64 +606,60 @@ export default observer(function StoriesScreen() {
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
-  root:             { flex: 1, backgroundColor: theme.colors.background },
-  centered:         { flex: 1, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' },
-  loadingTxt:       { color: theme.colors.textSecondary, marginTop: 12, fontSize: 14 },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: TOP_INSET, backgroundColor: theme.colors.surface },
-  headerBack:       { color: theme.colors.primary, fontSize: 16 },
-  headerTitle:      { fontSize: 20, fontWeight: 'bold', color: theme.colors.text },
-  headerAdd:        { color: LOCAL.accent, fontSize: 16, fontWeight: 'bold' },
-
-  circlesWrap:      { maxHeight: 130 },
-  circlesRow:       { paddingHorizontal: 15, paddingVertical: 15, gap: 15 },
-  circle:           { alignItems: 'center', width: 80 },
-  ring:             { width: 70, height: 70, borderRadius: 35, borderWidth: 3, borderColor: LOCAL.ring, padding: 3, marginBottom: 5 },
-  ringViewed:       { borderColor: LOCAL.ringViewed },
-  circleImg:        { width: '100%', height: '100%', borderRadius: 32 },
-  circleName:       { color: theme.colors.text, fontSize: 12, textAlign: 'center', width: '100%' },
-  circleMeta:       { color: theme.colors.textSecondary, fontSize: 10 },
-  placeholder:      { backgroundColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
-  placeholderEmoji: { fontSize: 24 },
-
-  empty:            { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyIcon:        { fontSize: 80, marginBottom: 20 },
-  emptyTitle:       { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 10 },
-  emptyText:        { fontSize: 16, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 30 },
-  emptyBtn:         { backgroundColor: LOCAL.accent, paddingVertical: 14, paddingHorizontal: 30, borderRadius: 25 },
-  emptyBtnTxt:      { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
-
-  viewer:           { flex: 1, backgroundColor: LOCAL.black },
-  progRow:          { position: 'absolute', top: TOP_INSET - 6, left: 0, right: 0, flexDirection: 'row', gap: 4, paddingHorizontal: 8, zIndex: 10 },
-  progBg:           { flex: 1, height: 3, backgroundColor: LOCAL.progressBg, borderRadius: 2, overflow: 'hidden' },
-  progFill:         { height: '100%', backgroundColor: LOCAL.white, borderRadius: 2 },
-  progDone:         { height: '100%', width: '100%', backgroundColor: LOCAL.white, borderRadius: 2 },
-
-  vHead:            { position: 'absolute', top: TOP_INSET + 10, left: 15, right: 15, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 },
-  vHeadImg:         { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: LOCAL.white },
-  vHeadInfo:        { flex: 1 },
-  vHeadName:        { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
-  vHeadTime:        { color: LOCAL.vHeadTime, fontSize: 12 },
-  closeBtn:         { color: LOCAL.white, fontSize: 28, fontWeight: 'bold' },
-  mediaWrap:        { flex: 1 },
-  media:            { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
-
-  vFoot:            { position: 'absolute', bottom: Platform.OS === 'ios' ? 50 : 30, left: 0, right: 0, alignItems: 'center', gap: 12 },
-  viewsBadge:       { backgroundColor: LOCAL.overlayLight, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
-  viewsTxt:         { color: LOCAL.white, fontSize: 14 },
-  delBtn:           { backgroundColor: LOCAL.dangerBg, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25 },
-  delBtnTxt:        { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
-
-  cModal:           { flex: 1, backgroundColor: LOCAL.overlay, justifyContent: 'flex-end' },
-  cContent:         { backgroundColor: theme.colors.surface, borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25, paddingBottom: Platform.OS === 'ios' ? 40 : 25 },
-  cTitle:           { fontSize: 20, fontWeight: 'bold', color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
-  cOption:          { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.border, padding: 18, borderRadius: 15, marginBottom: 12, gap: 15 },
-  cOptionIcon:      { fontSize: 28 },
-  cOptionTxt:       { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
-  cCancel:          { backgroundColor: theme.colors.error, padding: 16, borderRadius: 15, marginTop: 10 },
-  cCancelTxt:       { color: LOCAL.white, fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
-
-  uploadOverlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: LOCAL.overlayDense, justifyContent: 'center', alignItems: 'center' },
-  uploadTxt:        { color: LOCAL.white, fontSize: 16, marginTop: 15 },
+const styles = StyleSheet.create(theme => ({
+  root:                { flex: 1, backgroundColor: theme.colors.background },
+  centered:            { flex: 1, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingTxt:          { color: theme.colors.textSecondary, marginTop: 12, fontSize: 14 },
+  header:              { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: TOP_INSET, backgroundColor: theme.colors.surface },
+  headerBack:          { color: theme.colors.primary, fontSize: 16 },
+  headerTitle:         { fontSize: 20, fontWeight: 'bold', color: theme.colors.text },
+  headerAdd:           { color: LOCAL.accent, fontSize: 16, fontWeight: 'bold' },
+  circlesWrap:         { maxHeight: 130 },
+  circlesRow:          { paddingHorizontal: 15, paddingVertical: 15, gap: 15 },
+  circle:              { alignItems: 'center', width: 80 },
+  ring:                { width: 70, height: 70, borderRadius: 35, borderWidth: 3, borderColor: LOCAL.ring, padding: 3, marginBottom: 5 },
+  ringViewed:          { borderColor: LOCAL.ringViewed },
+  circleImg:           { width: '100%', height: '100%', borderRadius: 32 },
+  circleImgPlaceholder:{ width: '100%', height: '100%', borderRadius: 32, backgroundColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  circleName:          { color: theme.colors.text, fontSize: 12, textAlign: 'center', width: '100%' },
+  circleMeta:          { color: theme.colors.textSecondary, fontSize: 10 },
+  placeholder:         { backgroundColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  placeholderEmoji:    { fontSize: 24 },
+  empty:               { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyIcon:           { fontSize: 80, marginBottom: 20 },
+  emptyTitle:          { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 10 },
+  emptyText:           { fontSize: 16, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 30 },
+  emptyBtn:            { backgroundColor: LOCAL.accent, paddingVertical: 14, paddingHorizontal: 30, borderRadius: 25 },
+  emptyBtnTxt:         { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
+  viewer:              { flex: 1, backgroundColor: LOCAL.black },
+  progRow:             { position: 'absolute', top: TOP_INSET - 6, left: 0, right: 0, flexDirection: 'row', gap: 4, paddingHorizontal: 8, zIndex: 10 },
+  progBg:              { flex: 1, height: 3, backgroundColor: LOCAL.progressBg, borderRadius: 2, overflow: 'hidden' },
+  progFill:            { height: '100%', backgroundColor: LOCAL.white, borderRadius: 2 },
+  progDone:            { height: '100%', width: '100%', backgroundColor: LOCAL.white, borderRadius: 2 },
+  vHead:               { position: 'absolute', top: TOP_INSET + 10, left: 15, right: 15, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 },
+  vHeadImg:            { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: LOCAL.white },
+  vHeadImgPlaceholder: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: LOCAL.white, backgroundColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  vHeadInfo:           { flex: 1 },
+  vHeadName:           { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
+  vHeadTime:           { color: LOCAL.vHeadTime, fontSize: 12 },
+  closeBtn:            { color: LOCAL.white, fontSize: 28, fontWeight: 'bold' },
+  mediaWrap:           { flex: 1 },
+  media:               { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  vFoot:               { position: 'absolute', bottom: Platform.OS === 'ios' ? 50 : 30, left: 0, right: 0, alignItems: 'center', gap: 12 },
+  viewsBadge:          { backgroundColor: LOCAL.overlayLight, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
+  viewsTxt:            { color: LOCAL.white, fontSize: 14 },
+  delBtn:              { backgroundColor: LOCAL.dangerBg, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25 },
+  delBtnTxt:           { color: LOCAL.white, fontSize: 16, fontWeight: 'bold' },
+  cModal:              { flex: 1, backgroundColor: LOCAL.overlay, justifyContent: 'flex-end' },
+  cContent:            { backgroundColor: theme.colors.surface, borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25, paddingBottom: Platform.OS === 'ios' ? 40 : 25 },
+  cTitle:              { fontSize: 20, fontWeight: 'bold', color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
+  cOption:             { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.border, padding: 18, borderRadius: 15, marginBottom: 12, gap: 15 },
+  cOptionIcon:         { fontSize: 28 },
+  cOptionTxt:          { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
+  cCancel:             { backgroundColor: theme.colors.error, padding: 16, borderRadius: 15, marginTop: 10 },
+  cCancelTxt:          { color: LOCAL.white, fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
+  uploadOverlay:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: LOCAL.overlayDense, justifyContent: 'center', alignItems: 'center' },
+  uploadTxt:           { color: LOCAL.white, fontSize: 16, marginTop: 15 },
 }));

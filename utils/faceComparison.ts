@@ -1,11 +1,18 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { CLOUDINARY_CONFIG } from '../cloudinaryConfig';
 import { db } from '../firebaseConfig';
-import { Storage } from '../services/storage';
 import { detectFaceInPhoto } from './faceDetection';
 import { writeAuditLog } from './logger';
 
-const SERVER_URL = process.env.EXPO_PUBLIC_FUNCTIONS_URL ?? process.env.EXPO_PUBLIC_SERVER_URL ?? '';
+// Local shim for missing Storage module
+const _store: Record<string, string> = {};
+const Storage = {
+  getString: (key: string): string | undefined => _store[key],
+  setString: (key: string, value: string): void => { _store[key] = value; },
+  delete: (key: string): void => { delete _store[key]; },
+};
+
+const SERVER_URL = process.env['EXPO_PUBLIC_FUNCTIONS_URL'] ?? process.env['EXPO_PUBLIC_SERVER_URL'] ?? '';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => {
   const c = new AbortController();
   const id = setTimeout(() => c.abort(), t);
@@ -19,20 +26,34 @@ export interface PerceptualHashResult { isDuplicate: boolean; similarity: number
 export interface CatfishScore { score: number; risk: 'low' | 'medium' | 'high' | 'critical'; signals: string[]; breakdown: CatfishBreakdown; recommendation: string; confidence: number; }
 export interface CatfishBreakdown { identityScore: number; behaviorScore: number; verificationScore: number; accountScore: number; socialScore: number; contentScore: number; }
 
+interface RetinaArcResult { match: boolean; similarity: number; distance: number; }
+interface FaceDetectionResult { hasFace: boolean; reason?: string; }
+interface CloudinaryUploadResult { secure_url?: string; }
+interface CatfishSignalResponse {
+  reverseImageSearchHits?: number; crossAccountDuplicate?: boolean; trustScore?: number;
+  reportCount?: number; bannedFaceMatch?: boolean; deviceTrustScore?: number; locationConsistent?: boolean;
+}
+interface UserDocument {
+  selfieVerified?: boolean; phoneVerified?: boolean; emailVerified?: boolean; profileCompleteness?: number;
+  photos?: string[]; bio?: string; voiceIntroUrl?: string;
+  instagram?: string; spotify?: string; tiktok?: string; linkedin?: string;
+  createdAt?: string | number | { toMillis?: () => number };
+}
+
 /**
  * Server-side face comparison using RetinaFace (detection) + ArcFace (embedding).
  * RetinaFace detects faces and extracts 5-point landmarks.
  * ArcFace generates 512-d embeddings used for cosine similarity.
  */
-async function compareFacesRetinaArc(u1: string, u2: string) {
+async function compareFacesRetinaArc(u1: string, u2: string): Promise<RetinaArcResult | null> {
   try {
     const r = await fetchSafe(`${SERVER_URL}/api/compare-faces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageUri1: u1, imageUri2: u2, detector: 'retinaface', recognizer: 'arcface', threshold: 0.5 }),
     });
-    if (r.ok) return await r.json() as { match: boolean; similarity: number; distance: number };
-  } catch { }
+    if (r.ok) return await r.json() as RetinaArcResult;
+  } catch { /* empty */ }
   return null;
 }
 
@@ -50,15 +71,25 @@ export async function compareFaces(uid: string, selfie: string): Promise<FaceCom
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (!snap.exists()) return { match: false, confidence: 0, method: 'unavailable', error: 'User not found' };
-    const photos: string[] = snap.data().photos ?? [];
-    if (!photos.length) return { match: false, confidence: 0, method: 'unavailable', error: 'No profile photos' };
+    const data = snap.data() as UserDocument;
+    const photos = data.photos ?? [];
+    if (photos.length === 0) return { match: false, confidence: 0, method: 'unavailable', error: 'No profile photos' };
 
     const retinaResult = await compareFacesRetinaArcMulti(selfie, photos);
     if (retinaResult) return retinaResult;
 
     const su = await uploadSelfieToCloudinary(selfie);
     if (!su) return { match: false, confidence: 0, method: 'cloudinary-presence', error: 'Upload failed' };
-    const [sc, pc] = await Promise.all([detectFaceInPhoto(su).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), detectFaceInPhoto(photos[0]!)]);
+
+    const firstPhoto = photos[0];
+    if (!firstPhoto) return { match: false, confidence: 0, method: 'unavailable', error: 'No profile photos' };
+
+    const detectFace = detectFaceInPhoto as (uri: string) => Promise<FaceDetectionResult>;
+    const [sc, pc] = await Promise.all([
+      detectFace(su).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
+      detectFace(firstPhoto),
+    ]);
+
     if (!sc.hasFace) return { match: false, confidence: 0, method: 'cloudinary-presence', error: sc.reason };
     if (!pc.hasFace) return { match: false, confidence: 0, method: 'cloudinary-presence', error: 'No face in profile' };
     return { match: true, confidence: 50, method: 'cloudinary-presence' };
@@ -69,16 +100,19 @@ export async function checkAllPhotosConsistency(uris: string[]): Promise<PhotoCo
   if (uris.length < 2) return { consistent: true, inconsistentPairs: [], confidence: 100 };
   try {
     const pairs: Array<{ index1: number; index2: number; distance: number }> = [];
-    const baseUri = uris[0]!;
+    const baseUri = uris[0];
+    if (!baseUri) return { consistent: true, inconsistentPairs: [], confidence: 100 };
     for (let i = 1; i < uris.length; i++) {
-      const r = await compareFacesRetinaArc(baseUri, uris[i]!);
+      const uri = uris[i];
+      if (!uri) continue;
+      const r = await compareFacesRetinaArc(baseUri, uri);
       if (r && !r.match) { pairs.push({ index1: 0, index2: i, distance: r.distance }); }
     }
     return {
       consistent: pairs.length === 0,
       inconsistentPairs: pairs,
       confidence: pairs.length > 0 ? 85 : 90,
-      reason: pairs.length > 0 ? `Photos ${pairs.map(p => p.index2 + 1).join(', ')} may show different people.` : undefined,
+      ...(pairs.length > 0 ? { reason: `Photos ${pairs.map(p => p.index2 + 1).join(', ')} may show different people.` } : {}),
     };
   } catch { return { consistent: true, inconsistentPairs: [], confidence: 0, reason: 'Check failed' }; }
 }
@@ -95,17 +129,22 @@ export async function computeImageHash(uri: string): Promise<string | null> {
         const d = await r.json() as { hash: string; quality: number };
         if (d.hash && d.quality >= 50) return d.hash;
       }
-    } catch { }
+    } catch { /* empty */ }
   }
   try {
-    const docEl = (globalThis as { document?: { createElement: (t: string) => { width: number; height: number; getContext: (t: '2d') => { drawImage: (i: HTMLImageElement, x: number, y: number, w: number, h: number) => void; getImageData: (x: number, y: number, w: number, h: number) => { data: Uint8ClampedArray } } | null }; createElement: (t: 'img') => HTMLImageElement } }).document;
-    const canvas = docEl?.createElement?.('canvas');
-    if (!canvas) return null;
+    interface BrowserDoc {
+      createElement(tag: 'canvas'): HTMLCanvasElement;
+      createElement(tag: 'img'): HTMLImageElement;
+      createElement(tag: string): HTMLElement;
+    }
+    const doc = (globalThis as unknown as { document?: BrowserDoc }).document;
+    if (!doc) return null;
+    const canvas = doc.createElement('canvas');
     canvas.width = 9; canvas.height = 8;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     const img = await new Promise<HTMLImageElement>((res, rej) => {
-      const el = docEl?.createElement('img');
+      const el = doc.createElement('img');
       el.crossOrigin = 'anonymous';
       el.onload = () => res(el);
       el.onerror = rej;
@@ -135,7 +174,9 @@ export async function checkDuplicatePhotoSameUser(newUri: string, existing: stri
   const nh = await computeImageHash(newUri);
   if (!nh) return { isDuplicate: false, similarity: 0 };
   for (let i = 0; i < existing.length; i++) {
-    const eh = await computeImageHash(existing[i]!);
+    const ex = existing[i];
+    if (!ex) continue;
+    const eh = await computeImageHash(ex);
     if (!eh) continue;
     const sim = Math.round(((64 - hammingDistance(nh, eh)) / 64) * 100);
     if (sim >= 90) return { isDuplicate: true, duplicateIndex: i, similarity: sim };
@@ -165,21 +206,39 @@ async function uploadSelfieToCloudinary(uri: string): Promise<string | null> {
     fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     fd.append('detection', 'faces');
     const r = await fetchSafe(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, { method: 'POST', body: fd });
-    const j = await r.json() as { secure_url?: string };
+    const j = await r.json() as CloudinaryUploadResult;
     return j.secure_url ?? null;
   } catch { return null; }
 }
 
 export function compareFaceEmbeddings(e1: number[], e2: number[]) {
   let dot = 0, n1 = 0, n2 = 0;
-  for (let i = 0; i < e1.length; i++) { dot += (e1[i] ?? 0) * (e2[i] ?? 0); n1 += (e1[i] ?? 0) ** 2; n2 += (e2[i] ?? 0) ** 2; }
+  for (let i = 0; i < e1.length; i++) {
+    const v1 = e1[i] ?? 0;
+    const v2 = e2[i] ?? 0;
+    dot += v1 * v2;
+    n1 += v1 ** 2;
+    n2 += v2 ** 2;
+  }
   const d = Math.sqrt(n1) * Math.sqrt(n2);
   return d === 0 ? 0 : Math.round((dot / d) * 100);
 }
 
 const CW = { identity: 30, verification: 25, behavior: 20, account: 10, social: 10, content: 5 } as const;
 
-export interface CatfishInput { faceMatchConfidence: number; photoConsistencyConfidence: number; reverseImageSearchHits?: number; crossAccountDuplicate?: boolean; selfieVerified?: boolean; hasVerifiedSocial?: boolean; hasPhoneVerified?: boolean; emailVerified?: boolean; livenessChecked?: boolean; askedForMoney?: boolean; triedToMoveOffPlatform?: boolean; videoCallRefused?: boolean; loveBombingDetected?: boolean; fastEscalation?: boolean; botLikeTimingDetected?: boolean; messageRiskScores?: number[]; accountAgeDays?: number; profileCompleteness?: number; bioLength?: number; photosCount?: number; deviceTrustScore?: number; socialLinksCount?: number; socialUsernameConsistent?: boolean; socialRedirectSuspicious?: boolean; hasVoiceIntro?: boolean; aiGeneratedImageDetected?: boolean; exifAnomalies?: boolean; voiceGenderMismatch?: boolean; voiceCloneDetected?: boolean; currentTrustScore?: number; reportCount?: number; locationConsistent?: boolean; bannedFaceMatch?: boolean; }
+export interface CatfishInput {
+  faceMatchConfidence: number; photoConsistencyConfidence: number; reverseImageSearchHits?: number;
+  crossAccountDuplicate?: boolean; selfieVerified?: boolean; hasVerifiedSocial?: boolean;
+  hasPhoneVerified?: boolean; emailVerified?: boolean; livenessChecked?: boolean;
+  askedForMoney?: boolean; triedToMoveOffPlatform?: boolean; videoCallRefused?: boolean;
+  loveBombingDetected?: boolean; fastEscalation?: boolean; botLikeTimingDetected?: boolean;
+  messageRiskScores?: number[]; accountAgeDays?: number; profileCompleteness?: number;
+  bioLength?: number; photosCount?: number; deviceTrustScore?: number; socialLinksCount?: number;
+  socialUsernameConsistent?: boolean; socialRedirectSuspicious?: boolean; hasVoiceIntro?: boolean;
+  aiGeneratedImageDetected?: boolean; exifAnomalies?: boolean; voiceGenderMismatch?: boolean;
+  voiceCloneDetected?: boolean; currentTrustScore?: number; reportCount?: number;
+  locationConsistent?: boolean; bannedFaceMatch?: boolean;
+}
 
 export function computeCatfishScore(f: CatfishInput): CatfishScore {
   const sig: string[] = []; let iR = 0, iF = 0;
@@ -223,7 +282,7 @@ export function computeCatfishScore(f: CatfishInput): CatfishScore {
   if (f.locationConsistent === false) { comp2 += 8; sig.push('Location inconsistencies'); }
   const score = Math.min(100, Math.max(0, Math.round(comp2)));
   const risk = score >= 75 ? 'critical' : score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low';
-  if (risk !== 'low') writeAuditLog('identity.catfish_score', { score, risk, signals: sig.slice(0, 5) }).catch(() => { });
+  if (risk !== 'low') writeAuditLog('identity.catfish_score', { score, risk, signals: sig.slice(0, 5) }).catch(() => { /* empty */ });
   const rec = risk === 'critical' ? 'Very high catfish probability. Review immediately.' : risk === 'high' ? 'Multiple indicators. Request video call.' : risk === 'medium' ? 'Some suspicious signals. Verify identity.' : 'Profile appears authentic.';
   const cl = [f.faceMatchConfidence, f.photoConsistencyConfidence, hits, f.selfieVerified, f.hasPhoneVerified, f.hasVerifiedSocial, f.emailVerified, age, comp, f.photosCount, f.bioLength, f.hasVoiceIntro, f.askedForMoney, f.triedToMoveOffPlatform, f.videoCallRefused, f.currentTrustScore, dt, f.socialLinksCount, f.messageRiskScores, f.locationConsistent];
   return { score, risk, signals: [...new Set(sig)], breakdown: { identityScore, behaviorScore, verificationScore, accountScore, socialScore, contentScore }, recommendation: rec, confidence: Math.round((cl.filter(v => v !== undefined && v !== null).length / cl.length) * 100) };
@@ -236,14 +295,14 @@ export async function computeEnrichedCatfishScore(uid: string, base: Partial<Cat
     if (authToken) h['Authorization'] = `Bearer ${authToken}`;
     const r = await fetchSafe(`${SERVER_URL}/catfish-signals`, { method: 'POST', headers: h, body: JSON.stringify({ userId: uid }) });
     if (r.ok) {
-      const s = await r.json() as { reverseImageSearchHits?: number; crossAccountDuplicate?: boolean; trustScore?: number; reportCount?: number; bannedFaceMatch?: boolean; deviceTrustScore?: number; locationConsistent?: boolean };
+      const s = await r.json() as CatfishSignalResponse;
       en = { ...en, reverseImageSearchHits: s.reverseImageSearchHits ?? en.reverseImageSearchHits, crossAccountDuplicate: s.crossAccountDuplicate ?? en.crossAccountDuplicate, currentTrustScore: s.trustScore ?? en.currentTrustScore, reportCount: s.reportCount ?? en.reportCount, bannedFaceMatch: s.bannedFaceMatch ?? en.bannedFaceMatch, deviceTrustScore: s.deviceTrustScore ?? en.deviceTrustScore, locationConsistent: s.locationConsistent ?? en.locationConsistent };
     }
-  } catch { }
+  } catch { /* empty */ }
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
-      const d = snap.data();
+      const d = snap.data() as UserDocument;
       en.selfieVerified ??= d.selfieVerified ?? false;
       en.hasPhoneVerified ??= d.phoneVerified ?? false;
       en.emailVerified ??= d.emailVerified ?? false;
@@ -253,11 +312,11 @@ export async function computeEnrichedCatfishScore(uid: string, base: Partial<Cat
       en.hasVoiceIntro ??= !!d.voiceIntroUrl;
       en.socialLinksCount ??= [d.instagram, d.spotify, d.tiktok, d.linkedin].filter(Boolean).length;
       if (d.createdAt) {
-        const c = typeof d.createdAt === 'string' ? new Date(d.createdAt).getTime() : d.createdAt?.toMillis?.() ?? d.createdAt;
-        en.accountAgeDays ??= Math.floor((Date.now() - (c as number)) / 86400000);
+        const c = typeof d.createdAt === 'string' ? new Date(d.createdAt).getTime() : typeof d.createdAt === 'number' ? d.createdAt : d.createdAt.toMillis?.() ?? 0;
+        en.accountAgeDays ??= Math.floor((Date.now() - c) / 86400000);
       }
     }
-  } catch { }
+  } catch { /* empty */ }
   return computeCatfishScore(en);
 }
 

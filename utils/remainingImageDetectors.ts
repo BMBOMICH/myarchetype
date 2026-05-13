@@ -1,4 +1,4 @@
-const API = process.env.EXPO_PUBLIC_API_URL || '';
+const API = process.env['EXPO_PUBLIC_API_URL'] || '';
 const srv = async <T>(p: string, b?: any) => {
   const c = new AbortController(); const id = setTimeout(() => c.abort(), 8000);
   try { const r = await fetch(`${API}${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined, signal: c.signal }); return r.ok ? r.json() : {} as T; }

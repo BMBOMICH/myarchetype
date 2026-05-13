@@ -1,0 +1,42 @@
+name: Stack Audit
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    name: Expo/RN Stack Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Audit
+        run: npx ts-node --project scripts/tsconfig.json scripts/audit-stack.ts --json-only --quiet
+        id: audit
+        continue-on-error: true
+
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stack-audit-report
+          path: stack-audit-report.json
+          retention-days: 30
+
+      - name: Fail pipeline on errors
+        if: steps.audit.outcome == 'failure'
+        run: |
+          echo "::error::Audit failed. Check the uploaded artifact for details."
+          exit 1

@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { auth } from '../firebaseConfig';
 import {
   type DateSpotReview,
@@ -31,7 +31,6 @@ const REVIEW_LINE_HEIGHT = 20 / 14;
 const REVIEW_TEXT_WIDTH  = SCREEN_WIDTH - 60;
 
 const CARD_FIXED_HEIGHT = 249;
-
 const GOOD_FOR_ROW_HEIGHT = 34;
 
 const pretextCache = new Map<string, number>();
@@ -40,10 +39,8 @@ function measureReviewText(text: string): number {
   const key = `${text}|${REVIEW_TEXT_WIDTH}`;
   const hit  = pretextCache.get(key);
   if (hit !== undefined) return hit;
-
   const prepared = prepare(text, REVIEW_FONT);
   const result   = layout(prepared, REVIEW_TEXT_WIDTH, REVIEW_LINE_HEIGHT);
-
   pretextCache.set(key, result.height);
   if (pretextCache.size > 500) {
     const oldest = pretextCache.keys().next().value;
@@ -57,7 +54,6 @@ function measureCardHeight(item: DateSpotReview): number {
   if (item.goodFor && item.goodFor.length > 0) height += GOOD_FOR_ROW_HEIGHT;
   return Math.ceil(height);
 }
-
 
 const PLACE_TYPES  = ['restaurant', 'cafe', 'bar', 'park', 'museum', 'cinema', 'other'] as const;
 const PRICE_RANGES = ['€', '€€', '€€€', '€€€€'] as const;
@@ -82,7 +78,6 @@ const DEFAULT_FORM: FormState = {
   rating: 5, atmosphere: 5, priceRange: '€€', reviewText: '', selectedGoodFor: [],
 };
 
-
 const PlaceTypeChip = React.memo(function PlaceTypeChip({ type, selected, onPress }: {
   type: PlaceType;
   selected: boolean;
@@ -93,9 +88,11 @@ const PlaceTypeChip = React.memo(function PlaceTypeChip({ type, selected, onPres
   const textStyle = useMemo(() => [styles.chipText, selected && styles.chipTextSelected], [selected]);
   return (
     <TouchableOpacity
-      style={chipStyle} onPress={handlePress}
+      style={chipStyle}
+      onPress={handlePress}
       accessibilityLabel={`Place type: ${type}${selected ? ', selected' : ''}`}
-      accessibilityRole="button" accessibilityState={{ selected }}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
       <Text style={textStyle}>{type}</Text>
     </TouchableOpacity>
@@ -112,9 +109,11 @@ const PriceRangeChip = React.memo(function PriceRangeChip({ price, selected, onP
   const textStyle = useMemo(() => [styles.chipText, selected && styles.chipTextSelected], [selected]);
   return (
     <TouchableOpacity
-      style={chipStyle} onPress={handlePress}
+      style={chipStyle}
+      onPress={handlePress}
       accessibilityLabel={`Price range: ${price}${selected ? ', selected' : ''}`}
-      accessibilityRole="button" accessibilityState={{ selected }}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
       <Text style={textStyle}>{price}</Text>
     </TouchableOpacity>
@@ -137,9 +136,11 @@ const GoodForChip = React.memo(function GoodForChip({ tag, selected, selectedGoo
   const textStyle = useMemo(() => [styles.chipText, selected && styles.chipTextSelected], [selected]);
   return (
     <TouchableOpacity
-      style={chipStyle} onPress={handlePress}
+      style={chipStyle}
+      onPress={handlePress}
       accessibilityLabel={`${tag.replace('_', ' ')}${selected ? ', selected' : ''}`}
-      accessibilityRole="button" accessibilityState={{ selected }}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
       <Text style={textStyle}>{tag.replace('_', ' ')}</Text>
     </TouchableOpacity>
@@ -149,13 +150,15 @@ const GoodForChip = React.memo(function GoodForChip({ tag, selected, selectedGoo
 const FilterChip = React.memo(function FilterChip({ type, active, onPress }: {
   type: string; active: boolean; onPress: (type: string) => void;
 }) {
-  const handlePress  = useCallback(() => onPress(type), [onPress, type]);
-  const chipStyle    = useMemo(() => [styles.filterChip, active && styles.filterChipActive], [active]);
-  const textStyle    = useMemo(() => [styles.filterChipText, active && styles.filterChipTextActive], [active]);
+  const handlePress = useCallback(() => onPress(type), [onPress, type]);
+  const chipStyle   = useMemo(() => [styles.filterChip, active && styles.filterChipActive], [active]);
+  const textStyle   = useMemo(() => [styles.filterChipText, active && styles.filterChipTextActive], [active]);
   return (
     <TouchableOpacity
-      style={chipStyle} onPress={handlePress}
-      accessibilityLabel={`Filter by ${type}`} accessibilityRole="button"
+      style={chipStyle}
+      onPress={handlePress}
+      accessibilityLabel={`Filter by ${type}`}
+      accessibilityRole="button"
       accessibilityState={{ selected: active }}
     >
       <Text style={textStyle}>{type}</Text>
@@ -173,7 +176,7 @@ const StarRow = React.memo(function StarRow({ count, onPress }: StarRowProps) {
       {[1, 2, 3, 4, 5].map((n) => (
         <TouchableOpacity
           key={n}
-          onPress={() = accessibilityLabel="button"> onPress?.(n)}
+          onPress={() => onPress?.(n)}
           disabled={!onPress}
           accessibilityLabel={`${n} star${n > 1 ? 's' : ''}${onPress ? '' : `, rated ${count}`}`}
           accessibilityRole={onPress ? 'button' : 'text'}
@@ -190,9 +193,7 @@ interface ReviewCardProps {
   currentUserId: string;
   onLike: (id: string) => void;
 }
-const ReviewCard = React.memo(function ReviewCard({
-  item, currentUserId, onLike,
-}: ReviewCardProps) {
+const ReviewCard = React.memo(function ReviewCard({ item, currentUserId, onLike }: ReviewCardProps) {
   const handleLike = useCallback(() => onLike(item.id), [onLike, item.id]);
   const isLiked    = item.likedBy?.includes(currentUserId);
 
@@ -228,8 +229,8 @@ const ReviewCard = React.memo(function ReviewCard({
 
       {item.goodFor.length > 0 && (
         <View style={styles.reviewTags}>
-          {item.goodFor.map((tag, i) => (
-            <View key={i} style={styles.reviewTag}>
+          {item.goodFor.map((tag) => (
+            <View key={tag} style={styles.reviewTag}>
               <Text style={styles.reviewTagText}>{tag.replace('_', ' ')}</Text>
             </View>
           ))}
@@ -249,7 +250,6 @@ const ReviewCard = React.memo(function ReviewCard({
     </View>
   );
 });
-
 
 export default function DateSpotReviewsScreen() {
   const router        = useRouter();
@@ -315,7 +315,7 @@ export default function DateSpotReviewsScreen() {
       }
     } catch (error) {
       logger.error('[Reviews] Submit error:', error);
-      Alert.alert('An unexpected error occurred.');
+      Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       if (isMounted.current) setSubmitting(false);
     }
@@ -330,17 +330,16 @@ export default function DateSpotReviewsScreen() {
     }
   }, [loadReviews]);
 
-  const handleBackFromCreate = useCallback(() => setCreate(false),    []);
-  const handleOpenCreate     = useCallback(() => setCreate(true),     []);
-  const handleBack           = useCallback(() => router.back(),       [router]);
+  const handleBackFromCreate = useCallback(() => setCreate(false), []);
+  const handleOpenCreate     = useCallback(() => setCreate(true),  []);
+  const handleBack           = useCallback(() => router.back(),    [router]);
   const handleFilterAll      = useCallback(() => setFilterType(null), []);
 
   const handlePlaceNameChange    = useCallback((v: string) => setField('placeName', v),    [setField]);
   const handlePlaceAddressChange = useCallback((v: string) => setField('placeAddress', v), [setField]);
   const handleReviewTextChange   = useCallback((v: string) => setField('reviewText', v),   [setField]);
-
-  const handleRating     = useCallback((n: number) => setField('rating',     n), [setField]);
-  const handleAtmosphere = useCallback((n: number) => setField('atmosphere', n), [setField]);
+  const handleRating             = useCallback((n: number) => setField('rating',     n),   [setField]);
+  const handleAtmosphere         = useCallback((n: number) => setField('atmosphere', n),   [setField]);
 
   const keyExtractor = useCallback((item: DateSpotReview) => item.id, []);
 
@@ -350,11 +349,9 @@ export default function DateSpotReviewsScreen() {
 
   const estimatedItemSize = useMemo(() => {
     if (reviews.length === 0) return CARD_FIXED_HEIGHT + 60;
-
     let total   = 0;
     let sampled = 0;
     const step  = Math.max(1, Math.floor(reviews.length / Math.min(reviews.length, 20)));
-
     for (let i = 0; i < reviews.length; i += step) {
       const review = reviews[i];
       if (!review) continue;
@@ -362,7 +359,6 @@ export default function DateSpotReviewsScreen() {
       sampled++;
       if (sampled >= 20) break;
     }
-
     return sampled > 0 ? Math.ceil(total / sampled) : CARD_FIXED_HEIGHT + 60;
   }, [reviews]);
 
@@ -371,6 +367,16 @@ export default function DateSpotReviewsScreen() {
       <Text style={styles.emptyText}>No reviews yet. Be the first!</Text>
     </View>
   ), []);
+
+  const submitButtonStyle = useMemo(
+    () => [styles.submitButton, submitting && styles.submitButtonDisabled],
+    [submitting],
+  );
+
+  const filterAllStyle     = useMemo(() => [styles.filterChip, !filterType && styles.filterChipActive], [filterType]);
+  const filterAllTextStyle = useMemo(() => [styles.filterChipText, !filterType && styles.filterChipTextActive], [filterType]);
+
+  const textAreaStyle = useMemo(() => [styles.input, styles.textArea], []);
 
   if (loading && reviews.length === 0) {
     return (
@@ -428,7 +434,8 @@ export default function DateSpotReviewsScreen() {
           <View style={styles.chipsContainer}>
             {PLACE_TYPES.map((type) => (
               <PlaceTypeChip
-                key={type} type={type}
+                key={type}
+                type={type}
                 selected={form.placeType === type}
                 onPress={setField}
               />
@@ -451,7 +458,8 @@ export default function DateSpotReviewsScreen() {
           <View style={styles.chipsContainer}>
             {PRICE_RANGES.map((price) => (
               <PriceRangeChip
-                key={price} price={price}
+                key={price}
+                price={price}
                 selected={form.priceRange === price}
                 onPress={setField}
               />
@@ -464,7 +472,8 @@ export default function DateSpotReviewsScreen() {
           <View style={styles.chipsContainer}>
             {GOOD_FOR.map((tag) => (
               <GoodForChip
-                key={tag} tag={tag}
+                key={tag}
+                tag={tag}
                 selected={form.selectedGoodFor.includes(tag)}
                 selectedGoodFor={form.selectedGoodFor}
                 onPress={setField}
@@ -476,7 +485,7 @@ export default function DateSpotReviewsScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Your Review *</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={textAreaStyle}
             placeholder="Share your experience..."
             placeholderTextColor="#666"
             value={form.reviewText}
@@ -488,8 +497,8 @@ export default function DateSpotReviewsScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-          onPress={() = accessibilityLabel="button"> void handleSubmit()}
+          style={submitButtonStyle}
+          onPress={() => void handleSubmit()}
           disabled={submitting}
           accessibilityLabel="Post review"
           accessibilityRole="button"
@@ -530,19 +539,18 @@ export default function DateSpotReviewsScreen() {
         style={styles.filtersScroll}
       >
         <TouchableOpacity
-          style={[styles.filterChip, !filterType && styles.filterChipActive]}
+          style={filterAllStyle}
           onPress={handleFilterAll}
           accessibilityLabel="Show all types"
           accessibilityRole="button"
           accessibilityState={{ selected: !filterType }}
         >
-          <Text style={[styles.filterChipText, !filterType && styles.filterChipTextActive]}>
-            All
-          </Text>
+          <Text style={filterAllTextStyle}>All</Text>
         </TouchableOpacity>
         {PLACE_TYPES.map((type) => (
           <FilterChip
-            key={type} type={type}
+            key={type}
+            type={type}
             active={filterType === type}
             onPress={setFilterType}
           />

@@ -104,11 +104,11 @@ if NudeDetector:
     EXPL = {'FEMALE_BREAST_EXPOSED','MALE_GENITALIA_EXPOSED','FEMALE_GENITALIA_EXPOSED','BUTTOCKS_EXPOSED','ANUS_EXPOSED'}
     PART = {'FEMALE_BREAST_COVERED','FEMALE_GENITALIA_COVERED','MALE_GENITALIA_COVERED','BUTTOCKS_COVERED'}
     SWIM = {'UNDERWEAR','SWIMWEAR'}
-    
+
     expl = [d for d in dets if d['class'] in EXPL and d['score'] > 0.55]
     part = [d for d in dets if d['class'] in PART and d['score'] > 0.60]
     swim = [d for d in dets if d['class'] in SWIM and d['score'] > 0.65]
-    
+
     max_s = max((d['score'] for d in dets), default=0)
     n_res = {
         "explicit_parts": [d['class'] for d in expl],
@@ -132,7 +132,7 @@ elif m_nsfw > 0.72: reason = f"nsfw_score:{m_nsfw:.3f}"
 
 print(json.dumps({
     "safe": not is_nsfw, "confidence": conf, "reason": reason, "shouldBlur": blur, "needsReview": needs_rev,
-    "signals": {"partialNudity": n_res['is_partial'], "contextScore": n_res.get('context_score',0), 
+    "signals": {"partialNudity": n_res['is_partial'], "contextScore": n_res.get('context_score',0),
                 "cyberflashSignal": n_res.get('cyberflash_signal',False), "explicitParts": n_res['explicit_parts'], "aiArtifactRisk": 0.0},
     "layers": {"marqo_nsfw": m_nsfw, "nudenet": n_res}
 }))

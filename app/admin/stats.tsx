@@ -1,7 +1,7 @@
 import type { LegendListRenderItemProps } from '@legendapp/list';
 import { LegendList } from '@legendapp/list';
 import { collection, getDocs } from 'firebase/firestore';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { db } from '../../firebaseConfig';
@@ -27,14 +27,14 @@ const EMPTY_STATS: Stats = {
 };
 interface Section { key: string; render: () => React.ReactElement }
 
-const scheduleIdleTask = (cb: () => void): (() => void) => {
+function scheduleIdleTask(cb: () => void): () => void {
   if (typeof requestIdleCallback === 'function') {
     const id = requestIdleCallback(cb);
     return () => cancelIdleCallback(id);
   }
   const id = setTimeout(cb, 100);
   return () => clearTimeout(id);
-};
+}
 
 export default function AdminStatsScreen() {
   const [loading, setLoading] = useState(true);
@@ -91,13 +91,22 @@ export default function AdminStatsScreen() {
 
   useEffect(() => {
     isMounted.current = true;
-    return scheduleIdleTask(() => { void loadStats(); }, []);
+    return scheduleIdleTask(() => { void loadStats(); });
   }, [loadStats]);
 
   useEffect(() => () => { isMounted.current = false; }, []);
 
-  const pct  = useCallback((v: number) => stats.totalUsers === 0 ? 0 : Math.round((v / stats.totalUsers) * 100), [stats.totalUsers]);
-  const pctW = useCallback((v: number): `${number}%` => `${pct(v)}%`, [pct]);
+  // pct is a pure function of stats.totalUsers — no need to list pctW as a dep
+  // in anything that only needs pct. pctW wraps pct for string formatting.
+  const pct = useCallback(
+    (v: number) => stats.totalUsers === 0 ? 0 : Math.round((v / stats.totalUsers) * 100),
+    [stats.totalUsers],
+  );
+
+  const pctW = useCallback(
+    (v: number): `${number}%` => `${pct(v)}%`,
+    [pct],
+  );
 
   const healthScore = Math.round(
     pct(stats.selfieVerified) * 0.4 +
@@ -105,7 +114,18 @@ export default function AdminStatsScreen() {
     (100 - pct(stats.bannedUsers)) * 0.3,
   );
 
-  const sections: Section[] = [
+  const statNumberStyle   = useCallback((color: string) => [styles.statNumber,  { color }], []);
+  const safetyNumberStyle = useCallback((color: string) => [styles.safetyNumber, { color }], []);
+
+  const progressFillStyle = useCallback(
+    (v: number, color: string) => [styles.progressFill, { width: pctW(v), backgroundColor: color }],
+    [pctW],
+  );
+
+  const keyExtractor = useCallback((item: Section) => item.key, []);
+  const renderItem   = useCallback(({ item }: LegendListRenderItemProps<Section>) => item.render(), []);
+
+  const sections: Section[] = useMemo(() => [
     {
       key: 'overview',
       render: () => (
@@ -113,13 +133,13 @@ export default function AdminStatsScreen() {
           <Text style={styles.sectionTitle}>User Overview</Text>
           <View style={styles.statsGrid}>
             {[
-              { n: stats.totalUsers,  l: 'Total Users', c: '#eee'     },
-              { n: stats.maleUsers,   l: 'Male',        c: '#3498db'  },
-              { n: stats.femaleUsers, l: 'Female',      c: '#e91e63'  },
-              { n: stats.averageAge,  l: 'Avg Age',     c: '#eee'     },
+              { n: stats.totalUsers,  l: 'Total Users', c: '#eee'    },
+              { n: stats.maleUsers,   l: 'Male',        c: '#3498db' },
+              { n: stats.femaleUsers, l: 'Female',      c: '#e91e63' },
+              { n: stats.averageAge,  l: 'Avg Age',     c: '#eee'    },
             ].map((item) => (
               <View key={item.l} style={styles.statCard} accessibilityLabel={`${item.l}: ${item.n}`}>
-                <Text style={[styles.statNumber, { color: item.c }]}>{item.n}</Text>
+                <Text style={statNumberStyle(item.c)}>{item.n}</Text>
                 <Text style={styles.statLabel}>{item.l}</Text>
               </View>
             ))}
@@ -136,7 +156,7 @@ export default function AdminStatsScreen() {
             { l: 'Selfie Verified',  v: stats.selfieVerified,   c: '#3498db' },
             { l: 'Height Verified',  v: stats.heightVerified,   c: '#9b59b6' },
             { l: 'Age Verified',     v: stats.ageVerified,      c: '#e67e22' },
-            { l: 'Full Body Photo',  v: stats.hasFullBodyPhoto, c: '#1abc9c' },
+            { l: 'Full Body Photo',  v: stats.hasFullBodyPhoto,  c: '#1abc9c' },
           ].map((item) => (
             <View key={item.l} style={styles.progressItem} accessibilityLabel={`${item.l}: ${item.v} users, ${pct(item.v)} percent`}>
               <View style={styles.progressHeader}>
@@ -144,7 +164,7 @@ export default function AdminStatsScreen() {
                 <Text style={styles.progressValue}>{item.v} ({pct(item.v)}%)</Text>
               </View>
               <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: pctW(item.v), backgroundColor: item.c }]} />
+                <View style={progressFillStyle(item.v, item.c)} />
               </View>
             </View>
           ))}
@@ -162,9 +182,14 @@ export default function AdminStatsScreen() {
               { n: stats.totalRatings,      l: 'Total Ratings',   gold: false, suffix: ''  },
               { n: stats.averageTrustScore, l: 'Avg Trust Score', gold: false, suffix: '%' },
             ].map((item) => (
-              <View key={item.l} style={item.gold ? styles.statCardSmallGold : styles.statCardSmall}
-                accessibilityLabel={`${item.l}: ${item.n}${item.suffix}`}>
-                <Text style={item.gold ? styles.statNumberSmallGold : styles.statNumberSmall}>{item.n}{item.suffix}</Text>
+              <View
+                key={item.l}
+                style={item.gold ? styles.statCardSmallGold : styles.statCardSmall}
+                accessibilityLabel={`${item.l}: ${item.n}${item.suffix}`}
+              >
+                <Text style={item.gold ? styles.statNumberSmallGold : styles.statNumberSmall}>
+                  {item.n}{item.suffix}
+                </Text>
                 <Text style={styles.statLabelSmall}>{item.l}</Text>
               </View>
             ))}
@@ -184,7 +209,7 @@ export default function AdminStatsScreen() {
               { n: stats.lowRatedUsers,     l: 'Low-Rated Users',     c: '#e74c3c' },
             ].map((item) => (
               <View key={item.l} style={styles.safetyItem} accessibilityLabel={`${item.l}: ${item.n}`}>
-                <Text style={[styles.safetyNumber, { color: item.c }]}>{item.n}</Text>
+                <Text style={safetyNumberStyle(item.c)}>{item.n}</Text>
                 <Text style={styles.safetyLabel}>{item.l}</Text>
               </View>
             ))}
@@ -202,7 +227,7 @@ export default function AdminStatsScreen() {
         </View>
       ),
     },
-  ];
+  ], [stats, pct, healthScore, statNumberStyle, progressFillStyle, safetyNumberStyle]);
 
   if (loading) {
     return (
@@ -216,8 +241,8 @@ export default function AdminStatsScreen() {
   return (
     <LegendList
       data={sections}
-      keyExtractor={(item) => item.key}
-      renderItem={({ item }: LegendListRenderItemProps<Section>) => item.render()}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
       contentContainerStyle={styles.content}
       style={styles.container}
       estimatedItemSize={250}

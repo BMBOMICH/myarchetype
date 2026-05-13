@@ -1,7 +1,7 @@
 import { writeAuditLog } from './logger';
 
-export interface TraffickingReferralResult { shouldRefer: boolean; indicators: string[]; indicatorCount: number; urgency: 'immediate'|'high'|'standard'|'none'; referralResources: TraffickingResource[]; platformActions: string[]; }
-interface TraffickingResource { name: string; type: 'hotline'|'text'|'website'|'chat'|'law_enforcement'; contact: string; description: string; country: string; available24x7: boolean; }
+export interface TraffickingReferralResult { shouldRefer: boolean; indicators: string[]; indicatorCount: number; urgency: 'immediate' | 'high' | 'standard' | 'none'; referralResources: TraffickingResource[]; platformActions: string[]; }
+interface TraffickingResource { name: string; type: 'hotline' | 'text' | 'website' | 'chat' | 'law_enforcement'; contact: string; description: string; country: string; available24x7: boolean; }
 
 const TRAFFIC_PATTERNS = {
   communication_control: [/can't (talk|text|call) (right now|freely|in private)/i, /someone (is |might be )?watching/i, /not allowed to/i, /have to (go|stop|leave) (now|soon)/i, /they (check|read|monitor) my (phone|messages)/i, /can only (text|message|talk) at certain (times|hours)/i, /using (someone else's|their|his|her) phone/i],
@@ -22,7 +22,7 @@ export function scamCompoundPattern(sessions: Array<{ accountId: string; ip: str
   sessions.forEach(s => { const net = s.ip.split('.').slice(0, 3).join('.'); if (!subnets.has(net)) subnets.set(net, new Set()); subnets.get(net)!.add(s.accountId); });
   for (const [, accts] of subnets) { if (accts.size >= 3) { ipClustered = true; patterns.push('ip_cluster_3plus'); break; } }
   const vols: Record<string, number> = {};
-  sessions.forEach(s => { vols[s.accountId] = (vols[s.accountId] || 0) + s.messagesSent; });
+  sessions.forEach(s => { vols[s.accountId] = (vols[s.accountId] ?? 0) + s.messagesSent; });
   const vals = Object.values(vols);
   if (vals.length >= 3) { const avg = vals.reduce((a, b) => a + b, 0) / vals.length; if (vals.every(v => Math.abs(v - avg) < avg * 0.2)) { compoundOp = true; patterns.push('uniform_volume'); } }
   const confidence = [shiftDetected, ipClustered, compoundOp].filter(Boolean).length / 3;
@@ -48,7 +48,7 @@ export function scamTemplate(messages: string[]): ScriptMatchResult {
   const text = messages.join(' ');
   let best: ScriptMatchResult = { matched: false, matchScore: 0, matchedPhrases: [] };
   for (const script of KNOWN_SCRIPTS) {
-    const matched = script.phrases.filter(p => p.test(text)).map(p => { const m = text.match(p); return m ? m[0] : ''; }).filter(Boolean);
+    const matched = script.phrases.filter(p => p.test(text)).map(p => { const m = text.match(p); return m ? m[0] : ''; }).filter((s): s is string => s.length > 0);
     const score = matched.length / script.phrases.length;
     if (score > best.matchScore) best = { matched: score >= 0.4, scriptName: script.name, matchScore: score, matchedPhrases: matched };
   }
@@ -72,7 +72,7 @@ export function detectTraffickingAndRefer(msgs: Array<{ text: string; timestamp:
   if (country === 'US' || country === 'ALL') res.push(
     { name: 'National Human Trafficking Hotline (Polaris)', type: 'hotline', contact: '1-888-373-7888', description: 'Confidential, multilingual', country: 'US', available24x7: true },
     { name: 'Polaris BeFree Textline', type: 'text', contact: 'Text 233733 (BEFREE)', description: 'Text-based support', country: 'US', available24x7: true },
-    { name: 'FBI Tip Line', type: 'law_enforcement', contact: 'https://tips.fbi.gov', description: 'Report to FBI', country: 'US', available24x7: true }
+    { name: 'FBI Tip Line', type: 'law_enforcement', contact: 'https://tips.fbi.gov', description: 'Report to FBI', country: 'US', available24x7: true },
   );
   if (country === 'GB') res.push({ name: 'Modern Slavery Helpline', type: 'hotline', contact: '08000 121 700', description: 'UK helpline', country: 'GB', available24x7: true });
   if (country === 'CA') res.push({ name: 'Canadian Human Trafficking Hotline', type: 'hotline', contact: '1-833-900-1010', description: 'Multilingual', country: 'CA', available24x7: true });
@@ -99,17 +99,7 @@ export const laborTrafficking = humanTrafficking;
 export const traffickingReferral_769 = 'traffickingReferral';
 export const victimPathway_769 = 'victimPathway';
 export const polarisTipline_769 = 'polarisTipline';
-export const _det769_traffickingReferral = {
-  id: 769,
-  section: '5.6',
-  name: 'Trafficking victim referral pathway',
-  severity: 'critical' as const,
-  patterns: ['traffickingReferral', 'victimPathway', 'polarisTipline'],
-  enabled: true,
-  detect(input: string): boolean {
-    return ['traffickingReferral', 'victimPathway', 'polarisTipline'].some(pat => input.includes(pat));
-  }
-};
+export const _det769_traffickingReferral = { id: 769, section: '5.6', name: 'Trafficking victim referral pathway', severity: 'critical' as const, patterns: ['traffickingReferral', 'victimPathway', 'polarisTipline'], enabled: true, detect(input: string): boolean { return ['traffickingReferral', 'victimPathway', 'polarisTipline'].some(pat => input.includes(pat)); } };
 export const _ref_traffickingReferral = _det769_traffickingReferral;
 export const _ref_victimPathway = _det769_traffickingReferral;
 export const _ref_polarisTipline = _det769_traffickingReferral;

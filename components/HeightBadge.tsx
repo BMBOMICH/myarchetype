@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View, ViewStyle } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+import { useMemo } from 'react';
 
 interface HeightData {
   value:               number;
@@ -28,9 +29,11 @@ export default function HeightBadge({ height, style }: HeightBadgeProps) {
     method === 'ai-estimated'    ? '#53a8b6' :
     '#aaaaaa';
 
+  const _extracteduseMemo0 = useMemo(() => [styles.container, style], [style]);
+  const _extracteduseMemo1 = useMemo(() => [styles.text, { color: badgeColor }], [badgeColor]);
   return (
-    <View style={[styles.container, style]}>
-      <Text style={[styles.text, { color: badgeColor }]}>{badgeText}</Text>
+    <View style={_extracteduseMemo0}>
+      <Text style={_extracteduseMemo1}>{badgeText}</Text>
       {method === 'ai-estimated' && confidence != null && (
         <Text style={styles.confidence}>({confidence}% confidence)</Text>
       )}

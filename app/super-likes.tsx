@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
@@ -64,13 +64,11 @@ function measureCardHeight(message: string): number {
   return Math.ceil(CARD_FIXED_HEIGHT + measureMessage(message));
 }
 
-
 interface SuperLikeWithProfile extends SuperLike {
   fromUserName?:  string;
   fromUserPhoto?: string;
   fromUserAge?:   number;
 }
-
 
 interface SuperLikeCardProps {
   item:       SuperLikeWithProfile;
@@ -154,7 +152,6 @@ const SuperLikeCard = React.memo(function SuperLikeCard({
   );
 });
 
-
 export default function SuperLikesScreen() {
   const router = useRouter();
 
@@ -168,7 +165,7 @@ export default function SuperLikesScreen() {
     try {
       const likes = await getSuperLikesReceived();
       const withProfiles = await Promise.all(
-        likes.map(async (like).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }) => {
+        likes.map(async (like) => {
           try {
             const snap = await getDoc(doc(db, 'users', like.fromUserId));
             if (snap.exists()) {
@@ -203,7 +200,7 @@ export default function SuperLikesScreen() {
     isMounted.current = true;
     const task = InteractionManager.runAfterInteractions(() => {
       void loadSuperLikes();
-    }, []);
+    });
     return () => {
       isMounted.current = false;
       task.cancel();

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
@@ -17,6 +17,9 @@ import {
 
 export default function SocialVerificationScreen() {
   const router = useRouter();
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
+
   const [loading, setLoading] = useState(true);
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
   const [instagramInput, setInstagramInput] = useState('');
@@ -28,7 +31,7 @@ export default function SocialVerificationScreen() {
   const loadSocialLinks = async () => {
     try {
       const links = await getSocialLinks();
-      setSocialLinks(links);
+      if (isMounted.current) setSocialLinks(links);
     } catch (error) {
       logger.error('[SocialVerification] load error:', error);
       Alert.alert('Error', 'Failed to load social links.');
@@ -37,7 +40,7 @@ export default function SocialVerificationScreen() {
     }
   };
 
-  const handleLinkInstagram = async () => {
+  const handleLinkInstagram = useCallback(async () => {
     if (!instagramInput.trim()) {
       Alert.alert('Error', 'Please enter your Instagram username');
       return;
@@ -58,9 +61,9 @@ export default function SocialVerificationScreen() {
     } finally {
       setLinking(null);
     }
-  };
+  }, [instagramInput]);
 
-  const handleLinkLinkedIn = async () => {
+  const handleLinkLinkedIn = useCallback(async () => {
     if (!linkedinInput.trim()) {
       Alert.alert('Error', 'Please enter your LinkedIn profile URL');
       return;
@@ -81,9 +84,9 @@ export default function SocialVerificationScreen() {
     } finally {
       setLinking(null);
     }
-  };
+  }, [linkedinInput]);
 
-  const doUnlink = async (platform: 'instagram' | 'linkedin' | 'spotify') => {
+  const doUnlink = useCallback(async (platform: 'instagram' | 'linkedin' | 'spotify') => {
     const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
     try {
       const success = await unlinkSocial(platform);
@@ -97,9 +100,9 @@ export default function SocialVerificationScreen() {
       logger.error('[SocialVerification] unlink error:', error);
       Alert.alert('Error', `Failed to unlink ${platformName}.`);
     }
-  };
+  }, []);
 
-  const handleUnlink = (platform: 'instagram' | 'linkedin' | 'spotify') => {
+  const handleUnlink = useCallback((platform: 'instagram' | 'linkedin' | 'spotify') => {
     const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
     Alert.alert(
       `Unlink ${platformName}?`,
@@ -109,7 +112,29 @@ export default function SocialVerificationScreen() {
         { text: 'Unlink', style: 'destructive', onPress: () => void doUnlink(platform) },
       ]
     );
-  };
+  }, [doUnlink]);
+
+  const instagramLinkBtnStyle = useMemo(
+    () => [styles.linkButton, linking === 'instagram' && styles.linkButtonDisabled],
+    [linking],
+  );
+  const linkedinLinkBtnStyle = useMemo(
+    () => [styles.linkButton, linking === 'linkedin' && styles.linkButtonDisabled],
+    [linking],
+  );
+
+  const onOpenInstagram = useCallback(
+    () => openInstagramProfile(socialLinks.instagram?.username),
+    [socialLinks.instagram?.username],
+  );
+  const onOpenLinkedIn = useCallback(
+    () => openLinkedInProfile(socialLinks.linkedin?.profileUrl),
+    [socialLinks.linkedin?.profileUrl],
+  );
+  const onUnlinkInstagram = useCallback(() => handleUnlink('instagram'), [handleUnlink]);
+  const onUnlinkLinkedIn  = useCallback(() => handleUnlink('linkedin'),  [handleUnlink]);
+  const onLinkInstagram   = useCallback(() => void handleLinkInstagram(), [handleLinkInstagram]);
+  const onLinkLinkedIn    = useCallback(() => void handleLinkLinkedIn(),  [handleLinkLinkedIn]);
 
   if (loading) return (
     <View style={styles.container}>
@@ -126,7 +151,11 @@ export default function SocialVerificationScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() = accessibilityLabel="button"> router.back()}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>🔗 Social Verification</Text>
@@ -157,12 +186,22 @@ export default function SocialVerificationScreen() {
 
         {socialLinks.instagram ? (
           <View style={styles.linkedCard}>
-            <TouchableOpacity style={styles.linkedInfo} onPress={() = accessibilityLabel="button"> openInstagramProfile(socialLinks.instagram?.username)}>
+            <TouchableOpacity
+              style={styles.linkedInfo}
+              onPress={onOpenInstagram}
+              accessibilityRole="button"
+              accessibilityLabel="View Instagram profile"
+            >
               <Text style={styles.linkedUsername}>@{socialLinks.instagram.username}</Text>
               <Text style={styles.linkedDate}>Linked {formatSocialLinkDate(socialLinks.instagram.linkedAt)}</Text>
               <Text style={styles.tapToView}>Tap to view profile →</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.unlinkButton} onPress={() = accessibilityLabel="button"> handleUnlink('instagram')}>
+            <TouchableOpacity
+              style={styles.unlinkButton}
+              onPress={onUnlinkInstagram}
+              accessibilityRole="button"
+              accessibilityLabel="Unlink Instagram"
+            >
               <Text style={styles.unlinkButtonText}>Unlink</Text>
             </TouchableOpacity>
           </View>
@@ -178,9 +217,11 @@ export default function SocialVerificationScreen() {
               autoCorrect={false}
             />
             <TouchableOpacity
-              style={[styles.linkButton, linking === 'instagram' && styles.linkButtonDisabled]}
-              onPress={() = accessibilityLabel="button"> void handleLinkInstagram()}
+              style={instagramLinkBtnStyle}
+              onPress={onLinkInstagram}
               disabled={linking === 'instagram'}
+              accessibilityRole="button"
+              accessibilityLabel="Link Instagram"
             >
               {linking === 'instagram'
                 ? <ActivityIndicator size="small" color="#fff" />
@@ -203,12 +244,22 @@ export default function SocialVerificationScreen() {
 
         {socialLinks.linkedin ? (
           <View style={styles.linkedCard}>
-            <TouchableOpacity style={styles.linkedInfo} onPress={() = accessibilityLabel="button"> openLinkedInProfile(socialLinks.linkedin?.profileUrl)}>
+            <TouchableOpacity
+              style={styles.linkedInfo}
+              onPress={onOpenLinkedIn}
+              accessibilityRole="button"
+              accessibilityLabel="View LinkedIn profile"
+            >
               <Text style={styles.linkedUsername}>Profile Linked</Text>
               <Text style={styles.linkedDate}>Linked {formatSocialLinkDate(socialLinks.linkedin.linkedAt)}</Text>
               <Text style={styles.tapToView}>Tap to view profile →</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.unlinkButton} onPress={() = accessibilityLabel="button"> handleUnlink('linkedin')}>
+            <TouchableOpacity
+              style={styles.unlinkButton}
+              onPress={onUnlinkLinkedIn}
+              accessibilityRole="button"
+              accessibilityLabel="Unlink LinkedIn"
+            >
               <Text style={styles.unlinkButtonText}>Unlink</Text>
             </TouchableOpacity>
           </View>
@@ -225,9 +276,11 @@ export default function SocialVerificationScreen() {
               keyboardType="url"
             />
             <TouchableOpacity
-              style={[styles.linkButton, linking === 'linkedin' && styles.linkButtonDisabled]}
-              onPress={() = accessibilityLabel="button"> void handleLinkLinkedIn()}
+              style={linkedinLinkBtnStyle}
+              onPress={onLinkLinkedIn}
               disabled={linking === 'linkedin'}
+              accessibilityRole="button"
+              accessibilityLabel="Link LinkedIn"
             >
               {linking === 'linkedin'
                 ? <ActivityIndicator size="small" color="#fff" />

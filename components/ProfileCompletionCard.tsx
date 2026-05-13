@@ -1,38 +1,62 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { observable } from '@legendapp/state';
+import { observer } from '@legendapp/state/react';
+import React, { useCallback, useEffect } from 'react';
+import { ActivityIndicator, InteractionManager, Text, TouchableOpacity, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { logger } from '../utils/logger';
 import { calculateProfileStrength, getStrengthMessage, ProfileStrengthResult } from '../utils/profileStrength';
 
 interface ProfileStrengthBarProps { onPress?: () => void; compact?: boolean; }
 
-export default function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
-  const [loading,  setLoading]  = useState(true);
-  const [strength, setStrength] = useState<ProfileStrengthResult | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
+const bar$ = observable({
+  loading:  true,
+  strength: null as ProfileStrengthResult | null,
+  error:    null as string | null,
+});
 
-  const loadStrength = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setStrength(await calculateProfileStrength());
-    } catch (err: unknown) {
-      logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
-      setError('Could not load profile strength');
-    } finally {
-      setLoading(false);
-    }
+export default observer(function ProfileStrengthBar({ onPress, compact = false }: ProfileStrengthBarProps) {
+  const loading  = bar$.loading.get();
+  const strength = bar$.strength.get();
+  const error    = bar$.error.get();
+
+  const loadStrength = useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(async () => {
+      try {
+        bar$.loading.set(true);
+        bar$.error.set(null);
+        bar$.strength.set(await calculateProfileStrength());
+      } catch (err: unknown) {
+        logger.error('[ProfileStrengthBar] Failed to load profile strength:', err);
+        bar$.error.set('Could not load profile strength');
+      } finally {
+        bar$.loading.set(false);
+      }
+    });
+    return task;
   }, []);
 
-  useEffect(() => { void loadStrength(); }, [loadStrength]);
+  useEffect(() => {
+    const task = loadStrength();
+    return () => task.cancel();
+  }, [loadStrength]);
 
-  if (loading) return <View style={styles.container}><ActivityIndicator size="small" color="#53a8b6" /></View>;
+  const onRetry = useCallback(() => { loadStrength(); }, [loadStrength]);
+
+  if (loading) return (
+    <View style={styles.container}>
+      <ActivityIndicator size="small" color="#53a8b6" />
+    </View>
+  );
 
   if (error) {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={() = accessibilityLabel="button"> void loadStrength()} accessibilityLabel="Retry loading profile strength" accessibilityRole="button">
+        <TouchableOpacity
+          onPress={onRetry}
+          accessibilityLabel="Retry loading profile strength"
+          accessibilityRole="button"
+        >
           <Text style={styles.retryText}>Tap to retry</Text>
         </TouchableOpacity>
       </View>
@@ -43,16 +67,28 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
 
   const Container = onPress ? TouchableOpacity : View;
 
+  // Computed styles that depend on runtime `strength`
+  const compactPercentageStyle = [styles.compactPercentage, { color: strength.color }];
+  const compactBarFillStyle    = [styles.barFill, { width: `${strength.percentage}%` as `${number}%`, backgroundColor: strength.color }];
+  const levelBadgeStyle        = [styles.levelBadge,   { backgroundColor: strength.color }];
+  const percentageStyle        = [styles.percentage,   { color: strength.color }];
+  const barFillStyle           = [styles.barFill, { width: `${strength.percentage}%` as `${number}%`, backgroundColor: strength.color }];
+
   if (compact) {
     return (
-      <Container style={styles.compactContainer} onPress={onPress} accessibilityLabel={`Profile strength: ${strength.percentage}%`} accessibilityRole={onPress ? 'button' : 'none'}>
+      <Container
+        style={styles.compactContainer}
+        onPress={onPress}
+        accessibilityLabel={`Profile strength: ${strength.percentage}%`}
+        accessibilityRole={onPress ? 'button' : 'none'}
+      >
         <View style={styles.compactHeader}>
           <Text style={styles.compactLabel}>Profile Strength</Text>
-          <Text style={[styles.compactPercentage, { color: strength.color }]}>{strength.percentage}%</Text>
+          <Text style={compactPercentageStyle}>{strength.percentage}%</Text>
         </View>
         <View style={styles.barContainer}>
           <View style={styles.barBackground}>
-            <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+            <View style={compactBarFillStyle} />
           </View>
         </View>
       </Container>
@@ -60,20 +96,25 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
   }
 
   return (
-    <Container style={styles.container} onPress={onPress} accessibilityLabel={`Profile strength: ${strength.level}, ${strength.percentage}%`} accessibilityRole={onPress ? 'button' : 'none'}>
+    <Container
+      style={styles.container}
+      onPress={onPress}
+      accessibilityLabel={`Profile strength: ${strength.level}, ${strength.percentage}%`}
+      accessibilityRole={onPress ? 'button' : 'none'}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Profile Strength</Text>
-        <View style={[styles.levelBadge, { backgroundColor: strength.color }]}>
+        <View style={levelBadgeStyle}>
           <Text style={styles.levelText}>{strength.level}</Text>
         </View>
       </View>
       <View style={styles.scoreRow}>
         <Text style={styles.scoreText}>{strength.score} / {strength.maxScore} points</Text>
-        <Text style={[styles.percentage, { color: strength.color }]}>{strength.percentage}%</Text>
+        <Text style={percentageStyle}>{strength.percentage}%</Text>
       </View>
       <View style={styles.barContainer}>
         <View style={styles.barBackground}>
-          <View style={[styles.barFill, { width: `${strength.percentage}%`, backgroundColor: strength.color }]} />
+          <View style={barFillStyle} />
         </View>
       </View>
       <Text style={styles.message}>{getStrengthMessage(strength.level)}</Text>
@@ -87,7 +128,7 @@ export default function ProfileStrengthBar({ onPress, compact = false }: Profile
       )}
     </Container>
   );
-}
+});
 
 const styles = StyleSheet.create((theme) => ({
   container:            { backgroundColor: '#16213e', borderRadius: 15, padding: 15, borderWidth: 1, borderColor: '#0f3460' },

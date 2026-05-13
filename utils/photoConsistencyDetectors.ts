@@ -1,5 +1,5 @@
 import { writeAuditLog } from './logger';
-const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? '';
+const SERVER_URL = process.env['EXPO_PUBLIC_SERVER_URL'] ?? '';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
 async function serverScan<T>(ep: string, body: Record<string, unknown>): Promise<T | null> { try { const r = await fetchSafe(`${SERVER_URL}/api/${ep}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (r.ok) return await r.json() as T; } catch {} return null; }
 

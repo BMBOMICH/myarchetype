@@ -3,7 +3,6 @@
  * (Comprehensive keyword + pattern coverage for all remaining detectors)
  */
 
-
 const REJECTION_PUNISHMENT_PATTERNS = [
   /you('ll| will) regret (this|rejecting|saying no)/i,
   /no one (else )?will (ever |want|love|date|have) you/i,
@@ -40,7 +39,6 @@ export function stalkingLanguage(text: string): {
   const match = STALKING_PATTERNS_LIST.some(p => p.test(text));
   return { obsessiveLanguage: match, stalkingDetected: match };
 }
-
 
 const ROMANCE_SCAM_WORDS = [
   'western union', 'moneygram', 'wire transfer', 'gift card',
@@ -100,7 +98,6 @@ export function inheritanceScam(text: string): { dyingRelative: boolean; willBen
   const match = /(inheritance|dying.*relative|will beneficiary|estate.*claim|unclaimed.*funds|next of kin)/i.test(text);
   return { dyingRelative: /dying.*relative|terminally ill.*uncle/i.test(text), willBeneficiary: match };
 }
-
 
 export function loveBombEscalation(
   messages: Array<{ text: string; timestamp: number; senderId: string }>,
@@ -353,7 +350,6 @@ export function platformSwitchUrgent(text: string): { moveToWhatsApp: boolean; s
   return { moveToWhatsApp: /whatsapp/i.test(text) && m, switchToTelegram: /telegram/i.test(text) && m };
 }
 
-
 const NEGGING_PATTERNS = [
   /you're (cute|pretty|attractive) (but|for a|despite)/i,
   /you'd be (hotter|prettier|better) if you/i,
@@ -409,7 +405,6 @@ export function parallelScripting(
     duplicateRate,
   };
 }
-
 
 export function normalizeConfusableChars(text: string): {
   confusableNormalize: boolean;
@@ -472,7 +467,6 @@ export function messageEntropy(text: string): { shannonEntropy: number; entropyS
   }, 0);
   return { shannonEntropy: Math.round(entropy * 100) / 100, entropyScore: entropy };
 }
-
 
 export function copyPaste(
   messages: Array<{ text: string; senderId: string }>,
@@ -549,7 +543,6 @@ export function temporalInconsistency(
   return { timeContradiction: inconsistencies.length > 0, inconsistencies };
 }
 
-
 const MLM_COMPANIES = [
   'herbalife', 'amway', 'avon', 'mary kay', 'younique', 'rodan and fields',
   'lularoe', 'usana', 'monat', 'nu skin', 'doterra', 'young living',
@@ -606,7 +599,6 @@ export function codedPricing(text: string): { priceCode: boolean; rosesHundred: 
   return { priceCode: m, rosesHundred: /\d+ roses/i.test(text) };
 }
 
-
 export function emailAlias(email: string): { plusAlias: boolean; dotAlias: boolean; normalizedEmail: string } {
   const [local, domain] = email.split('@');
   const stripped = local?.replace(/\+.*$/, '').replace(/\./g, '');
@@ -654,7 +646,6 @@ export const REFRESH_TOKEN_ROTATION = {
   implementation: 'Firebase Auth automatically rotates refresh tokens. ' +
     'For custom auth: invalidate old refresh token on each use, issue new one.',
 };
-
 
 export const ACCENT_MISMATCH = {
   accentMismatch: false,
@@ -725,7 +716,6 @@ export const VOICE_STRESS_ANALYSIS = {
   voiceTremor: 'Tremor detection possible via pitch analysis but unreliable as stress indicator',
 };
 
-
 export const API_VERSIONING = {
   apiVersioning: true,
   versionAbuse: false,
@@ -739,7 +729,6 @@ export const SSE_PROTECTION = {
   implementation: 'Limit concurrent SSE connections per user. Apply backpressure on slow consumers.',
   limits: { maxConnectionsPerUser: 3, maxRetryInterval: 30000 },
 };
-
 
 export const postBreakupImpersonation = {
   exImpersonation: true,

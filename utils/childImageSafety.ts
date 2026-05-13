@@ -1,13 +1,12 @@
 /**
  * Child Image Safety — Detectors #76, #783, #784
- * 
+ *
  * #76  — Minor in photo detection (already partially covered by ageEstimation)
  * #783 — childPhotoBlur | childPhotoBlock | childImageEnforcement
  * #784 — predatorAttractionRisk | childPhotoRiskScore
  */
 
 import { addDoc, collection, getFirestore } from 'firebase/firestore';
-
 
 export interface ChildPhotoEnforcementResult {
   action: 'block' | 'blur' | 'review' | 'pass';
@@ -95,7 +94,6 @@ export function getChildPhotoBlockMessage(): string {
     'Photos on dating platforms must only contain adults (18+). ' +
     'If you believe this is an error, please contact support.';
 }
-
 
 export interface PredatorAttractionRisk {
   riskScore: number; // 0–100

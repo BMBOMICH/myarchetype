@@ -119,7 +119,6 @@ export function nftScam(text: string): { detected: boolean } {
 export const nftFraud = nftScam;
 export const cryptoArtScam = nftScam;
 
-
 export function graphqlDepthLimit(query: string, maxDepth = 5): { allowed: boolean; depth: number } {
   let depth = 0, maxFound = 0;
   for (const ch of query) {
@@ -223,7 +222,6 @@ export function xmlExternalEntity(xmlContent: string): { detected: boolean } {
 }
 export const xxePrevention = xmlExternalEntity;
 export const xmlInjection = xmlExternalEntity;
-
 
 const profileAccessLog: Record<string, number[]> = {};
 export function profileScrapingDetect(userId: string, windowMs = 60_000, maxProfiles = 30): {

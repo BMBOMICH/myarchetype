@@ -12,7 +12,7 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import { auth, db } from '../firebaseConfig';
 import { logger } from '../utils/logger';
@@ -60,9 +60,85 @@ const screen$ = observable({
   userRank:      null as number | null,
 });
 
+// ─── Leaderboard row ─────────────────────────────────────────────────────────
+
+interface LeaderboardRowProps {
+  item:          LeaderboardEntry;
+  rank:          number;
+  isCurrentUser: boolean;
+  getRankEmoji:  (rank: number) => string;
+}
+
+const LeaderboardRow = React.memo<LeaderboardRowProps>(
+  ({ item, rank, isCurrentUser, getRankEmoji }) => {
+    const itemStyle = useMemo(
+      () => [s.leaderboardItem, isCurrentUser && s.leaderboardItemCurrent],
+      [isCurrentUser],
+    );
+    const nameStyle = useMemo(
+      () => [s.leaderboardName, isCurrentUser && s.leaderboardNameCurrent],
+      [isCurrentUser],
+    );
+    return (
+      <View
+        style={itemStyle}
+        accessibilityLabel={`Rank ${getRankEmoji(rank)}: ${item.name}${isCurrentUser ? ' (You)' : ''}, ${item.referralCount} referral${item.referralCount !== 1 ? 's' : ''}${item.isChampion ? ', Community Champion' : ''}`}
+      >
+        <Text style={s.leaderboardRank} accessibilityElementsHidden>
+          {getRankEmoji(rank)}
+        </Text>
+        {item.photo ? (
+          <TurboImage
+            source={{ uri: item.photo }}
+            style={s.leaderboardPhoto}
+            cachePolicy="dataCache"
+            accessibilityLabel={`${item.name}'s profile photo`}
+          />
+        ) : (
+          <View
+            style={s.leaderboardPhotoPlaceholder}
+            accessibilityLabel={`${item.name} has no photo`}
+          >
+            <Text style={s.leaderboardPhotoText} accessibilityElementsHidden>?</Text>
+          </View>
+        )}
+        <View style={s.leaderboardInfo}>
+          <View style={s.leaderboardNameRow}>
+            <Text style={nameStyle}>
+              {item.name}{isCurrentUser ? ' (You)' : ''}
+            </Text>
+            {item.isChampion && (
+              <Text style={s.leaderboardChampion} accessibilityElementsHidden>🌟</Text>
+            )}
+          </View>
+          <Text style={s.leaderboardCount}>
+            {item.referralCount} referral{item.referralCount !== 1 ? 's' : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  },
+);
+LeaderboardRow.displayName = 'LeaderboardRow';
+
+// ─── How It Works steps ───────────────────────────────────────────────────────
+// Stable data defined at module level — never changes, no index-key issue
+// because these are fixed items with stable identities.
+
+const HOW_IT_WORKS_STEPS = [
+  { key: 'step1', n: 1, text: 'Share your code with friends' },
+  { key: 'step2', n: 2, text: 'They sign up using your code' },
+  { key: 'step3', n: 3, text: 'Get 10 referrals = Community Champion badge!' },
+] as const;
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default observer(function ReferralScreen() {
   const router = useRouter();
   const user   = auth.currentUser;
+
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
   const generateReferralCode = useCallback(
     (uid: string): string => `MA${uid.substring(0, 6).toUpperCase()}`,
@@ -129,7 +205,7 @@ export default observer(function ReferralScreen() {
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       void loadReferralData();
-    }, []);
+    });
     return () => task.cancel();
   }, [loadReferralData]);
 
@@ -163,48 +239,14 @@ export default observer(function ReferralScreen() {
   }, []);
 
   const renderLeaderboardItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<LeaderboardEntry>) => {
-      const isCurrentUser = item.uid === user?.uid;
-      const rank          = index + 1;
-      return (
-        <View
-          style={[s.leaderboardItem, isCurrentUser && s.leaderboardItemCurrent]}
-          accessibilityLabel={`Rank ${getRankEmoji(rank)}: ${item.name}${isCurrentUser ? ' (You)' : ''}, ${item.referralCount} referral${item.referralCount !== 1 ? 's' : ''}${item.isChampion ? ', Community Champion' : ''}`}
-        >
-          <Text style={s.leaderboardRank} accessibilityElementsHidden>
-            {getRankEmoji(rank)}
-          </Text>
-          {item.photo ? (
-            <TurboImage
-              source={{ uri: item.photo }}
-              style={s.leaderboardPhoto}
-              cachePolicy="dataCache"
-              accessibilityLabel={`${item.name}'s profile photo`}
-            />
-          ) : (
-            <View
-              style={s.leaderboardPhotoPlaceholder}
-              accessibilityLabel={`${item.name} has no photo`}
-            >
-              <Text style={s.leaderboardPhotoText} accessibilityElementsHidden>?</Text>
-            </View>
-          )}
-          <View style={s.leaderboardInfo}>
-            <View style={s.leaderboardNameRow}>
-              <Text style={[s.leaderboardName, isCurrentUser && s.leaderboardNameCurrent]}>
-                {item.name}{isCurrentUser ? ' (You)' : ''}
-              </Text>
-              {item.isChampion && (
-                <Text style={s.leaderboardChampion} accessibilityElementsHidden>🌟</Text>
-              )}
-            </View>
-            <Text style={s.leaderboardCount}>
-              {item.referralCount} referral{item.referralCount !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        </View>
-      );
-    },
+    ({ item, index }: LegendListRenderItemProps<LeaderboardEntry>) => (
+      <LeaderboardRow
+        item={item}
+        rank={index + 1}
+        isCurrentUser={item.uid === user?.uid}
+        getRankEmoji={getRankEmoji}
+      />
+    ),
     [user?.uid, getRankEmoji],
   );
 
@@ -224,6 +266,8 @@ export default observer(function ReferralScreen() {
 
   const isChampion         = referralCount >= 10;
   const progressToChampion = Math.min((referralCount / 10) * 100, 100);
+
+  const progressBarStyle = [s.progressBar, { width: `${progressToChampion}%` as `${number}%` }];
 
   const ListHeader = (
     <View style={s.headerCard}>
@@ -280,7 +324,7 @@ export default observer(function ReferralScreen() {
           </Text>
           <View style={s.progressBarBg}>
             <View
-              style={[s.progressBar, { width: `${progressToChampion}%` as `${number}%` }]}
+              style={progressBarStyle}
               accessibilityRole="progressbar"
               accessibilityValue={{ min: 0, max: 100, now: progressToChampion }}
             />
@@ -304,14 +348,14 @@ export default observer(function ReferralScreen() {
   const ListFooter = (
     <View style={s.howItWorks}>
       <Text style={s.howItWorksTitle} accessibilityRole="header">How it works</Text>
-      {([
-        'Share your code with friends',
-        'They sign up using your code',
-        'Get 10 referrals = Community Champion badge!',
-      ] as const).map((step, i) => (
-        <View key={i} style={s.howItWorksItem} accessibilityLabel={`Step ${i + 1}: ${step}`}>
-          <Text style={s.howItWorksNumber} accessibilityElementsHidden>{i + 1}</Text>
-          <Text style={s.howItWorksText}>{step}</Text>
+      {HOW_IT_WORKS_STEPS.map((step) => (
+        <View
+          key={step.key}
+          style={s.howItWorksItem}
+          accessibilityLabel={`Step ${step.n}: ${step.text}`}
+        >
+          <Text style={s.howItWorksNumber} accessibilityElementsHidden>{step.n}</Text>
+          <Text style={s.howItWorksText}>{step.text}</Text>
         </View>
       ))}
     </View>

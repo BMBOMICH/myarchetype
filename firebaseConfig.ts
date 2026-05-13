@@ -15,7 +15,13 @@ type MMKVStore = {
 
 function requireEnv(key: string): string {
   const value = process.env[key];
-  if (!value) throw new Error(`Missing required environment variable: ${key}`);
+  if (!value) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(`[firebaseConfig] Missing environment variable: ${key}. Firebase will not work correctly.`);
+    }
+    return '';
+  }
   return value;
 }
 
@@ -73,4 +79,3 @@ export const auth    = createAuth();
 export const db      = createFirestore();
 export const storage = getStorage(app);
 export { app };
-

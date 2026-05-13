@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TurboImage from 'react-native-turbo-image';
+import TurboImage from '../src/components/TurboImage';
 import { StyleSheet } from 'react-native-unistyles';
 import HeightBadge from '../components/HeightBadge';
 import TrustScoreDisplay from '../components/TrustScoreDisplay';
@@ -34,21 +34,21 @@ const PHOTO_WIDTH = SCREEN_WIDTH - 80;
 const SERVER      = process.env['EXPO_PUBLIC_SERVER_URL'] ?? 'https://myarchetype-server.vercel.app';
 
 const LOCAL = {
-  white:        '#ffffff',
-  success:      '#5cb85c',
-  warning:      '#e67e22',
-  danger:       '#d9534f',
-  verifiedBlue: '#3498db',
-  cardSurface:  '#16213e',
-  deepSurface:  '#0f3460',
-  matchBg:      '#1a5c3a',
-  matchText:    '#5cb85c',
-  textMuted:    '#666666',
-  textSub:      '#888888',
-  overlayPhoto: 'rgba(0,0,0,0.6)',
-  onlineBg:     'rgba(92,184,92,0.2)',
-  dotInactive:  'rgba(255,255,255,0.4)',
-  bioText:      '#dddddd',
+  white:            '#ffffff',
+  success:          '#5cb85c',
+  warning:          '#e67e22',
+  danger:           '#d9534f',
+  verifiedBlue:     '#3498db',
+  cardSurface:      '#16213e',
+  deepSurface:      '#0f3460',
+  matchBg:          '#1a5c3a',
+  matchText:        '#5cb85c',
+  textMuted:        '#666666',
+  textSub:          '#888888',
+  overlayPhoto:     'rgba(0,0,0,0.6)',
+  onlineBg:         'rgba(92,184,92,0.2)',
+  dotInactive:      'rgba(255,255,255,0.4)',
+  bioText:          '#dddddd',
   placeholderInput: '#555555',
 } as const;
 
@@ -140,7 +140,7 @@ interface UserProfile {
   lifestyle?:        string;
   relationshipGoal?: string;
   personalityType?:  string;
-  personalityScores?:{ serious: number; social: number };
+  personalityScores?: { serious: number; social: number };
   blockedUsers?:     string[];
   location?:         { latitude: number; longitude: number; city?: string; country?: string };
   lastSeen?:         { toMillis?: () => number };
@@ -266,6 +266,7 @@ function calcCompatibility(
   return { score: Math.min(Math.max(Math.round(score), 0), 100), reasons };
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const PhotoDot = React.memo(function PhotoDot({ active }: { active: boolean }) {
   const dotStyle = useMemo(() => [s.dot, active && s.dotOn], [active]);
@@ -325,6 +326,7 @@ const FilterToggle = React.memo(function FilterToggle({
 const PhotoItem = React.memo(function PhotoItem({
   uri, index, userName,
 }: { uri: string; index: number; userName: string }) {
+  // PHOTO_WIDTH is a module-level constant — no deps needed
   const photoStyle = useMemo(() => [s.photo, { width: PHOTO_WIDTH }], []);
   return (
     <TurboImage
@@ -354,17 +356,43 @@ const ChipGroup = React.memo(function ChipGroup({
         {opts.map(o => {
           const active = selected.includes(o);
           return (
-            <FilterChip
+            <ChipGroupItem
               key={o}
-              label={o}
+              label={label}
+              filterKey={filterKey}
+              value={o}
               active={active}
-              onPress={useCallback(() => onToggle(filterKey, o), [])}
-              a11yLabel={`${label}: ${o}${active ? ', selected' : ''}`}
+              onToggle={onToggle}
             />
           );
         })}
       </View>
     </View>
+  );
+});
+
+// Extracted so each chip gets its own stable onPress via useCallback
+const ChipGroupItem = React.memo(function ChipGroupItem({
+  label,
+  filterKey,
+  value,
+  active,
+  onToggle,
+}: {
+  label:     string;
+  filterKey: string;
+  value:     string;
+  active:    boolean;
+  onToggle:  (key: string, val: string) => void;
+}) {
+  const onPress = useCallback(() => onToggle(filterKey, value), [onToggle, filterKey, value]);
+  return (
+    <FilterChip
+      label={value}
+      active={active}
+      onPress={onPress}
+      a11yLabel={`${label}: ${value}${active ? ', selected' : ''}`}
+    />
   );
 });
 
@@ -383,6 +411,7 @@ const PhotoStrip = React.memo(function PhotoStrip({
     ),
     [userName],
   );
+  // uri and i are parameters — no external deps
   const keyExtractor = useCallback((uri: string, i: number) => `${uri}_${i}`, []);
   return (
     <LegendList
@@ -401,6 +430,7 @@ const PhotoStrip = React.memo(function PhotoStrip({
   );
 });
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function MatchesScreen() {
   const router = useRouter();
@@ -414,7 +444,6 @@ export default function MatchesScreen() {
   const [filters,     setFilters]     = useState<Filters>(DEFAULT_FILTERS);
   const [lastSkipped, setLastSkipped] = useState<MatchEntry | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-
 
   const matchesRef     = useRef(matches);
   const filtersRef     = useRef(filters);
@@ -464,11 +493,11 @@ export default function MatchesScreen() {
       const h = getHeightValue(u.height);
       if (minH > 0   && h < minH) return false;
       if (maxH < 999 && h > maxH) return false;
-      if (f.bodyTypes.length         && !f.bodyTypes.includes(u.bodyType))                                       return false;
-      if (f.religiousViews.length    && u.religiousViews  && !f.religiousViews.includes(u.religiousViews))       return false;
-      if (f.lifestyles.length        && u.lifestyle       && !f.lifestyles.includes(u.lifestyle))                return false;
-      if (f.relationshipGoals.length && u.relationshipGoal && !f.relationshipGoals.includes(u.relationshipGoal)) return false;
-      if (f.personalityTypes.length  && u.personalityType && !f.personalityTypes.includes(u.personalityType))    return false;
+      if (f.bodyTypes.length         && !f.bodyTypes.includes(u.bodyType))                                              return false;
+      if (f.religiousViews.length    && u.religiousViews   && !f.religiousViews.includes(u.religiousViews))             return false;
+      if (f.lifestyles.length        && u.lifestyle        && !f.lifestyles.includes(u.lifestyle))                      return false;
+      if (f.relationshipGoals.length && u.relationshipGoal && !f.relationshipGoals.includes(u.relationshipGoal))        return false;
+      if (f.personalityTypes.length  && u.personalityType  && !f.personalityTypes.includes(u.personalityType))          return false;
       if (f.verifiedOnly && !u.selfieVerified) return false;
       if (f.activeWithin !== 'any') {
         const lastSeen = u.lastSeen?.toMillis?.() ?? 0;
@@ -507,7 +536,10 @@ export default function MatchesScreen() {
       let snap:      Awaited<ReturnType<typeof getDocs>>;
       try {
         [likesSnap, snap] = await Promise.all([
-          getDocs(query(collection(db, 'likes').catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), where('fromUserId', '==', user.uid))),
+          getDocs(query(
+            collection(db, 'likes'),
+            where('fromUserId', '==', user.uid),
+          )),
           getDocs(query(
             collection(db, 'users'),
             where('profileComplete', '==', true),
@@ -526,8 +558,8 @@ export default function MatchesScreen() {
       snap.forEach(docSnap => {
         const them = docSnap.data() as UserProfile;
         if (
-          them.uid === user.uid        ||
-          blocked.includes(them.uid)  ||
+          them.uid === user.uid              ||
+          blocked.includes(them.uid)        ||
           them.blockedUsers?.includes(user.uid) ||
           liked.has(them.uid)
         ) return;
@@ -553,13 +585,16 @@ export default function MatchesScreen() {
   }, [loadMatches]);
 
   useEffect(() => {
-    if (mountedRef.current) setPhotoIdx(0);
+    const timer = setTimeout(() => {
+      if (mountedRef.current) setPhotoIdx(0);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [idx]);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       applyFilters();
-    }, []);
+    });
     return () => task.cancel();
   }, [matches, filters, applyFilters]);
 
@@ -612,7 +647,7 @@ export default function MatchesScreen() {
         const theirData = theirDoc.data() as LikeDoc;
         try {
           await Promise.all([
-            setDoc(doc(db, 'likes', theirDoc.id).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), {
+            setDoc(doc(db, 'likes', theirDoc.id), {
               ...theirData,
               status:    'matched',
               matchedAt: new Date().toISOString(),
@@ -729,7 +764,7 @@ export default function MatchesScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
+          text:  'Block',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -738,7 +773,7 @@ export default function MatchesScreen() {
               try {
                 await Promise.all([
                   updateDoc(
-                    doc(db, 'users', user.uid).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }),
+                    doc(db, 'users', user.uid),
                     { blockedUsers: [...current, them.uid] },
                   ),
                   setDoc(
@@ -808,6 +843,8 @@ export default function MatchesScreen() {
   const onHandleLike  = useCallback(() => void handleLike(),          [handleLike]);
   const onHandleSkip  = useCallback(() => void handleSkip(),          [handleSkip]);
 
+  // ─── Derived values (not hooks) ────────────────────────────────────────────
+
   if (loading) {
     return (
       <View style={s.center}>
@@ -851,9 +888,9 @@ export default function MatchesScreen() {
     return (
       <View style={s.center}>
         <Text style={s.bigEmoji} accessibilityElementsHidden>🎉</Text>
-        <Text style={s.title} accessibilityRole="header">That's Everyone!</Text>
+        <Text style={s.title} accessibilityRole="header">That&apos;s Everyone!</Text>
         <Text style={s.subtitle}>
-          You've seen all {filtered.length} matches.{'\n'}Check back later!
+          You&apos;ve seen all {filtered.length} matches.{'\n'}Check back later!
         </Text>
         {lastSkipped && (
           <TouchableOpacity
@@ -900,16 +937,17 @@ export default function MatchesScreen() {
   const heightVerified = heightIsObj &&
     (u.height as { verificationMethod?: string }).verificationMethod === 'manual-measured';
 
-  const estimatedCardHeight = useMemo(() => measureCardHeight(u), [u]);
+  // These are plain expressions — not hooks — computed after early returns.
+  // They depend on u which changes per profile, so useMemo would give no benefit
+  // (new object on every render anyway). Kept as plain style arrays.
+  const compatBadgeStyle = [s.compatBadge, { backgroundColor: scoreColor }];
+  const ageBadgeStyle    = [s.ageBadge,    { backgroundColor: ageBadge.color }];
 
-  const compatBadgeStyle = useMemo(
-    () => [s.compatBadge, { backgroundColor: scoreColor }],
-    [scoreColor],
-  );
-  const ageBadgeStyle = useMemo(
-    () => [s.ageBadge, { backgroundColor: ageBadge.color }],
-    [ageBadge.color],
-  );
+  const religiousViewsStyle    = [s.tag, currentUser?.religiousViews === u.religiousViews && s.tagMatch];
+  const lifestyleStyle         = [s.tag, currentUser?.lifestyle      === u.lifestyle      && s.tagMatch];
+  const relationshipGoalStyle  = [s.tag, currentUser?.relationshipGoal === u.relationshipGoal && s.tagMatch];
+  const centeredSectionStyle   = [s.section, s.centeredSection];
+  const estimatedCardHeight = measureCardHeight(u);
 
   const listHeader = (
     <View style={s.headerRow}>
@@ -1001,7 +1039,7 @@ export default function MatchesScreen() {
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         data={[entry]}
-        keyExtractor={item => item.user.uid}
+        keyExtractor={(item: MatchEntry) => item.user.uid}
         recycleItems={false}
         estimatedItemSize={estimatedCardHeight}
         ListHeaderComponent={listHeader}
@@ -1025,8 +1063,8 @@ export default function MatchesScreen() {
                       <Text style={s.photoBadgeTxt}>{photoIdx + 1} / {photoCount}</Text>
                     </View>
                     <View style={s.dots} accessibilityElementsHidden>
-                      {(u.photos ?? []).map((_, i) => (
-                        <PhotoDot key={i} active={photoIdx === i} />
+                      {(u.photos ?? []).map((uri, i) => (
+                        <PhotoDot key={uri} active={photoIdx === i} />
                       ))}
                     </View>
                   </>
@@ -1052,8 +1090,8 @@ export default function MatchesScreen() {
 
             {entry.reasons.length > 0 && (
               <View style={s.mutualRow} accessibilityElementsHidden>
-                {entry.reasons.slice(0, 2).map((r, i) => (
-                  <View key={i} style={s.mutualChip}>
+                {entry.reasons.slice(0, 2).map((r) => (
+                  <View key={r} style={s.mutualChip}>
                     <Text style={s.mutualTxt}>✓ {r}</Text>
                   </View>
                 ))}
@@ -1137,7 +1175,7 @@ export default function MatchesScreen() {
 
             {(u.selfieVerified === true || (u.ratings?.totalRatings ?? 0) > 0) && u.ratings && (
               <View style={s.section}>
-                <Text style={s.sectionTitle}>Trust & Verification</Text>
+                <Text style={s.sectionTitle}>Trust &amp; Verification</Text>
                 <TrustScoreDisplay
                   ratings={u.ratings}
                   selfieVerified={u.selfieVerified}
@@ -1150,14 +1188,11 @@ export default function MatchesScreen() {
 
             {(u.religiousViews ?? u.lifestyle ?? u.relationshipGoal) && (
               <View style={s.section}>
-                <Text style={s.sectionTitle}>Beliefs & Values</Text>
+                <Text style={s.sectionTitle}>Beliefs &amp; Values</Text>
                 {u.religiousViews && (
                   <View style={s.infoRow}>
                     <Text style={s.label}>Views</Text>
-                    <Text style={[
-                      s.tag,
-                      currentUser?.religiousViews === u.religiousViews && s.tagMatch,
-                    ]}>
+                    <Text style={religiousViewsStyle}>
                       {u.religiousViews}
                       {currentUser?.religiousViews === u.religiousViews ? ' ✓' : ''}
                     </Text>
@@ -1166,10 +1201,7 @@ export default function MatchesScreen() {
                 {u.lifestyle && (
                   <View style={s.infoRow}>
                     <Text style={s.label}>Lifestyle</Text>
-                    <Text style={[
-                      s.tag,
-                      currentUser?.lifestyle === u.lifestyle && s.tagMatch,
-                    ]}>
+                    <Text style={lifestyleStyle}>
                       {u.lifestyle}
                       {currentUser?.lifestyle === u.lifestyle ? ' ✓' : ''}
                     </Text>
@@ -1178,10 +1210,7 @@ export default function MatchesScreen() {
                 {u.relationshipGoal && (
                   <View style={s.infoRow}>
                     <Text style={s.label}>Goal</Text>
-                    <Text style={[
-                      s.tag,
-                      currentUser?.relationshipGoal === u.relationshipGoal && s.tagMatch,
-                    ]}>
+                    <Text style={relationshipGoalStyle}>
                       {u.relationshipGoal}
                       {currentUser?.relationshipGoal === u.relationshipGoal ? ' ✓' : ''}
                     </Text>
@@ -1191,7 +1220,7 @@ export default function MatchesScreen() {
             )}
 
             {u.personalityType && (
-              <View style={[s.section, s.centeredSection]}>
+              <View style={centeredSectionStyle}>
                 <Text style={s.sectionTitle}>Personality</Text>
                 <View
                   style={s.personalityBadge}
@@ -1213,8 +1242,10 @@ export default function MatchesScreen() {
                 <Text style={s.reasonsTitle} accessibilityElementsHidden>
                   💫 Why you matched:
                 </Text>
-                {entry.reasons.map((r, i) => (
-                  <Text key={i} style={s.reasonTxt} accessibilityElementsHidden>• {r}</Text>
+                {entry.reasons.map((r) => (
+                  <Text key={r} style={s.reasonTxt}>
+                    • {r}
+                  </Text>
                 ))}
               </View>
             )}
@@ -1251,7 +1282,7 @@ export default function MatchesScreen() {
             style={s.flex}
             contentContainerStyle={s.modalBody}
             data={['filters']}
-            keyExtractor={item => item}
+            keyExtractor={(item: string) => item}
             recycleItems={false}
             estimatedItemSize={1200}
             renderItem={() => (

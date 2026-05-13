@@ -31,7 +31,7 @@ export default function DailyQuestionScreen() {
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
-  }, []);
+  }, [isMounted]);
 
   void setQuestion;
 
@@ -44,7 +44,7 @@ export default function DailyQuestionScreen() {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, []);
+  }, [setLoading, setAlreadyAnswered]);
 
   useEffect(() => { void checkIfAnswered(); }, [checkIfAnswered]);
 
@@ -71,7 +71,7 @@ export default function DailyQuestionScreen() {
     }
   }, [answer, question.id, router]);
 
-  const onAnswerChange = useCallback((t: string) => setAnswer(t), []);
+  const onAnswerChange = useCallback((t: string) => setAnswer(t), [setAnswer]);
   const onSubmit       = useCallback(() => void handleSubmit(), [handleSubmit]);
   const onBack         = useCallback(() => router.back(), [router]);
 

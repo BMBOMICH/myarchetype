@@ -1,0 +1,1 @@
+export { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';

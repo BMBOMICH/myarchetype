@@ -22,12 +22,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLanguageState(savedLang as Language);
     }
     setIsLoaded(true);
-  }, []);
+  }, [SUPPORTED_LANGUAGES]);
 
   const setLanguage = useCallback(async (lang: Language) => {
     langStorage.set('app_language', lang);
     setLanguageState(lang);
-  }, []);
+  }, [setLanguageState]);
 
   const t = useMemo(() => getTranslation(language), [language]);
 

@@ -1,5 +1,5 @@
 import { writeAuditLog } from './logger';
-const API = process.env.EXPO_PUBLIC_API_URL || '';
+const API = process.env['EXPO_PUBLIC_API_URL'] || '';
 const fetchSafe = async (u: string, o: RequestInit, t = 8000) => { const c = new AbortController(); const id = setTimeout(() => c.abort(), t); try { return await fetch(u, { ...o, signal: c.signal }); } finally { clearTimeout(id); } };
 
 async function serverCheck(path: string, body: any) {
@@ -55,7 +55,7 @@ export const nciiHashMatch = stopNciiHash;
 export const reportToNCMEC = async (uri: string, data: any) => { await serverCheck('/safety/ncmec-report', { imageUri: uri, ...data }); writeAuditLog('safety.ncmec_reported', { uri }).catch(() => {}); };
 
 export async function screenImage(uri: string) {
-  const [csam, minor, selfHarm, ncii] = await Promise.all([csamDetection(uri).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), minorInPhoto(uri), selfHarmImagery(uri), revengePorn(uri)]);
+  const [csam, minor, selfHarm, ncii] = await Promise.all([csamDetection(uri).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; }), minorInPhoto(uri), selfHarmImagery(uri), revengePorn(uri)]).catch((e: unknown) => { if (__DEV__) console.error(e); throw e; });
   if (csam.match) { await reportToNCMEC(uri, csam); return { safe: false, blocked: true, reason: 'csam_hash' as const, reportRequired: true, confidence: 1 }; }
   if (minor.blocked) return { safe: false, blocked: true, reason: 'minor_detected' as const, reportRequired: false, confidence: minor.confidence };
   if (selfHarm.flagged) return { safe: false, blocked: true, reason: 'self_harm' as const, reportRequired: false, confidence: 0.8 };
